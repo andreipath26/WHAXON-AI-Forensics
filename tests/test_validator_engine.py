@@ -155,3 +155,27 @@ def test_database_name_alone_does_not_verify_sqli():
         assert "postgresql" not in reason.lower()
     finally:
         srv.shutdown()
+
+class _TextareaReflector(_Reflector):
+    """Raw markup inside a textarea is text, not executable HTML."""
+    def do_GET(self):
+        from urllib.parse import parse_qs, urlparse
+        q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+        body = f"<html><body><textarea>{q}</textarea></body></html>".encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def test_xss_raw_reflection_inside_textarea_is_not_verified():
+    srv, url = _serve(_TextareaReflector)
+    try:
+        v = Validator(PAYLOAD_DIR)
+        f = Finding(kind="xss", severity="high", source="test",
+                    data={"parameter": "q"}, raw_line="")
+        status, reason = v.validate(f, target_url=url)
+        assert status == "candidate", reason
+    finally:
+        srv.shutdown()
