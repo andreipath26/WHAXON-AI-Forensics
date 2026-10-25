@@ -8,7 +8,7 @@ Its design emphasizes explicit target scope and controlled execution. AI suggest
 
 ## Why WHAXON?
 
-Most automated scanners stop at "this looks vulnerable." WHAXON goes further. When a scanner proposes a finding, the deterministic engine replays the payload and checks the response for evidence: an error marker for SQL injection, a reflected marker for XSS, or a timing delta for blind injection. If the evidence matches, the finding is marked `verified` and gets a reproducible `curl` proof. If it does not match, the finding stays `candidate`, is kept out of the verified count, and is queued for human review. Validation is deterministic and offline-checkable, but it is not universal confirmation: only the finding kinds with a replay path are covered, and timing-based verification can false-positive on a slow baseline.
+Most automated scanners stop at "this looks vulnerable." WHAXON adds deterministic replay for supported finding types. The validator checks for payload-specific evidence such as SQL error markers, unescaped XSS markers, or a command-execution canary. Timing differences are recorded as supporting evidence only: timing alone remains `candidate` because network jitter and target load can produce false positives. Verified results include a reproducible proof where supported; findings without sufficient evidence remain `candidate` for human review. Validation covers only finding kinds with an implemented replay path and is not universal confirmation.
 
 No LLM decides if a finding is real. The proof does.
 
@@ -34,7 +34,7 @@ No LLM decides if a finding is real. The proof does.
 - **Correlation:** relate findings from different tools to help analysts prioritize investigation.
 - **Scope controls:** the documented default scope is restrictive and designed to deny targets that are not explicitly allowed. Review [Scope](docs/scope.md) before running assessments.
 - **Evidence and reports:** persist engagement data and generate Markdown, HTML, and PDF reports.
-- **Deterministic validation:** findings are `candidate` until a payload is replayed and the response shows the expected evidence (error marker, reflected marker, or timing delta). `whaxon validate` generates a raw `curl` proof for every verified finding, rendered in the report. Supported kinds and the reason for each verdict are recorded with the finding. Kinds without a replay path stay `candidate` and go to the Approvals queue, not the verified count.
+- **Deterministic validation:** findings are `candidate` until a supported replay produces the expected payload-specific evidence. Timing-only deltas do not promote a finding to `verified`. `whaxon validate` generates a raw `curl` proof for supported verified findings, rendered in the report. Supported kinds and the reason for each verdict are recorded with the finding. Kinds without a replay path stay `candidate` and go to the Approvals queue, not the verified count.
 - **PTES coverage mapping:** skipped steps are recorded and grouped by methodology phase (Recon, Enumeration, Vulnerability).
 - **Multiple interfaces:** CLI, terminal UI (Textual), desktop UI (PySide6), and web UI (Flask/SSE).
 - **Optional AI planning:** configurable providers can propose next steps. Keep the operator in control and review the AI boundary and limitations before enabling automation.
