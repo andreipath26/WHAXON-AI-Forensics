@@ -223,22 +223,27 @@ class ScopeManager:
         if not self._enabled:
             return ScopeMatch(allowed=True, reason="scope disabled")
 
-        host, kind = _normalize_target(raw_target)
+        host, _kind = _normalize_target(raw_target)
         if not host:
             return ScopeMatch(allowed=False, reason="empty target", matched_rule="")
 
+        # CIDR rules are evaluated for every target, not only bare IPs: a URL's
+        # host can be an IP literal (http://127.0.0.1:8099/ping). Gating the IP
+        # matcher on kind == "ip" let such URLs bypass both in-scope and
+        # out-of-scope ranges — the out-of-scope case being a deny path that
+        # silently stopped denying.
+        # Both matchers are safe to try in order: _rule_matches_ip returns
+        # False for hostnames, and _rule_matches_host returns False for CIDR
+        # rules.
+
         # Out-of-scope wins
         for rule in self._out:
-            if kind == "ip" and _rule_matches_ip(rule, host):
-                return ScopeMatch(False, "matches out-of-scope rule", rule)
-            if _rule_matches_host(rule, host):
+            if _rule_matches_ip(rule, host) or _rule_matches_host(rule, host):
                 return ScopeMatch(False, "matches out-of-scope rule", rule)
 
         # In-scope required
         for rule in self._in:
-            if kind == "ip" and _rule_matches_ip(rule, host):
-                return ScopeMatch(True, "matches in-scope rule", rule)
-            if _rule_matches_host(rule, host):
+            if _rule_matches_ip(rule, host) or _rule_matches_host(rule, host):
                 return ScopeMatch(True, "matches in-scope rule", rule)
 
         return ScopeMatch(False, "no matching in-scope rule", "")
