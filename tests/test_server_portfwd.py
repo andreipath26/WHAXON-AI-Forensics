@@ -172,3 +172,14 @@ def test_pf_del_success(tmp_path, monkeypatch):
     fwd = captured[0]
     assert fwd.session_id == "3"
     assert fwd.lport == 8080
+
+def test_pf_del_rejects_invalid_port_types(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    for value in (None, True, False, [], {}, "80x", 0, 65536):
+        response = client.delete(
+            "/api/msf/sessions/3/portfwd",
+            json={"lport": value},
+        )
+        assert response.status_code == 400, value
+        assert "lport must be an integer" in response.get_json()["error"]
