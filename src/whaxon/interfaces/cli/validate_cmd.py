@@ -13,6 +13,7 @@ from whaxon.core.validator import Validator
 EXIT_OK = 0
 EXIT_NOT_FOUND = 1
 EXIT_USAGE = 2
+EXIT_SCOPE_BLOCKED = 4
 
 def main(args: list[str] | None = None) -> int:
     args = list(args or [])
@@ -62,8 +63,23 @@ def main(args: list[str] | None = None) -> int:
     raw_target = (job or {}).get("target", "")
     target_url = raw_target if raw_target.startswith(("http://", "https://")) else f"http://{raw_target}" if raw_target else None
 
+    if not target_url:
+        print("Cannot validate: finding has no target URL; no request was sent.", file=sys.stderr)
+        return EXIT_SCOPE_BLOCKED
+    try:
+        scope_match = core.scope.check(target_url)
+    except Exception as exc:
+        print(f"Cannot validate: scope evaluation failed ({exc}); no request was sent.", file=sys.stderr)
+        return EXIT_SCOPE_BLOCKED
+    if not scope_match.allowed:
+        print(
+            f"Cannot validate: target is out of scope ({scope_match.reason}); no request was sent.",
+            file=sys.stderr,
+        )
+        return EXIT_SCOPE_BLOCKED
+
     print(f"[*] Validating {target_f['kind']} (job {job_id}, seq {seq})...")
-    
+
     # Build the Finding object
     f_obj = Finding(
         kind=target_f["kind"],
