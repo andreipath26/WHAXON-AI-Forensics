@@ -1,6 +1,7 @@
 """Minimal Flask server for WHAXON. Stage 1: JSON API only."""
 from __future__ import annotations
 
+import asyncio
 import os
 import queue
 import subprocess
@@ -108,7 +109,7 @@ class AsyncRunner:
 
 
 _PROCS: dict[str, subprocess.Popen] = {}
-_RUN_LOOPS: dict[str, object] = {}
+_RUN_LOOPS: dict[str, asyncio.AbstractEventLoop] = {}
 _PROCS_LOCK = threading.Lock()
 
 
