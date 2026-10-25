@@ -190,7 +190,7 @@ def _cancel_job_blocking(core: Core, job_id: str) -> bool:
     with _PROCS_LOCK:
         loop = _RUN_LOOPS.get(job_id)
     proc = core.runner._procs.get(job_id)
-    if loop is None or proc is None or proc.returncode is not None:
+    if loop is None or proc is None:
         return False
     if not getattr(loop, "is_running", lambda: False)():
         return False
