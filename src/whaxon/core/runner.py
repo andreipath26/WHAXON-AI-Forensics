@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shlex
+import signal
 import time
 import uuid
 from collections.abc import Sequence
@@ -530,6 +532,8 @@ class ToolRunner:
                 stderr=asyncio.subprocess.PIPE,
                 cwd=str(cwd) if cwd else None,
                 env=env,
+                # Isolate each tool so timeout/cancel can stop child processes too.
+                start_new_session=(os.name == "posix"),
             )
         except FileNotFoundError as e:
             from .events import CoverageSkipped
@@ -569,8 +573,7 @@ class ToolRunner:
                 timeout=timeout_s,
             )
         except TimeoutError:
-            proc.kill()
-            await proc.wait()
+            await self._kill_process_tree(proc)
             from .events import CoverageSkipped
             self._bus.publish(CoverageSkipped(
                 job_id=job_id, tool_id=tool_id, target=target,
@@ -638,11 +641,26 @@ class ToolRunner:
                 findings=tuple(resolved),
             ))
 
+    @staticmethod
+    async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
+        """Stop the tool and any descendants started in its isolated process group."""
+        if proc.returncode is not None:
+            return
+        if os.name == "posix":
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                proc.kill()
+        else:
+            proc.kill()
+        try:
+            await proc.wait()
+        except ProcessLookupError:
+            pass
+
     async def cancel(self, job_id: str) -> None:
         proc = self._procs.get(job_id)
         if proc and proc.returncode is None:
-            proc.terminate()
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=5)
-            except TimeoutError:
-                proc.kill()
+            await self._kill_process_tree(proc)
