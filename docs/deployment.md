@@ -26,6 +26,8 @@ Stop:
 - WHAXON_DATA       default data        data directory
 - WHAXON_AUTH_USER  default whaxon      basic auth user
 - WHAXON_AUTH_PASS  default whaxon      basic auth password
+- WHAXON_TRUST_PROXY default off         trust one configured reverse proxy for forwarded client IP / HTTPS scheme
+- WHAXON_ALLOWED_HOSTS comma-separated additional Host values accepted by the local Host-header guard
 
 Loopback development defaults are accepted only on loopback. For a non-loopback listener, set an explicit non-default username and either a strong `WHAXON_AUTH_PASS` or a precomputed `WHAXON_AUTH_PASS_HASH`. Never use the demo credentials in a network deployment.
 
@@ -56,7 +58,7 @@ Notes:
 
 ## HTTPS
 
-Recommended: reverse-proxy. Terminate TLS at nginx/caddy/traefik in front of 127.0.0.1:5001. Keep the WHAXON bind on loopback and let the proxy handle certificates, HSTS, and rate limiting.
+Recommended: reverse-proxy. Terminate TLS at nginx/caddy/traefik in front of 127.0.0.1:5001. Keep the WHAXON bind on loopback and let the proxy handle certificates, HSTS, and rate limiting. For the nginx pattern below, set `WHAXON_TRUST_PROXY=1` and add the public hostname to `WHAXON_ALLOWED_HOSTS` (for example, `whaxon.example.com`). Only enable proxy trust when the app is reachable exclusively through that trusted proxy; otherwise clients could spoof forwarded headers.
 
 nginx example:
 
