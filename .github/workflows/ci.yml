@@ -25,7 +25,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # PDF integration depends on OS packages; exercise it once per matrix on 3.12.
+      # test_report_pdf.py explicitly skips when these binaries are absent, so other
+      # Python versions still run the full non-PDF suite without redundant apt setup.
       - name: Install system deps (pandoc, weasyprint)
+        if: matrix.python-version == '3.12'
         timeout-minutes: 7
         env:
           DEBIAN_FRONTEND: noninteractive
