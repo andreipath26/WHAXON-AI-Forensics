@@ -147,18 +147,60 @@ class Validator:
 
         baseline_l = (baseline or "").lower()
         injected_l = (injected or "").lower()
+        baseline_bodies = [(sample[0] or "").lower() for sample in baseline_samples]
+        injected_bodies = [(sample[0] or "").lower() for sample in injected_samples]
         for m in markers:
-            if m in injected_l and m not in baseline_l:
+            if (all(m in body for body in injected_bodies)
+                    and all(m not in body for body in baseline_bodies)):
                 self.last_payload = payload
-                return "verified", f"SQL error signature {m!r} appeared only after a quote probe"
-        if family == "xss" and payload in (injected or "") and payload not in (baseline or ""):
+                return "verified", f"SQL error signature {m!r} appeared consistently only after a quote probe"
+        if family == "xss" and (
+            all(self._xss_probe_is_executable(sample[0] or "", payload) for sample in injected_samples)
+            and all(not self._xss_probe_is_executable(sample[0] or "", payload) for sample in baseline_samples)
+        ):
             self.last_payload = payload
-            return "verified", "unique non-destructive XSS probe was reflected unescaped in the response"
+            return "verified", "unique non-destructive XSS probe parsed as an active SVG event handler in all injected responses"
         if timing_reason:
             return "candidate", timing_reason
         # Failure to reproduce is not proof that a finding is false: the
         # parameter, method, auth state, or payload may not match.
         return "candidate", "replay produced no conclusive, payload-specific proof"
+
+    @staticmethod
+    def _xss_probe_is_executable(body: str, payload: str) -> bool:
+        """Confirm the unique probe parses as an active SVG event handler.
+
+        Raw substring reflection is insufficient: markup inside a textarea,
+        script block, or HTML comment is not parsed as an SVG element.
+        """
+        from html.parser import HTMLParser
+
+        match = re.search(r"whaxon_xss_[0-9a-f]{12}", payload)
+        if not match:
+            return False
+        token = match.group(0)
+
+        class _ProbeParser(HTMLParser):
+            found = False
+
+            def handle_starttag(self, tag, attrs):
+                if tag.lower() != "svg":
+                    return
+                values = {name.lower(): value or "" for name, value in attrs}
+                handler = values.get("onload", "")
+                if token in handler and "console.log" in handler:
+                    self.found = True
+
+            def handle_startendtag(self, tag, attrs):
+                self.handle_starttag(tag, attrs)
+
+        parser = _ProbeParser(convert_charrefs=True)
+        try:
+            parser.feed(body)
+            parser.close()
+        except Exception:
+            return False
+        return parser.found
 
     @staticmethod
     def _safe_probe(kind: str) -> str | None:
@@ -171,7 +213,7 @@ class Validator:
             import secrets
             token = secrets.token_hex(6)
             # No network calls, cookie access, storage access, or state change.
-            return f"<svg/onload=console.log('whaxon_xss_{token}')>"
+            return f"<svg onload=\"console.log('whaxon_xss_{token}')\"></svg>"
         return None
 
     @classmethod
@@ -391,6 +433,8 @@ class Validator:
         delta = injected_elapsed - base_elapsed
         baseline_l = (baseline_samples[0][0] or "").lower()
         injected_l = (injected_samples[0][0] or "").lower()
+        baseline_bodies = [(sample[0] or "").lower() for sample in baseline_samples]
+        injected_bodies = [(sample[0] or "").lower() for sample in injected_samples]
 
         if delta >= self.timing_threshold:
             return "candidate", (
@@ -403,10 +447,14 @@ class Validator:
             return "verified", f"command-execution canary {cmdi_marker!r} appeared only after injection"
         if kind in ("sqli", "sql_injection"):
             for marker in self.SQL_ERROR_MARKERS:
-                if marker in injected_l and marker not in baseline_l:
+                if (all(marker in body for body in injected_bodies)
+                        and all(marker not in body for body in baseline_bodies)):
                     self.last_payload = payload
-                    return "verified", f"SQL error signature {marker!r} appeared only after a quote probe"
-        if kind == "xss" and payload and payload in injected_l and payload not in baseline_l:
+                    return "verified", f"SQL error signature {marker!r} appeared consistently only after a quote probe"
+        if kind == "xss" and payload and (
+            all(self._xss_probe_is_executable(sample[0] or "", payload) for sample in injected_samples)
+            and all(not self._xss_probe_is_executable(sample[0] or "", payload) for sample in baseline_samples)
+        ):
             self.last_payload = payload
-            return "verified", "unique non-destructive XSS probe was reflected unescaped in the response"
+            return "verified", "unique non-destructive XSS probe parsed as an active SVG event handler in all injected responses"
         return "candidate", "context replay produced no conclusive, payload-specific proof"
