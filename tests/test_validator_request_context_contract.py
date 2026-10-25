@@ -69,3 +69,24 @@ def test_canonical_context_takes_precedence_over_legacy_context(tmp_path, monkey
         "candidate",
         "canonical context",
     )
+
+def test_sqlmap_adapter_populates_canonical_request_context():
+    from whaxon.adapters.sqlmap import SqlmapAdapter
+
+    adapter = SqlmapAdapter()
+    findings = adapter.parse(
+        [
+            ("stdout", "Parameter: id (GET)"),
+            ("stdout", "    Type: boolean-based blind"),
+            ("stdout", "    Title: AND boolean-based blind - WHERE or HAVING clause"),
+            ("stdout", "    Payload: id=1 AND 1234=1234"),
+        ],
+        ctx={"target": "https://example.test/item?id=1"},
+    )
+
+    assert len(findings) == 1
+    assert findings[0].request_context == {
+        "method": "GET",
+        "url": "https://example.test/item?id=1",
+        "parameter": "id",
+    }
