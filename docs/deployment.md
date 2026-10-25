@@ -27,7 +27,7 @@ Stop:
 - WHAXON_AUTH_USER  default whaxon      basic auth user
 - WHAXON_AUTH_PASS  default whaxon      basic auth password
 
-Change the auth credentials before binding to a non-loopback address.
+Loopback development defaults are accepted only on loopback. For a non-loopback listener, set an explicit non-default username and either a strong `WHAXON_AUTH_PASS` or a precomputed `WHAXON_AUTH_PASS_HASH`. Never use the demo credentials in a network deployment.
 
 ## systemd
 
@@ -44,7 +44,7 @@ Adjust User, WorkingDirectory, and paths to your layout.
 Hardened container:
 
     docker build -t whaxon:secure .
-    docker run --rm -d --name whaxon --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --cap-drop=ALL --security-opt=no-new-privileges:true -p 127.0.0.1:5001:5001 -v data:/data -e HOME=/tmp -e WHAXON_AUTH_USER=whaxon -e WHAXON_AUTH_PASS=change-me -e WHAXON_DATA=/data whaxon:secure
+    docker run --rm -d --name whaxon --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --cap-drop=ALL --security-opt=no-new-privileges:true -p 127.0.0.1:5001:5001 -v data:/data -e HOME=/tmp -e WHAXON_AUTH_USER=whaxon-admin -e WHAXON_AUTH_PASS=replace-with-a-long-unique-password -e WHAXON_DATA=/data whaxon:secure
 
 Notes:
 
