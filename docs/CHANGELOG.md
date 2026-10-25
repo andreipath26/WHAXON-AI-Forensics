@@ -1,4 +1,4 @@
-## 2026-10-25 (Unreleased - beta hardening)
+## 1.0.0 — 2026-10-25
 
 **Validation correctness**
 - Request context now survives the SQLMap adapter, SQLite persistence, and web/CLI validation and retest paths. Older findings using the legacy `data["_request_context"]` shape remain supported.
