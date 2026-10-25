@@ -65,6 +65,25 @@ describe("Obsidian Kinetic React shell", () => {
     expect(host.textContent).toContain("not in scope");
   });
 
+  it("does not offer tools that are missing or lack an adapter", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/health") return response({ ok: true });
+      if (url === "/api/tools") return response([
+        { id: "missing-tool", name: "Missing tool", available: false, adapter_available: true },
+        { id: "unsupported-tool", name: "Unsupported tool", available: true, adapter_available: false },
+      ]);
+      if (url === "/api/scope") return response({ enabled: true });
+      return response({ error: "not found" }, 404);
+    }));
+    await act(async () => root.render(<App />));
+    const nav = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Run orchestration");
+    await act(async () => nav?.click());
+    const select = host.querySelector<HTMLSelectElement>("#run-tool");
+    expect(select?.options.length).toBe(0);
+    expect(host.textContent).toContain("No installed, adapter-supported tools are currently available");
+  });
+
   it("does not submit a run when the scope preflight denies the target", async () => {
     const fetchMock = vi.mocked(fetch);
     await act(async () => root.render(<App />));
