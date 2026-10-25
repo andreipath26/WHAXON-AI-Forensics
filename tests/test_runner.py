@@ -333,16 +333,20 @@ async def test_timeout_kills_descendant_processes(tmp_path):
     if Path("/proc").is_dir():
         # On Linux, a killed child may briefly remain as a zombie until init
         # reaps it; zombies cannot execute and are acceptable here.
+        def proc_state():
+            try:
+                fields = Path(f"/proc/{child_pid}/stat").read_text(encoding="utf-8").split()
+            except OSError:
+                # The kernel can remove the proc entry between exists() and read().
+                return None
+            return fields[2] if len(fields) > 2 else None
+
         for _ in range(30):
-            stat_path = Path(f"/proc/{child_pid}/stat")
-            if not stat_path.exists():
-                break
-            fields = stat_path.read_text(encoding="utf-8").split()
-            if len(fields) > 2 and fields[2] == "Z":
+            state = proc_state()
+            if state is None or state == "Z":
                 break
             await asyncio.sleep(0.1)
-        stat_path = Path(f"/proc/{child_pid}/stat")
-        assert not stat_path.exists() or stat_path.read_text(encoding="utf-8").split()[2] == "Z"
+        assert proc_state() in (None, "Z")
     else:
         with pytest.raises(ProcessLookupError):
             os.kill(child_pid, 0)
