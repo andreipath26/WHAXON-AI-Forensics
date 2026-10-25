@@ -259,12 +259,12 @@ class ToolRunner:
         if (
             user_host.count("@") != 1
             or not user
-            or any(ch in user for ch in "/:@\\r\\n\\0")
-            or any(ch in host for ch in "/@\\r\\n\\0")
-            or any(ch in domain for ch in "/:@\\r\\n\\0")
+            or any(ch in user for ch in "/:@\r\n\0")
+            or any(ch in host for ch in "/@\r\n\0")
+            or any(ch in domain for ch in "/:@\r\n\0")
             or (port is not None and not 1 <= int(port) <= 65535)
-            or any(ch in str(session_id) for ch in "\\r\\n\\0")
-            or any(ch in command for ch in "\\r\\n\\0")
+            or any(ch in str(session_id) for ch in "\r\n\0")
+            or any(ch in command for ch in "\r\n\0")
         ):
             return "[error] invalid SMB session identity or command"
         if self._scope is not None:
@@ -274,7 +274,7 @@ class ToolRunner:
         password = _os.environ.get("WHAXON_SMB_PASS", "")
         if not password:
             return "[error] WHAXON_SMB_PASS not set"
-        if any(ch in password for ch in "\\r\\n\\0"):
+        if any(ch in password for ch in "\r\n\0"):
             return "[error] SMB password must not contain newlines or NUL"
         argv = ["impacket-smbclient"]
         prefix = (domain + "/") if domain else ""
@@ -284,7 +284,7 @@ class ToolRunner:
         argv.append(prefix + user + "@" + host)
         if port:
             argv += ["-port", port]
-        stdin_bytes = (password + "\\n" + command + "\\nexit\\n").encode()
+        stdin_bytes = (password + "\n" + command + "\nexit\n").encode()
         try:
             proc = await _asyncio.create_subprocess_exec(
                 *argv,
@@ -337,11 +337,11 @@ class ToolRunner:
         if (
             user_host.count("@") != 1
             or not user
-            or any(ch in user for ch in "/:@\\r\\n\\0")
-            or any(ch in host for ch in "/@\\r\\n\\0")
-            or any(ch in domain for ch in "/:@\\r\\n\\0")
+            or any(ch in user for ch in "/:@\r\n\0")
+            or any(ch in host for ch in "/@\r\n\0")
+            or any(ch in domain for ch in "/:@\r\n\0")
             or (port is not None and not 1 <= int(port) <= 65535)
-            or any(ch in str(session_id) for ch in "\\r\\n\\0")
+            or any(ch in str(session_id) for ch in "\r\n\0")
         ):
             return "[error] invalid WMI session identity"
         if self._scope is not None:
@@ -351,7 +351,7 @@ class ToolRunner:
         password = _os.environ.get("WHAXON_WMI_PASS") or _os.environ.get("WHAXON_SMB_PASS", "")
         if not password:
             return "[error] WHAXON_WMI_PASS not set (and WHAXON_SMB_PASS empty)"
-        if any(ch in password for ch in "\\r\\n\\0"):
+        if any(ch in password for ch in "\r\n\0"):
             return "[error] WMI password must not contain newlines or NUL"
         argv = ["impacket-wmiexec"]
         prefix = (domain + "/") if domain else ""
@@ -369,7 +369,7 @@ class ToolRunner:
                 start_new_session=(_os.name == "posix"),
             )
             stdout, stderr = await _asyncio.wait_for(
-                proc.communicate((password + "\\n").encode()), timeout=timeout_s,
+                proc.communicate((password + "\n").encode()), timeout=timeout_s,
             )
         except TimeoutError:
             await self._kill_process_tree(proc)
