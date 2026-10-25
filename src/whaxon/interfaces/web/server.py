@@ -804,6 +804,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         info = live.get(str(session_id))
         if info is None:
             return {"error": "session not found"}, 404
+        if not isinstance(info, dict):
+            return {"error": "session details are invalid; refusing to act"}, 503
         host = info.get("target_host") or info.get("tunnel_peer")
         if not host:
             return {"error": "session host is unknown; refusing out-of-scope-capable action"}, 403
@@ -1076,10 +1078,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except Exception:
             app.logger.exception("Scope evaluation failed before validation replay")
             return {"error": "scope evaluation failed; replay was not attempted"}, 503
-        if not match.allowed:
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
             return {
-                "error": f"target out of scope: {match.reason}; replay was not attempted",
-                "matched_rule": match.matched_rule,
+                "error": f"target out of scope: {reason}; replay was not attempted",
+                "matched_rule": getattr(match, "matched_rule", None),
             }, 403
         return None
 
@@ -1358,9 +1361,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except Exception:
             app.logger.exception("Scope evaluation failed for port-forward destination")
             return {"error": "scope evaluation failed; port forward was not created"}, 503
-        if not match.allowed:
-            return {"error": f"port-forward destination out of scope: {match.reason}",
-                    "target": rhost, "matched_rule": match.matched_rule}, 403
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
+            return {"error": f"port-forward destination out of scope: {reason}",
+                    "target": rhost, "matched_rule": getattr(match, "matched_rule", None)}, 403
         try:
             fwd = _pf.add_forward(registry.core.msf, session_id,
                                   local_port, rhost, remote_port, label.strip())
