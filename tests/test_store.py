@@ -79,3 +79,39 @@ def test_history_reports_finding_count_not_output_line_count(store):
     entry = next(row for row in store.history() if row["id"] == "history-findings")
     assert entry["line_count"] == 1
     assert entry["findings_count"] == 2
+
+def test_findings_by_target_preserves_conflicting_path_observations(store):
+    """Do not collapse different tools' status/size evidence into the first row."""
+    target = "http://127.0.0.1:8080/"
+    store.create("ffuf-job")
+    store.set_started("ffuf-job", "ffuf", target)
+    store.append_finding(
+        "ffuf-job",
+        {
+            "kind": "found_path", "severity": "info", "source": "ffuf",
+            "data": {"path": "/admin", "status": None, "size": None},
+            "raw_line": "admin",
+        },
+        0,
+    )
+    store.create("gobuster-job")
+    store.set_started("gobuster-job", "gobuster", target)
+    store.append_finding(
+        "gobuster-job",
+        {
+            "kind": "found_path", "severity": "info", "source": "gobuster",
+            "data": {"path": "/admin", "status": 403, "size": 289},
+            "raw_line": "/admin (Status: 403) [Size: 289]",
+        },
+        0,
+    )
+
+    grouped = store.findings_by_target()
+    target_row = next(row for row in grouped if row["target"] == "127.0.0.1")
+    observations = [f for f in target_row["findings"] if f["data"].get("path") == "/admin"]
+
+    assert len(observations) == 2
+    by_source = {finding["source"]: finding["data"] for finding in observations}
+    assert by_source["ffuf"]["status"] is None
+    assert by_source["gobuster"]["status"] == 403
+    assert by_source["gobuster"]["size"] == 289
