@@ -695,16 +695,17 @@ class ToolRunner:
     @staticmethod
     async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
         """Stop the tool and any descendants started in its isolated process group."""
-        if proc.returncode is not None:
-            return
         if os.name == "posix":
+            # The process-group leader may already have exited while a child
+            # still holds stdout/stderr open. Kill the group even in that case.
             try:
                 os.killpg(proc.pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
             except OSError:
-                proc.kill()
-        else:
+                if proc.returncode is None:
+                    proc.kill()
+        elif proc.returncode is None:
             proc.kill()
         try:
             await proc.wait()
