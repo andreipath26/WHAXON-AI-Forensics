@@ -199,3 +199,17 @@ def test_cli_retest_restores_request_context(tmp_path, monkeypatch):
 
 async def _async_noop():
     return None
+
+
+def test_cli_validate_unknown_job_returns_not_found(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from whaxon.interfaces.cli import validate_cmd
+
+    store = SimpleNamespace(get_findings=lambda job_id: None)
+    core = SimpleNamespace(initialize=_async_noop, store=store)
+    monkeypatch.setattr(validate_cmd, "Core", lambda data_dir: core)
+
+    assert validate_cmd.main(["missing-job", "0", "--data", str(tmp_path)]) == (
+        validate_cmd.EXIT_NOT_FOUND
+    )
