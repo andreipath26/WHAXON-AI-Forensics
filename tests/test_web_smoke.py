@@ -61,3 +61,13 @@ def test_evidence_note_persists_for_selected_job(page, live_server):
         timeout=5000,
     )
     assert "Evidence inspector persistence check." in page.locator("#evidence-list").text_content()
+
+
+def test_ai_strategy_gate_shows_pending_operator_decision(page, live_server):
+    page.goto(f"{live_server}/ui")
+    page.click('.nav-item[data-view="ai-gate"]')
+    page.wait_for_function(
+        "() => document.querySelector('#ai-pending-list')?.textContent.includes('seed-ai-run')",
+        timeout=5000,
+    )
+    assert "enumeration" in page.locator("#ai-pending-list").text_content()
