@@ -119,6 +119,52 @@ class ToolRunner:
                 "authorized target as the positional target argument"
             )
 
+        # Some tools accept multiple positional targets, so checking only
+        # explicit flags such as -u/--url is insufficient. Reject common
+        # target-shaped values anywhere in extra_args before building argv.
+        import ipaddress
+        import re
+        from urllib.parse import urlsplit
+
+        def _looks_like_target_token(token: str) -> bool:
+            value = token.strip()
+            if not value or value.startswith("-"):
+                return False
+            if value.lower().startswith(("http://", "https://")):
+                parsed = urlsplit(value)
+                return bool(parsed.hostname)
+            try:
+                ipaddress.ip_address(value.strip("[]"))
+                return True
+            except ValueError:
+                pass
+            try:
+                ipaddress.ip_network(value, strict=False)
+                return True
+            except ValueError:
+                pass
+            host = value
+            if host.count(":") == 1:
+                possible_host, possible_port = host.rsplit(":", 1)
+                if possible_port.isdigit():
+                    host = possible_host
+            if host.lower() == "localhost":
+                return True
+            if "." not in host:
+                return False
+            labels = host.rstrip(".").split(".")
+            return all(
+                label and len(label) <= 63
+                and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label)
+                for label in labels
+            )
+
+        if any(_looks_like_target_token(token) for token in extra_tokens):
+            raise ValueError(
+                "extra_args cannot include a second target or target network; "
+                "pass the authorized target as the positional target argument"
+            )
+
         try:
             parts = shlex.split(template.format(target=target))
         except (KeyError, ValueError) as e:
