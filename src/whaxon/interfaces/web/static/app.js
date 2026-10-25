@@ -1296,13 +1296,16 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       tbody.innerHTML = '';
       rows.forEach(({ job, f }) => {
         const tr = document.createElement('tr');
+        const rawSeverity = String(f.severity || 'info').toLowerCase();
+        const severity = ['critical', 'high', 'medium', 'low', 'info'].includes(rawSeverity) ? rawSeverity : 'info';
         tr.innerHTML =
           '<td><span class="title"></span></td>' +
-          '<td><span class="pill pill-' + (f.severity || 'info') + ' no-border"><span class="dot"></span>' + (f.severity || 'info') + '</span></td>' +
+          '<td><span class="pill pill-' + severity + ' no-border"><span class="dot"></span><span class="severity-label"></span></span></td>' +
           '<td><span class="target"></span></td>' +
           '<td><span class="mono"></span></td>' +
           '<td><span class="pill pill-success">Verified</span></td>' +
           '<td><button class="btn btn-sm btn-primary">Retest</button></td>';
+        tr.querySelector('.severity-label').textContent = severity;
         tr.querySelector('.title').textContent = f.title || f.kind || '(finding)';
         tr.querySelector('.target').textContent = job.target || '';
         tr.querySelector('.mono').textContent = f.source || job.tool || '';
@@ -1358,11 +1361,13 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         tr.innerHTML =
           '<td><span class="mono"></span></td>' +
           '<td><span class="target"></span></td>' +
-          '<td><span class="pill pill-accent"><span class="dot"></span>' + ((info && info.type) || '?') + '</span></td>' +
+          '<td><span class="pill pill-accent"><span class="dot"></span><span class="session-type"></span></span></td>' +
           '<td><span class="mono"></span></td>' +
-          '<td><span class="pill ' + pillCls + '">' + status + '</span></td>';
+          '<td><span class="pill ' + pillCls + ' session-status"></span></td>';
         tr.querySelector('.mono').textContent = sid;
         tr.querySelector('.target').textContent = (info && info.target_host) || (info && info.tunnel_peer) || '';
+        tr.querySelector('.session-type').textContent = String((info && info.type) || '?');
+        tr.querySelector('.session-status').textContent = String(status);
         tr.querySelectorAll('.mono')[1].textContent = (info && info.info) || '';
         tbody.appendChild(tr);
       });
