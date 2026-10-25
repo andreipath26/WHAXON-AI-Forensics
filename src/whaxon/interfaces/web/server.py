@@ -136,122 +136,52 @@ def _ai_run_blocking(core, executor_factory, run_id, goal, store):
         _tb.print_exc()
         store.set_ai_run_finished(run_id, status="error", error=repr(e))
 
-def _run_job_blocking(core: Core, registry: JobRegistry, tool_id: str, target: str, job_id: str, extra_args: str = "") -> None:
-    """Run a tool synchronously in a thread. Publishes events to the bus."""
-    import subprocess
+def _run_job_blocking(
+    core: Core, registry: JobRegistry, tool_id: str, target: str,
+    job_id: str, extra_args: str = "",
+) -> None:
+    """Execute web-submitted jobs through the same guarded core runner as the CLI."""
+    import asyncio
 
-    from whaxon.core.events import JobFailed, JobFinished, JobOutput, JobStarted
-
-    tool = core.catalog.get(tool_id)
-    if tool is None:
-        core.bus.publish(JobFailed(job_id=job_id, error=f"unknown tool: {tool_id}"))
-        return
-
-    argv = core.runner.build_argv(tool_id, target)
-    core.bus.publish(JobStarted(job_id=job_id, tool_id=tool_id, target=target))
-    start = time.monotonic()
+    from whaxon.core.events import JobFailed
+    from whaxon.core.scope import OutOfScopeError
 
     try:
-        proc = subprocess.Popen(
-            argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, bufsize=1,
-        )
-    except FileNotFoundError as e:
-        core.bus.publish(JobFailed(job_id=job_id, error=f"tool not found: {e}"))
-        return
-
-    with _PROCS_LOCK:
-        _PROCS[job_id] = proc
-
-    collected: list[tuple[str, str]] = []
-
-    def pump(stream, name):
-        if stream is None:
-            return
-        for line in iter(stream.readline, ""):
-            text = line.rstrip("\n")
-            collected.append((name, text))
-            core.bus.publish(JobOutput(job_id=job_id, stream=name, line=text))
-
-    t_out = threading.Thread(target=pump, args=(proc.stdout, "stdout"), daemon=True)
-    t_err = threading.Thread(target=pump, args=(proc.stderr, "stderr"), daemon=True)
-    t_out.start(); t_err.start()
-    # Bound external-tool runtime so a hung scanner cannot occupy a worker
-    # indefinitely. Invalid configuration falls back to the conservative
-    # 15-minute default; termination escalates to kill after a short grace.
-    try:
-        timeout_s = float(_os.environ.get("WHAXON_JOB_TIMEOUT_S", "900"))
+        try:
+            timeout_s = float(_os.environ.get("WHAXON_JOB_TIMEOUT_S", "900"))
+        except (TypeError, ValueError):
+            timeout_s = 900.0
         if timeout_s <= 0:
             timeout_s = 900.0
-    except (TypeError, ValueError):
-        timeout_s = 900.0
-
-    timed_out = False
-    try:
-        proc.wait(timeout=timeout_s)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-    finally:
-        t_out.join(timeout=5)
-        t_err.join(timeout=5)
-        with _PROCS_LOCK:
-            _PROCS.pop(job_id, None)
-
-    if timed_out:
-        core.bus.publish(JobFailed(
+        asyncio.run(core.runner.run_tool(
+            tool_id=tool_id,
+            target=target,
             job_id=job_id,
-            error=f"tool timed out after {timeout_s:.1f}s and was terminated",
+            extra_args=extra_args,
+            timeout_s=timeout_s,
+            phase="web",
         ))
+    except OutOfScopeError as exc:
+        # Scope is checked again by ToolRunner immediately before process launch.
+        core.bus.publish(JobFailed(job_id=job_id, error=f"target blocked by scope: {exc}"))
+    except FileNotFoundError:
+        # ToolRunner already publishes JobFailed for missing executables.
         return
-
-    core.bus.publish(JobFinished(
-        job_id=job_id,
-        exit_code=proc.returncode or 0,
-        duration_s=time.monotonic() - start,
-    ))
-
-    # Parse output into structured findings
-    try:
-        from whaxon.core.events import JobFindings as _JF
-        _findings = []
-        # Try the adapter layer first (produces enriched findings)
-        try:
-            from whaxon.adapters import get_adapter as _get_adapter
-            _adapter = _get_adapter(tool_id)
-            if _adapter is not None:
-                _findings = _adapter.parse(collected, ctx={"tool_id": tool_id})
-        except Exception as _e:
-            import sys
-            print(f"[web] adapter error for {tool_id}: {_e!r}", file=sys.stderr)
-            _findings = []
-        # Fall back to the legacy parser if the adapter gave nothing
-        if not _findings:
-            from whaxon.core.findings import parse_findings as _pf
-            _findings = _pf(tool_id, collected)
-        if _findings:
-            core.bus.publish(_JF(
-                job_id=job_id,
-                findings=tuple(f.to_dict() for f in _findings),
-            ))
-    except Exception:
+    except Exception as exc:
         import traceback
         traceback.print_exc()
+        core.bus.publish(JobFailed(job_id=job_id, error=f"job execution failed: {exc}"))
 
 
 
-def _cancel_job_blocking(job_id: str) -> bool:
-    with _PROCS_LOCK:
-        proc = _PROCS.get(job_id)
-    if proc and proc.poll() is None:
-        proc.terminate()
-        return True
-    return False
+def _cancel_job_blocking(core: Core, job_id: str) -> bool:
+    """Cancel through the shared runner so child processes are cleaned up too."""
+    import asyncio
+    proc = core.runner._procs.get(job_id)
+    if proc is None or proc.returncode is not None:
+        return False
+    asyncio.run(core.runner.cancel(job_id))
+    return True
 
 
 import base64 as _b64
@@ -1618,7 +1548,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/jobs/<job_id>/cancel")
     def cancel_job(job_id: str):
-        ok = _cancel_job_blocking(job_id)
+        ok = _cancel_job_blocking(core, job_id)
         return {"ok": ok, "job_id": job_id}
 
     @app.get("/")
