@@ -312,3 +312,36 @@ def test_build_argv_rejects_alternate_target_flags(extra_args):
     runner, _, _ = _runner(tools=[tool])
     with pytest.raises(ValueError, match="cannot specify alternate targets"):
         runner.build_argv("nmap", "127.0.0.1", extra_args=extra_args)
+
+async def test_timeout_kills_descendant_processes(tmp_path):
+    """A timed-out shell tool must not leave child scans running in the background."""
+    import os
+    import shlex
+
+    pid_file = tmp_path / "child.pid"
+    script = f"sleep 30 & child=$!; echo $child > {shlex.quote(str(pid_file))}; wait"
+    tool = Tool(
+        id="tree", name="Process tree", category="test",
+        binary="/bin/sh", args="-c " + shlex.quote(script),
+    )
+    runner, _, _ = _runner(tools=[tool])
+    await runner.run_tool("tree", "127.0.0.1", timeout_s=0.5)
+
+    assert pid_file.exists(), "child process did not start"
+    child_pid = int(pid_file.read_text(encoding="utf-8").strip())
+    if Path("/proc").is_dir():
+        # On Linux, a killed child may briefly remain as a zombie until init
+        # reaps it; zombies cannot execute and are acceptable here.
+        for _ in range(30):
+            stat_path = Path(f"/proc/{child_pid}/stat")
+            if not stat_path.exists():
+                break
+            fields = stat_path.read_text(encoding="utf-8").split()
+            if len(fields) > 2 and fields[2] == "Z":
+                break
+            await asyncio.sleep(0.1)
+        stat_path = Path(f"/proc/{child_pid}/stat")
+        assert not stat_path.exists() or stat_path.read_text(encoding="utf-8").split()[2] == "Z"
+    else:
+        with pytest.raises(ProcessLookupError):
+            os.kill(child_pid, 0)
