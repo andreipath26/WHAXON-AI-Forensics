@@ -53,6 +53,27 @@ def test_context_replay_rejects_different_target_host(tmp_path: Path) -> None:
     assert "does not match the authorized target" in reason
 
 
+
+def test_context_replay_requires_authorized_target_before_network(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    import urllib.request
+
+    def unexpected_network(*args, **kwargs):
+        pytest.fail("context replay must not make a request without an authorized target")
+
+    monkeypatch.setattr(urllib.request, "build_opener", unexpected_network)
+    validator = Validator(tmp_path)
+    status, reason = validator._replay_ctx(
+        {"method": "GET", "url": "http://127.0.0.1:9/"},
+        target_url=None,
+        kind="sqli",
+    )
+    assert status == "candidate"
+    assert "authorized target URL required" in reason
+    assert "no request sent" in reason
+
+
 def test_query_fetch_rejects_non_http_urls() -> None:
     with pytest.raises(ValueError, match="absolute HTTP"):
         Validator._fetch("file:///etc/passwd", "q", "test")
