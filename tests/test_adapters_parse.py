@@ -158,3 +158,12 @@ def test_hashcat_find_hashes_reads_ntlm_from_store(tmp_path):
     assert len(hashes) == 1
     assert hashes[0]["user"] == "alice"
     assert hashes[0]["nt_hash"] == "5f4dcc3b5aa765d61d8327deb882cf99"
+
+def test_burp_rejects_external_entities(tmp_path):
+    xml_file = tmp_path / "burp-xxe.xml"
+    xml_file.write_text(
+        '<!DOCTYPE issues [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+        '<issues><issue><name>&xxe;</name></issue></issues>',
+        encoding="utf-8",
+    )
+    assert BurpAdapter().parse_file(xml_file) == []
