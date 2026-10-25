@@ -603,7 +603,7 @@ class ToolRunner:
                     del buffer[:newline + 1]
                     emit_line(raw, name)
                 if len(buffer) > max_line_bytes:
-                    emit_line(bytes(buffer[:max_line_bytes]), name)
+                    emit_line(bytes(buffer[:max_line_bytes]) + b" ...[line truncated]", name)
                     buffer.clear()
                     discarding_long_line = True
             if buffer and not discarding_long_line:
