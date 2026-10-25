@@ -25,6 +25,7 @@
 | AI strategy gate | List pending AI runs, submit operator answers, inspect AI run history | `GET /api/ai/pending`, `POST /api/ai/runs/<id>/answer`, `GET /api/ai/runs` | Wired; verify answer lifecycle and conflicts in browser/CI |
 | Coverage & reports | Export Markdown, HTML, JSON, PDF, WHAXON envelope | `GET /api/report?format=...` | Wired; PDF depends on renderer availability |
 | Job history | Read persisted jobs and inspect job output | `GET /api/history`, `GET /api/jobs/<id>/output.txt` | Wired; verify response schemas in CI |
+| Attack surface graph | Display only persisted relationship edges | `GET /api/pivot/graph` | Wired read-only; empty graph is shown honestly when no edges exist |
 | Evidence inspector | List, upload, download and delete job evidence; save analyst notes | `GET/POST/DELETE /api/jobs/<id>/evidence`, `GET /api/jobs/<id>/evidence/<seq>/download` | Wired; verify upload/download lifecycle in browser/CI |
 | Burp XML import | Parse an existing Burp XML export into a persisted job and findings | `POST /api/import/burp` | Wired; parser rejects unsupported/empty imports; verify in browser/CI |
 | Coverage ledger | Read recorded coverage gaps for a selected job | `GET /api/coverage/<job_id>` | Wired; verify with jobs that have coverage records |
@@ -45,6 +46,7 @@
 - [ ] Finding severity/status fields map correctly from actual report payloads; validate and retest refresh state after completion.
 - [ ] Human review is clearly distinguished from deterministic engine verification.
 - [ ] AI pending decisions load, operator answers are submitted and errors/conflicts are visible; this gate is kept separate from vulnerability verification.
+- [ ] Attack surface graph renders persisted edges only and shows an honest empty state when none exist.
 - [ ] Report download formats and failure handling are tested.
 - [ ] No demo target, fake telemetry, fabricated finding, default credential or unsupported hardware-enforcement claim is shown as live system state.
 - [ ] Keyboard and small-screen interactions are checked.
