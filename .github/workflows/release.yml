@@ -73,19 +73,29 @@ jobs:
           /tmp/whaxon-release-smoke/bin/python -m pip install --upgrade pip
           /tmp/whaxon-release-smoke/bin/python -m pip install dist/*.whl
           /tmp/whaxon-release-smoke/bin/whaxon --help
-          /tmp/whaxon-release-smoke/bin/python - <<'PY'
+          SMOKE_DATA="$(mktemp -d)"
+          /tmp/whaxon-release-smoke/bin/whaxon scope --show --data "$SMOKE_DATA"
+          SMOKE_DATA="$SMOKE_DATA" /tmp/whaxon-release-smoke/bin/python - <<'PY'
           import json
+          import os
           from importlib.resources import files
+          from pathlib import Path
 
           package = files("whaxon")
-          catalog = package.joinpath("data", "tools.json")
+          packaged_catalog = package.joinpath("data", "tools.json")
           payloads = package.joinpath("data", "payloads")
-          assert catalog.is_file(), "wheel is missing whaxon/data/tools.json"
-          data = json.loads(catalog.read_text(encoding="utf-8"))
-          assert isinstance(data, (dict, list)), "packaged tools catalog has invalid JSON shape"
+          assert packaged_catalog.is_file(), "wheel is missing whaxon/data/tools.json"
+          packaged_data = json.loads(packaged_catalog.read_text(encoding="utf-8"))
+          assert isinstance(packaged_data, (dict, list)), "packaged tools catalog has invalid JSON shape"
           assert payloads.is_dir(), "wheel is missing whaxon/data/payloads"
           assert any(payloads.iterdir()), "wheel contains no validation payload files"
-          print("Built wheel package-data smoke test passed.")
+
+          user_catalog = Path(os.environ["SMOKE_DATA"]) / "tools.json"
+          assert user_catalog.is_file(), "Core did not seed the user catalog from the installed package"
+          user_data = json.loads(user_catalog.read_text(encoding="utf-8"))
+          tools = user_data.get("tools", []) if isinstance(user_data, dict) else user_data
+          assert isinstance(tools, list) and tools, "seeded tool catalog is empty or malformed"
+          print("Installed-wheel CLI, catalog, and payload smoke tests passed.")
           PY
 
       - name: Publish to PyPI
