@@ -253,8 +253,9 @@ def _hash_pw(pw: str) -> str:
 
 def _check_auth(header: str | None) -> bool:
     creds = _get_credentials()
+    # Missing credentials must never disable authentication implicitly.
     if creds is None:
-        return True
+        return False
     if not header or not header.startswith("Basic "):
         return False
     try:
@@ -1295,6 +1296,28 @@ def create_app_factory(host: str | None = None, port: int | None = None):
         host = os.environ.get("WHAXON_HOST", "127.0.0.1")
     if port is None:
         port = int(os.environ.get("WHAXON_PORT", "5001"))
+
+    # Never synthesize the known demo credentials for a network-facing
+    # listener. Loopback development remains convenient; remote deployments
+    # must explicitly configure a non-default username and password.
+    import ipaddress
+    try:
+        loopback = ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        loopback = host.lower() == "localhost"
+    configured_user = os.environ.get("WHAXON_AUTH_USER", "").strip()
+    configured_pass = os.environ.get("WHAXON_AUTH_PASS", "")
+    has_hash = bool(os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip())
+    if not loopback and (
+        not configured_user
+        or configured_user == "whaxon"
+        or (not has_hash and (not configured_pass or configured_pass == "whaxon"))
+    ):
+        raise RuntimeError(
+            "Refusing to expose WHAXON on a non-loopback host without "
+            "explicit non-default authentication credentials."
+        )
+
     os.environ["WHAXON_HOST"] = host
     os.environ["WHAXON_PORT"] = str(port)
     os.environ.setdefault("WHAXON_AUTH_USER", "whaxon")
