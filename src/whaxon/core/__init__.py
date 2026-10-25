@@ -91,6 +91,23 @@ class Core:
         # Metasploit RPC + session tracker
         self.msf = MSFClient()
         self.msf_tracker = MSFTracker(self.bus, self.store, self.msf)
+        # A PyPI installation must work from an arbitrary working directory.
+        # Seed the user data directory from the packaged catalog on first run;
+        # never overwrite an operator's existing tools.json.
+        if not self.catalog.path.exists():
+            packaged_catalog = Path(__file__).parent / "data" / "tools.json"
+            if packaged_catalog.is_file():
+                self.data_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    self.catalog.path.write_text(
+                        packaged_catalog.read_text(encoding="utf-8"),
+                        encoding="utf-8",
+                    )
+                except OSError as exc:
+                    raise RuntimeError(
+                        f"cannot initialize tool catalog at {self.catalog.path}: {exc}"
+                    ) from exc
+
         # Scope enforcement
         if self.catalog.path.exists():
             self.catalog.load()
