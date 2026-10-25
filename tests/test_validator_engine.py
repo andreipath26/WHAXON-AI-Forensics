@@ -119,7 +119,9 @@ def test_replay_ctx_injects_payload_from_request_context():
             },
             raw_line="",
         )
-        status, reason = v.validate(f, target_url=None)
+        # The caller must supply the scope-checked engagement target; the
+        # context URL alone is evidence, not authorization to make a request.
+        status, reason = v.validate(f, target_url=url)
         assert status == "verified", reason
         assert "XSS probe" in reason
     finally:
