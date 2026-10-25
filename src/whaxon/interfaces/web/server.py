@@ -236,15 +236,13 @@ def _remote_auth_ready(user: str, password: str, password_hash: str) -> bool:
         if _bcrypt is None:
             return False
         parts = password_hash.split("$")
-        if (
-            len(parts) != 4
-            or parts[1] not in {"2a", "2b", "2y"}
-            or not parts[2].isdigit()
-            or int(parts[2]) < 12
-            or len(password_hash) != 60
-        ):
+        if len(parts) != 4:
             return False
-        return True
+        if parts[1] not in {"2a", "2b", "2y"}:
+            return False
+        if not parts[2].isdigit() or int(parts[2]) < 12:
+            return False
+        return len(password_hash) == 60
     return bool(password and password != "whaxon" and _bcrypt is not None)
 
 
