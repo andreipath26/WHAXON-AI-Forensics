@@ -878,6 +878,22 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         log_override(registry.core.data_dir, tool, target)
         return {"logged": True}
 
+    def _validation_scope_error(target_url: str | None):
+        """Re-check current scope before any validator network replay."""
+        if not target_url:
+            return {"error": "finding has no target URL; replay was not attempted"}, 400
+        try:
+            match = registry.core.scope.check(target_url)
+        except Exception:
+            app.logger.exception("Scope evaluation failed before validation replay")
+            return {"error": "scope evaluation failed; replay was not attempted"}, 503
+        if not match.allowed:
+            return {
+                "error": f"target out of scope: {match.reason}; replay was not attempted",
+                "matched_rule": match.matched_rule,
+            }, 403
+        return None
+
     @app.post("/api/validate/<job_id>/<int:seq>")
     def api_validate(job_id: str, seq: int):
         from whaxon.core.findings import Finding
@@ -894,6 +910,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             target_url = f"http://{raw_target}"
         else:
             target_url = None
+        scope_error = _validation_scope_error(target_url)
+        if scope_error:
+            return scope_error
+        scope_error = _validation_scope_error(target_url)
+        if scope_error:
+            return scope_error
         f_obj = Finding(
             kind=target_f["kind"], severity=target_f["severity"],
             source=target_f["source"], data=target_f["data"],
