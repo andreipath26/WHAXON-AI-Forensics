@@ -43,6 +43,17 @@ def test_context_replay_rejects_non_http_urls(tmp_path: Path) -> None:
     assert "absolute HTTP(S)" in reason
 
 
+def test_context_replay_rejects_credentials_embedded_in_url(tmp_path: Path) -> None:
+    validator = Validator(tmp_path)
+    status, reason = validator._replay_ctx(
+        {"method": "GET", "url": "https://user:secret@example.test/search"},
+        target_url="https://example.test",
+        kind="sqli",
+    )
+    assert status == "candidate"
+    assert "must not embed credentials" in reason
+
+
 def test_context_replay_rejects_different_target_host(tmp_path: Path) -> None:
     validator = Validator(tmp_path)
     status, reason = validator._replay_ctx(
