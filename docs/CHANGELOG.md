@@ -1,5 +1,9 @@
 ## 2026-10-25 (Unreleased - beta hardening)
 
+**Validation correctness**
+- Request context now survives the SQLMap adapter, SQLite persistence, and web/CLI validation and retest paths. Older findings using the legacy `data["_request_context"]` shape remain supported.
+- CLI validation reports an unknown job cleanly instead of raising an exception.
+
 **Security and execution**
 - Tool processes run in their own POSIX process group; timeout and cancellation terminate descendants so scans are not left running after the parent tool exits.
 - Web-submitted tool jobs use the guarded core runner and re-check scope at execution time; web cancellation is routed to the job's owning event loop.
