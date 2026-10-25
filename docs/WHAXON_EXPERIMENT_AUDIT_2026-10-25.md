@@ -84,6 +84,14 @@ There is also a separate `evidence/whaxon-run/redactions.json` entry claiming th
 
 **Release action:** surface a prominent warning or require explicit confirmation when an operator configures `0.0.0.0/0` or `::/0`. Do not silently reinterpret a user-supplied broad rule, but make its reach unmistakable and audit the acknowledgement.
 
+### E-A10 — HTTP 200 path discovery was over-classified as a vulnerability
+
+The old ffuf/gobuster adapter metadata assigned a generic discovered path HTTP 200 a low severity, CWE-200, and CVSS 3.7. The experiment's own evidence demonstrates why that is not justified: a path-discovery result says the endpoint responded, not whether its contents are sensitive or its access controls are defective. This can inflate severity counts and make a report imply a vulnerability before the endpoint has been assessed.
+
+**Change made outside the protected folder:** current ffuf and gobuster adapters now keep HTTP 200 path observations informational and omit generic CWE/CVSS claims. Status-less ffuf output also remains informational with status and size set to unknown. Regression tests assert these rules.
+
+**Release action:** preserve the raw status, size, tool source, and original line; require a separate evidence-backed finding before assigning vulnerability severity or a CVSS score. Existing historical engagement artefacts should be treated as records of the older parser, not rewritten in place.
+
 ## 3. Evidence quality and reproducibility limits
 
 - The benchmark has only 12 labelled cases and one payload family per kind; its metrics are useful counterexamples, not a reliable estimate of real-world scanner accuracy.
