@@ -375,16 +375,49 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.before_request
     def _auth_gate():
-        """Loopback requests are trusted; anything else must authenticate.
+        """Protect state-changing routes from cross-origin browser requests.
 
-        Rationale: a server bound to 127.0.0.1 is only reachable by processes
-        on this machine. Requiring basic auth there adds friction (browser
-        retry loops in embedded views, GUI shells, curl one-liners) without
-        meaningfully improving security. When WHAXON_HOST is set to a
-        non-loopback address, the startup warning below tells the operator
-        that credentials are the only gate.
+        Loopback is a useful local-development trust boundary, but browsers can
+        be induced by an unrelated website to send requests to localhost. Check
+        the Host header to resist DNS-rebinding and validate browser Origin /
+        Fetch Metadata before applying the local-peer authentication shortcut.
         """
-        if request.remote_addr in ("127.0.0.1", "::1"):  # never trust None or hostnames: fail closed on unknown peer
+        import ipaddress as _ipaddress
+        from urllib.parse import urlsplit as _urlsplit
+
+        configured_host = _os.environ.get("WHAXON_HOST", "127.0.0.1")
+        try:
+            loopback_listener = _ipaddress.ip_address(configured_host.strip("[]")).is_loopback
+        except ValueError:
+            loopback_listener = configured_host.lower() == "localhost"
+
+        if loopback_listener:
+            request_host = request.host
+            if request_host.startswith("[") and "]" in request_host:
+                request_hostname = request_host[1:request_host.index("]")]
+            elif request_host.count(":") == 1:
+                request_hostname = request_host.rsplit(":", 1)[0]
+            else:
+                request_hostname = request_host
+            if request_hostname.lower().rstrip(".") not in {"localhost", "127.0.0.1", "::1"}:
+                return {"error": "invalid Host for loopback listener"}, 403
+
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
+            if fetch_site in {"cross-site", "same-site"}:
+                return {"error": "cross-origin state-changing request rejected"}, 403
+            origin = request.headers.get("Origin")
+            if origin:
+                supplied = _urlsplit(origin)
+                current = _urlsplit(request.host_url)
+                if (
+                    supplied.scheme.lower() != current.scheme.lower()
+                    or (supplied.hostname or "").lower() != (current.hostname or "").lower()
+                    or supplied.port != current.port
+                ):
+                    return {"error": "cross-origin state-changing request rejected"}, 403
+
+        if request.remote_addr in ("127.0.0.1", "::1"):
             return None
         if _auth_failures_exceeded(request.remote_addr):
             return _too_many_requests()
