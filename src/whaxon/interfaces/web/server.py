@@ -465,12 +465,26 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/tools")
     def list_tools():
-        return jsonify([
-            {"id": t.id, "name": t.name, "category": t.category,
-             "binary": t.binary, "description": t.description,
-             "available": bool(t.available), "package": t.package or ""}
-            for t in core.catalog.list()
-        ])
+        from whaxon.adapters import get_adapter
+
+        result = []
+        for tool in core.catalog.list():
+            try:
+                adapter_available = get_adapter(tool.id) is not None
+            except Exception:
+                app.logger.exception("Adapter lookup failed for catalog tool %s", tool.id)
+                adapter_available = False
+            result.append({
+                "id": tool.id,
+                "name": tool.name,
+                "category": tool.category,
+                "binary": tool.binary,
+                "description": tool.description,
+                "available": bool(tool.available),
+                "package": tool.package or "",
+                "adapter_available": adapter_available,
+            })
+        return jsonify(result)
 
     @app.post("/api/run")
     @limiter.limit("30 per minute")
