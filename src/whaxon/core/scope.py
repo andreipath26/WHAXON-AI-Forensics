@@ -169,11 +169,44 @@ class ScopeManager:
                 f"scope config at {self.path} is unreadable ({e}). "
                 f"Fix or delete it to continue."
             ) from e
-        self._enabled = bool(raw.get("enabled", True))
-        self._engagement = str(raw.get("engagement", "") or "")
-        self._in = [str(x) for x in (raw.get("in_scope") or [])]
-        self._out = [str(x) for x in (raw.get("out_of_scope") or [])]
-        self._notes = str(raw.get("notes", "") or "")
+        if not isinstance(raw, dict):
+            raise RuntimeError(
+                f"scope config at {self.path} must contain a JSON object"
+            )
+
+        enabled = raw.get("enabled", True)
+        # bool(value) is unsafe here: null, 0, and "" would silently disable
+        # scope enforcement. Only the literal JSON booleans are valid.
+        if type(enabled) is not bool:
+            raise RuntimeError(
+                f"scope config at {self.path} has invalid 'enabled'; "
+                "expected true or false"
+            )
+
+        def _rules(key: str) -> list[str]:
+            value = raw.get(key, [])
+            if not isinstance(value, list) or any(
+                not isinstance(item, str) or not item.strip() for item in value
+            ):
+                raise RuntimeError(
+                    f"scope config at {self.path} has invalid '{key}'; "
+                    "expected a list of non-empty strings"
+                )
+            return [item.strip() for item in value]
+
+        engagement = raw.get("engagement", "")
+        notes = raw.get("notes", "")
+        if not isinstance(engagement, str) or not isinstance(notes, str):
+            raise RuntimeError(
+                f"scope config at {self.path} has invalid engagement or notes; "
+                "expected strings"
+            )
+
+        self._enabled = enabled
+        self._engagement = engagement
+        self._in = _rules("in_scope")
+        self._out = _rules("out_of_scope")
+        self._notes = notes
 
     def save(self, data: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
