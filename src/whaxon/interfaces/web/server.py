@@ -913,9 +913,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         scope_error = _validation_scope_error(target_url)
         if scope_error:
             return scope_error
-        scope_error = _validation_scope_error(target_url)
-        if scope_error:
-            return scope_error
         f_obj = Finding(
             kind=target_f["kind"], severity=target_f["severity"],
             source=target_f["source"], data=target_f["data"],
@@ -948,6 +945,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             target_url = f"http://{raw_target}"
         else:
             target_url = None
+        scope_error = _validation_scope_error(target_url)
+        if scope_error:
+            return scope_error
         f_obj = Finding(
             kind=target_f["kind"], severity=target_f["severity"],
             source=target_f["source"], data=target_f["data"],
