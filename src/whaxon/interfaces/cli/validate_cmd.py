@@ -49,6 +49,9 @@ def main(args: list[str] | None = None) -> int:
     
     # Fetch the finding
     findings = core.store.get_findings(job_id)
+    if not findings:
+        print(f"Job not found: {job_id}", file=sys.stderr)
+        return EXIT_NOT_FOUND
     target_f = None
     for f in findings:
         if f["seq"] == seq:
@@ -86,7 +89,8 @@ def main(args: list[str] | None = None) -> int:
         severity=target_f["severity"],
         source=target_f["source"],
         data=target_f["data"],
-        raw_line=target_f["raw_line"]
+        raw_line=target_f["raw_line"],
+        request_context=target_f.get("request_context") or {},
     )
 
     # Run the validator
