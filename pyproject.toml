@@ -67,6 +67,10 @@ whaxon-gui = "whaxon.interfaces.gui.app:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/whaxon"]
 
+# Runtime catalog and validation payloads are required by installed wheels.
+[tool.hatch.build.targets.wheel.force-include]
+"src/whaxon/data" = "whaxon/data"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
