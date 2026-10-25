@@ -85,7 +85,7 @@ class ToolRunner:
         # contain control characters. Even if scope enforcement lets the
         # target through (override path, session paths), the argv builder
         # must not construct an argument that changes the tool's behavior.
-        if not target or target.startswith("-") or chr(10) in target or chr(13) in target:
+        if not target or target.startswith("-") or any(char.isspace() for char in target):
             raise ValueError(f"refusing to build argv for unsafe target: {target!r}")
         template = tool.args or "{target}"
 
