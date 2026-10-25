@@ -29,7 +29,7 @@ Stop:
 - WHAXON_TRUST_PROXY default off         trust one configured reverse proxy for forwarded client IP / HTTPS scheme
 - WHAXON_ALLOWED_HOSTS comma-separated additional Host values accepted by the local Host-header guard
 
-Loopback development defaults are accepted only on loopback. For a non-loopback listener, set an explicit non-default username and either a strong `WHAXON_AUTH_PASS` or a precomputed `WHAXON_AUTH_PASS_HASH`. Never use the demo credentials in a network deployment.
+Loopback development defaults are accepted only on loopback. For a non-loopback listener, install the `web` extra and set an explicit non-default username plus either a strong, unique `WHAXON_AUTH_PASS` or a precomputed bcrypt `WHAXON_AUTH_PASS_HASH` with cost factor 12 or higher. Network-facing startup rejects SHA-256 password hashes and refuses to fall back to weak hashing if bcrypt is unavailable. Never use the demo credentials in a network deployment.
 
 ## systemd
 
