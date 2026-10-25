@@ -792,6 +792,35 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "file missing"}, 404
         return send_file(str(full), as_attachment=True, download_name=item["name"])
 
+    def _msf_session_scope_error(session_id: str):
+        """Require a live Metasploit session whose host is currently in scope."""
+        client = registry.core.msf
+        if not client.is_up():
+            return {"error": "msf not reachable; session scope cannot be verified"}, 503
+        try:
+            live = client.sessions()
+        except Exception:
+            app.logger.exception("Could not read Metasploit sessions for scope check")
+            return {"error": "could not verify session scope"}, 503
+        info = live.get(str(session_id))
+        if info is None:
+            return {"error": "session not found"}, 404
+        host = info.get("target_host") or info.get("tunnel_peer")
+        if not host:
+            return {"error": "session host is unknown; refusing out-of-scope-capable action"}, 403
+        try:
+            match = registry.core.scope.check(str(host))
+        except Exception:
+            app.logger.exception("Scope evaluation failed for Metasploit session host")
+            return {"error": "scope evaluation failed; action was not performed"}, 503
+        if not match.allowed:
+            return {
+                "error": f"session host out of scope: {match.reason}",
+                "target": str(host),
+                "matched_rule": match.matched_rule,
+            }, 403
+        return None
+
     @app.get("/api/msf/status")
     def msf_status():
         client = registry.core.msf
@@ -818,29 +847,75 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/msf/run")
     def msf_run():
+        import re as _re
         import uuid as _uuid
-        data = request.get_json(silent=True) or {}
-        module_type = (data.get("module_type") or "exploit").strip()
-        module_path = (data.get("module_path") or "").strip()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
+        module_type = data.get("module_type", "exploit")
+        module_path = data.get("module_path", "")
         options = data.get("options") or {}
-        target = (data.get("target") or options.get("RHOSTS") or "").strip()
-
+        target_value = data.get("target") or ""
+        if not isinstance(module_type, str) or not isinstance(module_path, str):
+            return {"error": "module_type and module_path must be strings"}, 400
+        if not isinstance(options, dict):
+            return {"error": "options must be a JSON object"}, 400
+        module_type = module_type.strip()
+        module_path = module_path.strip()
         if not module_path:
             return {"error": "module_path required"}, 400
         if module_type not in ("exploit", "auxiliary", "post"):
             return {"error": f"bad module_type: {module_type}"}, 400
+        if (
+            module_path.startswith("/")
+            or any(part in {"", ".", ".."} for part in module_path.split("/"))
+            or not _re.fullmatch(r"[A-Za-z0-9_/-]+", module_path)
+        ):
+            return {"error": "invalid Metasploit module path"}, 400
+        if not isinstance(target_value, str):
+            return {"error": "target must be a string"}, 400
+        for key, value in options.items():
+            if not isinstance(key, str) or not _re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", key):
+                return {"error": "invalid Metasploit option name"}, 400
+            if value is None or isinstance(value, (dict, list, tuple)):
+                return {"error": f"option {key} must be a scalar value"}, 400
+            value_text = str(value)
+            if len(value_text) > 2048 or any(ch in value_text for ch in ("\r", "\n", "\x00")):
+                return {"error": f"option {key} contains invalid or oversized data"}, 400
+        for key in ("RHOSTS", "RHOST"):
+            if options.get(key) is not None and not isinstance(options[key], str):
+                return {"error": f"{key} must be a string"}, 400
 
-        # Scope enforcement is server-side and cannot be disabled by a
-        # request-body flag. Metasploit must have at least one explicit target.
+        target = target_value.strip() or str(options.get("RHOSTS") or options.get("RHOST") or "").strip()
+        session_host = ""
+        if module_type == "post":
+            session_id = options.get("SESSION")
+            if session_id is None or not str(session_id).strip():
+                return {"error": "post modules require a SESSION option"}, 400
+            session_error = _msf_session_scope_error(str(session_id).strip())
+            if session_error:
+                return session_error
+            try:
+                session_info = registry.core.msf.sessions().get(str(session_id).strip()) or {}
+            except Exception:
+                app.logger.exception("Could not read Metasploit session for post module")
+                return {"error": "could not verify post-module session"}, 503
+            session_host = str(session_info.get("target_host") or session_info.get("tunnel_peer") or "").strip()
+            if not session_host:
+                return {"error": "post-module session host is unknown"}, 403
+            if not target:
+                target = session_host
+
+        # Scope enforcement is server-side and cannot be disabled by request data.
         candidates = []
         if target:
-            candidates.append(target)
+            candidates.extend(h.strip() for h in target.split(",") if h.strip())
         rhosts = options.get("RHOSTS") or options.get("RHOST") or ""
         if rhosts:
-            for h in str(rhosts).split(","):
-                h = h.strip()
-                if h and h not in candidates:
-                    candidates.append(h)
+            for host in rhosts.split(","):
+                host = host.strip()
+                if host and host not in candidates:
+                    candidates.append(host)
         if not candidates:
             return {"error": "an explicit in-scope target (RHOST/RHOSTS) is required"}, 400
         for cand in candidates:
@@ -907,15 +982,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/msf/sessions/<session_id>/exec")
     def msf_session_exec(session_id: str):
-        data = request.get_json(silent=True) or {}
-        command = (data.get("command") or "").strip()
-        if not command:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
+        command = data.get("command", "")
+        if not isinstance(command, str) or not command.strip():
             return {"error": "command required"}, 400
+        command = command.strip()
+        if len(command) > 4096 or "\x00" in command:
+            return {"error": "command must be at most 4096 characters and contain no NUL"}, 400
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
 
         client = registry.core.msf
-        if not client.is_up():
-            return {"error": "msf not reachable"}, 503
-
         try:
             output = client.session_exec(session_id, command, timeout=15.0)
         except Exception as e:
@@ -929,9 +1009,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/msf/sessions/<session_id>")
     def msf_session_info(session_id: str):
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
         client = registry.core.msf
-        if not client.is_up():
-            return {"error": "msf not reachable"}, 503
         try:
             live = client.sessions()
             info = live.get(str(session_id))
@@ -1237,6 +1318,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/api/msf/sessions/<session_id>/portfwd")
     def pf_list(session_id: str):
         from whaxon.core import portfwd as _pf
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
         try:
             live = _pf.list_live(registry.core.msf, session_id)
         except Exception as e:
@@ -1246,14 +1330,41 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/msf/sessions/<session_id>/portfwd")
     def pf_add(session_id: str):
         from whaxon.core import portfwd as _pf
-        data = request.get_json(silent=True) or {}
-        lport = data.get("lport"); rhost = data.get("rhost"); rport = data.get("rport")
-        label = (data.get("label") or "").strip()
-        if lport is None or not rhost or rport is None:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
+        lport = data.get("lport")
+        rhost = data.get("rhost")
+        rport = data.get("rport")
+        label = data.get("label", "")
+        if not isinstance(rhost, str) or not rhost.strip() or lport is None or rport is None:
             return {"error": "lport, rhost, rport required"}, 400
+        if not isinstance(label, str) or len(label) > 200:
+            return {"error": "label must be a string of at most 200 characters"}, 400
+        try:
+            if isinstance(lport, bool) or isinstance(rport, bool):
+                raise ValueError
+            local_port = int(lport)
+            remote_port = int(rport)
+            if not 1 <= local_port <= 65535 or not 1 <= remote_port <= 65535:
+                raise ValueError
+        except (TypeError, ValueError):
+            return {"error": "lport and rport must be integers between 1 and 65535"}, 400
+        rhost = rhost.strip()
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
+        try:
+            match = registry.core.scope.check(rhost)
+        except Exception:
+            app.logger.exception("Scope evaluation failed for port-forward destination")
+            return {"error": "scope evaluation failed; port forward was not created"}, 503
+        if not match.allowed:
+            return {"error": f"port-forward destination out of scope: {match.reason}",
+                    "target": rhost, "matched_rule": match.matched_rule}, 403
         try:
             fwd = _pf.add_forward(registry.core.msf, session_id,
-                                  int(lport), str(rhost), int(rport), label)
+                                  local_port, rhost, remote_port, label.strip())
         except Exception as e:
             return {"error": str(e)}, 500
         try:
@@ -1278,11 +1389,22 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.delete("/api/msf/sessions/<session_id>/portfwd")
     def pf_del(session_id: str):
         from whaxon.core import portfwd as _pf
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
         lport = data.get("lport")
-        if lport is None:
-            return {"error": "lport required"}, 400
-        fwd = _pf.Forward(session_id=session_id, lport=int(lport), rhost="", rport=0)
+        try:
+            if isinstance(lport, bool):
+                raise ValueError
+            local_port = int(lport)
+            if not 1 <= local_port <= 65535:
+                raise ValueError
+        except (TypeError, ValueError):
+            return {"error": "lport must be an integer between 1 and 65535"}, 400
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
+        fwd = _pf.Forward(session_id=session_id, lport=local_port, rhost="", rport=0)
         return jsonify(_pf.remove_forward(registry.core.msf, fwd))
 
     @app.get("/api/settings")
