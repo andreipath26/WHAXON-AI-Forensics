@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "whaxon"
-version = "0.11.16"
+version = "1.0.0"
 description = "Deterministic, validated penetration testing platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,7 +28,7 @@ keywords = [
     "python3", "devsecops",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Information Technology",
     "Intended Audience :: System Administrators",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
