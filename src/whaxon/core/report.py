@@ -547,6 +547,16 @@ def _escape_html(s):
     import html as _h
     return _h.escape(str(s if s is not None else ""))
 
+def _safe_count(value, fallback=0):
+    """Convert report counters to bounded non-negative integers."""
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError, OverflowError):
+        try:
+            return max(0, int(fallback))
+        except (TypeError, ValueError, OverflowError):
+            return 0
+
 
 def _md_to_text_exec(report):
     md = []
@@ -587,12 +597,16 @@ def to_html(report, overrides=None, static=False):
     tpl = tpl.replace("{{ENGAGEMENT}}", _escape_html(report.get("engagement", "")))
     
     if static:
-        tpl = tpl.replace(">Loading findings...</p>", f">{payload.get('finding_count', len(findings))} findings identified across {payload.get('job_count', 0)} execution jobs</p>")
+        finding_count = _safe_count(payload.get("finding_count"), len(findings))
+        job_count = _safe_count(payload.get("job_count"), len(payload.get("jobs") or []))
+        tpl = tpl.replace(">Loading findings...</p>", f">{finding_count} findings identified across {job_count} execution jobs</p>")
         sev = payload.get("severity_counts", {})
-        tpl = tpl.replace('id="kpi-critical">0</div>', f'id="kpi-critical">{sev.get("critical", 0)}</div>')
-        tpl = tpl.replace('id="kpi-high">0</div>', f'id="kpi-high">{sev.get("high", 0)}</div>')
-        tpl = tpl.replace('id="kpi-medium">0</div>', f'id="kpi-medium">{sev.get("medium", 0)}</div>')
-        low = sev.get("low", 0) + sev.get("info", 0)
+        if not isinstance(sev, dict):
+            sev = {}
+        tpl = tpl.replace('id="kpi-critical">0</div>', f'id="kpi-critical">{_safe_count(sev.get("critical"))}</div>')
+        tpl = tpl.replace('id="kpi-high">0</div>', f'id="kpi-high">{_safe_count(sev.get("high"))}</div>')
+        tpl = tpl.replace('id="kpi-medium">0</div>', f'id="kpi-medium">{_safe_count(sev.get("medium"))}</div>')
+        low = _safe_count(sev.get("low")) + _safe_count(sev.get("info"))
         tpl = tpl.replace('id="kpi-low">0</div>', f'id="kpi-low">{low}</div>')
         
         rows = []
