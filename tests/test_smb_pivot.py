@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -79,7 +79,7 @@ def test_smb_happy_path(monkeypatch):
 
         async def communicate(input=None):
             captured["stdin"] = input
-            return b"Share1 Disk\\nShare2 Disk\\n", b""
+            return b"Share1 Disk\nShare2 Disk\n", b""
 
         proc.communicate = communicate
         proc.returncode = 0
@@ -92,7 +92,7 @@ def test_smb_happy_path(monkeypatch):
     assert captured["argv"][0] == "impacket-smbclient"
     assert "user@10.0.0.5" in captured["argv"][1]
     assert "pw" not in " ".join(captured["argv"])
-    assert captured["stdin"].startswith(b"pw\\nshares\\nexit\\n")
+    assert captured["stdin"].startswith(b"pw\nshares\nexit\n")
     assert captured["kwargs"]["start_new_session"] is True
 
 
