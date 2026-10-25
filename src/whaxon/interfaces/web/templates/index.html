@@ -69,13 +69,13 @@
         </div>
 
         <div class="toolbar">
-          <span class="chip on">All <span class="ct">52</span></span>
-          <span class="chip">Critical <span class="ct">3</span></span>
-          <span class="chip">High <span class="ct">8</span></span>
-          <span class="chip">Medium <span class="ct">14</span></span>
-          <span class="chip">Low <span class="ct">27</span></span>
-          <span class="chip">Verified <span class="ct">18</span></span>
-          <span class="chip">Candidate <span class="ct">34</span></span>
+          <span class="chip on" data-filter="all">All <span class="ct" id="filter-count-all">0</span></span>
+          <span class="chip" data-filter="critical">Critical <span class="ct" id="filter-count-critical">0</span></span>
+          <span class="chip" data-filter="high">High <span class="ct" id="filter-count-high">0</span></span>
+          <span class="chip" data-filter="medium">Medium <span class="ct" id="filter-count-medium">0</span></span>
+          <span class="chip" data-filter="low">Low / Info <span class="ct" id="filter-count-low">0</span></span>
+          <span class="chip" data-filter="verified">Verified <span class="ct" id="filter-count-verified">0</span></span>
+          <span class="chip" data-filter="candidate">Candidate <span class="ct" id="filter-count-candidate">0</span></span>
           <span class="spacer"></span>
           <div class="density-toggle"><button class="on" data-density="comfortable">Comfortable</button><button data-density="compact">Compact</button></div>
         </div>
@@ -103,7 +103,7 @@
           <button class="btn btn-sm btn-success" style="display:none;">Mark verified</button>
           <button class="btn btn-sm btn-ghost" style="display:none;">Export</button>
           <button class="btn btn-sm btn-danger" style="display:none;">Delete</button>
-          <button class="btn btn-sm btn-ghost">Clear</button>
+          <button class="btn btn-sm btn-ghost" id="bulk-clear-btn">Clear</button>
         </div>
       </section>
  
@@ -118,7 +118,7 @@
           <div>
             <div class="card card-pad-lg" style="margin-bottom:16px;">
               <div class="form-row"><label class="form-label">Target</label><input class="form-input" id="run-target" placeholder="host, IP, or URL"></div>
-              <div class="form-row"><label class="form-label">Extra arguments <span class="hint">optional</span></label><input class="form-input" id="run-extra" placeholder="tool flags"></div>
+              <div class="form-row"><label class="form-label">Extra arguments <span class="hint">not available in the web runner</span></label><input class="form-input" id="run-extra" placeholder="Use the CLI for tool-specific flags" disabled aria-describedby="run-extra-help"><div id="run-extra-help" class="form-hint">Arbitrary arguments are disabled for safety. Use the CLI for advanced tool options.</div></div>
               <div style="display:flex; gap:8px; align-items:center;">
                 <button class="btn btn-primary btn-lg" id="run-btn">▶ Run</button>
                 <button class="btn btn-ghost" id="run-cancel-btn" disabled>Cancel</button>
