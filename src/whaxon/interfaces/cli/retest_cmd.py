@@ -102,6 +102,7 @@ def main(args: list[str] | None = None) -> int:
         source=target_f["source"],
         data=target_f["data"],
         raw_line=target_f["raw_line"],
+        request_context=target_f.get("request_context") or {},
     )
 
     if verbose:

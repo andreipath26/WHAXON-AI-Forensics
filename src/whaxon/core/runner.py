@@ -85,7 +85,7 @@ class ToolRunner:
         # contain control characters. Even if scope enforcement lets the
         # target through (override path, session paths), the argv builder
         # must not construct an argument that changes the tool's behavior.
-        if not target or target.startswith("-") or chr(10) in target or chr(13) in target:
+        if not target or target.startswith("-") or any(char.isspace() for char in target):
             raise ValueError(f"refusing to build argv for unsafe target: {target!r}")
         template = tool.args or "{target}"
 
@@ -98,14 +98,16 @@ class ToolRunner:
             raise ValueError(f"bad extra args: {e}") from e
         target_override_flags = {
             "-u", "--url", "-h", "--host", "--target", "--target-url",
-            "--targets", "--target-list", "-il", "--input-list",
+            "--targets", "--target-list", "--domain", "--domains",
+            "--target-ip", "--target-host", "-il", "--input-list",
             "--input-file", "--targets-file", "-ir",
         }
         user_overrides_target = any(
             token.lower() in target_override_flags
             or token.lower().startswith((
                 "--url=", "-u=", "--host=", "--target=", "--target-url=",
-                "--targets=", "--target-list=",
+                "--targets=", "--target-list=", "--domain=", "--domains=",
+                "--target-ip=", "--target-host=", "--input-list=", "--input-file=",
             ))
             or (
                 token.lower().startswith(("-u", "-h", "-il", "-ir"))
@@ -117,6 +119,61 @@ class ToolRunner:
             raise ValueError(
                 "extra_args cannot specify alternate targets or target lists; pass the "
                 "authorized target as the positional target argument"
+            )
+
+        # Some tools accept multiple positional targets, so checking only
+        # explicit flags such as -u/--url is insufficient. Reject common
+        # target-shaped values anywhere in extra_args before building argv.
+        import ipaddress
+        import re
+        from urllib.parse import urlsplit
+
+        def _looks_like_target_token(token: str) -> bool:
+            value = token.strip()
+            if not value:
+                return False
+            if value.startswith("-"):
+                return False
+            if "://" in value or value.startswith("//"):
+                parsed = urlsplit(value)
+                return bool(parsed.hostname)
+            if "/" in value:
+                # Some tools accept host/path or CIDR-like target values.
+                # Inspect the authority portion, but do not treat ordinary
+                # relative paths such as /admin as an alternate host.
+                authority = value.split("/", 1)[0]
+                if authority and _looks_like_target_token(authority):
+                    return True
+            try:
+                ipaddress.ip_address(value.strip("[]"))
+                return True
+            except ValueError:
+                pass
+            try:
+                ipaddress.ip_network(value, strict=False)
+                return True
+            except ValueError:
+                pass
+            host = value
+            if host.count(":") == 1:
+                possible_host, possible_port = host.rsplit(":", 1)
+                if possible_port.isdigit():
+                    host = possible_host
+            if host.lower() == "localhost":
+                return True
+            if "." not in host:
+                return False
+            labels = host.rstrip(".").split(".")
+            return all(
+                label and len(label) <= 63
+                and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label)
+                for label in labels
+            )
+
+        if any(_looks_like_target_token(token) for token in extra_tokens):
+            raise ValueError(
+                "extra_args cannot include a second target or target network; "
+                "pass the authorized target as the positional target argument"
             )
 
         try:

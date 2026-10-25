@@ -109,3 +109,107 @@ def test_store_round_trips_canonical_request_context(tmp_path):
     saved = store.get_findings("job-context")
     assert saved is not None
     assert saved[0]["request_context"] == context
+
+
+def test_cli_validate_restores_request_context(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from whaxon.interfaces.cli import validate_cmd
+
+    context = {"url": "https://example.test/item?id=1", "method": "GET", "parameter": "id"}
+    finding_row = {
+        "seq": 0,
+        "kind": "sqli",
+        "severity": "high",
+        "source": "sqlmap",
+        "data": {"parameter": "id"},
+        "raw_line": "SQL injection",
+        "request_context": context,
+    }
+    store = SimpleNamespace(
+        get_findings=lambda job_id: [finding_row],
+        get=lambda job_id: {"target": "https://example.test"},
+        update_verification=lambda *args, **kwargs: None,
+        set_proof=lambda *args, **kwargs: None,
+    )
+    core = SimpleNamespace(
+        initialize=_async_noop,
+        store=store,
+        scope=SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True, reason="")),
+    )
+    monkeypatch.setattr(validate_cmd, "Core", lambda data_dir: core)
+    seen = {}
+
+    class FakeValidator:
+        def __init__(self, payload_dir):
+            pass
+
+        def validate(self, finding, target_url=None):
+            seen["context"] = finding.request_context
+            return "candidate", "test"
+
+    monkeypatch.setattr(validate_cmd, "Validator", FakeValidator)
+
+    assert validate_cmd.main(["job-cli", "0", "--data", str(tmp_path)]) == validate_cmd.EXIT_OK
+    assert seen["context"] == context
+
+
+def test_cli_retest_restores_request_context(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from whaxon.interfaces.cli import retest_cmd
+
+    context = {"url": "https://example.test/item?id=1", "method": "GET", "parameter": "id"}
+    finding_row = {
+        "seq": 0,
+        "kind": "sqli",
+        "severity": "high",
+        "source": "sqlmap",
+        "data": {"parameter": "id"},
+        "raw_line": "SQL injection",
+        "verification_status": "verified",
+        "request_context": context,
+    }
+    store = SimpleNamespace(
+        get_findings=lambda job_id: [finding_row],
+        get=lambda job_id: {"target": "https://example.test"},
+        update_verification=lambda *args, **kwargs: None,
+    )
+    core = SimpleNamespace(
+        initialize=_async_noop,
+        store=store,
+        scope=SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True, reason="")),
+    )
+    monkeypatch.setattr(retest_cmd, "Core", lambda data_dir: core)
+    seen = {}
+
+    class FakeValidator:
+        def __init__(self, payload_dir):
+            pass
+
+        def revalidate(self, finding, target_url=None):
+            seen["context"] = finding.request_context
+            return "inconclusive", "test"
+
+    monkeypatch.setattr(retest_cmd, "Validator", FakeValidator)
+
+    assert retest_cmd.main(["job-cli", "0", "--data", str(tmp_path)]) == retest_cmd.EXIT_OK
+    assert seen["context"] == context
+
+
+async def _async_noop():
+    return None
+
+
+def test_cli_validate_unknown_job_returns_not_found(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from whaxon.interfaces.cli import validate_cmd
+
+    store = SimpleNamespace(get_findings=lambda job_id: None)
+    core = SimpleNamespace(initialize=_async_noop, store=store)
+    monkeypatch.setattr(validate_cmd, "Core", lambda data_dir: core)
+
+    assert validate_cmd.main(["missing-job", "0", "--data", str(tmp_path)]) == (
+        validate_cmd.EXIT_NOT_FOUND
+    )
