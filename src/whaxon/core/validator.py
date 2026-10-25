@@ -82,7 +82,7 @@ class Validator:
     # the submitted value therefore cannot satisfy the check.
     CMDI_MARKER_PREFIX = "whaxon_cmdi_"
 
-    REPLAYABLE = {"sqli": "sql", "xss": "xss", "command_injection": "cmdi"}
+    REPLAYABLE = {"sqli": "sql", "sql_injection": "sql", "xss": "xss", "command_injection": "cmdi"}
 
     def __init__(self, payload_dir: Path, timing_threshold: float = 3.0):
         self.loader = PayloadLoader(payload_dir)
