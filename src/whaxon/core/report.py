@@ -545,7 +545,7 @@ def _load_config_meta(overrides=None):
 
 def _escape_html(s):
     import html as _h
-    return _h.escape(s)
+    return _h.escape(str(s if s is not None else ""))
 
 
 def _md_to_text_exec(report):
@@ -584,7 +584,7 @@ def to_html(report, overrides=None, static=False):
     payload["unique_findings"] = findings
     safe = json.dumps(payload, default=str).replace("<", chr(92) + "u003c")
     tpl = tpl.replace("{{REPORT_JSON}}", safe)
-    tpl = tpl.replace("{{ENGAGEMENT}}", str(report.get("engagement", "")))
+    tpl = tpl.replace("{{ENGAGEMENT}}", _escape_html(report.get("engagement", "")))
     
     if static:
         tpl = tpl.replace(">Loading findings...</p>", f">{payload.get('finding_count', len(findings))} findings identified across {payload.get('job_count', 0)} execution jobs</p>")
@@ -597,21 +597,25 @@ def to_html(report, overrides=None, static=False):
         
         rows = []
         for f in findings:
-            sev_val = f.get("severity", "info").lower()
-            title = f.get("kind", "Finding")
-            target = f.get("target", "Unknown")
-            source = f.get("kind", "Adapter")
-            status = f.get("status", "candidate")
-            color = "var(--low)" if status == "verified" else "var(--text-muted)"
-            vstat = f.get("verification_status") or "candidate"
-            vby = f.get("verified_by") or "engine"
-            vreason = f.get("verification_reason") or ""
-            vcell = f'<span class="pill pill-{vstat if vstat in ("verified","refuted") else "info"}" style="font-size:11px;">{vstat}</span> <small style="color:var(--text-muted); font-size:11px;">by {vby}'
+            raw_severity = str(f.get("severity") or "info").lower()
+            sev_val = raw_severity if raw_severity in ("critical", "high", "medium", "low", "info") else "info"
+            title = _escape_html(f.get("kind") or "Finding")
+            target = _escape_html(f.get("target") or "Unknown")
+            source = _escape_html(f.get("kind") or "Adapter")
+            status_raw = str(f.get("status") or "candidate")
+            status = _escape_html(status_raw)
+            color = "var(--low)" if status_raw == "verified" else "var(--text-muted)"
+            raw_vstat = str(f.get("verification_status") or "candidate")
+            vstat_class = raw_vstat if raw_vstat in ("verified", "refuted") else "info"
+            vstat = _escape_html(raw_vstat)
+            vby = _escape_html(f.get("verified_by") or "engine")
+            vreason = _escape_html(f.get("verification_reason") or "")
+            vcell = f'<span class="pill pill-{vstat_class}" style="font-size:11px;">{vstat}</span> <small style="color:var(--text-muted); font-size:11px;">by {vby}'
             if vreason:
-                vcell += ' \u2014 ' + vreason
+                vcell += ' — ' + vreason
             vcell += '</small>'
             rows.append(f'<tr><td><span class="pill pill-{sev_val}">{sev_val}</span></td><td style="font-weight:600;">{title}</td><td style="font-family:var(--font-mono); font-size:12px;">{target}</td><td><span class="chip">{source}</span></td><td><span style="color:{color}; font-size:12px;">{status}</span></td><td>{vcell}</td></tr>')
-            
+
         tpl = tpl.replace('<tbody id="findings-tbody">\n        <!-- Dynamic Rows -->\n      </tbody>', f'<tbody id="findings-tbody">{"".join(rows)}</tbody>')
         tpl = tpl.replace('id="donut-summary">0 findings total</div>', f'id="donut-summary">{len(findings)} findings total</div>')
         
