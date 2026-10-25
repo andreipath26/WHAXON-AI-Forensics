@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import socket
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -256,27 +257,69 @@ class ScopeManager:
         if not self._enabled:
             return ScopeMatch(allowed=True, reason="scope disabled")
 
-        host, _kind = _normalize_target(raw_target)
+        host, kind = _normalize_target(raw_target)
         if not host:
             return ScopeMatch(allowed=False, reason="empty target", matched_rule="")
 
-        # CIDR rules are evaluated for every target, not only bare IPs: a URL's
-        # host can be an IP literal (http://127.0.0.1:8099/ping). Gating the IP
-        # matcher on kind == "ip" let such URLs bypass both in-scope and
-        # out-of-scope ranges — the out-of-scope case being a deny path that
-        # silently stopped denying.
-        # Both matchers are safe to try in order: _rule_matches_ip returns
-        # False for hostnames, and _rule_matches_host returns False for CIDR
-        # rules.
-
-        # Out-of-scope wins
+        # Direct host/IP rules are evaluated before DNS. Out-of-scope always wins.
         for rule in self._out:
             if _rule_matches_ip(rule, host) or _rule_matches_host(rule, host):
                 return ScopeMatch(False, "matches out-of-scope rule", rule)
 
-        # In-scope required
-        for rule in self._in:
-            if _rule_matches_ip(rule, host) or _rule_matches_host(rule, host):
-                return ScopeMatch(True, "matches in-scope rule", rule)
+        resolved_ips: set[str] = set()
+        if kind == "ip":
+            resolved_ips.add(str(ipaddress.ip_address(host)))
+        else:
+            # A hostname can resolve outside an IP/CIDR-only engagement. Check
+            # its current A/AAAA answers before authorizing a network operation.
+            # This is a preflight guard, not a substitute for network-level
+            # egress enforcement: tools may resolve the name again at connect
+            # time, so DNS rebinding must also be controlled at the network layer.
+            try:
+                answers = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+                for answer in answers:
+                    address = answer[4][0].split("%", 1)[0]
+                    resolved_ips.add(str(ipaddress.ip_address(address)))
+            except (OSError, ValueError):
+                return ScopeMatch(
+                    False,
+                    "hostname resolution failed; scope cannot be confirmed",
+                    host,
+                )
+            if not resolved_ips:
+                return ScopeMatch(
+                    False,
+                    "hostname resolved to no addresses; scope cannot be confirmed",
+                    host,
+                )
 
-        return ScopeMatch(False, "no matching in-scope rule", "")
+        # Out-of-scope IP/CIDR rules also apply to hostname resolutions.
+        for rule in self._out:
+            for address in resolved_ips:
+                if _rule_matches_ip(rule, address):
+                    return ScopeMatch(
+                        False, "resolved address matches out-of-scope rule", rule
+                    )
+
+        # An explicit hostname rule authorizes that hostname, subject to the
+        # out-of-scope checks above. Otherwise every resolved address must
+        # match an in-scope IP/CIDR rule; one in-scope answer is not enough if
+        # the same name also resolves to an unauthorized address.
+        for rule in self._in:
+            if _rule_matches_host(rule, host):
+                return ScopeMatch(True, "matches in-scope hostname rule", rule)
+
+        if resolved_ips and all(
+            any(_rule_matches_ip(rule, address) for rule in self._in)
+            for address in resolved_ips
+        ):
+            matched = next(
+                (
+                    rule for rule in self._in
+                    if any(_rule_matches_ip(rule, address) for address in resolved_ips)
+                ),
+                "",
+            )
+            return ScopeMatch(True, "all resolved addresses match in-scope rules", matched)
+
+        return ScopeMatch(False, "no matching in-scope rule for host or resolved addresses", "")
