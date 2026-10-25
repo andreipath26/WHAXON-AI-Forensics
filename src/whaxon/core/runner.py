@@ -128,7 +128,11 @@ class ToolRunner:
 
         def _looks_like_target_token(token: str) -> bool:
             value = token.strip()
-            if not value or value.startswith("-"):
+            if not value:
+                return False
+            if value.startswith("-"):
+                if "=" in value:
+                    return _looks_like_target_token(value.split("=", 1)[1])
                 return False
             if value.lower().startswith(("http://", "https://")):
                 parsed = urlsplit(value)
