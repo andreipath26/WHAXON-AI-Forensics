@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/health") return response({ ok: true });
-    if (url === "/api/tools") return response([]);
+    if (url === "/api/tools") return response([{ id: "nmap", name: "Nmap" }]);
     if (url === "/api/scope") return response({ enabled: true, in_scope: ["127.0.0.0/8"] });
     if (url === "/api/scope/check") return response({ allowed: false, reason: "not in scope" });
     return response({ error: "not found" }, 404);
@@ -63,5 +63,34 @@ describe("Obsidian Kinetic React shell", () => {
     expect(form).not.toBeNull();
     await act(async () => form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(host.textContent).toContain("not in scope");
+  });
+
+  it("does not submit a run when the scope preflight denies the target", async () => {
+    const fetchMock = vi.mocked(fetch);
+    await act(async () => root.render(<App />));
+    const nav = Array.from(host.querySelectorAll("button")).find((button) => button.textContent === "Run orchestration");
+    await act(async () => nav?.click());
+
+    const targetInput = host.querySelector<HTMLInputElement>("#run-target");
+    const toolSelect = host.querySelector<HTMLSelectElement>("#run-tool");
+    const form = targetInput?.closest("form");
+    expect(targetInput).not.toBeNull();
+    expect(toolSelect).not.toBeNull();
+    expect(form).not.toBeNull();
+
+    await act(async () => {
+      if (!targetInput || !toolSelect) throw new Error("Run form controls missing");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(targetInput, "example.invalid");
+      targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+      targetInput.dispatchEvent(new Event("change", { bubbles: true }));
+      const selectSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      selectSetter?.call(toolSelect, "nmap");
+      toolSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () => form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+
+    expect(host.textContent).toContain("not confirmed in scope");
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/run")).toBe(false);
   });
 });
