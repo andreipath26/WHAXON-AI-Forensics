@@ -20,7 +20,8 @@
       <button class="nav-item" data-view="run"><span>▶</span> Run orchestration</button>
       <button class="nav-item" data-view="findings"><span>⌁</span> Verified findings</button>
       <button class="nav-item" data-view="retest"><span>↻</span> Remediation &amp; retest</button>
-      <button class="nav-item" data-view="approvals"><span>✓</span> Trust layer</button>
+      <button class="nav-item" data-view="approvals"><span>✓</span> Finding review</button>
+      <button class="nav-item" data-view="ai-gate"><span>⟁</span> AI strategy gate</button>
       <button class="nav-item" data-view="reports"><span>▤</span> Coverage &amp; reports</button>
       <div class="side-label side-label-gap">SYSTEM</div>
       <button class="nav-item" data-view="history"><span>◷</span> Job history</button>
@@ -75,6 +76,11 @@
     <section class="view" id="view-approvals">
       <div class="section-intro"><div><div class="eyebrow">HUMAN-IN-THE-LOOP</div><h2>Trust layer</h2><p>Review unverified findings. Human decisions are recorded as human review, not as deterministic engine validation.</p></div><button class="btn btn-quiet" data-refresh="report">Reload queue</button></div>
       <article class="panel"><div class="table-wrap"><table><thead><tr><th>Finding</th><th>Target</th><th>Current state</th><th>Decision</th></tr></thead><tbody id="approvals-body"><tr><td colspan="4" class="empty">Loading review queue…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-ai-gate">
+      <div class="section-intro"><div><div class="eyebrow">HUMAN-IN-THE-LOOP CONTROL</div><h2>AI strategy gate</h2><p>Review AI runs waiting for operator input. These decisions gate the AI workflow; they do not verify vulnerability findings.</p></div><button class="btn btn-quiet" id="ai-pending-refresh">Reload pending runs</button></div>
+      <article class="panel"><div class="table-tools"><input id="ai-owner-filter" type="search" placeholder="Filter by owner…"></div><div id="ai-pending-list" class="health-list"><div class="empty">Loading pending AI runs…</div></div></article>
+      <article class="panel" style="margin-top:15px"><div class="panel-heading"><h3>Recent AI run history</h3><button class="btn btn-quiet" id="ai-history-refresh">Reload history</button></div><div class="table-wrap"><table><thead><tr><th>Run</th><th>Status</th><th>Goal</th><th>Provider</th></tr></thead><tbody id="ai-history-body"><tr><td colspan="4" class="empty">Loading AI run history…</td></tr></tbody></table></div></article>
     </section>
     <section class="view" id="view-reports">
       <div class="section-intro"><div><div class="eyebrow">TRANSPARENT OUTPUT</div><h2>Coverage &amp; reports</h2><p>Export report formats from the current persisted engagement data. Report contents reflect recorded data; they do not imply unperformed tests.</p></div></div>
