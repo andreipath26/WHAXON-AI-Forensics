@@ -1093,6 +1093,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             kind=target_f["kind"], severity=target_f["severity"],
             source=target_f["source"], data=target_f["data"],
             raw_line=target_f["raw_line"],
+            request_context=target_f.get("request_context") or {},
         )
         pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
         v = Validator(pkg_payloads)
@@ -1128,6 +1129,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             kind=target_f["kind"], severity=target_f["severity"],
             source=target_f["source"], data=target_f["data"],
             raw_line=target_f["raw_line"],
+            request_context=target_f.get("request_context") or {},
         )
         pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
         v = Validator(pkg_payloads)
