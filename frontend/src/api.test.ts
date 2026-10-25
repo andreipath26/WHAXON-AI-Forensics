@@ -23,6 +23,6 @@ describe("typed API client", () => {
       headers: { "Content-Type": "application/json" },
     })));
     await expect(api("/api/run", { method: "POST", body: "{}" }))
-      .rejects.toMatchObject<ApiError>({ message: "scope denied", status: 403 });
+      .rejects.toMatchObject({ message: "scope denied", status: 403 });
   });
 });
