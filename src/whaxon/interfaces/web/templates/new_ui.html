@@ -21,6 +21,7 @@
       <button class="nav-item" data-view="reports"><span>▤</span> Coverage &amp; reports</button>
       <div class="side-label side-label-gap">SYSTEM</div>
       <button class="nav-item" data-view="history"><span>◷</span> Job history</button>
+      <button class="nav-item" data-view="evidence"><span>▧</span> Evidence inspector</button>
       <button class="nav-item" data-view="sessions"><span>⌘</span> Sessions</button>
       <button class="nav-item" data-view="catalog"><span>☷</span> Adapter catalog</button>
       <button class="nav-item" data-view="health"><span>⌁</span> Diagnostics</button>
@@ -79,6 +80,11 @@
     <section class="view" id="view-history">
       <div class="section-intro"><div><div class="eyebrow">PERSISTED EXECUTIONS</div><h2>Job history</h2><p>Historical job records returned by the framework's store.</p></div><button class="btn btn-quiet" data-refresh="history">Reload history</button></div>
       <article class="panel"><div class="table-wrap"><table><thead><tr><th>Job</th><th>Tool</th><th>Target</th><th>Status</th><th>Details</th></tr></thead><tbody id="history-body"><tr><td colspan="5" class="empty">Loading history…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-evidence">
+      <div class="section-intro"><div><div class="eyebrow">PERSISTED ARTIFACTS</div><h2>Evidence inspector</h2><p>Browse evidence attached to a recorded job, add analyst notes, upload supporting files, and download stored artifacts.</p></div><button class="btn btn-quiet" id="evidence-refresh">Reload evidence</button></div>
+      <article class="panel"><div class="stack"><label for="evidence-job">Job</label><select id="evidence-job"><option value="">Choose a recorded job</option></select></div><div id="evidence-list" class="health-list"><div class="empty">Choose a job to inspect evidence.</div></div></article>
+      <div class="content-grid"><article class="panel"><div class="panel-heading"><h3>Add analyst note</h3></div><form id="evidence-note-form" class="stack"><label for="evidence-note-name">Note title</label><input id="evidence-note-name" maxlength="200" value="Analyst note" required><label for="evidence-note">Note</label><textarea id="evidence-note" rows="4" maxlength="10000" required placeholder="Record context, reproduction notes or review observations…"></textarea><button class="btn btn-primary" type="submit">Save note</button></form></article><article class="panel"><div class="panel-heading"><h3>Upload supporting file</h3></div><form id="evidence-file-form" class="stack"><label for="evidence-file">File (up to server upload limit)</label><input id="evidence-file" type="file" required><label for="evidence-file-note">Context (optional)</label><input id="evidence-file-note" maxlength="10000" placeholder="What does this artifact demonstrate?"><button class="btn btn-primary" type="submit">Upload evidence</button><p class="help">Files are stored within the selected job's evidence directory. Upload limits are enforced by the server.</p></form></article></div>
     </section>
     <section class="view" id="view-sessions">
       <div class="section-intro"><div><div class="eyebrow">METASPLOIT INTEGRATION</div><h2>Sessions</h2><p>Read-only session status. Interactive session control is not exposed here unless a safe supported workflow is implemented.</p></div><button class="btn btn-quiet" id="sessions-refresh">Reload sessions</button></div>
