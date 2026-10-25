@@ -391,7 +391,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except ValueError:
             loopback_listener = configured_host.lower() == "localhost"
 
-        if loopback_listener:
+        # Also apply the host check to loopback clients when the server is
+        # bound to 0.0.0.0/::; otherwise a local browser can reach that listener
+        # through an attacker-controlled DNS-rebinding hostname.
+        if loopback_listener or request.remote_addr in ("127.0.0.1", "::1"):
             request_host = request.host
             if request_host.startswith("[") and "]" in request_host:
                 request_hostname = request_host[1:request_host.index("]")]
@@ -399,8 +402,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 request_hostname = request_host.rsplit(":", 1)[0]
             else:
                 request_hostname = request_host
-            if request_hostname.lower().rstrip(".") not in {"localhost", "127.0.0.1", "::1"}:
-                return {"error": "invalid Host for loopback listener"}, 403
+            allowed_hosts = {"localhost", "127.0.0.1", "::1"}
+            allowed_hosts.update(
+                item.strip().lower().rstrip(".")
+                for item in _os.environ.get("WHAXON_ALLOWED_HOSTS", "").split(",")
+                if item.strip()
+            )
+            if request_hostname.lower().rstrip(".") not in allowed_hosts:
+                return {"error": "invalid Host for local request"}, 403
 
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
