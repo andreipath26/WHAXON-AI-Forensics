@@ -63,9 +63,11 @@ def test_validate_route_candidate_on_non_replayable(live_server):
     job_id, seq = _seed_sqli_job(live_server)
     status, body = _post(f"{live_server}/api/validate/{job_id}/{seq}")
     assert status == 200
-    # open_port and similar are not replayable. candidate is correct.
-    assert body["status"] in ("candidate", "verified", "refuted")
+    # open_port is observational, not replayable. It must not be promoted
+    # by a validation endpoint that has no observation-probe implementation.
+    assert body["status"] == "candidate"
     assert "reason" in body
+    assert body["reason"]
 
 
 def test_retest_route_requires_verified(live_server):
