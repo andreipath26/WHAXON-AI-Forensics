@@ -130,10 +130,9 @@
 <!-- COMMAND PALETTE -->
 <div class="palette-overlay" id="palette">
   <div class="palette">
-    <input class="palette-input" placeholder="Type a command, tool, target, or finding…" id="palette-input">
-    <div class="palette-results">
-      <div class="palette-group">Search</div>
-      <div class="palette-item" style="color:var(--text-dim); font-size:var(--t-sm); padding:12px 14px;">Type to filter findings and tools. Search arrives in the next release.</div>
+    <input class="palette-input" placeholder="Search pages, findings, and tools…" id="palette-input" autocomplete="off" aria-label="Search pages, findings, and tools">
+    <div class="palette-results" role="listbox" aria-label="Command palette results">
+      <div class="palette-item">Type to search pages, findings, and tools.</div>
     </div>
   </div>
 </div>
