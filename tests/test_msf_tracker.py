@@ -147,12 +147,15 @@ def test_start_then_stop(tmp_path):
     tracker._interval = 0.05
 
     tracker.start()
-    # First poll happens immediately; wait up to 1s for the store row.
-    deadline = time.time() + 1.0
-    while time.time() < deadline and not store.list_sessions():
+    # Wait for the event itself, not the store row: the tracker writes the
+    # row immediately before publishing SessionStarted, so polling the store
+    # can observe the intermediate state and race the event assertion.
+    deadline = time.time() + 2.0
+    while time.time() < deadline and not rec.started:
         time.sleep(0.02)
 
     assert len(rec.started) == 1
+    assert len(store.list_sessions()) == 1
     tracker.stop()
     assert tracker._thread is None or not tracker._thread.is_alive()
 
