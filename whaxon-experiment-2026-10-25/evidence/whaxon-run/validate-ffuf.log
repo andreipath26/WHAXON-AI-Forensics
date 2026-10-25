@@ -1,0 +1,36 @@
+########## whaxon validate 86c7295507ae 0
+[verbose] target_url='https://pentest-ground.com:4280'
+[verbose] finding kind='found_path' data={'path': 'login.php', 'status': 200, 'size': None}
+[verbose] payloads_dir=/workspace/chats/631d3594b40a92b083bca535/work/WHAXON/src/whaxon/data/payloads
+[verbose] result status='candidate' reason="kind 'found_path' is not directly replayable"
+[*] Validating found_path (job 86c7295507ae, seq 0)...
+[=] Verification status: CANDIDATE
+    Reason: kind 'found_path' is not directly replayable
+EXIT=0
+########## whaxon validate 86c7295507ae 9
+[verbose] target_url='https://pentest-ground.com:4280'
+[verbose] finding kind='found_path' data={'path': '.htaccess', 'status': 200, 'size': None}
+[verbose] payloads_dir=/workspace/chats/631d3594b40a92b083bca535/work/WHAXON/src/whaxon/data/payloads
+[verbose] result status='candidate' reason="kind 'found_path' is not directly replayable"
+[*] Validating found_path (job 86c7295507ae, seq 9)...
+[=] Verification status: CANDIDATE
+    Reason: kind 'found_path' is not directly replayable
+EXIT=0
+########## whaxon validate 86c7295507ae 11
+[verbose] target_url='https://pentest-ground.com:4280'
+[verbose] finding kind='found_path' data={'path': 'server-status', 'status': 200, 'size': None}
+[verbose] payloads_dir=/workspace/chats/631d3594b40a92b083bca535/work/WHAXON/src/whaxon/data/payloads
+[verbose] result status='candidate' reason="kind 'found_path' is not directly replayable"
+[*] Validating found_path (job 86c7295507ae, seq 11)...
+[=] Verification status: CANDIDATE
+    Reason: kind 'found_path' is not directly replayable
+EXIT=0
+########## whaxon validate 86c7295507ae 3
+[verbose] target_url='https://pentest-ground.com:4280'
+[verbose] finding kind='found_path' data={'path': 'phpinfo.php', 'status': 200, 'size': None}
+[verbose] payloads_dir=/workspace/chats/631d3594b40a92b083bca535/work/WHAXON/src/whaxon/data/payloads
+[verbose] result status='candidate' reason="kind 'found_path' is not directly replayable"
+[*] Validating found_path (job 86c7295507ae, seq 3)...
+[=] Verification status: CANDIDATE
+    Reason: kind 'found_path' is not directly replayable
+EXIT=0

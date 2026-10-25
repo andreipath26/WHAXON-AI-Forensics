@@ -1,0 +1,11 @@
+{
+  "files": [
+    {
+      "path": "evidence/whaxon-run/whaxon.db",
+      "before": "4926b8b0362a1b4ed23d5678931f0ff4d75122b9c3e1a4ad741745dbff24fe04",
+      "after": "4926b8b0362a1b4ed23d5678931f0ff4d75122b9c3e1a4ad741745dbff24fe04",
+      "replacements": 3,
+      "transformation": "session-id values replaced in findings.data_json/raw_line and lines.text"
+    }
+  ]
+}

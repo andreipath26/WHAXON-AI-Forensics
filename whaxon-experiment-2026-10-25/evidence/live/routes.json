@@ -1,0 +1,353 @@
+{
+  "experiment": "E4/E5/E6",
+  "target": "https://pentest-ground.com:4280",
+  "authenticated": false,
+  "timestamp_utc": "2026-10-25T12:04:49.764Z",
+  "marker": "whaxon_probe_7f3a9c",
+  "results": [
+    {
+      "label": "home",
+      "path": "/index.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "is the app reachable at all",
+      "status": 200,
+      "bytes": 5930,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Welcome :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Welcome to Damn Vulnerable Web Application! Damn Vulnerable Web Application (DVWA) is a PHP/MySQL web application that is damn vulnerable. Its main goal is to be an aid for security professionals to test their skills and tools in a legal environment, help web develop",
+      "sha256_body": "c85abb2acd9eda01b0b21431fcc6ddc705fa831a07a73bdb72f736d19429a9e3",
+      "timestamp_utc": "2026-10-25T12:04:37.999Z"
+    },
+    {
+      "label": "login",
+      "path": "/login.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "login form + CSRF token presence",
+      "status": 200,
+      "bytes": 1395,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [
+        "login_required"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Login :: Damn Vulnerable Web Application (DVWA) --> Username Password --> --> Damn Vulnerable Web Application (DVWA) --> -->",
+      "sha256_body": "eef734dd9c853ee8f098e9858292f7520253d9fefd1e9d30117b5b369eccba43",
+      "timestamp_utc": "2026-10-25T12:04:38.589Z"
+    },
+    {
+      "label": "setup",
+      "path": "/setup.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "database setup page exposure",
+      "status": 200,
+      "bytes": 5152,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [
+        "phpinfo",
+        "setup_page"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Setup :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Database Setup Click on the 'Create / Reset Database' button below to create or reset your database. If you get an error make sure you have the correct user credentials in: /var/www/html/config/config.inc.php If the database already exists, it will be cleared and the d",
+      "sha256_body": "4f20a224caa64ef455b73fe1c33513e5dc8d6187d8791c74c253e9c2222caeb3",
+      "timestamp_utc": "2026-10-25T12:04:39.254Z"
+    },
+    {
+      "label": "phpinfo",
+      "path": "/phpinfo.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "PHP configuration exposure",
+      "status": 200,
+      "bytes": 87791,
+      "content_type": "text/html; charset=UTF-8",
+      "location": "",
+      "classifications": [
+        "phpinfo"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "body {background-color: #fff; color: #222; font-family: sans-serif;} pre {margin: 0; font-family: monospace;} a {color: inherit;} a:hover {text-decoration: none;} table {border-collapse: collapse; border: 0; width: 934px; box-shadow: 1px 2px 3px rgba(0, 0, 0, 0.2);} .center {text-align: center;} .center table {margin: 1em auto; text-align: left;} .center th {text-align: center !important;} td, th {border: 1px solid #666; font-size: 75%; vertical-align: baseline; padding: 4px 5px;} th {position: sticky; top: 0; background: inherit;} h1 {font-size: 150%;} h2 {font-size: 125%;} h2 > a {text-decor",
+      "sha256_body": "986e976c2acd9b001f11f0a79909fcd0158e9f50d019e2bfd5c645754f48e1a4",
+      "timestamp_utc": "2026-10-25T12:04:40.097Z"
+    },
+    {
+      "label": "instructions",
+      "path": "/instructions.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "static help page",
+      "status": 200,
+      "bytes": 32346,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [
+        "login_required",
+        "setup_page",
+        "upstream_error"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Instructions :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Instructions Read Me PDF Guide Change Log Copying DAMN VULNERABLE WEB APPLICATION Damn Vulnerable Web Application (DVWA) is a PHP/MySQL web application that is damn vulnerable. Its main goal is to be an aid for security professionals to test their skills and too",
+      "sha256_body": "1b54f775cd78fca931ca8e553b0888d3df1a89f78e25e47135f6df3695a614ac",
+      "timestamp_utc": "2026-10-25T12:04:40.702Z"
+    },
+    {
+      "label": "about",
+      "path": "/about.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "static about page",
+      "status": 200,
+      "bytes": 5198,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "About :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout About Damn Vulnerable Web Application (DVWA) is a PHP/MySQL web application that is damn vulnerable. Its main goals are to be an aid for security professionals to test their skills and tools in a legal environment, help web developers better understand the processes of",
+      "sha256_body": "2014348fedf4109aded6bdac4a658214bfaebd054c06b1a979e724587ed2df34",
+      "timestamp_utc": "2026-10-25T12:04:41.386Z"
+    },
+    {
+      "label": "sqli",
+      "path": "/vulnerabilities/sqli/",
+      "params": {
+        "id": "1",
+        "Submit": "Submit"
+      },
+      "experiment": "E4-surface",
+      "intent": "SQL module without a database",
+      "status": 200,
+      "bytes": 461,
+      "content_type": "text/html; charset=UTF-8",
+      "location": "",
+      "classifications": [
+        "fatal_error",
+        "upstream_error"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Fatal error : Uncaught mysqli_sql_exception: Table 'dvwa.users' doesn't exist in /var/www/html/vulnerabilities/sqli/source/low.php:11 Stack trace: #0 /var/www/html/vulnerabilities/sqli/source/low.php(11): mysqli_query(Object(mysqli), 'SELECT first_na...') #1 /var/www/html/vulnerabilities/sqli/index.php(34): require_once('/var/www/html/v...') #2 {main} thrown in /var/www/html/vulnerabilities/sqli/source/low.php on line 11",
+      "sha256_body": "05c5792834f240b826aede03772a6f2651b0d97928ee428e2a1e47a5d4ceec83",
+      "timestamp_utc": "2026-10-25T12:04:42.204Z"
+    },
+    {
+      "label": "sqli_blind",
+      "path": "/vulnerabilities/sqli_blind/",
+      "params": {
+        "id": "1",
+        "Submit": "Submit"
+      },
+      "experiment": "E4-surface",
+      "intent": "blind SQL module without a database",
+      "status": 200,
+      "bytes": 485,
+      "content_type": "text/html; charset=UTF-8",
+      "location": "",
+      "classifications": [
+        "fatal_error",
+        "upstream_error"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Fatal error : Uncaught mysqli_sql_exception: Table 'dvwa.users' doesn't exist in /var/www/html/vulnerabilities/sqli_blind/source/low.php:12 Stack trace: #0 /var/www/html/vulnerabilities/sqli_blind/source/low.php(12): mysqli_query(Object(mysqli), 'SELECT first_na...') #1 /var/www/html/vulnerabilities/sqli_blind/index.php(34): require_once('/var/www/html/v...') #2 {main} thrown in /var/www/html/vulnerabilities/sqli_blind/source/low.php on line 12",
+      "sha256_body": "d493bf79fba6cf2fac9cebbc12de6e0e5302774e9b27aa8ef7e53633fbd46541",
+      "timestamp_utc": "2026-10-25T12:04:42.799Z"
+    },
+    {
+      "label": "xss_r_marker",
+      "path": "/vulnerabilities/xss_r/",
+      "params": {
+        "name": "whaxon_probe_7f3a9c"
+      },
+      "experiment": "E4-surface",
+      "intent": "reflected-XSS module, benign marker (negative control)",
+      "status": 200,
+      "bytes": 4252,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": true,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: Reflected Cross Site Scripting (XSS) :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: Reflected Cross Site Scripting (XSS) What's your name? Hello whaxon_probe_7f3a9c More Information https://owasp.org/www-community/attacks/xss/ https://owasp.org/www-community/xss-filter-evasion-cheatsheet htt",
+      "sha256_body": "2bfb4750a4c3e5d687bdcc21c873c90c32f4727e837efaba43b6c6c2c9cb51c7",
+      "timestamp_utc": "2026-10-25T12:04:43.511Z"
+    },
+    {
+      "label": "xss_r_payload",
+      "path": "/vulnerabilities/xss_r/",
+      "params": {
+        "name": "<script>whaxon_probe_7f3a9c</script>"
+      },
+      "experiment": "E5-xss",
+      "intent": "reflected-XSS module, script payload",
+      "status": 200,
+      "bytes": 4269,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": true,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: Reflected Cross Site Scripting (XSS) :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: Reflected Cross Site Scripting (XSS) What's your name? Hello More Information https://owasp.org/www-community/attacks/xss/ https://owasp.org/www-community/xss-filter-evasion-cheatsheet https://en.wikipedia.or",
+      "sha256_body": "f541da9c1ca267d59f269e5e2c84223b18f33a0ee9cd00a41e36bc2013d8454c",
+      "timestamp_utc": "2026-10-25T12:04:44.307Z"
+    },
+    {
+      "label": "exec_benign",
+      "path": "/vulnerabilities/exec/",
+      "params": {
+        "ip": "127.0.0.1",
+        "Submit": "Submit"
+      },
+      "experiment": "E4-surface",
+      "intent": "command module with a benign, well-formed IP",
+      "status": 200,
+      "bytes": 4093,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: Command Injection :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: Command Injection Ping a device Enter an IP address: More Information https://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution http://www.ss64.com/bash/ http://www.ss64.com/nt/ https://owasp.org/www-community/atta",
+      "sha256_body": "3081f42f2f0c6b262e018ac68b0657c08096fd55e9adae4a8199679e0baa117a",
+      "timestamp_utc": "2026-10-25T12:04:44.885Z"
+    },
+    {
+      "label": "exec_inject",
+      "path": "/vulnerabilities/exec/",
+      "params": {
+        "ip": "127.0.0.1;id",
+        "Submit": "Submit"
+      },
+      "experiment": "E6-command-injection",
+      "intent": "command-separator payload executing read-only `id`",
+      "status": 200,
+      "bytes": 4093,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: Command Injection :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: Command Injection Ping a device Enter an IP address: More Information https://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution http://www.ss64.com/bash/ http://www.ss64.com/nt/ https://owasp.org/www-community/atta",
+      "sha256_body": "3081f42f2f0c6b262e018ac68b0657c08096fd55e9adae4a8199679e0baa117a",
+      "timestamp_utc": "2026-10-25T12:04:45.493Z"
+    },
+    {
+      "label": "fi_lfi",
+      "path": "/vulnerabilities/fi/",
+      "params": {
+        "page": "/etc/passwd"
+      },
+      "experiment": "E4-surface",
+      "intent": "file-inclusion probe for a world-readable OS file",
+      "status": 200,
+      "bytes": 4582,
+      "content_type": "text/html; charset=UTF-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "root:x:0:0:root:/root:/bin/bash daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin bin:x:2:2:bin:/bin:/usr/sbin/nologin sys:x:3:3:sys:/dev:/usr/sbin/nologin sync:x:4:65534:sync:/bin:/bin/sync games:x:5:60:games:/usr/games:/usr/sbin/nologin man:x:6:12:man:/var/cache/man:/usr/sbin/nologin lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin mail:x:8:8:mail:/var/mail:/usr/sbin/nologin news:x:9:9:news:/var/spool/news:/usr/sbin/nologin uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin proxy:x:13:13:proxy:/bin:/usr/sbin/nologin www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin backup:x:34:34:backup:/var/b",
+      "sha256_body": "48513bcf262d05756672e93dd92e10fd378896e3008ffb01ffb9a4ea4a6c2d44",
+      "timestamp_utc": "2026-10-25T12:04:46.290Z"
+    },
+    {
+      "label": "upload",
+      "path": "/vulnerabilities/upload/",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "upload form exposure",
+      "status": 200,
+      "bytes": 3986,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: File Upload :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: File Upload Choose an image to upload: More Information https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload https://www.acunetix.com/websitesecurity/upload-forms-threat/ Username: Unknown Security Level: low Loca",
+      "sha256_body": "3fd4cd0b20b92c90fc6dc88d33cda15bf3cd705e681bdd737f4b3c5be5c15e2b",
+      "timestamp_utc": "2026-10-25T12:04:46.917Z"
+    },
+    {
+      "label": "weak_id",
+      "path": "/vulnerabilities/weak_id/",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "weak session id module",
+      "status": 200,
+      "bytes": 3427,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: Weak Session IDs :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: Weak Session IDs This page will set a new cookie called dvwaSession each time the button is clicked. Username: Unknown Security Level: low Locale: en SQLi DB: mysql Damn Vulnerable Web Application (DVWA)",
+      "sha256_body": "6ff25a9c2fb218f31ca27608b1eba00a8021a76416c0bb0b3ca2deb3329505dd",
+      "timestamp_utc": "2026-10-25T12:04:47.588Z"
+    },
+    {
+      "label": "xss_s",
+      "path": "/vulnerabilities/xss_s/",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "stored XSS module (needs DB)",
+      "status": 200,
+      "bytes": 435,
+      "content_type": "text/html; charset=UTF-8",
+      "location": "",
+      "classifications": [
+        "fatal_error",
+        "upstream_error"
+      ],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Fatal error : Uncaught mysqli_sql_exception: Table 'dvwa.guestbook' doesn't exist in /var/www/html/dvwa/includes/dvwaPage.inc.php:545 Stack trace: #0 /var/www/html/dvwa/includes/dvwaPage.inc.php(545): mysqli_query(Object(mysqli), 'SELECT name, co...') #1 /var/www/html/vulnerabilities/xss_s/index.php(72): dvwaGuestbook() #2 {main} thrown in /var/www/html/dvwa/includes/dvwaPage.inc.php on line 545",
+      "sha256_body": "6d43dfe93264f90ae2b92ddaf80c94675f3b55f28b1d70d1cead8beb832ccae7",
+      "timestamp_utc": "2026-10-25T12:04:48.344Z"
+    },
+    {
+      "label": "csrf",
+      "path": "/vulnerabilities/csrf/",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "CSRF module",
+      "status": 200,
+      "bytes": 5359,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "Vulnerability: Cross Site Request Forgery (CSRF) :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout Vulnerability: Cross Site Request Forgery (CSRF) Change your admin password: Test Credentials New password: Confirm new password: Note: Browsers are starting to default to setting the SameSite cookie flag to Lax, and in doing ",
+      "sha256_body": "fd0f5c93a5b2ed3255bb2483c20a9d54abce8a4ce19545e0e96979bdeb5da35f",
+      "timestamp_utc": "2026-10-25T12:04:49.054Z"
+    },
+    {
+      "label": "security",
+      "path": "/security.php",
+      "params": null,
+      "experiment": "E4-surface",
+      "intent": "security-level selector",
+      "status": 200,
+      "bytes": 4486,
+      "content_type": "text/html;charset=utf-8",
+      "location": "",
+      "classifications": [],
+      "marker_reflected": false,
+      "contains_id_output": false,
+      "excerpt": "DVWA Security :: Damn Vulnerable Web Application (DVWA) Home Instructions Setup / Reset DB Brute Force Command Injection CSRF File Inclusion File Upload Insecure CAPTCHA SQL Injection SQL Injection (Blind) Weak Session IDs XSS (DOM) XSS (Reflected) XSS (Stored) CSP Bypass JavaScript Open HTTP Redirect DVWA Security PHP Info About Logout DVWA Security Security Level Security level is currently: low . You can set the security level to low, medium, high or impossible. The security level changes the vulnerability level of DVWA: Low - This security level is completely vulnerable and has no security",
+      "sha256_body": "33262d1a439db014b13963c9d4fbfaaefcd945681bae33bdac09ba7aa318a74c",
+      "timestamp_utc": "2026-10-25T12:04:49.764Z"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "check_in_scope": {
+    "allowed": true,
+    "reason": "matches in-scope rule",
+    "matched_rule": "127.0.0.1/32"
+  },
+  "check_out_of_scope": {
+    "allowed": false,
+    "reason": "matches out-of-scope rule",
+    "matched_rule": "127.0.0.2"
+  },
+  "port_a": 38405,
+  "port_b": 33467,
+  "runner_job": "66ccc67072f0",
+  "runner_output": [],
+  "direct_out_of_scope_run": "blocked: OutOfScopeError: Out of scope: http://127.0.0.2:33467/escaped \u2014 matches out-of-scope rule",
+  "validator_fetch": "ValueError: redirect blocked by validator (HTTP 302)",
+  "server_a_requests": [
+    {
+      "server": "A(127.0.0.1,in-scope)",
+      "path": "/start",
+      "ts": "2026-10-25T12:21:39Z"
+    },
+    {
+      "server": "A(127.0.0.1,in-scope)",
+      "path": "/start?q=whaxon_baseline",
+      "ts": "2026-10-25T12:21:39Z"
+    }
+  ],
+  "server_b_requests": [
+    {
+      "server": "B(127.0.0.2,OUT-of-scope)",
+      "path": "/escaped",
+      "ts": "2026-10-25T12:21:39Z"
+    }
+  ],
+  "scope_escaped_via_runner": true
+}

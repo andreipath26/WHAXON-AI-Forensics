@@ -1,0 +1,482 @@
+{
+  "experiment": "E9-adapter-fidelity",
+  "synthetic": {
+    "silent_mode_input": [
+      "admin\n",
+      "config\n",
+      "docs\n"
+    ],
+    "silent_mode_findings": [
+      {
+        "kind": "found_path",
+        "severity": "low",
+        "source": "ffuf",
+        "data": {
+          "path": "admin",
+          "status": 200,
+          "size": null
+        },
+        "raw_line": "admin\n"
+      },
+      {
+        "kind": "found_path",
+        "severity": "low",
+        "source": "ffuf",
+        "data": {
+          "path": "config",
+          "status": 200,
+          "size": null
+        },
+        "raw_line": "config\n"
+      },
+      {
+        "kind": "found_path",
+        "severity": "low",
+        "source": "ffuf",
+        "data": {
+          "path": "docs",
+          "status": 200,
+          "size": null
+        },
+        "raw_line": "docs\n"
+      }
+    ],
+    "silent_mode_observation": "input lines carry no HTTP status; the adapter still writes status=200 and size=None",
+    "default_mode_input": [
+      "admin  [Status: 200, Size: 1234]\n",
+      "secret [Status: 403, Size: 289]\n",
+      "missing [Status: 404, Size: 12]\n"
+    ],
+    "default_mode_findings": [
+      {
+        "kind": "found_path",
+        "severity": "low",
+        "source": "ffuf",
+        "data": {
+          "path": "admin",
+          "status": 200,
+          "size": 1234
+        },
+        "raw_line": "admin  [Status: 200, Size: 1234]\n"
+      },
+      {
+        "kind": "found_path",
+        "severity": "info",
+        "source": "ffuf",
+        "data": {
+          "path": "secret",
+          "status": 403,
+          "size": 289
+        },
+        "raw_line": "secret [Status: 403, Size: 289]\n"
+      }
+    ],
+    "default_mode_observation": "status and size preserved when present; 404 dropped"
+  },
+  "shipped_artefact_contradiction": {
+    "source_file": "data/proof-dvwa/engagement.json",
+    "note": "both jobs ran against 172.17.0.3 in the same engagement",
+    "rows": [
+      {
+        "path": ".hta",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 403,
+        "gobuster_size": 289,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": ".htaccess",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 403,
+        "gobuster_size": 294,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": ".htpasswd",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 403,
+        "gobuster_size": 294,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": "config",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 301,
+        "gobuster_size": 309,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": "docs",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 301,
+        "gobuster_size": 307,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": "external",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 301,
+        "gobuster_size": 311,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": "favicon.ico",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 200,
+        "gobuster_size": 1406,
+        "gobuster_severity": "low",
+        "status_agrees": true
+      },
+      {
+        "path": "index.php",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 302,
+        "gobuster_size": 0,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": "php.ini",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 200,
+        "gobuster_size": 148,
+        "gobuster_severity": "low",
+        "status_agrees": true
+      },
+      {
+        "path": "phpinfo.php",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 302,
+        "gobuster_size": 0,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      },
+      {
+        "path": "robots.txt",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 200,
+        "gobuster_size": 26,
+        "gobuster_severity": "low",
+        "status_agrees": true
+      },
+      {
+        "path": "server-status",
+        "ffuf_status": 200,
+        "ffuf_size": null,
+        "ffuf_severity": "low",
+        "gobuster_status": 403,
+        "gobuster_size": 298,
+        "gobuster_severity": "info",
+        "status_agrees": false
+      }
+    ],
+    "disagreements": 9,
+    "both_paths_found": 12,
+    "ffuf_findings_with_null_size": 12,
+    "merged_unique_finding_sources": {
+      ".htaccess": "ffuf",
+      "config": "ffuf",
+      "docs": "ffuf",
+      "external": "ffuf",
+      "favicon.ico": "ffuf",
+      ".hta": "ffuf",
+      ".htpasswd": "ffuf",
+      "index.php": "ffuf",
+      "phpinfo.php": "ffuf",
+      "robots.txt": "ffuf",
+      "server-status": "ffuf",
+      "php.ini": "ffuf"
+    },
+    "dedupe_note": "unique_findings contains one record per path even where two tools disagree; the retained data is the first-ingested tool's, so the contradicting measurement is dropped from the canonical view"
+  },
+  "shipped_artefact_adjudicated_against_live_target": [
+    {
+      "path": ".hta",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 403,
+      "gobuster_size": 289,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 403,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": ".htaccess",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 403,
+      "gobuster_size": 294,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 403,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": ".htpasswd",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 403,
+      "gobuster_size": 294,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 403,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "config",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 301,
+      "gobuster_size": 309,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 301,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "docs",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 301,
+      "gobuster_size": 307,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 301,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "external",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 301,
+      "gobuster_size": 311,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 301,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "favicon.ico",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 200,
+      "gobuster_size": 1406,
+      "gobuster_severity": "low",
+      "status_agrees": true,
+      "live_status_this_engagement": 200,
+      "ffuf_matches_truth": true,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "index.php",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 302,
+      "gobuster_size": 0,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 200,
+      "ffuf_matches_truth": true,
+      "gobuster_matches_truth": false
+    },
+    {
+      "path": "php.ini",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 200,
+      "gobuster_size": 148,
+      "gobuster_severity": "low",
+      "status_agrees": true,
+      "live_status_this_engagement": 200,
+      "ffuf_matches_truth": true,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "phpinfo.php",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 302,
+      "gobuster_size": 0,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 200,
+      "ffuf_matches_truth": true,
+      "gobuster_matches_truth": false
+    },
+    {
+      "path": "robots.txt",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 200,
+      "gobuster_size": 26,
+      "gobuster_severity": "low",
+      "status_agrees": true,
+      "live_status_this_engagement": 200,
+      "ffuf_matches_truth": true,
+      "gobuster_matches_truth": true
+    },
+    {
+      "path": "server-status",
+      "ffuf_status": 200,
+      "ffuf_size": null,
+      "ffuf_severity": "low",
+      "gobuster_status": 403,
+      "gobuster_size": 298,
+      "gobuster_severity": "info",
+      "status_agrees": false,
+      "live_status_this_engagement": 403,
+      "ffuf_matches_truth": false,
+      "gobuster_matches_truth": true
+    }
+  ],
+  "gobuster_adapter_sanity": [],
+  "live_status_measurement": {
+    "target": "https://pentest-ground.com:4280",
+    "rows": [
+      {
+        "path": "/.htaccess",
+        "status": 403,
+        "bytes": 323,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>403 Forbidden</title> </head><body> <h1>Forbidden</h1> <p>You don't have permission to ac"
+      },
+      {
+        "path": "/.htpasswd",
+        "status": 403,
+        "bytes": 323,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>403 Forbidden</title> </head><body> <h1>Forbidden</h1> <p>You don't have permission to ac"
+      },
+      {
+        "path": "/.hta",
+        "status": 403,
+        "bytes": 323,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>403 Forbidden</title> </head><body> <h1>Forbidden</h1> <p>You don't have permission to ac"
+      },
+      {
+        "path": "/php.ini",
+        "status": 200,
+        "bytes": 154,
+        "server": "nginx/1.31.8",
+        "excerpt": "; This file attempts to overwrite the original php.ini file. Doesnt always work.\r \r magic_quotes_gpc = Off\r allow_url_fopen = on\r allow_url_include = on\r "
+      },
+      {
+        "path": "/robots.txt",
+        "status": 200,
+        "bytes": 25,
+        "server": "nginx/1.31.8",
+        "excerpt": "User-agent: * Disallow: /"
+      },
+      {
+        "path": "/server-status",
+        "status": 403,
+        "bytes": 323,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>403 Forbidden</title> </head><body> <h1>Forbidden</h1> <p>You don't have permission to ac"
+      },
+      {
+        "path": "/config",
+        "status": 301,
+        "bytes": 365,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>301 Moved Permanently</title> </head><body> <h1>Moved Permanently</h1> <p>The document ha"
+      },
+      {
+        "path": "/docs",
+        "status": 301,
+        "bytes": 363,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>301 Moved Permanently</title> </head><body> <h1>Moved Permanently</h1> <p>The document ha"
+      },
+      {
+        "path": "/external",
+        "status": 301,
+        "bytes": 367,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>301 Moved Permanently</title> </head><body> <h1>Moved Permanently</h1> <p>The document ha"
+      },
+      {
+        "path": "/favicon.ico",
+        "status": 200,
+        "bytes": 1405,
+        "server": "nginx/1.31.8",
+        "excerpt": "\u0000\u0000\u0001\u0000\u0001\u0000\u0010\u0010\u0000\u0000\u0001\u0000\b\u0000h\u0005\u0000\u0000\u0016\u0000\u0000\u0000(\u0000\u0000\u0000\u0010\u0000\u0000\u0000 \u0000\u0000\u0000\u0001\u0000\b\u0000\u0000\u0000\u0000\u0000@\u0005\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000TMI\u0000^WR\u0000PJF\u0000[SO\u0000]WR\u0000]XS\u0000`YT\u0000_XS\u0000[TO\u0000]{n\u0000\\\ufffd\ufffd\u0000\\\ufffd\ufffd\u0000\\\ufffd\ufffd\u0000\\\ufffd\ufffd\u0000g\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000]sh\u0000`\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000xrn\u0000gb]\u0000]c\\\u0000]\ufffdv\u0000]\ufffd}\u0000z\u007fy\u0000\ufffd\ufffd\ufffd\u0000\ufffd\ufffd\ufffd\u0000f_Z\u0000[TP\u0000e\ufffd\u007f\u0000\ufffd\ufffd"
+      },
+      {
+        "path": "/index.php",
+        "status": 200,
+        "bytes": 5930,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE html>  <html lang=\"en-GB\">  \t<head> \t\t<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />  \t\t<title>Welcome :: Damn Vulnerable Web Application (DVWA)</title>  \t\t<link rel=\""
+      },
+      {
+        "path": "/phpinfo.php",
+        "status": 200,
+        "bytes": 87787,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"DTD/xhtml1-transitional.dtd\"> <html xmlns=\"http://www.w3.org/1999/xhtml\"><head> <style type=\"text/css\"> body {background-color: #fff; co"
+      },
+      {
+        "path": "/.gitignore",
+        "status": 404,
+        "bytes": 320,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>404 Not Found</title> </head><body> <h1>Not Found</h1> <p>The requested URL was not found"
+      },
+      {
+        "path": "/.git/HEAD",
+        "status": 404,
+        "bytes": 320,
+        "server": "nginx/1.31.8",
+        "excerpt": "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\"> <html><head> <title>404 Not Found</title> </head><body> <h1>Not Found</h1> <p>The requested URL was not found"
+      }
+    ]
+  }
+}

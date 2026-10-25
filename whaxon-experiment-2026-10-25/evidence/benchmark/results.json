@@ -1,0 +1,234 @@
+{
+  "experiment": "E8-validator-benchmark",
+  "base": "http://127.0.0.1:40165",
+  "results": [
+    {
+      "case": "xss_low",
+      "kind": "xss",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/xss_low",
+      "ground_truth_vulnerable": true,
+      "note": "raw reflection of the submitted value into <pre>",
+      "cwe": "CWE-79",
+      "legacy_path": {
+        "status": "verified",
+        "reason": "marker '<script>' appeared only after injection",
+        "predicted_positive": true
+      },
+      "context_path": {
+        "status": "verified",
+        "reason": "marker '<script>' appeared only after injection",
+        "predicted_positive": true
+      }
+    },
+    {
+      "case": "xss_high",
+      "kind": "xss",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/xss_high",
+      "ground_truth_vulnerable": false,
+      "note": "htmlspecialchars() encoding, as DVWA high",
+      "cwe": "CWE-79",
+      "legacy_path": {
+        "status": "candidate",
+        "reason": "response differed but no known marker",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "xss_no_reflection",
+      "kind": "xss",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/xss_no_reflection",
+      "ground_truth_vulnerable": false,
+      "note": "value never echoed; a stable page",
+      "cwe": "CWE-79",
+      "legacy_path": {
+        "status": "refuted",
+        "reason": "response identical to baseline",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "sqli_low",
+      "kind": "sqli",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/sqli_low",
+      "ground_truth_vulnerable": true,
+      "note": "concatenated query; MySQL syntax error on quote",
+      "cwe": "CWE-89",
+      "legacy_path": {
+        "status": "candidate",
+        "reason": "response differed but no known marker",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "sqli_medium",
+      "kind": "sqli",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/sqli_medium",
+      "ground_truth_vulnerable": false,
+      "note": "numeric-only filter, as DVWA medium",
+      "cwe": "CWE-89",
+      "legacy_path": {
+        "status": "refuted",
+        "reason": "response identical to baseline",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "sqli_union",
+      "kind": "sqli",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/sqli_union",
+      "ground_truth_vulnerable": true,
+      "note": "UNION injection returns rows with no error text",
+      "cwe": "CWE-89",
+      "legacy_path": {
+        "status": "refuted",
+        "reason": "response identical to baseline",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "cmdi_get",
+      "kind": "command_injection",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/cmdi_get",
+      "ground_truth_vulnerable": true,
+      "note": "shell concatenation; canary is actually executed",
+      "cwe": "CWE-78",
+      "legacy_path": {
+        "status": "verified",
+        "reason": "command output marker 'whaxon_cmdi_a56c584b' appeared only after injection (payload 'x;echo whaxon_cmdi_$(printf a56c584b)')",
+        "predicted_positive": true
+      },
+      "context_path": {
+        "status": "verified",
+        "reason": "marker 'whaxon_cmdi_13fe90e4' appeared only after injection",
+        "predicted_positive": true
+      }
+    },
+    {
+      "case": "cmdi_post",
+      "kind": "command_injection",
+      "method": "POST",
+      "url": "http://127.0.0.1:40165/cmdi_post",
+      "ground_truth_vulnerable": true,
+      "note": "shell concatenation, POST-only endpoint",
+      "cwe": "CWE-78",
+      "legacy_path": {
+        "status": "candidate",
+        "reason": "no command-execution canary appeared in the response (payload reflection alone is not proof)",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "automatic replay of POST is disabled because it may change target state",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "cmdi_safe",
+      "kind": "command_injection",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/cmdi_safe",
+      "ground_truth_vulnerable": false,
+      "note": "escapeshellarg(); separator is inert",
+      "cwe": "CWE-78",
+      "legacy_path": {
+        "status": "candidate",
+        "reason": "no command-execution canary appeared in the response (payload reflection alone is not proof)",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "lfi_low",
+      "kind": "lfi",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/lfi_low",
+      "ground_truth_vulnerable": true,
+      "note": "arbitrary file read via include()",
+      "cwe": "CWE-98",
+      "legacy_path": {
+        "status": "candidate",
+        "reason": "kind 'lfi' is not directly replayable",
+        "predicted_positive": false
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "context replay did not produce a baseline-differential proof",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "timing_decoy",
+      "kind": "sqli",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/timing_decoy",
+      "ground_truth_vulnerable": false,
+      "note": "NOT injectable; sleeps 3.2 s on any non-baseline value",
+      "cwe": "CWE-89",
+      "legacy_path": {
+        "status": "verified",
+        "reason": "timing delta (median of 3) 3.20s >= 3.0s",
+        "predicted_positive": true
+      },
+      "context_path": {
+        "status": "candidate",
+        "reason": "timing signal only: median injected-baseline delta 3.20s; needs independent confirmation",
+        "predicted_positive": false
+      }
+    },
+    {
+      "case": "marker_decoy",
+      "kind": "sqli",
+      "method": "GET",
+      "url": "http://127.0.0.1:40165/marker_decoy",
+      "ground_truth_vulnerable": false,
+      "note": "NOT injectable; prints a DB-driver word only for non-baseline values",
+      "cwe": "CWE-89",
+      "legacy_path": {
+        "status": "verified",
+        "reason": "marker 'postgresql' appeared only after injection",
+        "predicted_positive": true
+      },
+      "context_path": {
+        "status": "verified",
+        "reason": "marker 'postgresql' appeared only after injection",
+        "predicted_positive": true
+      }
+    }
+  ]
+}

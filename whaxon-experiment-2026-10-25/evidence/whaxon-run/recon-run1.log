@@ -1,0 +1,131 @@
+[recon] target=https://pentest-ground.com:4280/
+[recon] data_dir=evidence/whaxon-run
+[recon] checks=all
+[recon] scope: allowed=True reason=matches in-scope rule rule=pentest-ground.com
+[recon] running checks...
+[recon] job_id=recon:https://pentest-ground.com:4280/:a68fecd9392b
+    data: {'record_type': 'A', 'value': '178.79.134.182', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'MX', 'value': '10 mail.pentest-ground.com.', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'NS', 'value': 'ns1.linode.com.', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'NS', 'value': 'ns3.linode.com.', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'NS', 'value': 'ns4.linode.com.', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'NS', 'value': 'ns5.linode.com.', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'NS', 'value': 'ns2.linode.com.', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'record_type': 'SOA', 'value': 'ns1.linode.com. admin2.admin.test. 2021000191 14400 14400 1209600 86400', 'host': 'pentest-ground.com'}
+    remediation: 
+    impact: 
+    data: {'host': 'pentest-ground.com', 'subject': 'commonName=pentest-ground.com', 'issuer': "countryName=US, organizationName=Let's Encrypt, commonName=YE2", 'notBefore': 'Sep 22 18:46:51 2026 GMT', 'notAfter': 'Dec 21 18:46:50 2026 GMT', 'verified': True}
+    remediation: 
+    impact: 
+    data: {'header': 'strict-transport-security', 'url': 'https://pentest-ground.com:4280/'}
+    remediation: Send Strict-Transport-Security with max-age of at least 6 months and includeSubDomains: 'Strict-Transport-Security: max-
+    impact: Without HSTS, users are vulnerable to SSL-stripping attacks on first visit.
+    data: {'header': 'content-security-policy', 'url': 'https://pentest-ground.com:4280/'}
+    remediation: Define a Content-Security-Policy that restricts script-src and object-src to trusted origins. Start in report-only mode,
+    impact: Missing CSP leaves the application without a defence-in-depth layer against XSS and data injection.
+    data: {'header': 'x-frame-options', 'url': 'https://pentest-ground.com:4280/'}
+    remediation: Set 'X-Frame-Options: DENY' or 'SAMEORIGIN'. The modern equivalent is Content-Security-Policy frame-ancestors.
+    impact: Missing frame protections allow clickjacking.
+    data: {'header': 'x-content-type-options', 'url': 'https://pentest-ground.com:4280/'}
+    remediation: Send 'X-Content-Type-Options: nosniff' on every response.
+    impact: MIME sniffing can cause browsers to interpret content as a different type than intended, sometimes leading to script exe
+    data: {'header': 'referrer-policy', 'url': 'https://pentest-ground.com:4280/'}
+    remediation: Send 'Referrer-Policy: strict-origin-when-cross-origin' or stricter.
+    impact: Without a Referrer-Policy, sensitive URL fragments may leak to third-party origins via the Referer header.
+    data: {'header': 'permissions-policy', 'url': 'https://pentest-ground.com:4280/'}
+    remediation: Send Permissions-Policy to disable powerful browser features (camera, microphone, geolocation) unless explicitly require
+    impact: Unrestricted browser features expand the attack surface for malicious third-party scripts.
+    data: {'product': 'nginx', 'banner': 'nginx/1.31.8', 'url': 'https://pentest-ground.com:4280/', 'version': '1.31.8'}
+    remediation: 
+    impact: 
+    data: {'port': 443, 'protocol': 'tcp', 'state': 'open', 'service': 'nginx', 'version': 'nginx/1.31.8'}
+    remediation: 
+    impact: 
+    data: {'product': 'php', 'banner': 'PHP/8.5.12', 'url': 'https://pentest-ground.com:4280/', 'version': '8.5.12'}
+    remediation: 
+    impact: 
+    data: {'port': 443, 'protocol': 'tcp', 'state': 'open', 'service': 'php', 'version': 'PHP/8.5.12'}
+    remediation: 
+    impact: 
+    data: {'url': 'https://pentest-ground.com:4280/.well-known/security.txt', 'error': 'HTTP Error 404: Not Found'}
+    remediation: Publish a security.txt at /.well-known/security.txt (RFC 9116) with a Contact field so researchers can report vulnerabil
+    impact: Without security.txt, security researchers have no documented channel for disclosing findings, increasing the risk of pu
+    data: {'url': 'https://pentest-ground.com:4280/', 'cookie': 'security', 'missing': 'secure', 'raw': 'security=low; path=/'}
+    remediation: Set the Secure flag on every cookie. Cookies without Secure are sent over plain HTTP, exposing session tokens to network
+    impact: Without Secure, a downgrade to HTTP leaks the cookie to any attacker on the network path.
+    data: {'url': 'https://pentest-ground.com:4280/', 'cookie': 'security', 'missing': 'httponly', 'raw': 'security=low; path=/'}
+    remediation: Set HttpOnly on session cookies. Without it, document.cookie reads them, so any XSS becomes session theft.
+    impact: Without HttpOnly, a successful XSS can read and exfiltrate the session cookie.
+    data: {'url': 'https://pentest-ground.com:4280/', 'cookie': 'security', 'missing': 'samesite', 'raw': 'security=low; path=/'}
+    remediation: Set SameSite=Lax (default in modern browsers) or Strict. SameSite=None requires Secure and should only be used where cro
+    impact: Without a SameSite attribute, the cookie may be sent on cross-site requests, expanding CSRF surface.
+    data: {'url': 'https://pentest-ground.com:4280/', 'cookie': 'PHPSESSID', 'missing': 'secure', 'raw': 'PHPSESSID=<REDACTED-SESSION-ID>; expires=Mon, 26 Oct 2026 12:57:41 GMT; Max-Age=86400; path=/'}
+    remediation: Set the Secure flag on every cookie. Cookies without Secure are sent over plain HTTP, exposing session tokens to network
+    impact: Without Secure, a downgrade to HTTP leaks the cookie to any attacker on the network path.
+    data: {'url': 'https://pentest-ground.com:4280/', 'cookie': 'PHPSESSID', 'missing': 'httponly', 'raw': 'PHPSESSID=<REDACTED-SESSION-ID>; expires=Mon, 26 Oct 2026 12:57:41 GMT; Max-Age=86400; path=/'}
+    remediation: Set HttpOnly on session cookies. Without it, document.cookie reads them, so any XSS becomes session theft.
+    impact: Without HttpOnly, a successful XSS can read and exfiltrate the session cookie.
+    data: {'url': 'https://pentest-ground.com:4280/', 'cookie': 'PHPSESSID', 'missing': 'samesite', 'raw': 'PHPSESSID=<REDACTED-SESSION-ID>; expires=Mon, 26 Oct 2026 12:57:41 GMT; Max-Age=86400; path=/'}
+    remediation: Set SameSite=Lax (default in modern browsers) or Strict. SameSite=None requires Secure and should only be used where cro
+    impact: Without a SameSite attribute, the cookie may be sent on cross-site requests, expanding CSRF surface.
+    data: {'host': 'pentest-ground.com', 'value': '0 issue "letsencrypt.org"'}
+    remediation: 
+    impact: 
+    data: {'host': 'pentest-ground.com'}
+    remediation: Publish a DMARC record at _dmarc.<domain> with at least v=DMARC1; p=quarantine.
+    impact: Without DMARC, email from this domain can be forged without any policy check, enabling phishing from the legitimate doma
+    data: {'host': 'pentest-ground.com'}
+    remediation: Publish an SPF record (v=spf1 ... -all) naming the authorised senders for this domain.
+    impact: Without SPF, any host can send email claiming to be from this domain, enabling phishing and BEC.
+    data: {'pattern': 'web_service', 'target': 'https://pentest-ground.com:4280/', 'ports': [443], 'services': ['nginx', 'php']}
+    remediation: Ensure current TLS, disable legacy ciphers, patch server software.
+    impact: Web-facing service on target; confirm TLS posture.
+    data: {'pattern': 'recon_activity_burst', 'target': 'https://pentest-ground.com:4280/', 'kinds': ['cookie_insecure', 'dns_caa', 'dns_dmarc_missing', 'dns_record', 'dns_spf_missing', 'http_header_missing', 'open_port', 'security_txt_missing', 'ssl_cert', 'tech_detected']}
+    remediation: Confirm scope coverage; investigate each kind.
+    impact: Broad reconnaissance surface indicates active testing.
+recon: https://pentest-ground.com:4280/  (job recon:https://pentest-ground.com:4280/:a68fecd9392b, 31 findings)
+  [info    ] dns_record                   pentest-ground.com A 178.79.134.182
+  [info    ] dns_record                   pentest-ground.com MX 10 mail.pentest-ground.com.
+  [info    ] dns_record                   pentest-ground.com NS ns1.linode.com.
+  [info    ] dns_record                   pentest-ground.com NS ns3.linode.com.
+  [info    ] dns_record                   pentest-ground.com NS ns4.linode.com.
+  [info    ] dns_record                   pentest-ground.com NS ns5.linode.com.
+  [info    ] dns_record                   pentest-ground.com NS ns2.linode.com.
+  [info    ] dns_record                   pentest-ground.com SOA ns1.linode.com. admin2.admin.test. 2021000191 14400 14400 1209600 8
+  [info    ] ssl_cert                     TLS cert for pentest-ground.com: issuer=countryName=US, organizationName=Let's Encrypt, co
+  [low     ] http_header_missing          https://pentest-ground.com:4280/: missing strict-transport-security
+  [medium  ] http_header_missing          https://pentest-ground.com:4280/: missing content-security-policy
+  [low     ] http_header_missing          https://pentest-ground.com:4280/: missing x-frame-options
+  [low     ] http_header_missing          https://pentest-ground.com:4280/: missing x-content-type-options
+  [info    ] http_header_missing          https://pentest-ground.com:4280/: missing referrer-policy
+  [info    ] http_header_missing          https://pentest-ground.com:4280/: missing permissions-policy
+  [info    ] tech_detected                https://pentest-ground.com:4280/: nginx/1.31.8
+  [info    ] open_port                    443/tcp open  https   nginx/1.31.8
+  [info    ] tech_detected                https://pentest-ground.com:4280/: PHP/8.5.12
+  [info    ] open_port                    443/tcp open  https   PHP/8.5.12
+  [info    ] security_txt_missing         security.txt not reachable at https://pentest-ground.com:4280/.well-known/security.txt: HT
+  [low     ] cookie_insecure              https://pentest-ground.com:4280/: cookie 'security' missing secure
+  [low     ] cookie_insecure              https://pentest-ground.com:4280/: cookie 'security' missing httponly
+  [info    ] cookie_insecure              https://pentest-ground.com:4280/: cookie 'security' missing samesite
+  [low     ] cookie_insecure              https://pentest-ground.com:4280/: cookie 'PHPSESSID' missing secure
+  [low     ] cookie_insecure              https://pentest-ground.com:4280/: cookie 'PHPSESSID' missing httponly
+  [info    ] cookie_insecure              https://pentest-ground.com:4280/: cookie 'PHPSESSID' missing samesite
+  [info    ] dns_caa                      pentest-ground.com CAA 0 issue "letsencrypt.org"
+  [medium  ] dns_dmarc_missing            _dmarc.pentest-ground.com: no DMARC record
+  [medium  ] dns_spf_missing              pentest-ground.com: no SPF record
+  [medium  ] correlated                   web_service: https://pentest-ground.com:4280/ ports=[443]
+  [info    ] correlated                   recon_activity_burst: https://pentest-ground.com:4280/ 10 kinds

@@ -1,0 +1,33 @@
+{
+  "experiment": "E8-validator-benchmark",
+  "validator_module": "whaxon.core.validator",
+  "timing_threshold_s": 3.0,
+  "legacy_query_param_path": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 4,
+    "tn": 4,
+    "tpr_recall": 0.3333333333333333,
+    "fpr": 0.3333333333333333,
+    "precision": 0.5,
+    "youden_j": 0.0,
+    "n": 12
+  },
+  "context_replay_path": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 4,
+    "tn": 5,
+    "tpr_recall": 0.3333333333333333,
+    "fpr": 0.16666666666666666,
+    "precision": 0.6666666666666666,
+    "youden_j": 0.16666666666666666,
+    "n": 12
+  },
+  "cases": 12,
+  "notes": [
+    "predicted_positive = validator reported 'verified'",
+    "ground truth asserted independently in tests/test_benchmark_labels.py",
+    "a 'refuted' verdict on a truly vulnerable case is a completeness failure, counted here as a false negative"
+  ]
+}

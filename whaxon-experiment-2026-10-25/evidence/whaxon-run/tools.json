@@ -1,0 +1,40 @@
+{
+  "tools": [
+    {
+      "id": "nmap",
+      "name": "Nmap",
+      "category": "recon",
+      "binary": "nmap",
+      "description": "Network discovery and port scanning.",
+      "args": "-sT -sV --exclude-ports 3000,5000,5001 {target}",
+      "package": "nmap"
+    },
+    {
+      "id": "echo",
+      "name": "Echo",
+      "category": "test",
+      "binary": "/bin/echo",
+      "description": "Test tool - prints the target and exits.",
+      "args": "{target}"
+    },
+    {
+      "id": "ffuf",
+      "name": "ffuf",
+      "category": "web",
+      "binary": "/workspace/homes/631d3594b40a92b083bca535/.local/bin/ffuf",
+      "description": "Fast web fuzzer",
+      "args": "-u {target}/FUZZ -w wordlists/dvwa-small.txt -mc 200,204,301,302,307,401,403 -s",
+      "package": "ffuf",
+      "pivot_capable": true
+    },
+    {
+      "id": "sqlmap",
+      "name": "sqlmap",
+      "category": "web",
+      "binary": "/workspace/chats/631d3594b40a92b083bca535/work/sqlmap/sqlmap.py",
+      "description": "Automatic SQL injection and database takeover tool",
+      "args": "-u {target} --batch --level 1 --risk 1 --timeout 10 --retries 0 --threads 1 --technique=BEUSTQ --disable-coloring --flush-session",
+      "package": "sqlmap"
+    }
+  ]
+}
