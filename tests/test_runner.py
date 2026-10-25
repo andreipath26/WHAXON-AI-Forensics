@@ -537,3 +537,28 @@ def test_build_argv_rejects_whitespace_in_target():
             "sqlmap",
             "https://allowed.example/path -u https://evil.example",
         )
+
+
+@pytest.mark.parametrize(
+    "extra_args",
+    [
+        "https://evil.example",
+        "8.8.8.8",
+        "evil.example",
+        "10.0.0.0/8",
+        "--domain=evil.example",
+    ],
+)
+def test_build_argv_rejects_positional_alternate_target(extra_args):
+    """Extra arguments must not smuggle a second target past scope checking."""
+    tool = Tool(
+        id="nmap",
+        name="Nmap",
+        category="recon",
+        binary="nmap",
+        args="-sV {target}",
+    )
+    runner, _, _ = _runner(tools=[tool])
+
+    with pytest.raises(ValueError, match="second target"):
+        runner.build_argv("nmap", "10.0.0.5", extra_args=extra_args)
