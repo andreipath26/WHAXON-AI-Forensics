@@ -252,3 +252,22 @@ def test_malformed_scope_rule_fails_closed(tmp_path: Path, rule: str) -> None:
     }))
     with pytest.raises(RuntimeError, match="malformed 'in_scope' rule"):
         ScopeManager(cfg)
+
+def test_global_cidr_scope_rule_emits_high_blast_radius_warning(
+    tmp_path: Path, caplog,
+) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "explicit-global-test",
+        "enabled": True,
+        "in_scope": ["0.0.0.0/0", "::/0"],
+        "out_of_scope": ["169.254.0.0/16"],
+    }))
+
+    with caplog.at_level("WARNING", logger="whaxon.core.scope"):
+        ScopeManager(cfg)
+
+    assert any(
+        "effectively permits every address" in record.message
+        for record in caplog.records
+    )
