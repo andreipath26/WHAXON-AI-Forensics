@@ -1,3 +1,16 @@
+function whaxonRenderMessageRow(container, colspan, message, tone) {
+  if (!container) return;
+  container.replaceChildren();
+  const tr = document.createElement('tr');
+  const td = document.createElement('td');
+  td.colSpan = colspan;
+  td.style.padding = '16px';
+  td.style.color = tone === 'muted' ? 'var(--text-dim)' : 'var(--critical)';
+  td.textContent = String(message);
+  tr.appendChild(td);
+  container.appendChild(tr);
+}
+
 (function () {
   const app = document.getElementById('app');
   const palette = document.getElementById('palette');
@@ -739,7 +752,7 @@
         applyFilter();
       })
       .catch(err => {
-        tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--critical);">Failed to load findings: ' + err + '</td></tr>';
+        whaxonRenderMessageRow(tbody, 6, 'Failed to load findings: ' + err);
       });
   }
 
@@ -770,7 +783,11 @@
   function showScopePill(kind, text) {
     if (!scopePill) return;
     scopePill.className = 'pill ' + (kind === 'ok' ? 'pill-success' : 'pill-danger');
-    scopePill.innerHTML = '<span class="dot"></span>' + text;
+    scopePill.replaceChildren();
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    scopePill.appendChild(dot);
+    scopePill.appendChild(document.createTextNode(text));
     scopePill.style.display = '';
   }
 
@@ -1081,7 +1098,7 @@
         render(all);
       })
       .catch(err => {
-        tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:var(--critical);">Failed to load coverage: ' + err + '</td></tr>';
+        whaxonRenderMessageRow(tbody, 4, 'Failed to load coverage: ' + err);
       });
   }
 
@@ -1152,7 +1169,7 @@
         });
       });
     } catch (e) {
-      list.innerHTML = '<div class="card-sub" style="padding:12px; color:var(--critical);">Failed to load: ' + e + '</div>';
+      list.textContent = 'Failed to load pending findings: ' + e;
     }
   }
 
@@ -1258,7 +1275,7 @@
         tbody.appendChild(tr);
       });
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--critical);">Failed to load: ' + e + '</td></tr>';
+      whaxonRenderMessageRow(tbody, 6, 'Failed to load retest queue: ' + e);
     }
   }
 
@@ -1303,7 +1320,7 @@
         tbody.appendChild(tr);
       });
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; color:var(--critical);">Failed to load: ' + e + '</td></tr>';
+      whaxonRenderMessageRow(tbody, 5, 'Failed to load sessions: ' + e);
     }
   }
 
@@ -1347,7 +1364,7 @@
         tbody.appendChild(tr);
       });
     } catch (e) {
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; color:var(--critical);">Failed to load: ' + e + '</td></tr>';
+      whaxonRenderMessageRow(tbody, 5, 'Failed to load catalog: ' + e);
     }
   }
 
