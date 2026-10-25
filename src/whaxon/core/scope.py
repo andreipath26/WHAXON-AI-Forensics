@@ -293,7 +293,7 @@ class ScopeManager:
             try:
                 answers = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
                 for answer in answers:
-                    address = answer[4][0].split("%", 1)[0]
+                    address = str(answer[4][0]).split("%", 1)[0]
                     resolved_ips.add(str(ipaddress.ip_address(address)))
             except (OSError, ValueError):
                 return ScopeMatch(
