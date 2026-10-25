@@ -52,7 +52,10 @@
     bulkCount.textContent = checked;
     bulkBar.classList.toggle('on', checked > 0);
   }
-  document.querySelectorAll('#findings-table .row-cb').forEach(cb => cb.addEventListener('change', updateBulk));
+  const findingsTable = document.getElementById('findings-table');
+  if (findingsTable) findingsTable.addEventListener('change', event => {
+    if (event.target && event.target.matches('.row-cb')) updateBulk();
+  });
   if (selectAll) selectAll.addEventListener('change', () => {
     document.querySelectorAll('#findings-table .row-cb').forEach(cb => cb.checked = selectAll.checked);
     updateBulk();
@@ -515,6 +518,7 @@
             }
           }
         }
+        loadFindings();
         alert(kind + ': ' + data.status + '\n' + data.reason);
       }
     } catch (e) {
