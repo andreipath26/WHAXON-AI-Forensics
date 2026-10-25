@@ -814,11 +814,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except Exception:
             app.logger.exception("Scope evaluation failed for Metasploit session host")
             return {"error": "scope evaluation failed; action was not performed"}, 503
-        if not match.allowed:
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
             return {
-                "error": f"session host out of scope: {match.reason}",
+                "error": f"session host out of scope: {reason}",
                 "target": str(host),
-                "matched_rule": match.matched_rule,
+                "matched_rule": getattr(match, "matched_rule", None),
             }, 403
         return None
 
@@ -925,7 +926,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             except Exception:
                 app.logger.exception("Scope evaluation failed for Metasploit target")
                 return {"error": "scope evaluation failed; no job was started"}, 503
-            if match is None or not match.allowed:
+            if match is None or not getattr(match, "allowed", False):
                 reason = getattr(match, "reason", "target could not be confirmed in scope")
                 matched_rule = getattr(match, "matched_rule", None)
                 return {"error": f"target out of scope: {reason}",
