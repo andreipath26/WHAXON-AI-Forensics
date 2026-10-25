@@ -524,12 +524,22 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/run")
     @limiter.limit("30 per minute")
     def run_tool():
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
         tool_id = data.get("tool_id")
         target = data.get("target")
-        extra_args = data.get("extra_args", "") or ""
-        if not tool_id or not target:
-            return {"error": "tool_id and target required"}, 400
+        extra_args = data.get("extra_args", "")
+        if not isinstance(tool_id, str) or not tool_id.strip():
+            return {"error": "tool_id must be a non-empty string"}, 400
+        if not isinstance(target, str) or not target.strip():
+            return {"error": "target must be a non-empty string"}, 400
+        tool_id = tool_id.strip()
+        target = target.strip()
+        if len(tool_id) > 128 or len(target) > 2048 or "\\x00" in target:
+            return {"error": "tool_id or target exceeds allowed limits"}, 400
+        if extra_args is None:
+            extra_args = ""
         # The web runner intentionally does not accept arbitrary command-line
         # arguments from clients. The current runner path does not implement a
         # safe per-tool argument allowlist, so reject rather than silently ignore.
