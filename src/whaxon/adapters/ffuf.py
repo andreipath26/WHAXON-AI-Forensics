@@ -63,7 +63,9 @@ class FfufAdapter(Adapter):
                 # Strip scheme + host; keep only the path portion
                 parts = path.split("/", 3)
                 path = "/" + parts[-1] if len(parts) > 3 else "/"
-            status = int(m.group("status")) if m.group("status") else 200
+            # Silent ffuf output does not include an HTTP status. Preserve
+            # that uncertainty instead of fabricating a successful HTTP 200.
+            status = int(m.group("status")) if m.group("status") else None
             if status == 404:
                 continue
             knowledge = STATUS_KNOWLEDGE.get(status, {
