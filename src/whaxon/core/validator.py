@@ -94,7 +94,7 @@ class Validator:
         self.last_payload: str | None = None
 
     def validate(self, finding: Finding, target_url: str | None = None) -> tuple[str, str]:
-        """Return (status, reason). status in {verified, refuted, candidate}."""
+        """Return a conservative verdict; missing proof remains candidate, not refuted."""
         kind = finding.kind
         if kind in self.OBSERVATION_KINDS:
             return self._validate_observation(finding, target_url)
@@ -173,7 +173,7 @@ class Validator:
         import ssl
         import urllib.error
         import urllib.request
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, urlunparse
 
         if not target_url:
             return "candidate", "no target URL supplied for observation probe"
@@ -200,7 +200,8 @@ class Validator:
             evidence_host = data.get("host")
             if isinstance(evidence_host, str) and evidence_host.lower() != host.lower():
                 return "candidate", "certificate finding host does not match the authorized target"
-            port = parsed.port or 443
+            requested_port = data.get("port")
+            port = requested_port if type(requested_port) is int and 1 <= requested_port <= 65535 else 443
             try:
                 context = ssl.create_default_context()
                 with (
@@ -233,7 +234,10 @@ class Validator:
                 or evidence_parsed.hostname.lower() != host.lower()
             ):
                 return "candidate", "observation URL does not match the authorized target host"
-            probe_url = evidence_url
+            probe_url = urlunparse(evidence_parsed._replace(query="", fragment=""))
+        else:
+            base_parsed = urlparse(target_url)
+            probe_url = urlunparse(base_parsed._replace(query="", fragment=""))
 
         request = urllib.request.Request(
             probe_url, method="GET",
@@ -380,12 +384,11 @@ class Validator:
         )
 
     def revalidate(self, finding: Finding, target_url: str | None = None) -> tuple[str, str]:
-        """Re-run a previously verified finding and report the outcome.
+        """Re-run a verified finding without mistaking a failed replay for a fix.
 
-        Returns ("fixed", reason) if the finding no longer reproduces,
-        ("still_vulnerable", reason) if it does. The distinction is:
-        a finding was "verified" before; if the replay still produces
-        the marker, it is not fixed; if it does not, it is.
+        A repeatable positive proof returns "still_vulnerable". A missing or
+        inconclusive proof returns "inconclusive"; proving absence requires a
+        separate remediation check and cannot be inferred from one replay.
         """
         status, reason = self.validate(finding, target_url=target_url)
         if status == "verified":
