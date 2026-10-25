@@ -66,10 +66,9 @@ def test_evidence_note_persists_for_selected_job(page, live_server):
     assert "Evidence inspector persistence check." in page.locator("#evidence-list").text_content()
 
 
-def test_legacy_ai_strategy_gate_shows_pending_operator_decision(page, live_server):
-    # This test covers the deprecated reference UI. The new default UI has its
-    # own independent acceptance tests and must not inherit legacy selectors.
-    page.goto(f"{live_server}/ui/legacy")
+def test_ai_strategy_gate_shows_pending_operator_decision(page, live_server):
+    # This workflow belongs to the new default UI; the legacy reference UI is tested separately.
+    page.goto(f"{live_server}/ui")
     page.click('.nav-item[data-view="ai-gate"]')
     page.wait_for_function(
         "() => document.querySelector('#ai-pending-list')?.textContent.includes('seed-ai-run')",
