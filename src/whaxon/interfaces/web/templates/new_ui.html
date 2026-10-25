@@ -25,6 +25,7 @@
       <button class="nav-item" data-view="reports"><span>▤</span> Coverage &amp; reports</button>
       <div class="side-label side-label-gap">SYSTEM</div>
       <button class="nav-item" data-view="history"><span>◷</span> Job history</button>
+      <button class="nav-item" data-view="attack-surface"><span>◇</span> Attack surface graph</button>
       <button class="nav-item" data-view="evidence"><span>▧</span> Evidence inspector</button>
       <button class="nav-item" data-view="import"><span>⇧</span> Import Burp XML</button>
       <button class="nav-item" data-view="sessions"><span>⌘</span> Sessions</button>
@@ -100,6 +101,11 @@
     <section class="view" id="view-import">
       <div class="section-intro"><div><div class="eyebrow">ARTIFACT INGESTION</div><h2>Import Burp Suite XML</h2><p>Parse a Burp XML export into a persisted WHAXON job and findings. This imports an existing scan; it does not launch Burp or perform an active scan.</p></div></div>
       <div class="content-grid"><article class="panel"><div class="panel-heading"><h3>Select export</h3><span class="tag">XML ONLY</span></div><form id="burp-import-form" class="stack"><label for="burp-file">Burp Suite XML export</label><input id="burp-file" type="file" accept=".xml,text/xml,application/xml" required><p class="help">Upload size is bounded by the server's configured request limit. The adapter must recognize at least one finding for the import to be accepted.</p><button class="btn btn-primary" type="submit">Import findings</button></form></article><article class="panel"><div class="panel-heading"><h3>Import result</h3></div><pre id="burp-result" class="data-block">No import has been run in this session.</pre></article></div>
+    </section>
+    <section class="view" id="view-attack-surface">
+      <div class="section-intro"><div><div class="eyebrow">OBSERVED RELATIONSHIPS</div><h2>Attack surface graph</h2><p>Inspect relationships persisted by WHAXON. This view displays recorded graph data only; it does not invent nodes or imply unobserved reachability.</p></div><button class="btn btn-quiet" id="graph-refresh">Reload graph</button></div>
+      <div class="metric-grid compact-metrics"><article class="metric panel"><span>RECORDED EDGES</span><strong id="graph-edge-count">—</strong><small>Persisted relationships</small></article></div>
+      <article class="panel"><div class="panel-heading"><h3>Relationship records</h3><span class="tag">READ ONLY</span></div><div class="table-wrap"><table><thead><tr><th>Source</th><th>Relationship</th><th>Destination</th><th>Evidence</th></tr></thead><tbody id="graph-body"><tr><td colspan="4" class="empty">Loading graph…</td></tr></tbody></table></div><pre id="graph-raw" class="data-block">Loading graph metadata…</pre></article>
     </section>
     <section class="view" id="view-sessions">
       <div class="section-intro"><div><div class="eyebrow">METASPLOIT INTEGRATION</div><h2>Sessions</h2><p>Read-only session status. Interactive session control is not exposed here unless a safe supported workflow is implemented.</p></div><button class="btn btn-quiet" id="sessions-refresh">Reload sessions</button></div>
