@@ -1581,9 +1581,15 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         from flask import render_template as _rt
         return _rt("settings.html")
 
+    @app.get("/ui/legacy")
+    def legacy_ui():
+        """Serve the deprecated interface unchanged for reference only."""
+        return render_template("index.html")
+
     @app.get("/ui")
     def ui():
-        return render_template("index.html")
+        """Serve the Obsidian Kinetic frontend as the default web UI."""
+        return render_template("new_ui.html")
 
     @app.post("/api/jobs/<job_id>/cancel")
     def cancel_job(job_id: str):
@@ -1592,8 +1598,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/")
     def index():
-        from flask import redirect
-        return redirect("/ui")
+        """The project root opens the current default UI."""
+        return render_template("new_ui.html")
 
     return app
 
