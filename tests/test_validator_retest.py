@@ -72,7 +72,6 @@ def test_retest_cli_refuses_unverified(tmp_path, monkeypatch):
 def test_retest_cli_refuses_out_of_scope_target(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     from whaxon.core import Core
-    from whaxon.core import events
     from whaxon.interfaces.cli import retest_cmd
 
     core = Core(tmp_path / "data")
