@@ -130,10 +130,6 @@ class Validator:
         import statistics as _stats
         base_t = _stats.median(s[1] for s in baseline_samples)
         inj_t = _stats.median(s[1] for s in injected_samples)
-        # Use the first measurement's body for marker checks.
-        baseline = baseline_samples[0][0]
-        injected = injected_samples[0][0]
-
         delta = inj_t - base_t
         # Timing alone is evidence for a blind-injection hypothesis, not
         # proof: network jitter and target load can produce the same delta.
