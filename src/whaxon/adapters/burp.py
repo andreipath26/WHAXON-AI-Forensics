@@ -8,9 +8,10 @@ and remediation fields.
 from __future__ import annotations
 
 import base64
+from pathlib import Path
+
 from defusedxml import ElementTree as ET
 from defusedxml.common import DefusedXmlException
-from pathlib import Path
 
 from ..core.findings import Finding
 from .base import Adapter
