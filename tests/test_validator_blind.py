@@ -52,7 +52,7 @@ def test_blind_timing_remains_candidate_without_marker():
         srv.shutdown()
 
 
-def test_identical_fast_response_is_refuted():
+def test_identical_fast_response_remains_candidate():
     srv, url = _serve()
     try:
         v = Validator(PAYLOAD_DIR)
@@ -63,8 +63,9 @@ def test_identical_fast_response_is_refuted():
             data={"parameter": "q"}, raw_line="",
         )
         status, reason = v.validate(f, target_url=url)
-        # Identical body, fast: refuted.
-        assert status == "refuted", reason
+        # An identical response is not proof of absence; keep the finding inconclusive.
+        assert status == "candidate", reason
+        assert "no conclusive" in reason
     finally:
         srv.shutdown()
 
