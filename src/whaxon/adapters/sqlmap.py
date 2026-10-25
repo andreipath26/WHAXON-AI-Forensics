@@ -108,11 +108,18 @@ class SqlmapAdapter(Adapter):
                             "type": current_type,
                             "title": current_title or "",
                             "payload": current_payload,
+                            # Retained for compatibility with older serialized
+                            # findings; new validation reads Finding.request_context.
                             "_request_context": {
                                 "method": "GET",
                                 "url": ((ctx or {}).get("target") or ""),
                                 "parameter": current_param,
                             },
+                        },
+                        request_context={
+                            "method": "GET",
+                            "url": ((ctx or {}).get("target") or ""),
+                            "parameter": current_param,
                         },
                         raw_line=line,
                         remediation=(

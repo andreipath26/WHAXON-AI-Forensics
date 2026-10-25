@@ -230,6 +230,9 @@ class JobStore:
             "cwe": f.get("cwe", ""),
             "references": f.get("references", []),
             "lookup_hint": f.get("lookup_hint", ""),
+            # Keep the canonical request context alongside enrichment so it
+            # survives the SQLite round trip without a destructive schema migration.
+            "request_context": f.get("request_context") or {},
         }
         with self._lock:
             c = self._conn()
@@ -444,6 +447,7 @@ class JobStore:
                     "references": enrichment.get("references", []),
                     "lookup_hint": enrichment.get("lookup_hint", ""),
                     "proof": enrichment.get("proof", ""),
+                    "request_context": enrichment.get("request_context") or {},
                 })
             return out
         finally: c.close()

@@ -14,8 +14,8 @@ Thanks for your interest. Short version: open an issue first, keep PRs focused, 
 
 ## Setup
 
-    git clone https://github.com/andreipath26/WHAXON.git
-    cd WHAXON
+    git clone https://github.com/andreipath26/WHAXON-AI-Forensics.git
+    cd WHAXON-AI-Forensics
     python3 -m venv .venv
     source .venv/bin/activate
     pip install -e ".[tui,gui,web,dev]"
