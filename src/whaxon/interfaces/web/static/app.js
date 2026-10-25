@@ -1334,11 +1334,14 @@
           '<td><span class="mono"></span></td>' +
           '<td><span class="pill pill-neutral"></span></td>' +
           '<td><span class="mono"></span></td>' +
-          '<td></td>' +
+          '<td><span class="pill adapter-status"></span></td>' +
           '<td><span class="mono"></span></td>';
         const monos = tr.querySelectorAll('.mono');
         monos[0].textContent = tool.id || '';
         tr.querySelector('.pill').textContent = tool.category || '';
+        const adapterStatus = tr.querySelector('.adapter-status');
+        adapterStatus.textContent = tool.adapter_available ? 'Available' : 'Not registered';
+        adapterStatus.classList.add(tool.adapter_available ? 'pill-success' : 'pill-neutral');
         monos[1].textContent = tool.binary || '';
         monos[2].textContent = tool.package || '';
         tbody.appendChild(tr);
