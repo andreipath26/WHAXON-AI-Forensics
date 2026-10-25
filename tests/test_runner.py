@@ -546,6 +546,7 @@ def test_build_argv_rejects_whitespace_in_target():
         "ftp://evil.example",
         "8.8.8.8",
         "evil.example",
+        "evil.example/path",
         "10.0.0.0/8",
         "--domain=evil.example",
     ],
