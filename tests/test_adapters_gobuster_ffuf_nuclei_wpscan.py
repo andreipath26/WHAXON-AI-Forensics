@@ -75,6 +75,8 @@ def test_ffuf_handles_silent_mode_without_status():
     # Silent mode reports paths, not HTTP status codes. Do not invent 200s.
     assert len(findings) == 3
     assert all(f.data["status"] is None for f in findings)
+    assert all(f.severity == "info" for f in findings)
+    assert all(f.cvss is None and f.cwe == "" for f in findings)
 
 
 # ---------------------------------------------------------------- nuclei
