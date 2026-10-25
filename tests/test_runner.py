@@ -519,3 +519,21 @@ async def test_wmi_password_is_not_passed_in_process_arguments(monkeypatch):
     assert "whoami" in captured["argv"]
     assert captured["stdin"] == b"secret-wmi-password\n"
     assert captured["kwargs"]["stdin"] is asyncio.subprocess.PIPE
+
+
+def test_build_argv_rejects_whitespace_in_target():
+    """A target must remain one argv item after template substitution."""
+    tool = Tool(
+        id="sqlmap",
+        name="SQLMap",
+        category="web",
+        binary="sqlmap",
+        args="-u {target}",
+    )
+    runner, _, _ = _runner(tools=[tool])
+
+    with pytest.raises(ValueError, match="unsafe target"):
+        runner.build_argv(
+            "sqlmap",
+            "https://allowed.example/path -u https://evil.example",
+        )
