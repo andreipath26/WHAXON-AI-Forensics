@@ -459,3 +459,59 @@ async def test_cancel_kills_descendants_after_tool_leader_exits(tmp_path):
     else:
         with pytest.raises(ProcessLookupError):
             os.kill(child_pid, 0)
+
+async def test_smb_password_is_not_passed_in_process_arguments(monkeypatch):
+    """SMB credentials are supplied over stdin, not visible in argv/procfs."""
+    runner, _, _ = _runner()
+    monkeypatch.setenv("WHAXON_SMB_PASS", "secret-smb-password")
+    monkeypatch.setenv("WHAXON_SMB_DOMAIN", "LAB")
+    captured = {}
+
+    class FakeProcess:
+        returncode = 0
+        async def communicate(self, data=None):
+            captured["stdin"] = data
+            return b"ok", b""
+
+    async def fake_spawn(*argv, **kwargs):
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
+    result = await runner._run_smb_session("smb:tester@127.0.0.1", "whoami", 5)
+
+    assert result == "ok"
+    assert "secret-smb-password" not in " ".join(captured["argv"])
+    assert captured["argv"][-1] == "LAB/tester@127.0.0.1"
+    assert captured["stdin"].startswith(b"secret-smb-password\nwhoami\n")
+    assert captured["kwargs"]["stdin"] is asyncio.subprocess.PIPE
+
+
+async def test_wmi_password_is_not_passed_in_process_arguments(monkeypatch):
+    """WMI credentials are supplied over stdin, not visible in argv/procfs."""
+    runner, _, _ = _runner()
+    monkeypatch.setenv("WHAXON_WMI_PASS", "secret-wmi-password")
+    monkeypatch.setenv("WHAXON_WMI_DOMAIN", "LAB")
+    captured = {}
+
+    class FakeProcess:
+        returncode = 0
+        async def communicate(self, data=None):
+            captured["stdin"] = data
+            return b"ok", b""
+
+    async def fake_spawn(*argv, **kwargs):
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
+    result = await runner._run_wmi_session("wmi:tester@127.0.0.1", "whoami", 5)
+
+    assert result == "ok"
+    assert "secret-wmi-password" not in " ".join(captured["argv"])
+    assert "LAB/tester@127.0.0.1" in captured["argv"]
+    assert "whoami" in captured["argv"]
+    assert captured["stdin"] == b"secret-wmi-password\n"
+    assert captured["kwargs"]["stdin"] is asyncio.subprocess.PIPE
