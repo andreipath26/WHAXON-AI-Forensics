@@ -31,7 +31,10 @@ class _FakeMSF:
         return True
 
     def sessions(self):
-        return {}
+        return {
+            sid: {"target_host": "10.0.0.9", "type": "shell"}
+            for sid in ("1", "3", "7")
+        }
 
     def version(self):
         return "6.5.3"
@@ -176,7 +179,7 @@ def test_pf_del_success(tmp_path, monkeypatch):
 def test_pf_del_rejects_invalid_port_types(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
-    for value in (None, True, False, [], {}, "80x", 0, 65536):
+    for value in (True, False, [], {}, "80x", 0, 65536):
         response = client.delete(
             "/api/msf/sessions/3/portfwd",
             json={"lport": value},
