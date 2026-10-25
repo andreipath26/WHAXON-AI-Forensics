@@ -8,7 +8,7 @@ Its design emphasizes explicit target scope and controlled execution. AI suggest
 
 ## Why WHAXON?
 
-Most automated scanners stop at "this looks vulnerable." WHAXON adds deterministic replay for supported finding types. The validator checks for payload-specific evidence such as SQL error markers, unescaped XSS markers, or a command-execution canary. Timing differences are recorded as supporting evidence only: timing alone remains `candidate` because network jitter and target load can produce false positives. Verified results include a reproducible proof where supported; findings without sufficient evidence remain `candidate` for human review. Validation covers only finding kinds with an implemented replay path and is not universal confirmation.
+Most automated scanners stop at "this looks vulnerable." WHAXON adds conservative deterministic validation for supported finding types. It uses non-destructive SQL error probes, checks that an XSS canary parses as an active SVG event handler, and requires a command-execution canary that is not present in the submitted payload. It also supports read-only observation probes for TCP ports, missing HTTP headers, insecure cookie flags, and invalid TLS certificates. Evidence must be repeatable across samples; timing alone and failure to reproduce remain `candidate`, not proof. Validation is deliberately incomplete for unsupported finding kinds and is not universal confirmation.
 
 No LLM decides if a finding is real. The proof does.
 
@@ -28,7 +28,7 @@ No LLM decides if a finding is real. The proof does.
 - **Correlation:** relate findings from different tools to help analysts prioritize investigation.
 - **Scope controls:** the documented default scope is restrictive and designed to deny targets that are not explicitly allowed. Review [Scope](docs/scope.md) before running assessments.
 - **Evidence and reports:** persist engagement data and generate Markdown, HTML, and PDF reports.
-- **Deterministic validation:** findings are `candidate` until a supported replay produces the expected payload-specific evidence. Timing-only deltas do not promote a finding to `verified`. `whaxon validate` generates a raw `curl` proof for supported verified findings, rendered in the report. Supported kinds and the reason for each verdict are recorded with the finding. Kinds without a replay path stay `candidate` and go to the Approvals queue, not the verified count.
+- **Deterministic validation:** supported payload replays and read-only observation probes can promote findings to `verified` only when repeatable evidence is present. Timing-only deltas and failed replays remain `candidate`; a failed replay does not prove a finding false or fixed. `whaxon validate` generates a raw `curl` proof for supported verified findings, rendered in the report. The verdict and reason are recorded with the finding. Unsupported kinds remain `candidate` and go to the Approvals queue, not the verified count.
 - **PTES coverage mapping:** skipped steps are recorded and grouped by methodology phase (Recon, Enumeration, Vulnerability).
 - **Multiple interfaces:** CLI, terminal UI (Textual), desktop UI (PySide6), and web UI (Flask/SSE).
 - **Optional AI planning:** configurable providers can propose next steps. Keep the operator in control and review the AI boundary and limitations before enabling automation.
@@ -183,7 +183,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 ## Roadmap
 
-The Trust Layer is shipped: findings enter as `candidate` and become `verified` or `refuted` through deterministic payload replay for supported finding kinds, blind-timing detection, and manual human review via the Approvals page. Kinds without a replay path stay `candidate` and are queued for review. Coverage gaps are mapped to PTES phases (Recon, Enumeration, Vulnerability) so you know exactly what was skipped and when. Retest flips `verified` findings to `fixed`, `still_vulnerable`, or `inconclusive`; `inconclusive` means the replay could not establish either outcome and is not treated as remediation.
+The Trust Layer keeps findings as `candidate` until supported deterministic replay or read-only observation checks produce repeatable evidence. A failed replay is not labeled `refuted` or `fixed` merely because the issue did not reproduce; unsupported or inconclusive findings remain queued for human review. Coverage gaps are mapped to PTES phases (Recon, Enumeration, Vulnerability). Retesting can report `still_vulnerable` when proof repeats or `inconclusive` when the result cannot be established; `inconclusive` is not treated as remediation.
 
 Project notes record exploratory runs against four public training/demo targets (flaws.cloud, flaws2.cloud, rest.vulnweb.com, and pentest-ground.com). These runs are not a reproducible benchmark, do not establish comprehensive coverage, and do not guarantee zero false positives. Before relying on results, reproduce the workflow in an authorized test environment and review the evidence and limitations for each finding.
 
