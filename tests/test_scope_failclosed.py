@@ -233,3 +233,22 @@ def test_atomic_scope_write_does_not_follow_predictable_temp_symlink(tmp_path: P
 
     assert victim.read_text(encoding="utf-8") == "do not overwrite"
     assert config.read_text(encoding="utf-8") == '{"enabled": true}'
+
+@pytest.mark.parametrize("rule", [
+    "10.0.0.0/33",
+    "2001:db8::/129",
+    "*. ",
+    "*.example.com/path",
+    "bad..example",
+    "https://example.com",
+])
+def test_malformed_scope_rule_fails_closed(tmp_path: Path, rule: str) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "test",
+        "enabled": True,
+        "in_scope": [rule],
+        "out_of_scope": [],
+    }))
+    with pytest.raises(RuntimeError, match="malformed 'in_scope' rule"):
+        ScopeManager(cfg)
