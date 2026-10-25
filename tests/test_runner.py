@@ -304,6 +304,10 @@ def test_build_argv_allows_non_target_sqlmap_options():
     "-iL /tmp/targets.txt",
     "-iR 10",
     "--url=https://example.com",
+    "-uhttps://example.com",
+    "-hexample.com",
+    "-iL/tmp/targets.txt",
+    "-iR10",
 ])
 def test_build_argv_rejects_alternate_target_flags(extra_args):
     tool = Tool(
