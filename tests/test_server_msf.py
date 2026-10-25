@@ -154,7 +154,7 @@ def test_msf_sessions_when_down(tmp_path, monkeypatch):
 
 def test_msf_session_info_found(tmp_path, monkeypatch):
     fake = FakeMSF(up=True)
-    fake._sessions = {"5": {"host": "10.0.0.9", "type": "meterpreter"}}
+    fake._sessions = {"5": {"host": "10.0.0.9", "target_host": "10.0.0.9", "type": "meterpreter"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().get("/api/msf/sessions/5")
     assert r.status_code == 200
@@ -196,6 +196,7 @@ def test_msf_exec_when_down(tmp_path, monkeypatch):
 
 def test_msf_exec_success(tmp_path, monkeypatch):
     fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "10.0.0.9", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/sessions/1/exec", json={"command": "id"})
     assert r.status_code == 200
