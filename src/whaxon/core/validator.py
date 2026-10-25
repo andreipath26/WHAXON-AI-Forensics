@@ -197,7 +197,10 @@ class Validator:
             return "verified", f"TCP connection to {host}:{port} succeeded"
 
         if finding.kind == "ssl_cert_invalid":
-            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            evidence_host = data.get("host")
+            if isinstance(evidence_host, str) and evidence_host.lower() != host.lower():
+                return "candidate", "certificate finding host does not match the authorized target"
+            port = parsed.port or 443
             try:
                 context = ssl.create_default_context()
                 with socket.create_connection((host, port), timeout=5.0) as raw:
@@ -216,8 +219,22 @@ class Validator:
             def redirect_request(self, req, fp, code, msg, headers, newurl):
                 return None
 
+        probe_url = target_url
+        evidence_url = data.get("url")
+        if isinstance(evidence_url, str) and evidence_url:
+            evidence_parsed = urlparse(evidence_url)
+            if (
+                evidence_parsed.scheme not in ("http", "https")
+                or not evidence_parsed.hostname
+                or evidence_parsed.username is not None
+                or evidence_parsed.password is not None
+                or evidence_parsed.hostname.lower() != host.lower()
+            ):
+                return "candidate", "observation URL does not match the authorized target host"
+            probe_url = evidence_url
+
         request = urllib.request.Request(
-            target_url, method="GET",
+            probe_url, method="GET",
             headers={"User-Agent": "WHAXON-validate/1.0"},
         )
         opener = urllib.request.build_opener(_NoRedirect)
