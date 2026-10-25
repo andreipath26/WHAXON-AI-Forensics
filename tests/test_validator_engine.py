@@ -39,9 +39,11 @@ def test_xss_reflected_is_verified():
         f = Finding(kind="xss", severity="high", source="test",
                     data={"parameter": "q"}, raw_line="")
         status, reason = v.validate(f, target_url=url)
-        # Reflection by itself is not proof of executable XSS. The local
-        # fixture reflects input without executing it, so this must not verify.
-        assert status == "candidate", reason
+        # This fixture reflects the probe unescaped into an HTML response;
+        # the validator should identify the explicit XSS marker, not pass on
+        # timing alone or accept either verdict.
+        assert status == "verified", reason
+        assert "marker" in reason.lower(), reason
     finally:
         srv.shutdown()
 
