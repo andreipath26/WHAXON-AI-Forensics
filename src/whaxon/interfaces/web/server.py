@@ -1366,14 +1366,37 @@ def create_app_factory(host: str | None = None, port: int | None = None):
 
 
 def main(args: list[str] | None = None) -> None:
-    # Default credentials. Override via env before launch.
-    os.environ.setdefault("WHAXON_AUTH_USER", "whaxon")
-    if "WHAXON_AUTH_PASS_HASH" not in os.environ:
-        os.environ["WHAXON_AUTH_PASS_HASH"] = _hash_pw(
-            os.environ.get("WHAXON_AUTH_PASS", "whaxon")
-        )
     host = os.environ.get("WHAXON_HOST", "127.0.0.1")
     port = int(os.environ.get("WHAXON_PORT", "5001"))
+    import ipaddress
+    try:
+        loopback = ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        loopback = host.lower() == "localhost"
+
+    # Convenience defaults are permitted only for loopback development.
+    # Validate remote credentials before creating a fallback hash; otherwise a
+    # custom username with an omitted password could inherit the demo password.
+    if not loopback:
+        configured_user = os.environ.get("WHAXON_AUTH_USER", "").strip()
+        configured_pass = os.environ.get("WHAXON_AUTH_PASS", "")
+        has_hash = bool(os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip())
+        if (
+            not configured_user
+            or configured_user == "whaxon"
+            or (not has_hash and (not configured_pass or configured_pass == "whaxon"))
+        ):
+            raise SystemExit(
+                "Refusing network exposure without explicit non-default "
+                "WHAXON_AUTH_USER and WHAXON_AUTH_PASS or WHAXON_AUTH_PASS_HASH."
+            )
+    else:
+        os.environ.setdefault("WHAXON_AUTH_USER", "whaxon")
+        if "WHAXON_AUTH_PASS_HASH" not in os.environ:
+            os.environ["WHAXON_AUTH_PASS_HASH"] = _hash_pw(
+                os.environ.get("WHAXON_AUTH_PASS", "whaxon")
+            )
+
     data_dir = Path(os.environ.get("WHAXON_DATA", "data"))
 
     core = Core(data_dir=data_dir)
