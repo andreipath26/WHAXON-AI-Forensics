@@ -12,14 +12,14 @@ Most automated scanners stop at "this looks vulnerable." WHAXON adds conservativ
 
 No LLM decides a finding's verdict. Deterministic checks attach repeatable evidence for supported cases, but their coverage is limited and the evidence still requires analyst review.
 
-> **UI image note:** the UI v4 images in [docs/assets](docs/assets/) are design references, not live screenshots or evidence from a current engagement. Current-runtime screenshots still need to be captured and verified before release.
+> **UI image note:** the UI v4 images in [docs/assets](docs/assets/) are design references, not live screenshots or evidence from a current engagement. The browser UI is scheduled for replacement in a separate workstream; this release-readiness pass covers the core engine, runner, scope controls, validation, persistence, and packaging—not UI implementation.
 
 [![CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml/badge.svg)](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/whaxon.svg)](https://pypi.org/project/whaxon/)
 [![Python versions](https://img.shields.io/pypi/pyversions/whaxon.svg)](https://pypi.org/project/whaxon/)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
 
-> **Project maturity:** Alpha. Interfaces and integrations are under active development. Review the current limitations and verify your own environment before relying on WHAXON for client work or production operations.
+> **Project maturity:** 1.0.0 core release. The core runner, scope enforcement, deterministic validation, persistence, and package build are release-gated by CI. Optional interfaces and integrations still depend on the tools and configuration present in your environment; review limitations and verify your own deployment before client or production use.
 
 ## What it does
 
