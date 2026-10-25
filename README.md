@@ -12,15 +12,9 @@ Most automated scanners stop at "this looks vulnerable." WHAXON adds determinist
 
 No LLM decides if a finding is real. The proof does.
 
-![WHAXON findings interface](https://raw.githubusercontent.com/andreipath26/WHAXON/main/docs/assets/screenshot-ui-v4-findings.png)
+> **UI image note:** the UI v4 images in [docs/assets](docs/assets/) are design references, not live screenshots or evidence from a current engagement. Current-runtime screenshots still need to be captured and verified before release.
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/andreipath26/WHAXON/main/docs/assets/screenshot-ui-v4-scope.png" alt="WHAXON scope interface" width="32%">
-  <img src="https://raw.githubusercontent.com/andreipath26/WHAXON/main/docs/assets/screenshot-ui-v4-intel.png" alt="WHAXON intelligence interface" width="32%">
-  <img src="https://raw.githubusercontent.com/andreipath26/WHAXON/main/docs/assets/screenshot-ui-v4-compliance.png" alt="WHAXON compliance interface" width="32%">
-</p>
-
-[![CI](https://github.com/andreipath26/WHAXON/actions/workflows/ci.yml/badge.svg)](https://github.com/andreipath26/WHAXON/actions/workflows/ci.yml)
+[![CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml/badge.svg)](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/whaxon.svg)](https://pypi.org/project/whaxon/)
 [![Python versions](https://img.shields.io/pypi/pyversions/whaxon.svg)](https://pypi.org/project/whaxon/)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue.svg)](LICENSE)
