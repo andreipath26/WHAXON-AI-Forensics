@@ -1631,7 +1631,7 @@ def create_app_factory(host: str | None = None, port: int | None = None):
     os.environ["WHAXON_HOST"] = host
     os.environ["WHAXON_PORT"] = str(port)
     os.environ.setdefault("WHAXON_AUTH_USER", "whaxon")
-    if "WHAXON_AUTH_PASS_HASH" not in os.environ:
+    if not os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip():
         os.environ["WHAXON_AUTH_PASS_HASH"] = _hash_pw(
             os.environ.get("WHAXON_AUTH_PASS", "whaxon")
         )
@@ -1671,7 +1671,7 @@ def main(args: list[str] | None = None) -> None:
     # Hash the explicitly supplied password only after remote credentials have
     # passed validation. This keeps custom remote credentials usable without
     # ever manufacturing a known password for an exposed listener.
-    if "WHAXON_AUTH_PASS_HASH" not in os.environ:
+    if not os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip():
         os.environ["WHAXON_AUTH_PASS_HASH"] = _hash_pw(
             os.environ.get("WHAXON_AUTH_PASS", "whaxon")
         )
