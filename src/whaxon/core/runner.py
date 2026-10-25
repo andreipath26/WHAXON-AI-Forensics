@@ -168,16 +168,15 @@ class ToolRunner:
                     )
 
         outfile: Path | None = None
+        outdir: Path | None = None
         tool = self._catalog.get(tool_id) if self._catalog else None
-        # getattr default is typed bool in the stub; runtime accepts str
+        # Use a private, randomly named directory rather than a predictable
+        # /tmp/whaxon-<job-id>.json path that another local user could pre-create
+        # as a symlink and race against the external tool's file open.
         if tool is not None and getattr(tool, "outfile_flag", ""):  # type: ignore[arg-type]
             import tempfile
-            jid = job_id or uuid.uuid4().hex[:12]
-            outfile = Path(tempfile.gettempdir()) / f"whaxon-{jid}.json"
-            try:
-                outfile.unlink()
-            except FileNotFoundError:
-                pass
+            outdir = Path(tempfile.mkdtemp(prefix="whaxon-"))
+            outfile = outdir / "output.json"
 
         # Phase E.2: if a pivot route exists for the target and the tool
         # is pivot_capable, rewrite the target to the local forward.
@@ -193,18 +192,23 @@ class ToolRunner:
             except Exception:
                 route = None
 
-        argv = self.build_argv(tool_id, effective_target, extra_args=extra_args, outfile=outfile)
-        return await self.run(
-            tool_id=tool_id,
-            job_id=job_id,
-            argv=argv,
-            target=target,  # original host — attribution stays with the target
-            cwd=cwd,
-            env=env,
-            timeout_s=timeout_s,
-            outfile=outfile,
-            phase=phase,
-        )
+        try:
+            argv = self.build_argv(tool_id, effective_target, extra_args=extra_args, outfile=outfile)
+            return await self.run(
+                tool_id=tool_id,
+                job_id=job_id,
+                argv=argv,
+                target=target,  # original host — attribution stays with the target
+                cwd=cwd,
+                env=env,
+                timeout_s=timeout_s,
+                outfile=outfile,
+                phase=phase,
+            )
+        finally:
+            if outdir is not None:
+                import shutil
+                shutil.rmtree(outdir, ignore_errors=True)
 
     def _run_msf_session(self, session_id: str, command: str,
                         timeout_s: float) -> str:
