@@ -1,3 +1,17 @@
+## 2026-10-25 (Unreleased - beta hardening)
+
+**Security and execution**
+- Tool processes run in their own POSIX process group; timeout and cancellation terminate descendants so scans are not left running after the parent tool exits.
+- Web-submitted tool jobs use the guarded core runner and re-check scope at execution time; web cancellation is routed to the job's owning event loop.
+- Remote web listeners require a non-default username and bcrypt-backed credentials with a cost factor of at least 12.
+- Scope hostname checks fail closed when resolution fails and compare resolved addresses against IP/CIDR exclusions. This is a preflight check, not a connection-time DNS pin; beta deployments must enforce egress restrictions outside WHAXON.
+
+**Packaging and release verification**
+- Built wheels explicitly include the runtime tool catalog and validation payload resources.
+- CI builds wheel and source distributions, validates metadata, installs the wheel in a clean environment, checks CLI/catalog/scope initialization, and performs a local HTTP observation-validation smoke test.
+- Release workflow verifies the git tag matches the package version and repeats clean-wheel smoke tests before publishing.
+- README clone instructions now point to WHAXON-AI-Forensics; exploratory test claims are qualified as non-reproducible project notes.
+
 ## 2026-10-23 (Unreleased - recon Phase 2 complete)
 
 **Added**
