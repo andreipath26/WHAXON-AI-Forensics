@@ -10,7 +10,6 @@
       <section class="page active" id="page-findings">
         <div class="page-head">
           <div class="ph-main"><h1 class="page-title">Findings</h1><p class="page-sub" id="findings-summary">Loading…</p></div>
-          <div class="page-actions"><button class="btn btn-ghost btn-sm">Export</button><button class="btn btn-ghost btn-sm">Filters</button></div>
         </div>
 
         <div class="grid-4" style="margin-bottom: 20px;">
@@ -165,28 +164,13 @@
           <div class="card card-pad-lg"><div class="card-title">PDF</div><div class="card-sub">Client-ready</div><button class="btn btn-primary btn-sm" id="report-pdf">Generate</button></div>
         </div>
         <div class="card card-pad-lg">
-          <div class="card-title">Recent reports</div><div class="card-sub">This engagement</div>
-          <table class="tbl">
-            <thead><tr><th>Name</th><th>Format</th><th>Size</th><th>Created</th><th></th></tr></thead>
-            <tbody>
-              <tr><td><span class="title">dvwa-2026-10-01.pdf</span></td><td><span class="mono">pdf</span></td><td><span class="mono">2.4 MB</span></td><td><span class="mono">2026-10-01 18:22</span></td><td><button class="btn btn-sm btn-ghost">Open</button></td></tr>
-              <tr><td><span class="title">dvwa-2026-09-30.html</span></td><td><span class="mono">html</span></td><td><span class="mono">840 KB</span></td><td><span class="mono">2026-09-30 14:11</span></td><td><button class="btn btn-sm btn-ghost">Open</button></td></tr>
-            </tbody>
-          </table>
+          <div class="card-title">Report history</div>
+          <div class="card-sub">Saved report history is not available in this release. Use the Markdown, HTML, or PDF buttons above to generate a fresh report.</div>
         </div>
 
         <div class="card card-pad-lg" style="margin-top:20px;">
-          <div class="card-title">Known Vulnerabilities preview <span class="badge">7</span></div>
-          <div class="card-sub">This section appears in the generated report. Same data, visible before download.</div>
-          <table class="tbl">
-            <thead><tr><th>Hint</th><th>EDB-ID</th><th>Title</th><th>CVE</th></tr></thead>
-            <tbody>
-              <tr><td><span class="mono">apache 2.4.58</span></td><td><span class="mono">50383</span></td><td><span class="title">Apache HTTP Server 2.4.49 - Path Traversal &amp; RCE</span></td><td><span class="mono">CVE-2021-41773</span></td></tr>
-              <tr><td><span class="mono">apache 2.4.58</span></td><td><span class="mono">50406</span></td><td><span class="title">Apache HTTP Server 2.4.50 - Path Traversal &amp; RCE</span></td><td><span class="mono">CVE-2021-42013</span></td></tr>
-              <tr><td><span class="mono">openssh 9.6</span></td><td><span class="mono">-</span></td><td><span class="title">No exploits in the local mirror</span></td><td><span class="mono">-</span></td></tr>
-              <tr><td><span class="mono">vsftpd 2.3.4</span></td><td><span class="mono">49757</span></td><td><span class="title">vsftpd 2.3.4 - Backdoor Command Execution</span></td><td><span class="mono">CVE-2011-2523</span></td></tr>
-            </tbody>
-          </table>
+          <div class="card-title">Known vulnerabilities preview</div>
+          <div class="card-sub">Live CVE and exploit-intelligence data is not connected to this report page. No sample vulnerability records are shown as if they came from your engagement.</div>
         </div>
       </section>
 
@@ -220,34 +204,11 @@
 
       <!-- ATTACK SURFACE -->
       <section class="page" id="page-graph">
-        <div class="page-head"><div class="ph-main"><h1 class="page-title">Attack Surface</h1><p class="page-sub">Hosts, services, credentials, and the edges between them.</p></div></div>
-        <div class="card card-pad-lg" style="text-align:center;">
-          <div class="asg" style="max-height:520px;">
-            <svg viewBox="0 0 400 400">
-              <circle cx="200" cy="200" r="180" fill="none" stroke="var(--border)" stroke-dasharray="2 4"/>
-              <circle cx="200" cy="200" r="120" fill="none" stroke="var(--border)" stroke-dasharray="2 4"/>
-              <circle cx="200" cy="200" r="60" fill="none" stroke="var(--border)" stroke-dasharray="2 4"/>
-              <line x1="200" y1="200" x2="200" y2="80" stroke="var(--accent)" stroke-width="2" opacity="0.6"/>
-              <line x1="200" y1="200" x2="306" y2="260" stroke="var(--accent)" stroke-width="2" opacity="0.6"/>
-              <line x1="200" y1="200" x2="94" y2="260" stroke="var(--accent)" stroke-width="2" opacity="0.6"/>
-              <line x1="200" y1="80" x2="130" y2="30" stroke="var(--critical)" stroke-width="1.5" opacity="0.6"/>
-              <line x1="200" y1="80" x2="270" y2="30" stroke="var(--high)" stroke-width="1.5" opacity="0.6"/>
-              <line x1="306" y1="260" x2="370" y2="280" stroke="var(--high)" stroke-width="1.5" opacity="0.6"/>
-              <line x1="306" y1="260" x2="350" y2="340" stroke="var(--medium)" stroke-width="1.5" opacity="0.6"/>
-              <line x1="94" y1="260" x2="30" y2="280" stroke="var(--medium)" stroke-width="1.5" opacity="0.6"/>
-              <line x1="94" y1="260" x2="50" y2="340" stroke="var(--low)" stroke-width="1.5" opacity="0.6"/>
-              <circle cx="200" cy="200" r="20" fill="var(--accent)"/><text x="200" y="205" text-anchor="middle" font-size="11" fill="white" font-weight="700" font-family="var(--font-sans)">DVWA</text>
-              <g class="asg-node"><circle cx="200" cy="80" r="14" fill="var(--critical)"/><text x="200" y="60" text-anchor="middle" font-size="11">127.0.0.1</text></g>
-              <g class="asg-node"><circle cx="306" cy="260" r="12" fill="var(--accent)"/><text x="306" y="288" text-anchor="middle" font-size="11">:80 http</text></g>
-              <g class="asg-node"><circle cx="94" cy="260" r="12" fill="var(--accent)"/><text x="94" y="288" text-anchor="middle" font-size="11">:443 tls</text></g>
-              <g class="asg-node"><circle cx="130" cy="30" r="6" fill="var(--critical)"/><text x="130" y="18" text-anchor="middle" font-size="9">SQLi</text></g>
-              <g class="asg-node"><circle cx="270" cy="30" r="6" fill="var(--high)"/><text x="270" y="18" text-anchor="middle" font-size="9">Apache CVE</text></g>
-              <g class="asg-node"><circle cx="370" cy="280" r="6" fill="var(--high)"/><text x="370" y="298" text-anchor="middle" font-size="9">TLS weak</text></g>
-              <g class="asg-node"><circle cx="350" cy="340" r="5" fill="var(--medium)"/><text x="350" y="358" text-anchor="middle" font-size="9">dir listing</text></g>
-              <g class="asg-node"><circle cx="30" cy="280" r="5" fill="var(--medium)"/><text x="30" y="298" text-anchor="middle" font-size="9">XSS</text></g>
-              <g class="asg-node"><circle cx="50" cy="340" r="4" fill="var(--low)"/><text x="50" y="358" text-anchor="middle" font-size="9">headers</text></g>
-            </svg>
-          </div>
+        <div class="page-head"><div class="ph-main"><h1 class="page-title">Attack Surface</h1><p class="page-sub">Relationship visualization for hosts, services, and findings.</p></div></div>
+        <div class="card card-pad-lg">
+          <div class="card-title">Live graph unavailable</div>
+          <p class="card-sub">The graph visualization is not yet connected to the engagement data. The previous illustration used hardcoded sample hosts and findings, so it has been removed rather than presented as live assessment evidence.</p>
+          <p>Use the Scope, Findings, and Coverage pages for current data.</p>
         </div>
       </section>
 
