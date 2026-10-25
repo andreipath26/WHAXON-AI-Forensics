@@ -150,6 +150,8 @@ async def test_run_tool_out_of_scope_raises():
         matched_rule = ""
 
     class FakeScope:
+        path = tmp_path / "scope.json"
+
         def check(self, target):
             return FakeMatch()
 
@@ -165,7 +167,7 @@ async def test_run_tool_out_of_scope_raises():
     assert rec.events["started"] == []
 
 
-async def test_run_tool_out_of_scope_allowed_override():
+async def test_run_tool_out_of_scope_allowed_override(tmp_path):
     class FakeMatch:
         allowed = False
         reason = "no matching rule"
@@ -183,6 +185,9 @@ async def test_run_tool_out_of_scope_allowed_override():
     # allow_out_of_scope=True bypasses the check
     await runner.run_tool("echo", "8.8.8.8", timeout_s=5, allow_out_of_scope=True)
     assert len(rec.events["finished"]) == 1
+    override_log = tmp_path / "scope_overrides.log"
+    assert override_log.is_file()
+    assert "echo\t8.8.8.8" in override_log.read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------- missing binary
