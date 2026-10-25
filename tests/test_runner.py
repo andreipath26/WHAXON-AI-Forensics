@@ -561,5 +561,5 @@ def test_build_argv_rejects_positional_alternate_target(extra_args):
     )
     runner, _, _ = _runner(tools=[tool])
 
-    with pytest.raises(ValueError, match="alternate targets|second target"):
+    with pytest.raises(ValueError, match=r"alternate targets|second target"):
         runner.build_argv("nmap", "10.0.0.5", extra_args=extra_args)
