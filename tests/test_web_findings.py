@@ -111,3 +111,36 @@ def test_sort_by_severity_toggles_direction(page, live_server):
     page.wait_for_timeout(400)
     first_after = page.locator("#findings-tbody tr").first.get_attribute("data-severity")
     assert first_before != first_after
+
+def test_slideover_exposes_validate_and_retest_controls(page, live_server):
+    _open_findings(page, live_server)
+    row = page.locator("#findings-tbody tr").first
+    assert row.get_attribute("data-job-id")
+    assert row.get_attribute("data-seq") is not None
+    row.click()
+    page.wait_for_function(
+        "() => getComputedStyle(document.getElementById('so-validate')).display !== 'none'",
+        timeout=3000,
+    )
+    assert page.locator("#so-validate").is_visible()
+    assert page.locator("#so-retest").is_visible()
+
+
+def test_finding_filter_chips_use_live_counts_and_filter_rows(page, live_server):
+    _open_findings(page, live_server)
+    assert page.locator("#filter-count-all").text_content().strip() == "3"
+    assert page.locator("#filter-count-critical").text_content().strip() == "1"
+    page.locator('#page-findings .chip[data-filter="critical"]').click()
+    assert page.locator("#findings-tbody tr:visible").count() == 1
+    page.locator('#page-findings .chip[data-filter="all"]').click()
+    assert page.locator("#findings-tbody tr:visible").count() == 3
+
+
+def test_bulk_clear_unselects_dynamic_finding_rows(page, live_server):
+    _open_findings(page, live_server)
+    checkbox = page.locator("#findings-tbody .row-cb").first
+    checkbox.check()
+    assert checkbox.is_checked()
+    page.locator("#bulk-clear-btn").click()
+    assert not checkbox.is_checked()
+    assert not page.locator("#bulk-bar").evaluate("el => el.classList.contains('on')")
