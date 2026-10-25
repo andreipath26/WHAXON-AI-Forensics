@@ -477,7 +477,7 @@
       const top = findings.find(f => f.severity === 'critical') || findings.find(f => f.severity === 'high');
       const ex = document.getElementById('exec-summary');
       if (top) {
-        ex.innerHTML = `The primary security risk identified is <b>${escapeHtml(top.kind)}</b> affecting target <b>${escapeHtml(top.target)}</b>. Immediate remediation is required for <b>${sev.critical || 0} critical</b> and <b>${sev.high || 0} high</b> findings to reduce exposure to breach events.`;
+        ex.innerHTML = `The primary security risk identified is <b>${escapeHtml(top.kind)}</b> affecting target <b>${escapeHtml(top.target)}</b>. Immediate remediation is required for <b>${escapeHtml(sev.critical || 0)} critical</b> and <b>${escapeHtml(sev.high || 0)} high</b> findings to reduce exposure to breach events.`;
       } else {
         ex.textContent = 'No critical or high findings were identified during this assessment engagement.';
       }
