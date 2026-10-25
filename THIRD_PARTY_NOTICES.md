@@ -6,7 +6,7 @@ WHAXON runtime dependencies, base package plus optional extras.
 
 - platformdirs >= 4.0 — MIT; see upstream LICENSE.
 - dnspython >= 2.6 — ISC; see upstream LICENSE.
-- defusedxml >= 0.7.1 — PSF/Expat-related terms; see the upstream LICENSE and copyright notice.
+- defusedxml >= 0.7.1 — PSF License; see the upstream LICENSE and copyright notice.
 
 ## Extra: tui
 
