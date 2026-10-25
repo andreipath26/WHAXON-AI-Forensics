@@ -109,3 +109,50 @@ def test_default_scope_includes_ipv4_loopback_cidr(tmp_path: Path) -> None:
     ScopeManager(cfg)
     data = json.loads(cfg.read_text())
     assert "127.0.0.0/8" in data["in_scope"]
+
+@pytest.mark.parametrize("invalid_enabled", [None, 0, 1, "", "false", [], {}])
+def test_non_boolean_enabled_value_cannot_disable_scope(
+    tmp_path: Path, invalid_enabled
+) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "test",
+        "enabled": invalid_enabled,
+        "in_scope": ["127.0.0.1"],
+        "out_of_scope": [],
+    }))
+
+    with pytest.raises(RuntimeError, match="invalid 'enabled'"):
+        ScopeManager(cfg)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("in_scope", "127.0.0.1"),
+        ("in_scope", [None]),
+        ("out_of_scope", 0),
+        ("out_of_scope", [""]),
+    ],
+)
+def test_malformed_scope_rules_are_rejected(tmp_path: Path, key: str, value) -> None:
+    cfg = tmp_path / "scope.json"
+    data = {
+        "engagement": "test",
+        "enabled": True,
+        "in_scope": ["127.0.0.1"],
+        "out_of_scope": [],
+    }
+    data[key] = value
+    cfg.write_text(json.dumps(data))
+
+    with pytest.raises(RuntimeError, match=f"invalid '{key}'"):
+        ScopeManager(cfg)
+
+
+def test_non_object_scope_config_is_rejected(tmp_path: Path) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps(["enabled", False]))
+
+    with pytest.raises(RuntimeError, match="JSON object"):
+        ScopeManager(cfg)
