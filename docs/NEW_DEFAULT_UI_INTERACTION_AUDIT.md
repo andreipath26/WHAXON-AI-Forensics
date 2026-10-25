@@ -25,6 +25,7 @@
 | Coverage & reports | Export Markdown, HTML, JSON, PDF, WHAXON envelope | `GET /api/report?format=...` | Wired; PDF depends on renderer availability |
 | Job history | Read persisted jobs and inspect job output | `GET /api/history`, `GET /api/jobs/<id>/output.txt` | Wired; verify response schemas in CI |
 | Evidence inspector | List, upload, download and delete job evidence; save analyst notes | `GET/POST/DELETE /api/jobs/<id>/evidence`, `GET /api/jobs/<id>/evidence/<seq>/download` | Wired; verify upload/download lifecycle in browser/CI |
+| Burp XML import | Parse an existing Burp XML export into a persisted job and findings | `POST /api/import/burp` | Wired; parser rejects unsupported/empty imports; verify in browser/CI |
 | Coverage ledger | Read recorded coverage gaps for a selected job | `GET /api/coverage/<job_id>` | Wired; verify with jobs that have coverage records |
 | Sessions | Read Metasploit session status | `GET /api/msf/sessions` | Read-only; interactive session control intentionally omitted |
 | Adapter catalog | Tool availability and adapter support | `GET /api/tools` | Wired |
@@ -37,6 +38,7 @@
 - [ ] Browser tests pass for navigation, mobile navigation, live tool catalog, scope summary and scope checks.
 - [ ] Run flow confirms scope before submission, backend rejects unauthorized targets, and output stream displays lines/final status.
 - [ ] Evidence notes and uploads persist; download/delete are job-bound and tested; failed uploads display server errors.
+- [ ] Burp XML import creates a persisted job only when the adapter parses findings; malformed/empty uploads display a useful error.
 - [ ] Coverage ledger renders persisted gaps for the selected job and does not imply that unrecorded checks were performed.
 - [ ] Cancellation requests are reflected accurately; UI does not claim cancellation succeeded when the backend returns false.
 - [ ] Finding severity/status fields map correctly from actual report payloads; validate and retest refresh state after completion.
