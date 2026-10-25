@@ -134,9 +134,16 @@ class ToolRunner:
                 return False
             if value.startswith("-"):
                 return False
-            if "://" in value:
+            if "://" in value or value.startswith("//"):
                 parsed = urlsplit(value)
                 return bool(parsed.hostname)
+            if "/" in value:
+                # Some tools accept host/path or CIDR-like target values.
+                # Inspect the authority portion, but do not treat ordinary
+                # relative paths such as /admin as an alternate host.
+                authority = value.split("/", 1)[0]
+                if authority and _looks_like_target_token(authority):
+                    return True
             try:
                 ipaddress.ip_address(value.strip("[]"))
                 return True
