@@ -411,6 +411,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         extra_args = data.get("extra_args", "") or ""
         if not tool_id or not target:
             return {"error": "tool_id and target required"}, 400
+        # The web runner intentionally does not accept arbitrary command-line
+        # arguments from clients. The current runner path does not implement a
+        # safe per-tool argument allowlist, so reject rather than silently ignore.
+        if not isinstance(extra_args, str) or extra_args.strip():
+            return {"error": "extra_args are not supported by the web runner"}, 400
 
         # Scope enforcement is mandatory. Web out-of-scope overrides are
         # disabled until an operator-confirmed, target-bound audit flow exists.
