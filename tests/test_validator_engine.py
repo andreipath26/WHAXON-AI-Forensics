@@ -25,8 +25,22 @@ class _Reflector(BaseHTTPRequestHandler):
         pass
 
 
-def _serve():
-    srv = HTTPServer(("127.0.0.1", 0), _Reflector)
+class _EscapingReflector(_Reflector):
+    """Echoes the query only after HTML escaping it."""
+    def do_GET(self):
+        import html
+        from urllib.parse import parse_qs, urlparse
+        q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+        body = f"<html><body>You searched for: {html.escape(q)}</body></html>".encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def _serve(handler=_Reflector):
+    srv = HTTPServer(("127.0.0.1", 0), handler)
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
     return srv, f"http://127.0.0.1:{srv.server_address[1]}/search"
@@ -44,6 +58,18 @@ def test_xss_reflected_is_verified():
         # timing alone or accept either verdict.
         assert status == "verified", reason
         assert "marker" in reason.lower(), reason
+    finally:
+        srv.shutdown()
+
+
+def test_escaped_reflection_is_not_verified():
+    srv, url = _serve(_EscapingReflector)
+    try:
+        v = Validator(PAYLOAD_DIR)
+        f = Finding(kind="xss", severity="high", source="test",
+                    data={"parameter": "q"}, raw_line="")
+        status, reason = v.validate(f, target_url=url)
+        assert status != "verified", reason
     finally:
         srv.shutdown()
 
