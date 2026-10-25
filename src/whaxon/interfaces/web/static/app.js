@@ -221,12 +221,72 @@
     if (!notifPanel.contains(e.target) && e.target.id !== 'notif-trigger') notifPanel.classList.remove('open');
   });
 
-  // keyboard
+  // Keyboard shortcuts shown in the help legend are implemented here.
+  let goPending = false;
+  let goTimer = null;
+  const isTyping = () => {
+    const el = document.activeElement;
+    return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  };
+  function navigateTo(page) {
+    document.querySelector('.sb-item[data-page="' + page + '"]')?.click();
+  }
   document.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); palette.classList.toggle('open'); if (palette.classList.contains('open')) paletteInput.focus(); }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'b') { e.preventDefault(); app.classList.toggle('collapsed'); }
-    if (e.key === 'Escape') { palette.classList.remove('open'); closeSlideover(); notifPanel.classList.remove('open'); kbdLegend.classList.remove('open'); document.querySelectorAll('.scope-modal, .confirm-modal, .ws-modal').forEach(m => m.classList.remove('open')); }
-    if (e.key === '?' && document.activeElement.tagName !== 'INPUT') kbdLegend.classList.toggle('open');
+    const key = e.key.toLowerCase();
+    if ((e.metaKey || e.ctrlKey) && key === 'k') {
+      e.preventDefault();
+      renderPalette(paletteInput.value);
+      palette.classList.toggle('open');
+      if (palette.classList.contains('open')) paletteInput.focus();
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && key === 'b') {
+      e.preventDefault();
+      app.classList.toggle('collapsed');
+      return;
+    }
+    if (e.key === 'Escape') {
+      palette.classList.remove('open');
+      closeSlideover();
+      notifPanel.classList.remove('open');
+      kbdLegend.classList.remove('open');
+      document.querySelectorAll('.scope-modal, .confirm-modal').forEach(m => m.classList.remove('open'));
+      goPending = false;
+      return;
+    }
+    if (!isTyping() && e.key === '/') {
+      e.preventDefault();
+      renderPalette('');
+      palette.classList.add('open');
+      paletteInput.focus();
+      return;
+    }
+    if (!isTyping() && goPending) {
+      goPending = false;
+      if (goTimer) clearTimeout(goTimer);
+      if (key === 'f') navigateTo('findings');
+      else if (key === 'r') navigateTo('run');
+      else if (key === 'p') navigateTo('report');
+      return;
+    }
+    if (!isTyping() && key === 'g') {
+      goPending = true;
+      if (goTimer) clearTimeout(goTimer);
+      goTimer = setTimeout(() => { goPending = false; }, 1200);
+      return;
+    }
+    if (!isTyping() && key === 'n') {
+      navigateTo('run');
+      return;
+    }
+    if (!isTyping() && key === 'd') {
+      const current = document.body.dataset.density === 'compact' ? 'compact' : 'comfortable';
+      const next = current === 'compact' ? 'comfortable' : 'compact';
+      document.body.dataset.density = next;
+      document.querySelectorAll('.density-toggle button').forEach(btn => btn.classList.toggle('on', btn.dataset.density === next));
+      return;
+    }
+    if (e.key === '?' && !isTyping()) kbdLegend.classList.toggle('open');
   });
 
   palette.addEventListener('click', e => { if (e.target === palette) palette.classList.remove('open'); });
@@ -610,7 +670,6 @@
         const tr = document.querySelector('#findings-tbody tr.selected');
         if (tr) {
           tr.dataset.status = data.status;
-          const statusCell = tr.querySelector('.pill');
           // Find the status cell by class (last pill in the row)
           const cells = tr.querySelectorAll('td');
           if (cells.length >= 6) {
@@ -630,6 +689,7 @@
           }
         }
         loadFindings();
+        window.closeSlideover?.();
         alert(kind + ': ' + data.status + '\n' + data.reason);
       }
     } catch (e) {
