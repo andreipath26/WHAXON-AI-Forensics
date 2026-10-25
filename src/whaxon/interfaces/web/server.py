@@ -390,6 +390,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
               file=_sys.stderr)
 
     app = Flask(__name__)
+    # Only trust forwarded client metadata when an operator explicitly enables
+    # it for a known reverse proxy. This lets Origin validation work correctly
+    # behind HTTPS without trusting spoofable headers on direct deployments.
+    if _os.environ.get("WHAXON_TRUST_PROXY", "").strip().lower() in {"1", "true", "yes"}:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
     try:
         max_upload_mb = int(_os.environ.get("WHAXON_MAX_UPLOAD_MB", "25"))
     except ValueError:
