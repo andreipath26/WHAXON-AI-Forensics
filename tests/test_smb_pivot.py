@@ -188,7 +188,7 @@ def test_wmi_keeps_password_out_of_process_arguments(monkeypatch):
 
         async def communicate(input=None):
             captured["stdin"] = input
-            return b"command output\\n", b""
+            return b"command output\n", b""
 
         proc.communicate = communicate
         proc.returncode = 0
@@ -202,5 +202,5 @@ def test_wmi_keeps_password_out_of_process_arguments(monkeypatch):
     assert "command output" in out
     assert "wmi-secret" not in " ".join(captured["argv"])
     assert captured["argv"][1] == "user@10.0.0.5"
-    assert captured["stdin"] == b"wmi-secret\\n"
+    assert captured["stdin"] == b"wmi-secret\n"
     assert captured["kwargs"]["start_new_session"] is True
