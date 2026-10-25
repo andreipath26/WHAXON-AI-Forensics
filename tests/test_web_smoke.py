@@ -69,10 +69,19 @@ def test_evidence_note_persists_for_selected_job(page, live_server):
 def test_ai_strategy_gate_shows_pending_operator_decision(page, live_server):
     # This workflow belongs to the new default UI; the legacy reference UI is tested separately.
     page.goto(f"{live_server}/ui")
-    page.click('.nav-item[data-view="ai-gate"]')
+    with page.expect_response(
+        lambda response: response.url.endswith("/api/ai/pending"),
+        timeout=10000,
+    ) as pending_response:
+        page.click('.nav-item[data-view="ai-gate"]')
+    response = pending_response.value
+    assert response.status == 200, response.text()
+    pending = response.json()
+    assert any(run.get("id") == "seed-ai-run" for run in pending), pending
+
     page.wait_for_function(
         "() => document.querySelector('#ai-pending-list')?.textContent.includes('seed-ai-run')",
-        timeout=5000,
+        timeout=10000,
     )
     assert "enumeration" in page.locator("#ai-pending-list").text_content()
 
