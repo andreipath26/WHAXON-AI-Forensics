@@ -144,3 +144,15 @@ def test_bulk_clear_unselects_dynamic_finding_rows(page, live_server):
     page.locator("#bulk-clear-btn").click()
     assert not checkbox.is_checked()
     assert not page.locator("#bulk-bar").evaluate("el => el.classList.contains('on')")
+
+def test_command_palette_search_navigates_to_catalog(page, live_server):
+    page.goto(f"{live_server}/ui")
+    page.click("#palette-trigger")
+    page.fill("#palette-input", "catalog")
+    result = page.locator(".palette-item[role='button']").first
+    assert result.count() == 1
+    result.click()
+    page.wait_for_function(
+        "() => document.getElementById('page-catalog').classList.contains('active')",
+        timeout=3000,
+    )
