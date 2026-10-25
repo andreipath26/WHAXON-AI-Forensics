@@ -565,6 +565,7 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 .palette-group { font-size: var(--t-xs); color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.08em; padding: var(--sp-3) var(--sp-3) var(--sp-1); }
 .palette-item { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm); font-size: var(--t-sm); color: var(--text-dim); cursor: pointer; }
 .palette-item:hover, .palette-item.on { background: var(--accent-dim); color: var(--text); }
+.palette-item .palette-detail { margin-left: auto; color: var(--text-mute); font-size: var(--t-xs); text-align: right; }
 .palette-item .pi-icon { width: 20px; text-align: center; color: var(--text-mute); }
 .palette-item.on .pi-icon { color: var(--accent); }
 .palette-item .pi-kbd { margin-left: auto; font-family: var(--font-mono); font-size: var(--t-2xs); color: var(--text-faint); }
