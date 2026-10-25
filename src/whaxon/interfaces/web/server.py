@@ -350,9 +350,34 @@ def _unauthorized():
 
 
 def _evidence_dir(core, job_id):
-    d = core.data_dir / "evidence" / job_id
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    """Return a job-specific evidence directory contained inside data/evidence."""
+    import re
+
+    if not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", job_id):
+        raise ValueError("invalid job id for evidence storage")
+    data_root = Path(core.data_dir).resolve()
+    evidence_root = data_root / "evidence"
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    evidence_root = evidence_root.resolve()
+    if not evidence_root.is_relative_to(data_root):
+        raise ValueError("evidence directory resolves outside the data directory")
+    job_dir = evidence_root / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    job_dir = job_dir.resolve()
+    if not job_dir.is_relative_to(evidence_root):
+        raise ValueError("job evidence directory resolves outside the evidence directory")
+    return job_dir
+
+
+def _resolve_evidence_path(core, relative_path):
+    """Resolve a stored evidence path and reject traversal or symlink escapes."""
+    if not isinstance(relative_path, str) or not relative_path:
+        raise ValueError("evidence path is missing")
+    data_root = Path(core.data_dir).resolve()
+    full_path = (data_root / relative_path).resolve()
+    if not full_path.is_relative_to(data_root):
+        raise ValueError("evidence path resolves outside the data directory")
+    return full_path
 
 def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     import os as _os
@@ -365,6 +390,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
               file=_sys.stderr)
 
     app = Flask(__name__)
+    try:
+        max_upload_mb = int(_os.environ.get("WHAXON_MAX_UPLOAD_MB", "25"))
+    except ValueError:
+        max_upload_mb = 25
+    if not 1 <= max_upload_mb <= 1024:
+        max_upload_mb = 25
+    app.config["MAX_CONTENT_LENGTH"] = max_upload_mb * 1024 * 1024
     limiter = Limiter(
         key_func=get_remote_address,
         app=app,
@@ -433,6 +465,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not _check_auth(request.headers.get("Authorization")):
             _record_auth_failure(request.remote_addr)
             return _unauthorized()
+
+    @app.errorhandler(413)
+    def upload_too_large(_error):
+        return {"error": f"request exceeds the configured {max_upload_mb} MiB limit"}, 413
 
     @app.get("/favicon.ico")
     def favicon():
@@ -666,43 +702,93 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/jobs/<job_id>/evidence")
     def list_evidence(job_id: str):
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
         items = registry.core.store.list_evidence(job_id)
         return jsonify(items)
 
     @app.post("/api/jobs/<job_id>/evidence")
     def add_evidence(job_id: str):
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
         data = request.get_json(silent=True)
         if data and (data.get("note") or data.get("kind") == "note"):
+            note = data.get("note", "")
+            name = data.get("name", "note")
+            if not isinstance(note, str) or len(note) > 10000:
+                return {"error": "note must be a string of at most 10000 characters"}, 400
+            if not isinstance(name, str) or len(name) > 200:
+                return {"error": "name must be a string of at most 200 characters"}, 400
             seq = registry.core.store.add_evidence(
-                job_id, "note", data.get("name", "note"), note=data.get("note", ""))
+                job_id, "note", name, note=note)
             return {"seq": seq}, 201
         f = request.files.get("file")
         if f is None:
             return {"error": "provide file (multipart) or {note: ...} JSON"}, 400
-        target_dir = _evidence_dir(registry.core, job_id)
-        safe_name = Path(f.filename).name
-        dest = target_dir / safe_name
-        f.save(str(dest))
-        seq = registry.core.store.add_evidence(
-            job_id, "file", safe_name,
-            path=str(dest.relative_to(registry.core.data_dir)),
-            note=request.form.get("note", ""))
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(f.filename or "")
+        if not safe_name:
+            return {"error": "filename is empty or invalid"}, 400
+        try:
+            target_dir = _evidence_dir(registry.core, job_id)
+        except ValueError as exc:
+            return {"error": str(exc)}, 400
+        import uuid as _uuid
+        disk_name = f"{_uuid.uuid4().hex[:12]}-{safe_name}"
+        dest = target_dir / disk_name
+        try:
+            f.save(str(dest))
+            relative_path = str(dest.resolve().relative_to(Path(registry.core.data_dir).resolve()))
+            seq = registry.core.store.add_evidence(
+                job_id, "file", safe_name,
+                path=relative_path,
+                note=request.form.get("note", "")[:10000])
+        except Exception:
+            try:
+                dest.unlink(missing_ok=True)
+            except OSError:
+                app.logger.exception("Failed to clean up partial evidence upload")
+            app.logger.exception("Evidence upload failed for job %s", job_id)
+            return {"error": "evidence upload failed"}, 500
         return {"seq": seq, "name": safe_name}, 201
 
     @app.delete("/api/jobs/<job_id>/evidence/<int:seq>")
     def delete_evidence(job_id: str, seq: int):
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
+        items = registry.core.store.list_evidence(job_id)
+        item = next((x for x in items if x["seq"] == seq), None)
+        if item is None:
+            return {"ok": False}, 404
+        if item.get("path"):
+            try:
+                full = _resolve_evidence_path(registry.core, item["path"])
+            except ValueError:
+                app.logger.error("Refusing to delete evidence with unsafe path for job %s", job_id)
+                return {"error": "unsafe evidence path"}, 403
+            try:
+                full.unlink(missing_ok=True)
+            except OSError:
+                app.logger.exception("Failed to remove evidence file for job %s", job_id)
+                return {"error": "failed to remove evidence file"}, 500
         ok = registry.core.store.remove_evidence(job_id, seq)
         return {"ok": ok}, (200 if ok else 404)
 
     @app.get("/api/jobs/<job_id>/evidence/<int:seq>/download")
     def download_evidence(job_id: str, seq: int):
         from flask import send_file
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
         items = registry.core.store.list_evidence(job_id)
         item = next((x for x in items if x["seq"] == seq), None)
         if not item or not item.get("path"):
             return {"error": "not a file"}, 404
-        full = registry.core.data_dir / item["path"]
-        if not full.exists():
+        try:
+            full = _resolve_evidence_path(registry.core, item["path"])
+        except ValueError:
+            app.logger.error("Refusing to download evidence with unsafe path for job %s", job_id)
+            return {"error": "unsafe evidence path"}, 403
+        if not full.is_file():
             return {"error": "file missing"}, 404
         return send_file(str(full), as_attachment=True, download_name=item["name"])
 
