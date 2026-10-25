@@ -400,6 +400,12 @@
       critical: 'pill-critical', high: 'pill-high', medium: 'pill-medium', low: 'pill-low', info: 'pill-info'
     };
 
+    function escapeHtml(value) {
+      const node = document.createElement('span');
+      node.textContent = String(value == null ? '' : value);
+      return node.innerHTML;
+    }
+
     let reportData = {};
     let allFindings = [];
     let currentFilterSev = null;
@@ -471,7 +477,7 @@
       const top = findings.find(f => f.severity === 'critical') || findings.find(f => f.severity === 'high');
       const ex = document.getElementById('exec-summary');
       if (top) {
-        ex.innerHTML = `The primary security risk identified is <b>${top.kind}</b> affecting target <b>${top.target}</b>. Immediate remediation is required for <b>${sev.critical || 0} critical</b> and <b>${sev.high || 0} high</b> findings to reduce exposure to breach events.`;
+        ex.innerHTML = `The primary security risk identified is <b>${escapeHtml(top.kind)}</b> affecting target <b>${escapeHtml(top.target)}</b>. Immediate remediation is required for <b>${sev.critical || 0} critical</b> and <b>${sev.high || 0} high</b> findings to reduce exposure to breach events.`;
       } else {
         ex.textContent = 'No critical or high findings were identified during this assessment engagement.';
       }
@@ -534,13 +540,13 @@
         const vby = f.verified_by || 'engine';
         const vreason = f.verification_reason || '';
         const pillCls = (vstat === 'verified' || vstat === 'refuted') ? ('pill-' + (vstat === 'verified' ? 'low' : 'critical')) : 'pill-info';
-        const vcellHtml = '<span class="pill ' + pillCls + '" style="font-size:11px;">' + vstat + '</span> <small style="color:var(--text-muted); font-size:11px;">by ' + vby + (vreason ? ' \u2014 ' + vreason : '') + '</small>';
+        const vcellHtml = '<span class="pill ' + pillCls + '" style="font-size:11px;">' + escapeHtml(vstat) + '</span> <small style="color:var(--text-muted); font-size:11px;">by ' + escapeHtml(vby) + (vreason ? ' — ' + escapeHtml(vreason) : '') + '</small>';
         tr.innerHTML = `
-          <td><span class="pill ${SEV_PILL[f.severity] || 'pill-info'}">${f.severity}</span></td>
-          <td style="font-weight:600;">${f.title}</td>
-          <td style="font-family:var(--font-mono); font-size:12px;">${f.target}</td>
-          <td><span class="chip">${f.source}</span></td>
-          <td><span style="color:${f.status === 'verified' ? 'var(--low)' : 'var(--text-muted)'}; font-size:12px;">${f.status}</span></td>
+          <td><span class="pill ${SEV_PILL[f.severity] || 'pill-info'}">${escapeHtml(f.severity)}</span></td>
+          <td style="font-weight:600;">${escapeHtml(f.title)}</td>
+          <td style="font-family:var(--font-mono); font-size:12px;">${escapeHtml(f.target)}</td>
+          <td><span class="chip">${escapeHtml(f.source)}</span></td>
+          <td><span style="color:${f.status === 'verified' ? 'var(--low)' : 'var(--text-muted)'}; font-size:12px;">${escapeHtml(f.status)}</span></td>
           <td>${vcellHtml}</td>
         `;
         tbody.appendChild(tr);
@@ -562,7 +568,7 @@
       if (f.cost_range) {
         try {
           const cr = typeof f.cost_range === 'string' ? JSON.parse(f.cost_range) : f.cost_range;
-          costEl.innerHTML = `<b>${cr.incident_pattern || 'Breach Incident'}</b> · median $${Number(cr.median).toLocaleString()} · p90 $${Number(cr.p90).toLocaleString()} <span style="color:var(--text-muted)">(${cr.source || ''})</span>`;
+          costEl.innerHTML = `<b>${escapeHtml(cr.incident_pattern || 'Breach Incident')}</b> · median $${Number(cr.median).toLocaleString()} · p90 $${Number(cr.p90).toLocaleString()} <span style="color:var(--text-muted)">(${escapeHtml(cr.source || '')})</span>`;
         } catch (e) { costEl.textContent = 'Data unavailable'; }
       } else {
         costEl.textContent = 'No loss estimate modeled for this finding type.';
@@ -570,7 +576,7 @@
 
       // Provenance
       const jobsEl = document.getElementById('so-jobs');
-      jobsEl.innerHTML = (f.job_ids.length > 0 ? f.job_ids : ['standalone']).map(j => `<span class="chip">job:${j}</span>`).join('');
+      jobsEl.innerHTML = (f.job_ids.length > 0 ? f.job_ids : ['standalone']).map(j => `<span class="chip">job:${escapeHtml(j)}</span>`).join('');
 
       document.getElementById('so-evidence').textContent = f.raw_line || 'No raw evidence captured.';
       document.getElementById('so-remediation').textContent = f.remediation || 'Standard remediation practices apply.';
