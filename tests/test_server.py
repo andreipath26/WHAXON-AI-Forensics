@@ -678,6 +678,7 @@ def test_https_reverse_proxy_origin_is_accepted_when_explicitly_trusted(
 
 def test_network_auth_requires_non_default_bcrypt_credentials(monkeypatch):
     import hashlib
+
     from whaxon.interfaces.web import server as web_server
 
     monkeypatch.setattr(web_server, "_bcrypt", None)
