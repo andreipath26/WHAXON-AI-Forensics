@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>WHAXON · Security Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='new-ui.css') }}">
 </head>
 <body>
@@ -75,6 +78,7 @@
     <section class="view" id="view-reports">
       <div class="section-intro"><div><div class="eyebrow">TRANSPARENT OUTPUT</div><h2>Coverage &amp; reports</h2><p>Export report formats from the current persisted engagement data. Report contents reflect recorded data; they do not imply unperformed tests.</p></div></div>
       <article class="panel"><div class="panel-heading"><h3>Generate report</h3></div><div class="report-grid"><a class="report-card" href="/api/report?format=md"><b>Markdown</b><span>Readable text report</span><em>Download .md ↗</em></a><a class="report-card" href="/api/report?format=html"><b>HTML</b><span>Standalone report document</span><em>Download .html ↗</em></a><a class="report-card" href="/api/report?format=json"><b>JSON</b><span>Structured report payload</span><em>Download .json ↗</em></a><a class="report-card" href="/api/report?format=pdf"><b>PDF</b><span>Printable report (if renderer is installed)</span><em>Download .pdf ↗</em></a><a class="report-card" href="/api/report?format=whaxon"><b>WHAXON bundle</b><span>Integrity-digested report envelope</span><em>Download .whaxon ↗</em></a></div></article>
+      <article class="panel"><div class="panel-heading"><h3>Coverage ledger</h3><button class="btn btn-quiet" id="coverage-refresh">Reload coverage</button></div><div class="stack"><label for="coverage-job">Job</label><select id="coverage-job"><option value="">Choose a recorded job</option></select></div><div id="coverage-summary" class="data-block">Choose a job to inspect recorded coverage gaps.</div></article>
       <article class="panel"><div class="panel-heading"><h3>Report summary</h3><button class="btn btn-quiet" data-refresh="report">Refresh summary</button></div><pre id="report-summary" class="data-block">Loading report summary…</pre></article>
     </section>
     <section class="view" id="view-history">
