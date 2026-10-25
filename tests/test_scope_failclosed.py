@@ -205,7 +205,7 @@ def test_hostname_dns_failure_fails_closed(tmp_path: Path, monkeypatch) -> None:
         "engagement": "test",
         "enabled": True,
         "in_scope": ["target.test"],
-        "out_of_scope": [],
+        "out_of_scope": ["203.0.113.0/24"],
     }))
 
     def fail_dns(host, port, type):
