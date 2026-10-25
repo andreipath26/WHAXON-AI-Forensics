@@ -1408,7 +1408,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "request body must be a JSON object"}, 400
         lport = data.get("lport")
         try:
-            if isinstance(lport, bool):
+            if isinstance(lport, bool) or not isinstance(lport, (int, str)):
+                raise ValueError
+            if isinstance(lport, str) and not lport.strip().isdigit():
                 raise ValueError
             local_port = int(lport)
             if not 1 <= local_port <= 65535:
