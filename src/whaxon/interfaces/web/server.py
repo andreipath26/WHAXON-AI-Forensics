@@ -1413,6 +1413,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not isinstance(data, dict):
             return {"error": "request body must be a JSON object"}, 400
         lport = data.get("lport")
+        if lport is None:
+            return {"error": "lport required"}, 400
         try:
             if isinstance(lport, bool) or not isinstance(lport, (int, str)):
                 raise ValueError
