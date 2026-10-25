@@ -656,3 +656,22 @@ def test_run_rejects_malformed_request_fields(tmp_path, monkeypatch):
         response = client.post("/api/run", json=payload)
         assert response.status_code == 400, payload
         assert "error" in response.get_json()
+
+
+def test_https_reverse_proxy_origin_is_accepted_when_explicitly_trusted(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
+    monkeypatch.setenv("WHAXON_TRUST_PROXY", "1")
+    monkeypatch.setenv("WHAXON_ALLOWED_HOSTS", "whaxon.example.com")
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get(
+        "/api/scope",
+        headers={
+            "Host": "whaxon.example.com",
+            "X-Forwarded-Proto": "https",
+            "Origin": "https://whaxon.example.com",
+        },
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 200
