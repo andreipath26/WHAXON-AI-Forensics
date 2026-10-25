@@ -1591,6 +1591,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Serve the Obsidian Kinetic frontend as the default web UI."""
         return render_template("new_ui.html")
 
+    @app.get("/ui/react")
+    def react_ui_preview():
+        """Serve the React build for integration testing without changing the default UI."""
+        from flask import send_from_directory
+
+        bundle_dir = Path(app.static_folder or "") / "obsidian"
+        entry = bundle_dir / "index.html"
+        if not entry.is_file():
+            return jsonify({
+                "error": "React UI bundle is not built. Run npm run build in frontend/ first."
+            }), 503
+        return send_from_directory(str(bundle_dir), "index.html")
+
     @app.post("/api/jobs/<job_id>/cancel")
     def cancel_job(job_id: str):
         ok = _cancel_job_blocking(core, job_id)
