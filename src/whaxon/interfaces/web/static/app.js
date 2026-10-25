@@ -992,22 +992,47 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         approvalsList.innerHTML = '<div class="card-sub" style="padding:24px;">No pending approvals.</div>';
         return;
       }
-      approvalsList.innerHTML = rows.map(r => {
+      approvalsList.replaceChildren();
+      rows.forEach(r => {
         const q = r.pending_question || {};
-        const rationale = (q.rationale || '(no rationale)').replace(/</g, '&lt;');
-        const conf = (typeof q.confidence === 'number') ? q.confidence.toFixed(2) : '—';
-        const phase = (q.proposed_phase || '');
+        const rationale = q.rationale || '(no rationale)';
+        const confidence = (typeof q.confidence === 'number') ? q.confidence.toFixed(2) : '—';
+        const phase = q.proposed_phase || '';
         const ownerLabel = r.owner || 'local';
-        return '<div class="card" data-run="' + r.id + '" style="margin-bottom:12px;">' +
-          '<div class="card-title">' + rationale + '</div>' +
-          '<div class="card-sub">run ' + r.id + ' · owner ' + ownerLabel + ' · confidence ' + conf +
-            (phase ? (' · proposed phase <b>' + phase + '</b>') : '') + '</div>' +
-          '<div style="display:flex;gap:8px;margin-top:12px;align-items:center;">' +
-            '<input class="form-input" data-answer-input placeholder="answer (e.g. y, no, notes)" style="flex:1;">' +
-            '<button class="btn btn-primary btn-sm" data-answer-btn>Answer</button>' +
-          '</div>' +
-        '</div>';
-      }).join('');
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.run = String(r.id || '');
+        card.style.marginBottom = '12px';
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = String(rationale);
+        const sub = document.createElement('div');
+        sub.className = 'card-sub';
+        sub.appendChild(document.createTextNode('run ' + String(r.id || '') + ' · owner ' + String(ownerLabel) + ' · confidence ' + confidence));
+        if (phase) {
+          sub.appendChild(document.createTextNode(' · proposed phase '));
+          const phaseText = document.createElement('b');
+          phaseText.textContent = String(phase);
+          sub.appendChild(phaseText);
+        }
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:8px;margin-top:12px;align-items:center;';
+        const input = document.createElement('input');
+        input.className = 'form-input';
+        input.dataset.answerInput = '';
+        input.placeholder = 'answer (e.g. y, no, notes)';
+        input.style.flex = '1';
+        const button = document.createElement('button');
+        button.className = 'btn btn-primary btn-sm';
+        button.dataset.answerBtn = '';
+        button.textContent = 'Answer';
+        actions.append(input, button);
+        card.append(title, sub, actions);
+        approvalsList.appendChild(card);
+      });
       approvalsList.querySelectorAll('.card[data-run]').forEach(card => {
         const btn = card.querySelector('[data-answer-btn]');
         const input = card.querySelector('[data-answer-input]');
@@ -1129,18 +1154,40 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         list.innerHTML = '<div class="card-sub" style="padding:12px;">No findings waiting for human review.</div>';
         return;
       }
-      list.innerHTML = pending.slice(0, 50).map(({ job, f }) => {
-        const title = (f.title || f.kind || f.raw_line || '(finding)').replace(/</g, '&lt;');
-        const target = (job.target || '').replace(/</g, '&lt;');
-        return '<div class="card" data-job="' + job.id + '" data-seq="' + (f.seq || 0) + '" style="margin-bottom:8px;">' +
-          '<div class="card-title">' + title + '</div>' +
-          '<div class="card-sub">job ' + job.id + ' · seq ' + (f.seq || 0) + ' · target ' + target + ' · ' + (f.severity || 'info') + '</div>' +
-          '<div style="display:flex;gap:8px;margin-top:8px;">' +
-            '<button class="btn btn-primary btn-sm" data-resolve="verified">Mark Verified</button>' +
-            '<button class="btn btn-ghost btn-sm" data-resolve="refuted">Mark Refuted</button>' +
-          '</div>' +
-        '</div>';
-      }).join('');
+      list.replaceChildren();
+      pending.slice(0, 50).forEach(({ job, f }) => {
+        const titleText = f.title || f.kind || f.raw_line || '(finding)';
+        const targetText = job.target || '';
+        const severityText = f.severity || 'info';
+        const seq = Number.isInteger(f.seq) ? f.seq : 0;
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.job = String(job.id || '');
+        card.dataset.seq = String(seq);
+        card.style.marginBottom = '8px';
+
+        const title = document.createElement('div');
+        title.className = 'card-title';
+        title.textContent = String(titleText);
+        const sub = document.createElement('div');
+        sub.className = 'card-sub';
+        sub.textContent = 'job ' + String(job.id || '') + ' · seq ' + seq + ' · target ' + String(targetText) + ' · ' + String(severityText);
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:8px;margin-top:8px;';
+        const verified = document.createElement('button');
+        verified.className = 'btn btn-primary btn-sm';
+        verified.dataset.resolve = 'verified';
+        verified.textContent = 'Mark Verified';
+        const refuted = document.createElement('button');
+        refuted.className = 'btn btn-ghost btn-sm';
+        refuted.dataset.resolve = 'refuted';
+        refuted.textContent = 'Mark Refuted';
+        actions.append(verified, refuted);
+        card.append(title, sub, actions);
+        list.appendChild(card);
+      });
       list.querySelectorAll('.card[data-job]').forEach(card => {
         card.querySelectorAll('[data-resolve]').forEach(btn => {
           btn.addEventListener('click', async () => {
