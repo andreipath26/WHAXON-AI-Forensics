@@ -19,14 +19,16 @@ _FFUF_RE = re.compile(
 
 STATUS_KNOWLEDGE = {
     200: {
-        "severity": "low", "cwe": "CWE-200", "cvss": 3.7,
+        # A successful response proves reachability, not vulnerability or disclosure.
+        "severity": "info", "cwe": "", "cvss": None,
         "remediation": (
-            "Review the discovered path. Remove debug, admin, and backup endpoints "
-            "from production. If the path must be reachable, add authentication."
+            "Review the discovered path and confirm it is intended to be publicly "
+            "accessible. Assess its content and access controls before classifying "
+            "it as a security vulnerability."
         ),
         "impact": (
-            "Publicly reachable paths expand the attack surface and often disclose "
-            "application internals or accept unauthenticated input."
+            "The path responded successfully and may merit manual review. HTTP 200 "
+            "alone does not establish sensitive-data exposure or a vulnerability."
         ),
     },
     301: {"severity": "info", "cwe": "", "cvss": None,
