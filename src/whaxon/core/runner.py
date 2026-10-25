@@ -144,9 +144,9 @@ class ToolRunner:
         If a scope is bound and the target is out of scope, raises
         OutOfScopeError unless allow_out_of_scope=True.
         """
-        if self._scope is not None and not allow_out_of_scope:
+        if self._scope is not None:
             match = self._scope.check(target)
-            if not match.allowed:
+            if not match.allowed and not allow_out_of_scope:
                 from .events import CoverageSkipped
                 jid = job_id or uuid.uuid4().hex[:12]
                 self._bus.publish(CoverageSkipped(
@@ -155,6 +155,15 @@ class ToolRunner:
                     phase=phase,
                 ))
                 raise OutOfScopeError(target, match.reason, match.matched_rule)
+            if not match.allowed and allow_out_of_scope:
+                # Explicit overrides must be auditable. If the log cannot be
+                # written, refuse the bypass rather than silently lose the trail.
+                from .override_log import log_override
+                scope_path = getattr(self._scope, "path", None)
+                if scope_path is None or not log_override(scope_path.parent, tool_id, target):
+                    raise RuntimeError(
+                        "scope override could not be audited; refusing out-of-scope execution"
+                    )
 
         outfile: Path | None = None
         tool = self._catalog.get(tool_id) if self._catalog else None
