@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import os
 import socket
 import stat
@@ -262,6 +263,24 @@ class ScopeManager:
         self._in = _rules("in_scope")
         self._out = _rules("out_of_scope")
         self._notes = notes
+
+        # A /0 rule is valid CIDR syntax but effectively authorizes the whole
+        # address family. Keep explicit operator intent possible, while making
+        # this high-blast-radius configuration visible at load time.
+        broad_rules = []
+        for rule in self._in:
+            try:
+                if ipaddress.ip_network(rule, strict=False).prefixlen == 0:
+                    broad_rules.append(rule)
+            except ValueError:
+                continue
+        if self._enabled and broad_rules:
+            logging.getLogger(__name__).warning(
+                "scope config %s includes global network rule(s) %s; "
+                "this effectively permits every address in that family",
+                self.path,
+                ", ".join(broad_rules),
+            )
 
     def save(self, data: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
