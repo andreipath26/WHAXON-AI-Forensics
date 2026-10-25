@@ -40,7 +40,15 @@ def _signature_for(kind: str, data: dict) -> str:
     if kind == "web_issue":
         return f"path:{data.get('path') or data.get('location') or ''}"
     if kind == "found_path":
-        return f"path:{data.get('path') or ''}"
+        # A path is not a single fact: different tools or runs can observe
+        # different status codes and response sizes for the same URL. Include
+        # the observed response attributes so target-level aggregation never
+        # silently discards contradictory scanner evidence.
+        return "path:%s|status:%s|size:%s" % (
+            data.get("path") or "",
+            data.get("status") if data.get("status") is not None else "unknown",
+            data.get("size") if data.get("size") is not None else "unknown",
+        )
     if kind == "sqli":
         return f"param:{data.get('parameter') or ''}"
     if kind == "sqli_database":
@@ -521,7 +529,15 @@ class JobStore:
                             enrich = {}
 
                         sig = _signature_for(f["kind"], data)
-                        key = (target, f["kind"], sig)
+                        # Preserve source provenance for path discoveries:
+                        # two tools may report the same path with conflicting
+                        # status/size values. _signature_for includes the observed
+                        # status and size, while source prevents same-shaped but
+                        # independently produced observations from collapsing.
+                        key = (
+                            target, f["kind"], sig,
+                            f["source"] if f["kind"] == "found_path" else "",
+                        )
                         if key in seen:
                             idx = seen[key]
                             t["findings"][idx]["count"] += 1
