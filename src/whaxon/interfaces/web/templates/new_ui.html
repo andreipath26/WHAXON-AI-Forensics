@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>WHAXON · Security Operations</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='new-ui.css') }}">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="/" aria-label="WHAXON home"><span class="brand-mark">W</span><span><strong>WHAXON</strong><small>OBSIDIAN KINETIC</small></span></a>
+    <div class="side-label">OPERATIONS</div>
+    <nav id="main-nav" aria-label="Main navigation">
+      <button class="nav-item active" data-view="overview"><span>◈</span> Overview</button>
+      <button class="nav-item" data-view="scope"><span>◎</span> Scope &amp; targets</button>
+      <button class="nav-item" data-view="run"><span>▶</span> Run orchestration</button>
+      <button class="nav-item" data-view="findings"><span>⌁</span> Verified findings</button>
+      <button class="nav-item" data-view="retest"><span>↻</span> Remediation &amp; retest</button>
+      <button class="nav-item" data-view="approvals"><span>✓</span> Trust layer</button>
+      <button class="nav-item" data-view="reports"><span>▤</span> Coverage &amp; reports</button>
+      <div class="side-label side-label-gap">SYSTEM</div>
+      <button class="nav-item" data-view="history"><span>◷</span> Job history</button>
+      <button class="nav-item" data-view="sessions"><span>⌘</span> Sessions</button>
+      <button class="nav-item" data-view="catalog"><span>☷</span> Adapter catalog</button>
+      <button class="nav-item" data-view="health"><span>⌁</span> Diagnostics</button>
+    </nav>
+    <div class="sidebar-foot"><span class="live-dot"></span><span>LOCAL ENGINE</span><span class="foot-spacer"></span><span id="engine-label">CHECKING</span></div>
+  </aside>
+  <main class="main-shell">
+    <header class="topbar">
+      <button class="mobile-menu" id="mobile-menu" aria-label="Toggle navigation">☰</button>
+      <div><div class="eyebrow">WHAXON / SECURITY OPERATIONS</div><h1 id="page-title">Overview</h1></div>
+      <div class="top-actions"><span class="connection"><i id="connection-dot"></i><span id="connection-label">Connecting…</span></span><button class="btn btn-quiet" id="refresh-btn">↻ Refresh</button></div>
+    </header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section class="view active" id="view-overview">
+      <div class="hero panel">
+        <div><div class="eyebrow emerald">DETERMINISTIC VALIDATION · SCOPE-CONTROLLED EXECUTION</div><h2>Discover. Verify. Prove.</h2><p>One operational workspace for authorized security testing, reproducible evidence, and honest reporting.</p><p class="subtle">The engine's verification result—not an AI opinion—determines whether a finding is marked verified.</p></div>
+        <div class="hero-state"><span class="state-ring"></span><span><b id="overview-engine">Checking engine</b><small>LOCAL INSTANCE STATUS</small></span></div>
+      </div>
+      <div class="metric-grid">
+        <article class="metric panel"><span>RECORDED JOBS</span><strong id="metric-jobs">—</strong><small>Persisted execution history</small></article>
+        <article class="metric panel"><span>FINDINGS</span><strong id="metric-findings">—</strong><small>Across available report data</small></article>
+        <article class="metric panel"><span>VERIFIED</span><strong id="metric-verified">—</strong><small>Deterministically or explicitly reviewed</small></article>
+        <article class="metric panel"><span>AVAILABLE TOOLS</span><strong id="metric-tools">—</strong><small>Catalog entries reported available</small></article>
+      </div>
+      <div class="content-grid">
+        <article class="panel"><div class="panel-heading"><div><div class="eyebrow">QUICK ACTIONS</div><h3>Start from a safe baseline</h3></div></div><div class="quick-actions"><button class="action-card" data-go="scope"><b>01 / Define scope</b><span>Inspect configured authorization boundaries before running tools.</span><em>Open scope →</em></button><button class="action-card" data-go="run"><b>02 / Run a tool</b><span>Choose an installed tool and a target already authorized by scope.</span><em>Open orchestration →</em></button><button class="action-card" data-go="findings"><b>03 / Review evidence</b><span>Inspect findings and validate only against in-scope targets.</span><em>Open findings →</em></button></div></article>
+        <article class="panel"><div class="panel-heading"><div><div class="eyebrow">LATEST ACTIVITY</div><h3>Recent jobs</h3></div><button class="text-btn" data-go="history">View history →</button></div><div id="overview-jobs" class="table-wrap"><div class="empty">Loading persisted jobs…</div></div></article>
+      </div>
+    </section>
+    <section class="view" id="view-scope">
+      <div class="section-intro"><div><div class="eyebrow">AUTHORIZATION FIRST</div><h2>Scope &amp; targets</h2><p>Review the framework's configured scope and check a target before launching work. A check is not authorization to bypass policy.</p></div></div>
+      <div class="content-grid"><article class="panel"><div class="panel-heading"><h3>Scope summary</h3><button class="btn btn-quiet" id="scope-refresh">Reload</button></div><pre id="scope-summary" class="data-block">Loading scope…</pre></article><article class="panel"><div class="panel-heading"><h3>Check a target</h3></div><form id="scope-form" class="stack"><label for="scope-target">Target URL, hostname or address</label><input id="scope-target" required maxlength="2048" placeholder="https://authorized.example"><button class="btn btn-primary" type="submit">Check authorization</button></form><div id="scope-result" class="result-box" hidden></div></article></div>
+    </section>
+    <section class="view" id="view-run">
+      <div class="section-intro"><div><div class="eyebrow">GUARDED EXECUTION</div><h2>Run orchestration</h2><p>Only targets confirmed by the active scope policy can be launched. Arbitrary extra command-line arguments are not accepted by the web runner.</p></div></div>
+      <div class="content-grid run-grid"><article class="panel"><div class="panel-heading"><h3>Configure execution</h3><span class="tag amber">SCOPE ENFORCED</span></div><form id="run-form" class="stack"><label for="run-tool">Tool</label><select id="run-tool" required><option value="">Loading tool catalog…</option></select><label for="run-target">Authorized target</label><input id="run-target" required maxlength="2048" placeholder="https://in-scope.example"><p class="help">The backend checks scope again when you submit. This UI cannot override it.</p><button class="btn btn-primary" type="submit">▶ Start job</button></form></article><article class="panel"><div class="panel-heading"><h3>Live execution</h3><span id="run-status" class="tag">IDLE</span></div><div class="job-meta" id="job-meta">No job selected.</div><pre class="terminal" id="job-output" aria-live="polite">Waiting for a job. Output will appear here.</pre><div class="row-actions"><button class="btn btn-danger" id="cancel-job" disabled>■ Cancel job</button><button class="btn btn-quiet" id="clear-output">Clear output</button></div></article></div>
+    </section>
+    <section class="view" id="view-findings">
+      <div class="section-intro"><div><div class="eyebrow">EVIDENCE FIRST</div><h2>Verified findings</h2><p>Review report-backed findings. Candidate and inconclusive findings are not represented as verified.</p></div><button class="btn btn-quiet" data-refresh="report">Reload findings</button></div>
+      <div class="metric-grid compact-metrics"><article class="metric panel"><span>CRITICAL</span><strong id="sev-critical">0</strong></article><article class="metric panel"><span>HIGH</span><strong id="sev-high">0</strong></article><article class="metric panel"><span>MEDIUM</span><strong id="sev-medium">0</strong></article><article class="metric panel"><span>LOW / INFO</span><strong id="sev-low">0</strong></article></div>
+      <article class="panel"><div class="table-tools"><input id="finding-search" type="search" placeholder="Filter by title, target, source…"><select id="finding-status"><option value="all">All statuses</option><option value="verified">Verified</option><option value="candidate">Candidate / unverified</option><option value="refuted">Refuted</option><option value="inconclusive">Inconclusive</option></select></div><div class="table-wrap"><table><thead><tr><th>Severity</th><th>Finding</th><th>Target</th><th>Source</th><th>Verification</th><th>Actions</th></tr></thead><tbody id="findings-body"><tr><td colspan="6" class="empty">Loading report data…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-retest">
+      <div class="section-intro"><div><div class="eyebrow">REGRESSION CHECK</div><h2>Remediation &amp; retest</h2><p>Retest is available only for findings currently marked verified. The engine rechecks scope before replay.</p></div><button class="btn btn-quiet" data-refresh="report">Reload queue</button></div>
+      <article class="panel"><div class="table-wrap"><table><thead><tr><th>Finding</th><th>Target</th><th>Current state</th><th>Retest</th></tr></thead><tbody id="retest-body"><tr><td colspan="4" class="empty">Loading retest queue…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-approvals">
+      <div class="section-intro"><div><div class="eyebrow">HUMAN-IN-THE-LOOP</div><h2>Trust layer</h2><p>Review unverified findings. Human decisions are recorded as human review, not as deterministic engine validation.</p></div><button class="btn btn-quiet" data-refresh="report">Reload queue</button></div>
+      <article class="panel"><div class="table-wrap"><table><thead><tr><th>Finding</th><th>Target</th><th>Current state</th><th>Decision</th></tr></thead><tbody id="approvals-body"><tr><td colspan="4" class="empty">Loading review queue…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-reports">
+      <div class="section-intro"><div><div class="eyebrow">TRANSPARENT OUTPUT</div><h2>Coverage &amp; reports</h2><p>Export report formats from the current persisted engagement data. Report contents reflect recorded data; they do not imply unperformed tests.</p></div></div>
+      <article class="panel"><div class="panel-heading"><h3>Generate report</h3></div><div class="report-grid"><a class="report-card" href="/api/report?format=md"><b>Markdown</b><span>Readable text report</span><em>Download .md ↗</em></a><a class="report-card" href="/api/report?format=html"><b>HTML</b><span>Standalone report document</span><em>Download .html ↗</em></a><a class="report-card" href="/api/report?format=json"><b>JSON</b><span>Structured report payload</span><em>Download .json ↗</em></a><a class="report-card" href="/api/report?format=pdf"><b>PDF</b><span>Printable report (if renderer is installed)</span><em>Download .pdf ↗</em></a><a class="report-card" href="/api/report?format=whaxon"><b>WHAXON bundle</b><span>Integrity-digested report envelope</span><em>Download .whaxon ↗</em></a></div></article>
+      <article class="panel"><div class="panel-heading"><h3>Report summary</h3><button class="btn btn-quiet" data-refresh="report">Refresh summary</button></div><pre id="report-summary" class="data-block">Loading report summary…</pre></article>
+    </section>
+    <section class="view" id="view-history">
+      <div class="section-intro"><div><div class="eyebrow">PERSISTED EXECUTIONS</div><h2>Job history</h2><p>Historical job records returned by the framework's store.</p></div><button class="btn btn-quiet" data-refresh="history">Reload history</button></div>
+      <article class="panel"><div class="table-wrap"><table><thead><tr><th>Job</th><th>Tool</th><th>Target</th><th>Status</th><th>Details</th></tr></thead><tbody id="history-body"><tr><td colspan="5" class="empty">Loading history…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-sessions">
+      <div class="section-intro"><div><div class="eyebrow">METASPLOIT INTEGRATION</div><h2>Sessions</h2><p>Read-only session status. Interactive session control is not exposed here unless a safe supported workflow is implemented.</p></div><button class="btn btn-quiet" id="sessions-refresh">Reload sessions</button></div>
+      <article class="panel"><pre id="sessions-summary" class="data-block">Loading sessions…</pre></article>
+    </section>
+    <section class="view" id="view-catalog">
+      <div class="section-intro"><div><div class="eyebrow">CAPABILITIES</div><h2>Adapter catalog</h2><p>Tool availability and adapter support as reported by the installed framework.</p></div><button class="btn btn-quiet" data-refresh="tools">Reload catalog</button></div>
+      <article class="panel"><div class="table-tools"><input id="tool-search" type="search" placeholder="Filter tools…"></div><div class="table-wrap"><table><thead><tr><th>Tool</th><th>Category</th><th>Binary</th><th>Installed</th><th>Adapter</th></tr></thead><tbody id="tools-body"><tr><td colspan="5" class="empty">Loading catalog…</td></tr></tbody></table></div></article>
+    </section>
+    <section class="view" id="view-health">
+      <div class="section-intro"><div><div class="eyebrow">SYSTEM STATUS</div><h2>Diagnostics</h2><p>Live health endpoints and safe operational diagnostics.</p></div><button class="btn btn-quiet" id="health-refresh">Run checks</button></div>
+      <article class="panel"><div id="health-results" class="health-list"><div class="empty">Checking health endpoints…</div></div></article>
+    </section>
+    <footer class="page-footer">WHAXON · Local-first security testing · Authorization boundaries are enforced by the backend.</footer>
+  </main>
+  <script src="{{ url_for('static', filename='new-ui.js') }}" defer></script>
+</body>
+</html>
