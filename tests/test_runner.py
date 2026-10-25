@@ -320,7 +320,7 @@ async def test_timeout_kills_descendant_processes(tmp_path):
     import shlex
 
     pid_file = tmp_path / "child.pid"
-    script = f"sleep 30 & child=$!; echo $child > {shlex.quote(str(pid_file))}; wait"
+    script = f"sleep 30 & child=$!; echo $child > {shlex.quote(str(pid_file))}; exit 0"
     tool = Tool(
         id="tree", name="Process tree", category="test",
         binary="/bin/sh", args="-c " + shlex.quote(script),
