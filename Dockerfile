@@ -41,4 +41,4 @@ CMD ["gunicorn", \
      "--bind", "0.0.0.0:5001", \
      "--workers", "2", \
      "--access-logfile", "-", \
-     "whaxon.interfaces.web.server:create_app_factory()"]
+     "whaxon.interfaces.web.server:create_app_factory(host='0.0.0.0')"]
