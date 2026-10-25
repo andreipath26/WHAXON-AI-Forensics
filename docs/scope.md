@@ -88,3 +88,18 @@ The AI planner obeys the same fail-closed scope checker as everything else. `WHA
 
 - tests/test_scope_failclosed.py - default scope covers IPv4 loopback CIDR and IPv6 (::1, fe80::/10, fc00::/7); 127.0.0.1 and RFC1918 allowed; external hosts denied.
 - tests/test_scope.py - out_of_scope precedence, wildcards, exact hosts, fail-closed on missing file.
+
+## DNS and connection-time enforcement limits
+
+When the scope contains IP/CIDR rules, hostname checks resolve the hostname and compare the current A/AAAA answers against the configured rules. Resolution errors fail closed, and an out-of-scope address overrides an allow rule. This is a **preflight check**, not a guarantee about the address ultimately contacted: DNS answers can change between the check and a tool's connection, and many external tools resolve the hostname independently.
+
+For beta deployments, do not treat the scope checker as a network firewall or as complete DNS-rebinding protection.
+
+- Run beta tests in an isolated lab/VM or container with outbound network access restricted to the approved target ranges.
+- Use a dedicated test engagement and a written target allowlist; review redirects, proxy settings, VPN routes, and pivot/port-forward paths.
+- Do not use the default scope as authorization to scan arbitrary public hosts. It is intentionally limited to loopback and private ranges.
+- Do not expose WHAXON to untrusted users or allow untrusted users to edit scope, configure tools, or invoke runner APIs.
+- Keep `enabled: true`. Disabling scope removes this application-level guard and should only be considered in a deliberately isolated lab.
+- Before production use, enforce destination IP policy at connection/egress level for each execution path (including external tools and pivoted sessions), then add integration tests proving that the actual connection cannot escape the allowlist.
+
+A successful `whaxon scope --check` means the target passed the current application-level policy check. It does **not** prove that a later network connection is pinned to the checked address.
