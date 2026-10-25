@@ -215,3 +215,21 @@ def test_hostname_dns_failure_fails_closed(tmp_path: Path, monkeypatch) -> None:
     match = ScopeManager(cfg).check("target.test")
     assert match.allowed is False
     assert "resolution failed" in match.reason
+
+def test_atomic_scope_write_does_not_follow_predictable_temp_symlink(tmp_path: Path) -> None:
+    """A pre-created .tmp symlink must not redirect a scope write to another file."""
+    from whaxon.core.scope import _atomic_write
+
+    config = tmp_path / "scope.json"
+    victim = tmp_path / "victim.txt"
+    victim.write_text("do not overwrite", encoding="utf-8")
+    predictable_temp = config.with_suffix(config.suffix + ".tmp")
+    try:
+        predictable_temp.symlink_to(victim)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks are not available in this environment")
+
+    _atomic_write(config, '{"enabled": true}')
+
+    assert victim.read_text(encoding="utf-8") == "do not overwrite"
+    assert config.read_text(encoding="utf-8") == '{"enabled": true}'
