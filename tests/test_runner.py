@@ -262,3 +262,32 @@ async def test_run_tool_publishes_findings_when_adapter_matches():
     findings = rec.events["findings"][0].findings
     assert any(f["kind"] == "open_port" and f["data"]["port"] == 22
                for f in findings)
+
+def test_build_argv_rejects_extra_url_target_override():
+    """A second URL in extra_args must not bypass scope checks on target."""
+    tool = Tool(
+        id="sqlmap", name="SQLmap", category="web",
+        binary="sqlmap", args="-u {target} --batch",
+    )
+    runner, _, _ = _runner(tools=[tool])
+    with pytest.raises(ValueError, match="cannot override the target URL"):
+        runner.build_argv(
+            "sqlmap", "http://127.0.0.1/item?id=1",
+            extra_args="-u http://example.com/other --data=x",
+        )
+
+
+def test_build_argv_allows_non_target_sqlmap_options():
+    tool = Tool(
+        id="sqlmap", name="SQLmap", category="web",
+        binary="sqlmap", args="-u {target} --batch",
+    )
+    runner, _, _ = _runner(tools=[tool])
+    argv = runner.build_argv(
+        "sqlmap", "http://127.0.0.1/item?id=1",
+        extra_args="--data=x --level=2",
+    )
+    assert argv == [
+        "sqlmap", "-u", "http://127.0.0.1/item?id=1", "--batch",
+        "--data=x", "--level=2",
+    ]
