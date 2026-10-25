@@ -75,3 +75,13 @@ def test_ai_strategy_gate_shows_pending_operator_decision(page, live_server):
         timeout=5000,
     )
     assert "enumeration" in page.locator("#ai-pending-list").text_content()
+
+
+def test_react_preview_route_is_explicitly_gated_on_built_bundle(page, live_server):
+    response = page.request.get(f"{live_server}/ui/react")
+    if response.status == 200:
+        assert 'id="root"' in response.text()
+        assert "/static/obsidian/" in response.text()
+    else:
+        assert response.status == 503
+        assert "React UI bundle is not built" in response.text()
