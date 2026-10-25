@@ -128,7 +128,7 @@
       heading.className = 'palette-group';
       heading.textContent = label;
       paletteResults.appendChild(heading);
-      return heading;
+      return paletteResults;
     };
     const navMatches = palettePages.filter(p => !term || (p.label + ' ' + p.detail).toLowerCase().includes(term));
     if (navMatches.length) {
