@@ -6,7 +6,6 @@ import os
 import queue
 import subprocess
 import threading
-import time
 import uuid
 from pathlib import Path
 
