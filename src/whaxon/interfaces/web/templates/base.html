@@ -13,21 +13,21 @@
   <aside class="sidebar">
     <div class="sb-brand"><span class="dot"></span><span class="label-text">WHAXON</span><button class="collapse-btn" id="collapse-btn" data-tip="Collapse sidebar" data-tip-right>‹</button></div>
 
-    <div class="sb-workspace" data-tip="Switch workspace" data-tip-right>
+    <div class="sb-workspace" data-tip="Current workspace" data-tip-right style="cursor:default;">
       <div class="label">Workspace</div>
-      <div class="name">Path26 Security <span class="chev">▾</span></div>
+      <div class="name">Path26 Security</div>
     </div>
 
-    <div class="sb-engagement" data-tip="Switch engagement" data-tip-right>
+    <div class="sb-engagement" data-tip="Current engagement" data-tip-right style="cursor:default;">
       <div class="label">Engagement</div>
-      <div class="name">DVWA — local <span class="chev">▾</span></div>
+      <div class="name">DVWA — local</div>
     </div>
 
     <nav class="sb-nav">
       <div class="sb-section">Workflow</div>
       <a class="sb-item" data-page="scope" data-tip="Scope" data-tip-right><span class="sb-icon">◎</span><span class="label-text">Scope</span></a>
       <a class="sb-item" data-page="run" data-tip="Run" data-tip-right><span class="sb-icon">▶</span><span class="label-text">Run</span></a>
-      <a class="sb-item active" data-page="findings" data-tip="Findings" data-tip-right><span class="sb-icon">▤</span><span class="label-text">Findings</span><span class="badge">12</span></a>
+      <a class="sb-item active" data-page="findings" data-tip="Findings" data-tip-right><span class="sb-icon">▤</span><span class="label-text">Findings</span><span class="badge" id="findings-badge">—</span></a>
       <a class="sb-item" data-page="report" data-tip="Report" data-tip-right><span class="sb-icon">▦</span><span class="label-text">Report</span></a>
       <a class="sb-item" data-page="retest" data-tip="Retest" data-tip-right><span class="sb-icon">↻</span><span class="label-text">Retest</span></a>
 
@@ -58,10 +58,7 @@
     <header class="topbar">
       <div class="crumb">DVWA — local <span class="sep">/</span> <span class="here" id="crumb-here">Findings</span></div>
       <div class="tb-spacer"></div>
-      <span class="tb-pill" id="msf-pill"><span class="dot"></span> MSF · 2</span>
-      <select class="tb-select" title="Sort"><option>Sort: Severity ▾</option><option>Sort: Date</option><option>Sort: Target</option><option>Sort: Status</option></select>
-      <select class="tb-select" title="Group"><option>Group: None ▾</option><option>Group: Target</option><option>Group: Severity</option><option>Group: Source</option></select>
-      <select class="tb-select" title="Saved view"><option>View: Default ▾</option><option>View: Critical only</option><option>View: Verified</option><option>+ Save current view</option></select>
+      <span class="tb-pill" id="msf-pill" style="display:none;"><span class="dot"></span> MSF · 2</span>
       <div class="tb-search" id="palette-trigger"><span>Search or run a command</span><span class="tb-kbd">⌘K</span></div>
       <button class="tb-btn" id="notif-trigger" style="display:none;" data-tip="Notifications" data-tip-bottom>◔<span class="n"></span></button>
       <button class="tb-btn" id="help-trigger" data-tip="Shortcuts (?)" data-tip-bottom>?</button>
@@ -78,7 +75,7 @@
       <div class="notif-foot">View all activity</div>
     </div>
 
-    <div class="stages">
+    <div class="stages" style="display:none;" aria-hidden="true">
       <div class="stages-track">
         <div class="stage done"><div class="stage-row"><span class="num">✓</span> Scope <span class="frac">done</span></div><div class="stage-bar"><div class="b" style="width:100%"></div></div></div>
         <div class="stage done"><div class="stage-row"><span class="num">✓</span> Target <span class="frac">3/3</span></div><div class="stage-bar"><div class="b" style="width:100%"></div></div></div>
@@ -183,29 +180,6 @@
       <div class="kbd-row"><span>Close panel</span><span class="kbd-keys"><kbd>Esc</kbd></span></div>
       <div class="kbd-row"><span>This legend</span><span class="kbd-keys"><kbd>?</kbd></span></div>
       <div class="kbd-row"><span>Toggle sidebar</span><span class="kbd-keys"><kbd>⌘</kbd><kbd>B</kbd></span></div>
-    </div>
-  </div>
-</div>
-
-<!-- WORKSPACE SWITCHER -->
-<div class="ws-modal" id="ws-modal">
-  <div class="ws-card">
-    <div class="ws-head">Switch workspace</div>
-    <div class="ws-list">
-      <div class="ws-item current">
-        <div class="ws-av">P2</div>
-        <div class="ws-body"><div class="ws-name">Path26 Security</div><div class="ws-meta">4 members · 12 engagements</div></div>
-        <div class="ws-role">Owner</div>
-      </div>
-      <div class="ws-item">
-        <div class="ws-av">AC</div>
-        <div class="ws-body"><div class="ws-name">Acme Corp</div><div class="ws-meta">External pentest · read-only</div></div>
-        <div class="ws-role">Client</div>
-      </div>
-    </div>
-    <div class="ws-foot">
-      <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="document.getElementById('ws-modal').classList.remove('open')">Close</button>
-      <button class="btn btn-primary btn-sm">+ New workspace</button>
     </div>
   </div>
 </div>
