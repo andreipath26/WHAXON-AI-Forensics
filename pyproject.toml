@@ -43,8 +43,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/andreipath26/WHAXON-AI-Forensics"
 Repository = "https://github.com/andreipath26/WHAXON-AI-Forensics"
-Issues = "https://github.com/andreipath26/WHAXON-AI-Forensics-AI-Forensics/issues"
-Changelog = "https://github.com/andreipath26/WHAXON-AI-Forensics-AI-Forensics/blob/main/docs/CHANGELOG.md"
+Issues = "https://github.com/andreipath26/WHAXON-AI-Forensics/issues"
+Changelog = "https://github.com/andreipath26/WHAXON-AI-Forensics/blob/main/docs/CHANGELOG.md"
 
 [project.optional-dependencies]
 tui = ["textual>=0.80", "rich>=13", "textual-image>=0.8"]
