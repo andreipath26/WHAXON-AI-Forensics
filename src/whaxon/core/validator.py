@@ -100,6 +100,11 @@ class Validator:
             return self._validate_observation(finding, target_url)
         ctx = (finding.data or {}).get("_request_context")
         if ctx and ctx.get("url"):
+            if not target_url:
+                return (
+                    "candidate",
+                    "authorized target URL required for request-context replay; no request sent",
+                )
             return self._replay_ctx(ctx, target_url=target_url, kind=kind)
         if kind not in self.REPLAYABLE:
             return "candidate", f"kind {kind!r} has no safe validation probe"
@@ -445,6 +450,12 @@ class Validator:
         import urllib.error
         import urllib.request
         from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+        # A request context is evidence, not authorization. Require the caller
+        # to supply the already scope-checked engagement target before any network
+        # request; otherwise an untrusted finding could turn validation into SSRF.
+        if not target_url:
+            return "candidate", "authorized target URL required for request-context replay; no request sent"
 
         method = (ctx.get("method") or "GET").upper()
         # Automatic verification must not replay requests that may mutate data.
