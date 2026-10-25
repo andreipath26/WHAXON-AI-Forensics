@@ -498,3 +498,16 @@ def test_loopback_listener_rejects_cross_site_fetch_metadata(tmp_path, monkeypat
     )
     assert response.status_code == 403
     assert "cross-origin" in response.get_json()["error"]
+
+def test_web_validation_refuses_out_of_scope_job_target(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    core.store.create("outside")
+    core.store.set_started("outside", "sqlmap", "google.com")
+    core.store.append_finding("outside", _finding(kind="sqli"), 0)
+
+    response = app.test_client().post(
+        "/api/validate/outside/0",
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 403
+    assert "out of scope" in response.get_json()["error"].lower()
