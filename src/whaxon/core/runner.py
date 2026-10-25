@@ -714,5 +714,7 @@ class ToolRunner:
 
     async def cancel(self, job_id: str) -> None:
         proc = self._procs.get(job_id)
-        if proc and proc.returncode is None:
+        if proc is not None:
+            # The leader may have exited while a descendant still holds pipes
+            # open. Kill the isolated process group regardless of leader status.
             await self._kill_process_tree(proc)
