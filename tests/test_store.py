@@ -57,3 +57,25 @@ def test_concurrent_writes(store):
     for t in ts: t.join()
     for i in range(4):
         assert len(store.get(f"c{i}")["lines"]) == 50
+
+def test_history_reports_finding_count_not_output_line_count(store):
+    store.create("history-findings")
+    store.set_started("history-findings", "nmap", "127.0.0.1")
+    store.append_line("history-findings", "stdout", "tool output")
+    store.append_finding(
+        "history-findings",
+        {"kind": "open_port", "severity": "medium", "source": "nmap",
+         "data": {"port": 22}, "raw_line": "22/tcp open ssh"},
+        0,
+    )
+    store.append_finding(
+        "history-findings",
+        {"kind": "open_port", "severity": "high", "source": "nmap",
+         "data": {"port": 443}, "raw_line": "443/tcp open https"},
+        1,
+    )
+    store.set_finished("history-findings", 0, 0.1)
+
+    entry = next(row for row in store.history() if row["id"] == "history-findings")
+    assert entry["line_count"] == 1
+    assert entry["findings_count"] == 2
