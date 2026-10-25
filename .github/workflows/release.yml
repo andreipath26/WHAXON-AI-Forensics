@@ -95,7 +95,46 @@ jobs:
           user_data = json.loads(user_catalog.read_text(encoding="utf-8"))
           tools = user_data.get("tools", []) if isinstance(user_data, dict) else user_data
           assert isinstance(tools, list) and tools, "seeded tool catalog is empty or malformed"
-          print("Installed-wheel CLI, catalog, and payload smoke tests passed.")
+          # Exercise scope policy and a real, non-destructive HTTP observation
+          # through the installed wheel against an ephemeral localhost server.
+          import threading
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+          from whaxon.core.findings import Finding
+          from whaxon.core.scope import ScopeManager
+          from whaxon.core.validator import Validator
+
+          scope = ScopeManager(Path(os.environ["SMOKE_DATA"]) / "scope.json")
+          assert scope.check("127.0.0.1").allowed, "loopback should be in the default scope"
+          assert not scope.check("8.8.8.8").allowed, "public IP must be denied by default"
+
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  body = b"ok"
+                  self.send_response(200)
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+              def log_message(self, *args):
+                  pass
+
+          server = HTTPServer(("127.0.0.1", 0), Handler)
+          thread = threading.Thread(target=server.serve_forever, daemon=True)
+          thread.start()
+          try:
+              url = f"http://127.0.0.1:{server.server_address[1]}/"
+              finding = Finding(
+                  kind="http_header_missing", severity="low", source="smoke",
+                  data={"header": "Content-Security-Policy", "url": url},
+                  raw_line="missing CSP",
+              )
+              payload_dir = Path(str(files("whaxon").joinpath("data", "payloads")))
+              status, reason = Validator(payload_dir).validate(finding, target_url=url)
+              assert status == "verified", f"installed-wheel HTTP observation failed: {reason}"
+          finally:
+              server.shutdown()
+              server.server_close()
+
+          print("Installed-wheel CLI, catalog, scope, payload, and HTTP validation smoke tests passed.")
           PY
 
       - name: Publish to PyPI
