@@ -65,8 +65,8 @@ whaxon-tui = "whaxon.interfaces.tui.app:main"
 whaxon-gui = "whaxon.interfaces.gui.app:main"
 
 [tool.hatch.build.targets.wheel]
-# Include runtime JSON catalogs and payload files alongside the Python package.
-include = ["src/whaxon/**"]
+# Include the complete package tree, including non-Python runtime resources.
+only-include = ["src/whaxon"]
 sources = ["src"]
 
 [tool.pytest.ini_options]
@@ -124,7 +124,7 @@ include = [
     "src/whaxon",
     "README.md",
     "LICENSE",
-    "data/payloads",
+    "src/whaxon/data",
     "pyproject.toml",
     "docs/CHANGELOG.md",
 ]
