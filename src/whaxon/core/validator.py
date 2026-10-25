@@ -203,9 +203,11 @@ class Validator:
             port = parsed.port or 443
             try:
                 context = ssl.create_default_context()
-                with socket.create_connection((host, port), timeout=5.0) as raw:
-                    with context.wrap_socket(raw, server_hostname=host):
-                        pass
+                with (
+                    socket.create_connection((host, port), timeout=5.0) as raw,
+                    context.wrap_socket(raw, server_hostname=host),
+                ):
+                    pass
             except ssl.SSLCertVerificationError as exc:
                 return "verified", f"TLS certificate verification failed again: {exc}"
             except (OSError, ssl.SSLError) as exc:
