@@ -151,8 +151,8 @@ Optional AI settings include provider/model selection, step budgets, confidence 
 Clone the repository and install development dependencies:
 
 ```bash
-git clone https://github.com/andreipath26/WHAXON.git
-cd WHAXON
+git clone https://github.com/andreipath26/WHAXON-AI-Forensics.git
+cd WHAXON-AI-Forensics
 python -m pip install -e ".[tui,web,dev]"
 python -m pytest tests/ -q
 ```
@@ -185,7 +185,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes.
 
 The Trust Layer is shipped: findings enter as `candidate` and become `verified` or `refuted` through deterministic payload replay for supported finding kinds, blind-timing detection, and manual human review via the Approvals page. Kinds without a replay path stay `candidate` and are queued for review. Coverage gaps are mapped to PTES phases (Recon, Enumeration, Vulnerability) so you know exactly what was skipped and when. Retest flips `verified` findings to `fixed`, `still_vulnerable`, or `inconclusive`; `inconclusive` means the replay could not establish either outcome and is not treated as remediation.
 
-The platform was dogfooded against four public cloud targets (flaws.cloud, flaws2.cloud, rest.vulnweb.com, pentest-ground.com). Every target ran the full chain: recon, enumeration, vulnerability, clean stop. No false positives. No loops.
+Project notes record exploratory runs against four public training/demo targets (flaws.cloud, flaws2.cloud, rest.vulnweb.com, and pentest-ground.com). These runs are not a reproducible benchmark, do not establish comprehensive coverage, and do not guarantee zero false positives. Before relying on results, reproduce the workflow in an authorized test environment and review the evidence and limitations for each finding.
 
 The remaining roadmap includes team and role-based workflows, MCP integration, persistent knowledge features, and enterprise deployment options. These should be considered planned or in progress unless the relevant implementation and tests are present in the current release.
 
