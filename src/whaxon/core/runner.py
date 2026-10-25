@@ -94,14 +94,23 @@ class ToolRunner:
             extra_tokens = shlex.split(extra_args) if extra_args and extra_args.strip() else []
         except ValueError as e:
             raise ValueError(f"bad extra args: {e}") from e
-        user_has_url = any(
-            token in ("-u", "--url") or token.startswith("--url=") or token.startswith("-u=")
+        target_override_flags = {
+            "-u", "--url", "-h", "--host", "--target", "--target-url",
+            "--targets", "--target-list", "-il", "--input-list",
+            "--input-file", "--targets-file", "-ir",
+        }
+        user_overrides_target = any(
+            token.lower() in target_override_flags
+            or token.lower().startswith((
+                "--url=", "-u=", "--host=", "--target=", "--target-url=",
+                "--targets=", "--target-list=",
+            ))
             for token in extra_tokens
         )
-        if user_has_url and "-u {target}" in template:
+        if user_overrides_target:
             raise ValueError(
-                "extra_args cannot override the target URL; pass the authorized target "
-                "as the positional target argument"
+                "extra_args cannot specify alternate targets or target lists; pass the "
+                "authorized target as the positional target argument"
             )
 
         try:
