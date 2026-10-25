@@ -20,7 +20,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === "/api/health") return response({ ok: true });
-    if (url === "/api/tools") return response([{ id: "nmap", name: "Nmap" }]);
+    if (url === "/api/tools") return response([{ id: "nmap", name: "Nmap", available: true, adapter_available: true }]);
     if (url === "/api/scope") return response({ enabled: true, in_scope: ["127.0.0.0/8"] });
     if (url === "/api/scope/check") return response({ allowed: false, reason: "not in scope" });
     return response({ error: "not found" }, 404);
