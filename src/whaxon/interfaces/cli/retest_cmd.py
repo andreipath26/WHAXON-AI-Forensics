@@ -13,6 +13,7 @@ EXIT_OK = 0
 EXIT_NOT_FOUND = 1
 EXIT_USAGE = 2
 EXIT_NOT_VERIFIED = 3
+EXIT_SCOPE_BLOCKED = 4
 
 
 def main(args: list[str] | None = None) -> int:
@@ -79,6 +80,21 @@ def main(args: list[str] | None = None) -> int:
         target_url = f"http://{raw_target}"
     else:
         target_url = None
+
+    if not target_url:
+        print("Cannot retest: finding has no target URL; no request was sent.", file=sys.stderr)
+        return EXIT_SCOPE_BLOCKED
+    try:
+        scope_match = core.scope.check(target_url)
+    except Exception as exc:
+        print(f"Cannot retest: scope evaluation failed ({exc}); no request was sent.", file=sys.stderr)
+        return EXIT_SCOPE_BLOCKED
+    if not scope_match.allowed:
+        print(
+            f"Cannot retest: target is out of scope ({scope_match.reason}); no request was sent.",
+            file=sys.stderr,
+        )
+        return EXIT_SCOPE_BLOCKED
 
     f_obj = Finding(
         kind=target_f["kind"],
