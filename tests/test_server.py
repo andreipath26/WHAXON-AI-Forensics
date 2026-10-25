@@ -675,3 +675,24 @@ def test_https_reverse_proxy_origin_is_accepted_when_explicitly_trusted(
         environ_base={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert response.status_code == 200
+
+def test_network_auth_requires_non_default_bcrypt_credentials(monkeypatch):
+    import hashlib
+    from whaxon.interfaces.web import server as web_server
+
+    monkeypatch.setattr(web_server, "_bcrypt", None)
+    assert not web_server._remote_auth_ready("admin", "long-unique-password", "")
+    assert not web_server._remote_auth_ready(
+        "admin", "", hashlib.sha256(b"password").hexdigest()
+    )
+    assert not web_server._remote_auth_ready("whaxon-admin", "whaxon", "")
+
+    monkeypatch.setattr(web_server, "_bcrypt", __import__("bcrypt"))
+    strong_hash = web_server._bcrypt.hashpw(
+        b"long-unique-password", web_server._bcrypt.gensalt(rounds=12)
+    ).decode("utf-8")
+    assert web_server._remote_auth_ready("admin", "", strong_hash)
+    weak_hash = web_server._bcrypt.hashpw(
+        b"password", web_server._bcrypt.gensalt(rounds=11)
+    ).decode("utf-8")
+    assert not web_server._remote_auth_ready("admin", "", weak_hash)
