@@ -109,6 +109,18 @@ def _rule_matches_ip(rule: str, ip: str) -> bool:
         return False
 
 
+def _is_ip_rule(rule: str) -> bool:
+    """Return whether a scope rule is an IP literal or CIDR network."""
+    try:
+        if "/" in rule:
+            ipaddress.ip_network(rule, strict=False)
+        else:
+            ipaddress.ip_address(rule)
+        return True
+    except ValueError:
+        return False
+
+
 import os as _os_scope
 import stat as _stat_scope
 
@@ -267,9 +279,12 @@ class ScopeManager:
                 return ScopeMatch(False, "matches out-of-scope rule", rule)
 
         resolved_ips: set[str] = set()
+        ip_rules = [
+            rule for rule in (*self._in, *self._out) if _is_ip_rule(rule)
+        ]
         if kind == "ip":
             resolved_ips.add(str(ipaddress.ip_address(host)))
-        else:
+        elif ip_rules:
             # A hostname can resolve outside an IP/CIDR-only engagement. Check
             # its current A/AAAA answers before authorizing a network operation.
             # This is a preflight guard, not a substitute for network-level
