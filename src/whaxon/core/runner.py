@@ -255,36 +255,50 @@ class ToolRunner:
                 user_host, port = head, tail
         host = user_host.split("@", 1)[-1]
         user = user_host.split("@", 1)[0] if "@" in user_host else ""
+        domain = _os.environ.get("WHAXON_SMB_DOMAIN", "")
+        if (
+            user_host.count("@") != 1
+            or not user
+            or any(ch in user for ch in "/:@\\r\\n\\0")
+            or any(ch in host for ch in "/@\\r\\n\\0")
+            or any(ch in domain for ch in "/:@\\r\\n\\0")
+            or (port is not None and not 1 <= int(port) <= 65535)
+            or any(ch in str(session_id) for ch in "\\r\\n\\0")
+            or any(ch in command for ch in "\\r\\n\\0")
+        ):
+            return "[error] invalid SMB session identity or command"
         if self._scope is not None:
             match = self._scope.check(host)
             if not match.allowed:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         password = _os.environ.get("WHAXON_SMB_PASS", "")
-        domain = _os.environ.get("WHAXON_SMB_DOMAIN", "")
         if not password:
             return "[error] WHAXON_SMB_PASS not set"
+        if any(ch in password for ch in "\\r\\n\\0"):
+            return "[error] SMB password must not contain newlines or NUL"
         argv = ["impacket-smbclient"]
         prefix = (domain + "/") if domain else ""
-        auth = prefix + user + ":" + password + "@" + host
-        argv.append(auth)
+        # Never put the password in argv: ps/procfs can expose it to other
+        # local users. Impacket prompts when no password is supplied; its
+        # non-TTY getpass fallback consumes the first stdin line.
+        argv.append(prefix + user + "@" + host)
         if port:
             argv += ["-port", port]
-        stdin_bytes = (command + chr(10) + "exit" + chr(10)).encode()
+        stdin_bytes = (password + "\\n" + command + "\\nexit\\n").encode()
         try:
             proc = await _asyncio.create_subprocess_exec(
                 *argv,
                 stdin=_asyncio.subprocess.PIPE,
                 stdout=_asyncio.subprocess.PIPE,
                 stderr=_asyncio.subprocess.PIPE,
+                start_new_session=(_os.name == "posix"),
             )
             stdout, stderr = await _asyncio.wait_for(
                 proc.communicate(stdin_bytes), timeout=timeout_s,
             )
         except TimeoutError:
-            try:
-                proc.kill()
-            except Exception:
-                pass
+            await self._kill_process_tree(proc)
+            await proc.wait()
             return "[error] smb timeout"
         except FileNotFoundError:
             return "[error] impacket-smbclient not found"
@@ -319,35 +333,47 @@ class ToolRunner:
                 user_host, port = head, tail
         host = user_host.split("@", 1)[-1]
         user = user_host.split("@", 1)[0] if "@" in user_host else ""
+        domain = _os.environ.get("WHAXON_WMI_DOMAIN") or _os.environ.get("WHAXON_SMB_DOMAIN", "")
+        if (
+            user_host.count("@") != 1
+            or not user
+            or any(ch in user for ch in "/:@\\r\\n\\0")
+            or any(ch in host for ch in "/@\\r\\n\\0")
+            or any(ch in domain for ch in "/:@\\r\\n\\0")
+            or (port is not None and not 1 <= int(port) <= 65535)
+            or any(ch in str(session_id) for ch in "\\r\\n\\0")
+        ):
+            return "[error] invalid WMI session identity"
         if self._scope is not None:
             match = self._scope.check(host)
             if not match.allowed:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         password = _os.environ.get("WHAXON_WMI_PASS") or _os.environ.get("WHAXON_SMB_PASS", "")
-        domain = _os.environ.get("WHAXON_WMI_DOMAIN") or _os.environ.get("WHAXON_SMB_DOMAIN", "")
         if not password:
             return "[error] WHAXON_WMI_PASS not set (and WHAXON_SMB_PASS empty)"
+        if any(ch in password for ch in "\\r\\n\\0"):
+            return "[error] WMI password must not contain newlines or NUL"
         argv = ["impacket-wmiexec"]
         prefix = (domain + "/") if domain else ""
-        auth = prefix + user + ":" + password + "@" + host
-        argv.append(auth)
+        # Keep credentials out of argv; impacket prompts for a missing password.
+        argv.append(prefix + user + "@" + host)
         argv.append(command)
         if port:
             argv += ["-port", port]
         try:
             proc = await _asyncio.create_subprocess_exec(
                 *argv,
+                stdin=_asyncio.subprocess.PIPE,
                 stdout=_asyncio.subprocess.PIPE,
                 stderr=_asyncio.subprocess.PIPE,
+                start_new_session=(_os.name == "posix"),
             )
             stdout, stderr = await _asyncio.wait_for(
-                proc.communicate(), timeout=timeout_s,
+                proc.communicate((password + "\\n").encode()), timeout=timeout_s,
             )
         except TimeoutError:
-            try:
-                proc.kill()
-            except Exception:
-                pass
+            await self._kill_process_tree(proc)
+            await proc.wait()
             return "[error] wmi timeout"
         except FileNotFoundError:
             return "[error] impacket-wmiexec not found"
