@@ -20,7 +20,7 @@ NAVIGABLE = [
 
 @pytest.mark.parametrize("slug,section_id", NAVIGABLE)
 def test_page_navigation_activates_section(page, live_server, slug, section_id):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/ui/legacy")
     item = page.locator(f'.sb-item[data-page="{slug}"]')
     assert item.count() == 1, f"sidebar item for {slug} not found"
     item.click()
@@ -35,7 +35,7 @@ HIDDEN = ["audit", "intel", "compliance", "settings"]
 
 @pytest.mark.parametrize("slug", HIDDEN)
 def test_hidden_page_not_in_sidebar(page, live_server, slug):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/ui/legacy")
     item = page.locator(f'.sb-item[data-page="{slug}"]')
     assert item.count() == 1, f"sidebar item for {slug} not in DOM"
     assert not item.is_visible(), f"sidebar item for {slug} is still visible"
