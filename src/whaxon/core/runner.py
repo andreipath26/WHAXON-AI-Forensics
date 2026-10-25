@@ -98,14 +98,16 @@ class ToolRunner:
             raise ValueError(f"bad extra args: {e}") from e
         target_override_flags = {
             "-u", "--url", "-h", "--host", "--target", "--target-url",
-            "--targets", "--target-list", "-il", "--input-list",
+            "--targets", "--target-list", "--domain", "--domains",
+            "--target-ip", "--target-host", "-il", "--input-list",
             "--input-file", "--targets-file", "-ir",
         }
         user_overrides_target = any(
             token.lower() in target_override_flags
             or token.lower().startswith((
                 "--url=", "-u=", "--host=", "--target=", "--target-url=",
-                "--targets=", "--target-list=",
+                "--targets=", "--target-list=", "--domain=", "--domains=",
+                "--target-ip=", "--target-host=", "--input-list=", "--input-file=",
             ))
             or (
                 token.lower().startswith(("-u", "-h", "-il", "-ir"))
@@ -131,8 +133,6 @@ class ToolRunner:
             if not value:
                 return False
             if value.startswith("-"):
-                if "=" in value:
-                    return _looks_like_target_token(value.split("=", 1)[1])
                 return False
             if value.lower().startswith(("http://", "https://")):
                 parsed = urlsplit(value)
