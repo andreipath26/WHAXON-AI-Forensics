@@ -83,6 +83,9 @@ class Validator:
     CMDI_MARKER_PREFIX = "whaxon_cmdi_"
 
     REPLAYABLE = {"sqli": "sql", "sql_injection": "sql", "xss": "xss", "command_injection": "cmdi"}
+    OBSERVATION_KINDS = {
+        "open_port", "http_header_missing", "ssl_cert_invalid", "cookie_insecure",
+    }
 
     def __init__(self, payload_dir: Path, timing_threshold: float = 3.0):
         self.loader = PayloadLoader(payload_dir)
@@ -92,12 +95,14 @@ class Validator:
 
     def validate(self, finding: Finding, target_url: str | None = None) -> tuple[str, str]:
         """Return (status, reason). status in {verified, refuted, candidate}."""
+        kind = finding.kind
+        if kind in self.OBSERVATION_KINDS:
+            return self._validate_observation(finding, target_url)
         ctx = (finding.data or {}).get("_request_context")
         if ctx and ctx.get("url"):
-            return self._replay_ctx(ctx, target_url=target_url, kind=finding.kind)
-        kind = finding.kind
+            return self._replay_ctx(ctx, target_url=target_url, kind=kind)
         if kind not in self.REPLAYABLE:
-            return "candidate", f"kind {kind!r} is not directly replayable"
+            return "candidate", f"kind {kind!r} has no safe validation probe"
         if not target_url:
             return "candidate", "no target URL supplied"
         param = (finding.data or {}).get("parameter")
@@ -159,6 +164,101 @@ class Validator:
         # Failure to reproduce is not proof that a finding is false: the
         # parameter, method, auth state, or payload may not match.
         return "candidate", "replay produced no conclusive, payload-specific proof"
+
+    def _validate_observation(
+        self, finding: Finding, target_url: str | None,
+    ) -> tuple[str, str]:
+        """Re-check environmental observations without sending exploit payloads."""
+        import socket
+        import ssl
+        import urllib.error
+        import urllib.request
+        from urllib.parse import urlparse
+
+        if not target_url:
+            return "candidate", "no target URL supplied for observation probe"
+        parsed = urlparse(target_url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return "candidate", "observation target must be an absolute HTTP(S) URL"
+        data = finding.data or {}
+        host = parsed.hostname
+        if finding.kind == "open_port":
+            port = data.get("port")
+            if type(port) is not int or not 1 <= port <= 65535:
+                return "candidate", "open-port finding has no valid TCP port"
+            protocol = str(data.get("protocol") or "tcp").lower()
+            if protocol != "tcp":
+                return "candidate", f"automatic observation probe does not support {protocol!r}"
+            try:
+                with socket.create_connection((host, port), timeout=3.0):
+                    pass
+            except OSError as exc:
+                return "candidate", f"TCP connection did not confirm port {port}: {exc}"
+            return "verified", f"TCP connection to {host}:{port} succeeded"
+
+        if finding.kind == "ssl_cert_invalid":
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            try:
+                context = ssl.create_default_context()
+                with socket.create_connection((host, port), timeout=5.0) as raw:
+                    with context.wrap_socket(raw, server_hostname=host):
+                        pass
+            except ssl.SSLCertVerificationError as exc:
+                return "verified", f"TLS certificate verification failed again: {exc}"
+            except (OSError, ssl.SSLError) as exc:
+                return "candidate", f"TLS observation was inconclusive: {exc}"
+            return "candidate", "TLS certificate verified; invalid-certificate finding did not reproduce"
+
+        if finding.kind not in ("http_header_missing", "cookie_insecure"):
+            return "candidate", f"no observation probe registered for {finding.kind!r}"
+
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
+        request = urllib.request.Request(
+            target_url, method="GET",
+            headers={"User-Agent": "WHAXON-validate/1.0"},
+        )
+        opener = urllib.request.build_opener(_NoRedirect)
+        try:
+            response = opener.open(request, timeout=5.0)
+        except urllib.error.HTTPError as exc:
+            if 300 <= exc.code < 400:
+                return "candidate", f"observation redirect blocked (HTTP {exc.code})"
+            response = exc
+        except (OSError, ValueError) as exc:
+            return "candidate", f"HTTP observation failed: {exc}"
+
+        with response:
+            headers = response.headers
+            if finding.kind == "http_header_missing":
+                header = data.get("header")
+                if not isinstance(header, str) or not header.strip():
+                    return "candidate", "missing-header finding has no header name"
+                if headers.get(header) is None:
+                    return "verified", f"HTTP response still lacks {header}"
+                return "candidate", f"HTTP response includes {header}; finding did not reproduce"
+
+            cookie_name = data.get("cookie")
+            missing_flag = str(data.get("missing") or "").lower()
+            if not isinstance(cookie_name, str) or missing_flag not in {
+                "secure", "httponly", "samesite",
+            }:
+                return "candidate", "cookie finding lacks a valid cookie name or flag"
+            for raw_cookie in headers.get_all("Set-Cookie", []):
+                pieces = [part.strip() for part in raw_cookie.split(";")]
+                name = pieces[0].split("=", 1)[0].strip() if pieces else ""
+                if name != cookie_name:
+                    continue
+                attributes = {
+                    part.split("=", 1)[0].strip().lower()
+                    for part in pieces[1:] if part
+                }
+                if missing_flag not in attributes:
+                    return "verified", f"cookie {cookie_name!r} still lacks {missing_flag}"
+                return "candidate", f"cookie {cookie_name!r} now includes {missing_flag}"
+            return "candidate", f"cookie {cookie_name!r} was not observed in the response"
 
     @staticmethod
     def _xss_probe_is_executable(body: str, payload: str) -> bool:
