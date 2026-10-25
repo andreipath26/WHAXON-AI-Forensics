@@ -74,8 +74,14 @@ def test_smb_happy_path(monkeypatch):
     captured = {}
     async def fake_exec(*args, **kwargs):
         captured["argv"] = args
+        captured["kwargs"] = kwargs
         proc = MagicMock()
-        proc.communicate = AsyncMock(return_value=(b"Share1 Disk\nShare2 Disk\n", b""))
+
+        async def communicate(input=None):
+            captured["stdin"] = input
+            return b"Share1 Disk\\nShare2 Disk\\n", b""
+
+        proc.communicate = communicate
         proc.returncode = 0
         return proc
     async def run():
@@ -84,7 +90,10 @@ def test_smb_happy_path(monkeypatch):
     out = asyncio.run(run())
     assert "Share1" in out
     assert captured["argv"][0] == "impacket-smbclient"
-    assert "user:pw@10.0.0.5" in captured["argv"][1]
+    assert "user@10.0.0.5" in captured["argv"][1]
+    assert "pw" not in " ".join(captured["argv"])
+    assert captured["stdin"].startswith(b"pw\\nshares\\nexit\\n")
+    assert captured["kwargs"]["start_new_session"] is True
 
 
 def test_smb_scope_check(monkeypatch):
@@ -167,3 +176,31 @@ def test_run_tool_no_rewrite_when_not_pivot_capable():
     assert "10.0.0.7" in joined
     assert "18080" not in joined
 
+def test_wmi_keeps_password_out_of_process_arguments(monkeypatch):
+    monkeypatch.setenv("WHAXON_WMI_PASS", "wmi-secret")
+    r = ToolRunner(EventBus())
+    captured = {}
+
+    async def fake_exec(*args, **kwargs):
+        captured["argv"] = args
+        captured["kwargs"] = kwargs
+        proc = MagicMock()
+
+        async def communicate(input=None):
+            captured["stdin"] = input
+            return b"command output\\n", b""
+
+        proc.communicate = communicate
+        proc.returncode = 0
+        return proc
+
+    async def run():
+        with patch("asyncio.create_subprocess_exec", fake_exec):
+            return await r._run_wmi_session("wmi:user@10.0.0.5", "whoami", 5.0)
+
+    out = asyncio.run(run())
+    assert "command output" in out
+    assert "wmi-secret" not in " ".join(captured["argv"])
+    assert captured["argv"][1] == "user@10.0.0.5"
+    assert captured["stdin"] == b"wmi-secret\\n"
+    assert captured["kwargs"]["start_new_session"] is True
