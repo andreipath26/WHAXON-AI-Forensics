@@ -105,7 +105,7 @@ def test_command_injection_ctx_replay_verifies():
             },
             raw_line="",
         )
-        status, reason = v.validate(f, target_url=None)
+        status, reason = v.validate(f, target_url=url)
         assert status == "verified", reason
         assert "whaxon_cmdi_" in reason
     finally:
