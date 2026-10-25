@@ -454,7 +454,7 @@ def check_robots(target: str) -> list[Finding]:
             sitemap_url, method="GET",
             headers={"User-Agent": "WHAXON-recon/1.0"},
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with _open_no_redirect(req, timeout=5) as resp:
             xml = resp.read(65536).decode("utf-8", errors="replace")
     except Exception:
         return out
