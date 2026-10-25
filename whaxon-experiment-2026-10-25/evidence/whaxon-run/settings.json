@@ -1,0 +1,7 @@
+{
+  "theme": "system",
+  "autochain": false,
+  "confirm_destructive": true,
+  "nuclei_version": "absent",
+  "nuclei_templates_dir": "/workspace/homes/631d3594b40a92b083bca535/.local/nuclei-templates"
+}

