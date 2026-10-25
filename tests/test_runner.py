@@ -270,7 +270,7 @@ def test_build_argv_rejects_extra_url_target_override():
         binary="sqlmap", args="-u {target} --batch",
     )
     runner, _, _ = _runner(tools=[tool])
-    with pytest.raises(ValueError, match="cannot override the target URL"):
+    with pytest.raises(ValueError, match="cannot specify alternate targets"):
         runner.build_argv(
             "sqlmap", "http://127.0.0.1/item?id=1",
             extra_args="-u http://example.com/other --data=x",
@@ -291,3 +291,19 @@ def test_build_argv_allows_non_target_sqlmap_options():
         "sqlmap", "-u", "http://127.0.0.1/item?id=1", "--batch",
         "--data=x", "--level=2",
     ]
+
+@pytest.mark.parametrize("extra_args", [
+    "-h https://example.com",
+    "--target https://example.com",
+    "-iL /tmp/targets.txt",
+    "-iR 10",
+    "--url=https://example.com",
+])
+def test_build_argv_rejects_alternate_target_flags(extra_args):
+    tool = Tool(
+        id="nmap", name="Nmap", category="recon",
+        binary="nmap", args="-sV {target}",
+    )
+    runner, _, _ = _runner(tools=[tool])
+    with pytest.raises(ValueError, match="cannot specify alternate targets"):
+        runner.build_argv("nmap", "127.0.0.1", extra_args=extra_args)
