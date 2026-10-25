@@ -1425,10 +1425,14 @@ def main(args: list[str] | None = None) -> None:
             )
     else:
         os.environ.setdefault("WHAXON_AUTH_USER", "whaxon")
-        if "WHAXON_AUTH_PASS_HASH" not in os.environ:
-            os.environ["WHAXON_AUTH_PASS_HASH"] = _hash_pw(
-                os.environ.get("WHAXON_AUTH_PASS", "whaxon")
-            )
+
+    # Hash the explicitly supplied password only after remote credentials have
+    # passed validation. This keeps custom remote credentials usable without
+    # ever manufacturing a known password for an exposed listener.
+    if "WHAXON_AUTH_PASS_HASH" not in os.environ:
+        os.environ["WHAXON_AUTH_PASS_HASH"] = _hash_pw(
+            os.environ.get("WHAXON_AUTH_PASS", "whaxon")
+        )
 
     data_dir = Path(os.environ.get("WHAXON_DATA", "data"))
 
