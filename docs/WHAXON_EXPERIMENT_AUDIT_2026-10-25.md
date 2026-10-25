@@ -70,6 +70,14 @@ The experiment's `docs/scope-and-rules.md` explicitly says there were no written
 
 **Release action:** WHAXON's release process should require the operator to define and confirm the authorised scope before active scans. Do not rerun the public-target scripts from this evidence folder as part of CI or routine validation. Use loopback fixtures or an explicitly controlled lab for regression testing.
 
+### E-A9 — The evidence redaction/provenance claims are internally inconsistent
+
+The experiment's `logs/publication-log.md` says no credentials were written and the manifest's sanitisation section says no credential values were present, but the tracked `evidence/whaxon-run/whaxon.env` contains `WHAXON_MSF_PASS=test123`. This is a lab/default credential, not evidence of a production password, but the absolute publication claim is not accurate.
+
+There is also a separate `evidence/whaxon-run/redactions.json` entry claiming three database redactions while recording identical before/after SHA-256 values for `whaxon.db`. The database could not be opened with the available GitHub text reader, so the underlying content was not independently checked. The identical hashes make the claimed redaction unverifiable from the published record and may indicate that SQLite/WAL state or hash accounting was handled incorrectly.
+
+**Release action:** never claim “no credentials” without a secret scan that includes tracked environment files and binary/database artefacts. For any future redaction, verify the logical database contents after checkpoint/close, recompute the final file hash, and ensure the before/after hashes differ when bytes were actually changed. Keep the protected evidence unchanged for now.
+
 ### E-A8 — A broad scope file can intentionally grant an enormous target range
 
 `evidence/whaxon-run/scope-bug-demo.json` contains `0.0.0.0/0` as an in-scope range, with only the metadata range excluded. This is a deliberate reproduction artefact, not the default scope. It demonstrates that a syntactically valid but dangerously broad rule can make the operator's scope effectively global.
