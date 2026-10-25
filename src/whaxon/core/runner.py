@@ -107,6 +107,10 @@ class ToolRunner:
                 "--url=", "-u=", "--host=", "--target=", "--target-url=",
                 "--targets=", "--target-list=",
             ))
+            or (
+                token.lower().startswith(("-u", "-h", "-il", "-ir"))
+                and token.lower() not in target_override_flags
+            )
             for token in extra_tokens
         )
         if user_overrides_target:
