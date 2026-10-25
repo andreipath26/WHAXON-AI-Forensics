@@ -150,8 +150,6 @@ async def test_run_tool_out_of_scope_raises():
         matched_rule = ""
 
     class FakeScope:
-        path = tmp_path / "scope.json"
-
         def check(self, target):
             return FakeMatch()
 
@@ -174,6 +172,8 @@ async def test_run_tool_out_of_scope_allowed_override(tmp_path):
         matched_rule = ""
 
     class FakeScope:
+        path = tmp_path / "scope.json"
+
         def check(self, target):
             return FakeMatch()
 
