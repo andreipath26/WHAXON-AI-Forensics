@@ -96,6 +96,10 @@ def main(args: list[str] | None = None) -> int:
         loader = PayloadLoader(pkg_payloads)
         payloads = loader.get_payloads(f_obj.kind)
         used_payload = payloads[0] if payloads else None
+        # Kinds validated with a generated probe (command injection) report the
+        # exact payload that produced the proof, not a documentation snippet.
+        if validator.last_payload:
+            used_payload = validator.last_payload
         proof = render_proof(f_obj.data, payload=used_payload)
         core.store.set_proof(job_id, seq, proof)
         print()

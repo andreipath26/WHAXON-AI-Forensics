@@ -67,11 +67,19 @@ class Validator:
     # XSS markers: payload reflected unescaped.
     XSS_MARKERS = ("<script>", "onerror=", "javascript:")
 
-    REPLAYABLE = {"sqli": "sql", "xss": "xss"}
+    # Command-injection proof marker. The marker is built at execution time
+    # by the shell (`$(printf ...)` expands, `""` concatenation joins), so
+    # the literal payload never contains it. A response that merely reflects
+    # the submitted value therefore cannot satisfy the check.
+    CMDI_MARKER_PREFIX = "whaxon_cmdi_"
+
+    REPLAYABLE = {"sqli": "sql", "xss": "xss", "command_injection": "cmdi"}
 
     def __init__(self, payload_dir: Path, timing_threshold: float = 3.0):
         self.loader = PayloadLoader(payload_dir)
         self.timing_threshold = timing_threshold
+        # Payload that produced the last verified result (proof export).
+        self.last_payload: str | None = None
 
     def validate(self, finding: Finding, target_url: str | None = None) -> tuple[str, str]:
         """Return (status, reason). status in {verified, refuted, candidate}."""
@@ -86,6 +94,9 @@ class Validator:
         param = (finding.data or {}).get("parameter")
         if not param:
             return "candidate", "finding has no parameter to inject"
+
+        if kind == "command_injection":
+            return self._validate_command_injection(target_url, param)
 
         payloads = self.loader.get_payloads(kind)
         if not payloads:
@@ -123,6 +134,56 @@ class Validator:
         if injected_l == baseline_l:
             return "refuted", "response identical to baseline"
         return "candidate", "response differed but no known marker"
+
+    @classmethod
+    def _cmdi_probes(cls) -> list[tuple[str, str]]:
+        """Return (payload, marker) command-injection probes for one run.
+
+        Each probe appends one shell separator and an `echo` of a per-run
+        marker. The marker is split so that the submitted string does not
+        contain it: `$(printf <hex>)` is evaluated by the shell, and
+        `abcd""efgh` is joined by quote removal. Only real execution of the
+        injected command can put the marker in the response.
+        """
+        import secrets
+
+        token = secrets.token_hex(4)
+        head, tail = token[:4], token[4:]
+        marker = f"{cls.CMDI_MARKER_PREFIX}{token}"
+        payloads = (
+            f"x;echo {cls.CMDI_MARKER_PREFIX}$(printf {token})",
+            f'x;echo {cls.CMDI_MARKER_PREFIX}{head}""{tail}',
+            f"x|echo {cls.CMDI_MARKER_PREFIX}$(printf {token})",
+            f"x&&echo {cls.CMDI_MARKER_PREFIX}$(printf {token})",
+        )
+        return [(p, marker) for p in payloads if marker not in p]
+
+    def _validate_command_injection(self, url: str, param: str) -> tuple[str, str]:
+        """Replay canary probes and verify the target's shell produced them."""
+        try:
+            baseline_body, _ = self._fetch(url, param, "whaxon_baseline")
+        except Exception as e:
+            return "candidate", f"replay failed: {e}"
+        baseline_l = (baseline_body or "").lower()
+
+        for payload, marker in self._cmdi_probes():
+            try:
+                body, _ = self._fetch(url, param, payload)
+            except Exception as e:
+                return "candidate", f"replay failed: {e}"
+            if marker.lower() in (body or "").lower() and marker.lower() not in baseline_l:
+                self.last_payload = payload
+                return "verified", (
+                    f"command output marker {marker!r} appeared only after injection "
+                    f"(payload {payload!r})"
+                )
+
+        # Reflection of the payload is not proof: without the marker the
+        # result stays a candidate for a human to check.
+        return "candidate", (
+            "no command-execution canary appeared in the response "
+            "(payload reflection alone is not proof)"
+        )
 
     def revalidate(self, finding: Finding, target_url: str | None = None) -> tuple[str, str]:
         """Re-run a previously verified finding and report the outcome.
@@ -219,7 +280,10 @@ class Validator:
         body_template = ctx.get("body")
 
         payload = None
-        if kind:
+        cmdi_marker = ""
+        if kind == "command_injection":
+            payload, cmdi_marker = self._cmdi_probes()[0]
+        elif kind:
             payloads = self.loader.get_payloads(kind)
             if payloads:
                 payload = payloads[0]
@@ -296,7 +360,10 @@ class Validator:
                 f"timing signal only: median injected-baseline delta {delta:.2f}s; "
                 "needs independent confirmation"
             )
-        for marker in self.SQL_ERROR_MARKERS + self.XSS_MARKERS:
+        markers = (cmdi_marker,) if cmdi_marker else self.SQL_ERROR_MARKERS + self.XSS_MARKERS
+        for marker in markers:
             if marker in injected_l and marker not in baseline_l:
+                if cmdi_marker and payload:
+                    self.last_payload = payload
                 return "verified", f"marker {marker!r} appeared only after injection"
         return "candidate", "context replay did not produce a baseline-differential proof"

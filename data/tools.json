@@ -77,6 +77,16 @@
       "pivot_capable": true
     },
     {
+      "id": "commix",
+      "name": "Commix",
+      "category": "web",
+      "binary": "commix",
+      "description": "OS command injection detector and exploiter",
+      "args": "-u {target} --batch --level=1",
+      "package": "",
+      "pivot_capable": true
+    },
+    {
       "id": "ffuf",
       "name": "ffuf",
       "category": "web",
