@@ -21,7 +21,8 @@
 | Run orchestration | List available tools, launch scoped job, stream output, request cancellation | `GET /api/tools`, `POST /api/run`, `GET /api/jobs/<id>/stream`, `POST /api/jobs/<id>/cancel` | Wired; end-to-end tests pending |
 | Verified findings | Severity summary, search/filter, request deterministic validation | `GET /api/report?format=json`, `POST /api/validate/<job>/<seq>` | Wired; verify report field mapping |
 | Remediation & retest | Show only currently verified findings; revalidate | `POST /api/retest/<job>/<seq>` | Wired; backend eligibility and scope checks remain authoritative |
-| Trust layer | Review unverified findings; record explicit human verified/refuted decision | `POST /api/approvals/<job>/<seq>/resolve` | Wired; human decision is labelled separately from engine validation |
+| Finding review / trust layer | Review unverified findings; record explicit human verified/refuted decision | `POST /api/approvals/<job>/<seq>/resolve` | Wired; human decision is labelled separately from engine validation |
+| AI strategy gate | List pending AI runs, submit operator answers, inspect AI run history | `GET /api/ai/pending`, `POST /api/ai/runs/<id>/answer`, `GET /api/ai/runs` | Wired; verify answer lifecycle and conflicts in browser/CI |
 | Coverage & reports | Export Markdown, HTML, JSON, PDF, WHAXON envelope | `GET /api/report?format=...` | Wired; PDF depends on renderer availability |
 | Job history | Read persisted jobs and inspect job output | `GET /api/history`, `GET /api/jobs/<id>/output.txt` | Wired; verify response schemas in CI |
 | Evidence inspector | List, upload, download and delete job evidence; save analyst notes | `GET/POST/DELETE /api/jobs/<id>/evidence`, `GET /api/jobs/<id>/evidence/<seq>/download` | Wired; verify upload/download lifecycle in browser/CI |
@@ -43,6 +44,7 @@
 - [ ] Cancellation requests are reflected accurately; UI does not claim cancellation succeeded when the backend returns false.
 - [ ] Finding severity/status fields map correctly from actual report payloads; validate and retest refresh state after completion.
 - [ ] Human review is clearly distinguished from deterministic engine verification.
+- [ ] AI pending decisions load, operator answers are submitted and errors/conflicts are visible; this gate is kept separate from vulnerability verification.
 - [ ] Report download formats and failure handling are tested.
 - [ ] No demo target, fake telemetry, fabricated finding, default credential or unsupported hardware-enforcement claim is shown as live system state.
 - [ ] Keyboard and small-screen interactions are checked.
