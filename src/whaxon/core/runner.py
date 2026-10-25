@@ -549,19 +549,65 @@ class ToolRunner:
 
         self._lines_by_job.setdefault(job_id, [])
 
+        max_output_lines = 5000
+        max_output_bytes = 1_000_000
+        max_line_bytes = 16_384
+        captured = {"lines": 0, "bytes": 0, "truncated": False}
+
+        def emit_line(raw: bytes, name: str) -> None:
+            if captured["truncated"]:
+                return
+            if (
+                captured["lines"] >= max_output_lines
+                or captured["bytes"] + len(raw) > max_output_bytes
+            ):
+                captured["truncated"] = True
+                marker = (
+                    f"[runner] output truncated at {captured['lines']} lines "
+                    f"and {captured['bytes']} bytes"
+                )
+                self._lines_by_job[job_id].append((name, marker))
+                self._bus.publish(JobOutput(job_id=job_id, stream=name, line=marker))
+                return
+            captured["lines"] += 1
+            captured["bytes"] += len(raw)
+            if len(raw) > max_line_bytes:
+                raw = raw[:max_line_bytes] + b" ...[line truncated]"
+            text = raw.decode(errors="replace").rstrip("\r")
+            self._lines_by_job[job_id].append((name, text))
+            self._bus.publish(JobOutput(job_id=job_id, stream=name, line=text))
+
         async def pump(stream: asyncio.StreamReader | None, name: str) -> None:
             if stream is None:
                 return
+            buffer = bytearray()
+            discarding_long_line = False
             while True:
-                line = await stream.readline()
-                if not line:
+                chunk = await stream.read(65536)
+                if not chunk:
                     break
-                text = line.decode(errors="replace").rstrip("\n")
-                self._lines_by_job[job_id].append((name, text))
-                self._bus.publish(JobOutput(
-                    job_id=job_id, stream=name,
-                    line=text,
-                ))
+                if discarding_long_line:
+                    newline = chunk.find(b"\n")
+                    if newline < 0:
+                        continue
+                    chunk = chunk[newline + 1:]
+                    discarding_long_line = False
+                if not chunk:
+                    continue
+                buffer.extend(chunk)
+                while True:
+                    newline = buffer.find(b"\n")
+                    if newline < 0:
+                        break
+                    raw = bytes(buffer[:newline])
+                    del buffer[:newline + 1]
+                    emit_line(raw, name)
+                if len(buffer) > max_line_bytes:
+                    emit_line(bytes(buffer[:max_line_bytes]), name)
+                    buffer.clear()
+                    discarding_long_line = True
+            if buffer and not discarding_long_line:
+                emit_line(bytes(buffer), name)
 
         try:
             await asyncio.wait_for(
@@ -582,6 +628,7 @@ class ToolRunner:
             ))
             self._bus.publish(JobFailed(job_id=job_id, error="timeout"))
             self._procs.pop(job_id, None)
+            self._lines_by_job.pop(job_id, None)
             return job_id
 
         self._procs.pop(job_id, None)
