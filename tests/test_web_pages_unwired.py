@@ -1,17 +1,15 @@
-"""Stub tests for pages that still render ui-v4 mockup content.
+"""Navigation smoke tests for the visible web pages.
 
-These do NOT assert on mockup data -- that would be testing lies. They
-assert only that the page loads, the section is present, and clicking the
-sidebar item activates it. When a page gets wired to real data, its test
-graduates to a real behavioral test in its own file.
+These tests assert page activation only. Live-data and interaction behavior
+belongs in the dedicated page tests; the legacy filename is retained to
+avoid churn in downstream test references.
 """
 from __future__ import annotations
 
 import pytest
 
-# Pages that currently render static mockup content, with the DOM id of
-# their top-level section.
-UNWIRED = [
+# Visible pages and the DOM id of each top-level section.
+NAVIGABLE = [
     ("run", "page-run"),
     ("report", "page-report"),
     ("sessions", "page-sessions"),
@@ -20,8 +18,8 @@ UNWIRED = [
 ]
 
 
-@pytest.mark.parametrize("slug,section_id", UNWIRED)
-def test_unwired_page_loads(page, live_server, slug, section_id):
+@pytest.mark.parametrize("slug,section_id", NAVIGABLE)
+def test_page_navigation_activates_section(page, live_server, slug, section_id):
     page.goto(f"{live_server}/ui")
     item = page.locator(f'.sb-item[data-page="{slug}"]')
     assert item.count() == 1, f"sidebar item for {slug} not found"
