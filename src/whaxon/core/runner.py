@@ -134,7 +134,7 @@ class ToolRunner:
                 return False
             if value.startswith("-"):
                 return False
-            if value.lower().startswith(("http://", "https://")):
+            if "://" in value:
                 parsed = urlsplit(value)
                 return bool(parsed.hostname)
             try:
