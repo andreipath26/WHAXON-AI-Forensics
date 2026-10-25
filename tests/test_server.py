@@ -459,3 +459,42 @@ def test_run_refuses_out_of_scope_target_without_override(tmp_path, monkeypatch)
     assert core.store.history() == before
     assert submitted == []
 
+# ---------------------------------------------------------------- local browser boundary
+
+def test_loopback_listener_rejects_cross_origin_state_change(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    response = client.post(
+        "/api/run",
+        json={"tool_id": "echo", "target": "127.0.0.1"},
+        headers={"Origin": "https://attacker.example"},
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 403
+    assert "cross-origin" in response.get_json()["error"]
+
+
+def test_loopback_listener_rejects_dns_rebinding_host(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    response = client.get(
+        "/api/tools",
+        headers={"Host": "attacker.example"},
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 403
+    assert "Host" in response.get_json()["error"]
+
+
+def test_loopback_listener_rejects_cross_site_fetch_metadata(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    response = client.post(
+        "/api/scope/disable",
+        json={},
+        headers={"Sec-Fetch-Site": "cross-site"},
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 403
+    assert "cross-origin" in response.get_json()["error"]
