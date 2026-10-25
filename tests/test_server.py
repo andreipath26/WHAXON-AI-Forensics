@@ -474,8 +474,8 @@ def test_loopback_listener_rejects_cross_origin_state_change(tmp_path, monkeypat
     assert "cross-origin" in response.get_json()["error"]
 
 
-def test_loopback_listener_rejects_dns_rebinding_host(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
+def test_loopback_client_rejects_dns_rebinding_host_even_on_network_listener(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_HOST", "0.0.0.0")
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
     response = client.get(
