@@ -17,6 +17,23 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify release tag matches package version
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          version = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+          tag_version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          if version != tag_version:
+              raise SystemExit(
+                  f"Refusing release: git tag {tag_version!r} does not match "
+                  f"pyproject.toml version {version!r}"
+              )
+          print(f"Release tag matches package version {version}")
+          PY
+
       - name: Install system deps (pandoc, weasyprint)
         run: |
           sudo apt-get update
