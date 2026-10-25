@@ -268,6 +268,10 @@
     rulesEl.innerHTML = '';
     const eng = data.engagement || '(unnamed)';
     rulesEl.appendChild(row('Engagement', eng));
+    const engagementName = document.querySelector('.sb-engagement .name');
+    if (engagementName) engagementName.textContent = eng;
+    const crumb = document.querySelector('.crumb');
+    if (crumb && crumb.firstChild) crumb.firstChild.textContent = eng + ' ';
     const list = data.in_scope || [];
     countEl.textContent = list.length;
     list.forEach(rule => rulesEl.appendChild(row(classify(rule), rule)));
@@ -974,6 +978,8 @@
       tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:var(--text-dim);">No coverage gaps recorded for this engagement.</td></tr>';
       if (countEl) countEl.textContent = '0';
       if (summaryEl) summaryEl.textContent = 'Every step either ran or was not attempted.';
+      const badge = document.getElementById('coverage-badge');
+      if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
       return;
     }
     const KIND_PILL = {
@@ -999,6 +1005,8 @@
     });
     if (countEl) countEl.textContent = String(gaps.length);
     if (summaryEl) summaryEl.textContent = gaps.length + ' skipped step(s) across the engagement.';
+    const badge = document.getElementById('coverage-badge');
+    if (badge) { badge.textContent = String(gaps.length); badge.style.display = gaps.length ? '' : 'none'; }
   }
 
   function loadCoverage() {
