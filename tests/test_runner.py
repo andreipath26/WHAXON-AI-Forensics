@@ -543,6 +543,7 @@ def test_build_argv_rejects_whitespace_in_target():
     "extra_args",
     [
         "https://evil.example",
+        "ftp://evil.example",
         "8.8.8.8",
         "evil.example",
         "10.0.0.0/8",
