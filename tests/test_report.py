@@ -11,7 +11,7 @@ Guards:
 """
 from __future__ import annotations
 
-from whaxon.core.report import render_html, render_markdown, to_json, to_markdown
+from whaxon.core.report import render_html, render_markdown, to_html, to_json, to_markdown
 
 
 def _job():
@@ -102,3 +102,35 @@ def test_to_markdown_includes_pivot_chains():
 def test_to_markdown_without_chains_omits_section():
     md = to_markdown(_report_dict())
     assert "## Attack Surface" not in md
+
+
+def test_engagement_html_escapes_untrusted_finding_values():
+    report = _report_dict()
+    report["engagement"] = "<script>alert(1)</script>"
+    report["unique_findings"] = [{
+        "kind": '<img src=x onerror=alert(1)>',
+        "severity": "high",
+        "target": '<svg onload=alert(2)>',
+        "status": "candidate",
+        "verification_status": "candidate",
+        "verified_by": '<script>alert(3)</script>',
+        "verification_reason": '<img src=x onerror=alert(4)>',
+        "cost_range": {
+            "incident_pattern": '<script>alert(5)</script>',
+            "median": 10,
+            "p90": 20,
+            "source": '<img src=x onerror=alert(6)>',
+        },
+        "job_ids": ['<svg onload=alert(7)>'],
+    }]
+
+    for static in (False, True):
+        html = to_html(report, static=static)
+        assert "<script>alert(1)</script>" not in html
+        assert "<img src=x onerror=alert(1)>" not in html
+        assert "<svg onload=alert(2)>" not in html
+        assert "<script>alert(3)</script>" not in html
+        assert "<img src=x onerror=alert(4)>" not in html
+        assert "<script>alert(5)</script>" not in html
+        assert "<img src=x onerror=alert(6)>" not in html
+        assert "<svg onload=alert(7)>" not in html
