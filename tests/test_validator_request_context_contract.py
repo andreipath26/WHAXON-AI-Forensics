@@ -70,6 +70,7 @@ def test_canonical_context_takes_precedence_over_legacy_context(tmp_path, monkey
         "canonical context",
     )
 
+
 def test_sqlmap_adapter_populates_canonical_request_context():
     from whaxon.adapters.sqlmap import SqlmapAdapter
 
@@ -91,10 +92,15 @@ def test_sqlmap_adapter_populates_canonical_request_context():
         "parameter": "id",
     }
 
+
 def test_store_round_trips_canonical_request_context(tmp_path):
     from whaxon.core.store import JobStore
 
-    context = {"url": "https://example.test/item?id=1", "method": "GET", "parameter": "id"}
+    context = {
+        "url": "https://example.test/item?id=1",
+        "method": "GET",
+        "parameter": "id",
+    }
     finding = _finding(request_context=context)
     store = JobStore(tmp_path / "whaxon.sqlite3")
     store.create("job-context")
