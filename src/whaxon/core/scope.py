@@ -26,6 +26,9 @@ from __future__ import annotations
 import ipaddress
 import json
 import socket
+import tempfile
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -121,16 +124,28 @@ def _is_ip_rule(rule: str) -> bool:
         return False
 
 
-import os as _os_scope
-import stat as _stat_scope
 
 
-def _atomic_write(path, content: str) -> None:
+def _atomic_write(path: Path, content: str) -> None:
+    """Write a private config file atomically without following a predictable temp path."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8")
-    _os_scope.chmod(tmp, _stat_scope.S_IRUSR | _stat_scope.S_IWUSR)
-    _os_scope.replace(tmp, path)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent)
+    )
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(tmp, stat.S_IRUSR | stat.S_IWUSR)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 class ScopeManager:
