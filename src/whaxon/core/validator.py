@@ -442,7 +442,7 @@ class Validator:
 
         C-03 hardening applied:
         1. Method allowlist.
-        2. URL must match the target host (if target_url is provided).
+        2. A caller-supplied authorized target is mandatory and the context URL must match its host/port.
         3. Redirects are disabled.
         4. Auth/Cookie headers are stripped.
         """
@@ -468,6 +468,8 @@ class Validator:
         parsed_url = urlparse(url)
         if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname:
             return "candidate", "request context URL must be absolute HTTP(S)"
+        if parsed_url.username is not None or parsed_url.password is not None:
+            return "candidate", "request context URL must not embed credentials"
 
         # Constrain destination URL to the authorized target host and port.
         if target_url:
@@ -479,8 +481,15 @@ class Validator:
 
         headers = ctx.get("headers") or {"User-Agent": "whaxon-validate/0.11"}
         
-        # Check 4: Strip auth/cookie headers to prevent leaking them
-        headers = {k: v for k, v in headers.items() if k.lower() not in ("authorization", "cookie")}
+        # Strip credentials and authority overrides from captured headers. The
+        # URL must determine the destination host; captured Host or proxy-auth
+        # headers must not redirect or credential an otherwise authorized replay.
+        headers = {
+            k: v for k, v in headers.items()
+            if k.lower() not in (
+                "authorization", "proxy-authorization", "cookie", "cookie2", "host",
+            )
+        }
         if "User-Agent" not in headers and "user-agent" not in [k.lower() for k in headers]:
             headers["User-Agent"] = "whaxon-validate/0.11"
 
