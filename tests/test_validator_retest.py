@@ -68,3 +68,22 @@ def test_retest_cli_refuses_unverified(tmp_path, monkeypatch):
 
     rc = retest_cmd.main(["job1", "1"])
     assert rc == retest_cmd.EXIT_NOT_VERIFIED
+
+def test_retest_cli_refuses_out_of_scope_target(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    from whaxon.core import Core
+    from whaxon.core import events
+    from whaxon.interfaces.cli import retest_cmd
+
+    core = Core(tmp_path / "data")
+    asyncio.run(core.initialize())
+    core.store.create("outside")
+    core.store.set_started("outside", "sqlmap", "google.com")
+    finding = Finding(kind="sqli", severity="high", source="test",
+                      data={"parameter": "id"}, raw_line="test")
+    core.store.append_finding("outside", finding, 1)
+    core.store.update_verification("outside", 1, "verified", by="test", reason="seed")
+
+    rc = retest_cmd.main(["outside", "1"])
+    assert rc == retest_cmd.EXIT_SCOPE_BLOCKED
+    assert "out of scope" in capsys.readouterr().err.lower()
