@@ -417,3 +417,45 @@ async def test_tool_output_uses_private_random_directory_and_is_cleaned(tmp_path
     assert observed["exists_during_parse"] is True
     assert observed["contents"] == "tool output"
     assert not outpath.parent.exists(), "private temporary output directory should be removed"
+
+async def test_cancel_kills_descendants_after_tool_leader_exits(tmp_path):
+    """Cancellation must close inherited pipes by killing the whole process group."""
+    import os
+    import shlex
+
+    pid_file = tmp_path / "cancel-child.pid"
+    script = f"sleep 30 & child=$!; echo $child > {shlex.quote(str(pid_file))}; exit 0"
+    tool = Tool(
+        id="cancel-tree", name="Cancel process tree", category="test",
+        binary="/bin/sh", args="-c " + shlex.quote(script),
+    )
+    runner, _, _ = _runner(tools=[tool])
+    task = asyncio.create_task(
+        runner.run_tool("cancel-tree", "127.0.0.1", job_id="cancel-tree-job", timeout_s=10)
+    )
+    for _ in range(50):
+        if pid_file.exists() and "cancel-tree-job" in runner._procs:
+            break
+        await asyncio.sleep(0.02)
+    assert pid_file.exists(), "child process did not start"
+    child_pid = int(pid_file.read_text(encoding="utf-8").strip())
+    await runner.cancel("cancel-tree-job")
+    await asyncio.wait_for(task, timeout=3)
+
+    if Path("/proc").is_dir():
+        def proc_state():
+            try:
+                fields = Path(f"/proc/{child_pid}/stat").read_text(encoding="utf-8").split()
+            except OSError:
+                return None
+            return fields[2] if len(fields) > 2 else None
+
+        for _ in range(30):
+            state = proc_state()
+            if state is None or state == "Z":
+                break
+            await asyncio.sleep(0.1)
+        assert proc_state() in (None, "Z")
+    else:
+        with pytest.raises(ProcessLookupError):
+            os.kill(child_pid, 0)
