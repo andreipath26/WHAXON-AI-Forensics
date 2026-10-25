@@ -520,3 +520,63 @@ def test_tool_catalog_reports_adapter_availability(tmp_path, monkeypatch):
     assert isinstance(tools, list)
     assert tools
     assert all(isinstance(tool.get("adapter_available"), bool) for tool in tools)
+
+def test_evidence_upload_sanitizes_filename_and_delete_removes_file(tmp_path, monkeypatch):
+    import io
+
+    app, core = _make_app(tmp_path, monkeypatch)
+    core.store.create("evidence-job")
+    core.store.set_started("evidence-job", "test", "127.0.0.1")
+    client = app.test_client()
+    response = client.post(
+        "/api/jobs/evidence-job/evidence",
+        data={"file": (io.BytesIO(b"evidence bytes"), "../../outside.txt")},
+        content_type="multipart/form-data",
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 201
+    assert response.get_json()["name"] == "outside.txt"
+    item = core.store.list_evidence("evidence-job")[0]
+    data_root = core.data_dir.resolve()
+    saved = (data_root / item["path"]).resolve()
+    assert saved.is_relative_to(data_root)
+    assert saved.read_bytes() == b"evidence bytes"
+
+    download = client.get(
+        f"/api/jobs/evidence-job/evidence/{item['seq']}/download",
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert download.status_code == 200
+    assert download.data == b"evidence bytes"
+
+    deleted = client.delete(
+        f"/api/jobs/evidence-job/evidence/{item['seq']}",
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert deleted.status_code == 200
+    assert not saved.exists()
+    assert core.store.list_evidence("evidence-job") == []
+
+
+def test_evidence_routes_reject_unknown_jobs(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get(
+        "/api/jobs/unknown-job/evidence",
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 404
+
+
+def test_evidence_download_rejects_path_traversal(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    core.store.create("evidence-job")
+    core.store.set_started("evidence-job", "test", "127.0.0.1")
+    seq = core.store.add_evidence(
+        "evidence-job", "file", "outside.txt", path="../../outside.txt"
+    )
+    response = app.test_client().get(
+        f"/api/jobs/evidence-job/evidence/{seq}/download",
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "unsafe evidence path"
