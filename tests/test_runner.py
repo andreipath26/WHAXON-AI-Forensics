@@ -9,6 +9,7 @@ run without an explicit decorator.
 from __future__ import annotations
 
 import asyncio
+import sys
 from pathlib import Path
 
 import pytest
@@ -345,3 +346,35 @@ async def test_timeout_kills_descendant_processes(tmp_path):
     else:
         with pytest.raises(ProcessLookupError):
             os.kill(child_pid, 0)
+
+async def test_run_handles_single_output_line_larger_than_stream_limit():
+    runner, bus, _ = _runner(tools=[])
+    rec = _Recorder(bus)
+    await runner.run(
+        "test-output",
+        argv=[sys.executable, "-c", "print('x' * 200000, end='')"],
+        target="127.0.0.1",
+        timeout_s=5,
+    )
+    output = [event.line for event in rec.events["output"]]
+    assert len(output) == 1
+    assert "[line truncated]" in output[0]
+    assert len(output[0]) < 17000
+    assert len(rec.events["finished"]) == 1
+    assert rec.events["failed"] == []
+
+
+async def test_run_caps_excessive_subprocess_output():
+    runner, bus, _ = _runner(tools=[])
+    rec = _Recorder(bus)
+    await runner.run(
+        "test-output",
+        argv=[sys.executable, "-c", "print('x\\n' * 6000, end='')"],
+        target="127.0.0.1",
+        timeout_s=5,
+    )
+    output = [event.line for event in rec.events["output"]]
+    assert len(output) == 5001
+    assert "output truncated" in output[-1]
+    assert len(rec.events["finished"]) == 1
+    assert rec.events["failed"] == []
