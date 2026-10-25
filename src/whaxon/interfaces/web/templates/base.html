@@ -142,11 +142,12 @@
 <div class="scope-modal" id="scope-modal">
   <div class="sm-card">
     <h3>Out of scope</h3>
-    <p><code style="color:var(--text)">google.com:80</code> does not match any in-scope rule for engagement <b>DVWA — local</b>.</p>
-    <div class="sm-meta">Rule matched: none · Engagement: DVWA — local · Logged to scope_overrides.log</div>
+    <p><code style="color:var(--text)" data-scope-target>target</code> is not authorized by the active scope.</p>
+    <div class="sm-meta" data-scope-reason>This request was blocked by scope enforcement.</div>
+    <p class="sm-meta">Logging an override request does not authorize or launch a scan. Update the active scope through the operator-controlled configuration before retrying.</p>
     <div class="sm-actions">
-      <button class="btn btn-ghost" onclick="document.getElementById('scope-modal').classList.remove('open')">Cancel</button>
-      <button class="btn btn-danger" onclick="document.getElementById('scope-modal').classList.remove('open')">Run anyway (logged)</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('scope-modal').classList.remove('open')">Close</button>
+      <button class="btn btn-danger" id="scope-override-btn">Log override request</button>
     </div>
   </div>
 </div>
