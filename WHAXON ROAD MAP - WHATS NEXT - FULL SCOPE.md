@@ -29,11 +29,13 @@ This section supersedes stale progress estimates and any older status statements
 | CLI, web, TUI, GUI | `interfaces/cli/`, `interfaces/web/`, `interfaces/tui/`, `interfaces/gui/`; web, TUI, server, and route tests | Multiple interfaces exist. Their existence does not prove feature parity or a completed redesign. |
 | Quality and packaging | `pyproject.toml` declares package version `1.0.0`; CI/release workflows exist; changelog describes clean-wheel smoke tests and metadata checks | Release metadata/workflow work is present. Do not infer that a public v1.0 release, tag, publication, or green current CI run exists without checking those live states. |
 
-### UI design assets versus shipped UI
+### UI architecture decision — new default UI; legacy UIs retained as references
 
-The repository now contains a substantial design package under `web ui files and rendering/`, including 32 HTML screen files, 32 PNG renderings, and `obsidian_kinetic/DESIGN.md`. Treat these as the supplied design source and visual acceptance references, not disposable mockups. They are **not evidence that those screens have been integrated into Flask or wired to real backend behavior**.
+The checked-in design package under `web ui files and rendering/` (32 HTML screens, 32 PNG renderings, and `obsidian_kinetic/DESIGN.md`) defines the **new default WHAXON web UI**. This is a new UI implementation, not a refresh or continuation of the previous UI. The old web UI, its templates, CSS/JS, prior mockups, and prior screenshots are **deprecated reference material only**: preserve them unchanged for historical comparison, but do not use them as the design source, do not merge their visual language into the new UI, and do not treat their completion status as completion of the new UI.
 
-The existing implementation remains under `src/whaxon/interfaces/web/templates/`, `static/app.js`, and `static/style.css`. The existing `docs/WEB_UI_INTERACTION_AUDIT.md` explicitly marks several elements as mockups/hidden and several routes as wired but not yet browser-verified. That audit is useful baseline evidence but must be rerun against the new designs; do not assume it describes the new screen files.
+The new UI must become the default interface launched by WHAXON. Build/integrate it as the active frontend and connect it to the existing framework/services and safe backend routes. Use the checked-in screen HTML and PNG renderings as the source of truth for visual fidelity. The new UI is not complete just because the design assets are present: each screen intended for production must be mapped to a route/workflow, controls must be wired to real supported behavior, and browser/interaction/visual regression checks must pass. If a control has no safe implemented backend, hide or disable it in the live UI without deleting the supplied reference screen or redesigning it.
+
+The existing `docs/WEB_UI_INTERACTION_AUDIT.md` describes the deprecated UI, not the new default UI. Preserve it as a historical audit; create a separate interaction/acceptance audit for the new UI rather than rewriting history. The old Flask templates and assets remain untouched unless a later, explicitly scoped migration step requires changing how the app selects its default entry point. Do not delete or overwrite deprecated UI files.
 
 ### Corrected v1.0 interpretation
 
@@ -65,7 +67,7 @@ The framework has advanced substantially beyond the older `docs/STATE.md` snapsh
 16. MCP / competitor reference
 17. Team-ready capabilities
 18. Company-grade platform
-19. UI integration and interaction acceptance (URGENT; design assets now in repo)
+19. New default UI integration and acceptance (URGENT; legacy UI deprecated)
 20. Market coverage (20.1 URGENT)
 21. Report and UI quality issues
 22. Session log
@@ -640,13 +642,15 @@ Near-term roadmap remains §§4–10 + §17 MCP/knowledge graph/verification/tea
 
 ---
 
-# 19. UI INTEGRATION AND INTERACTION ACCEPTANCE (URGENT)
+# 19. NEW DEFAULT UI INTEGRATION AND ACCEPTANCE (URGENT)
 
-**Status: DESIGN ASSETS PRESENT; integration and acceptance remain open.** The original “redesign not started” framing is stale. The repository now contains the supplied Obsidian Kinetic design system, 32 HTML screens, and 32 matching renderings under `web ui files and rendering/`. Preserve these files and treat the renderings as visual acceptance references. Do not replace the design with a new interpretation.
+**Status: NEW UI DESIGN ASSETS PRESENT; implementation and acceptance remain open. Legacy UIs are deprecated and reference-only.**
 
-**Acceptance rule:** each intended production screen must be mapped to its source design, integrated into the existing Flask application, connected to a real backend route/service where supported, and covered by browser tests. Unsupported controls must be hidden or clearly disabled in the live UI; do not delete the source designs. Existing `docs/WEB_UI_INTERACTION_AUDIT.md` is a baseline only and must be updated after auditing the integrated UI.
+The repository contains the new Obsidian Kinetic design system, 32 HTML screens, and 32 matching renderings under `web ui files and rendering/`. This is a **new default UI**, not a redesign of the previous UI. Preserve the old UI source and assets unchanged for reference. Do not modify the legacy design to imitate the new one, and do not reuse its old interaction audit as the new UI's acceptance record.
 
-**Do not count uploading HTML/PNG assets as completing the UI redesign.**
+**Acceptance rule:** make the new UI the default interface launched by WHAXON; map each intended production screen to its workflow and backend service; wire every visible action to supported, safe behavior; hide or disable unsupported live controls without deleting supplied design assets; and cover the new UI with browser interaction and visual regression tests. The supplied HTML and PNG renderings are the design/visual source of truth.
+
+**Do not count uploading the design assets as completing the UI.**
 
 **Problem:** Interfaces cluttered as features accumulated across sessions 1–54. No information hierarchy.
 
@@ -667,7 +671,7 @@ Near-term roadmap remains §§4–10 + §17 MCP/knowledge graph/verification/tea
 
 **Recommendation:** B for web, C for TUI, CLI output consistency pass.
 
-**Design artifact (superseded):** the old reference to `mockups/ui-v4.html` on the founder's Desktop is no longer the current design source. Use the checked-in files under `web ui files and rendering/` and `obsidian_kinetic/DESIGN.md` as the design source. The checked-in screens currently use standalone HTML and must be integrated rather than served as unrelated static mockups. The intended system includes: sidebar navigation, six-stage workflow, right slide-over, command palette, AI banner, notifications, findings with severity donut + attack-surface graph + KPIs, CVE/exploit sections in slide-over, Threat Intel interactive lookup, Report Known Vulnerabilities preview, workspace switcher, and a components gallery. It is the spec that implementation follows.
+**Design artifact (deprecated):** the old reference to `mockups/ui-v4.html` on the founder's Desktop and all previous UI implementations are reference-only. The new default UI's source of truth is the checked-in files under `web ui files and rendering/` and `obsidian_kinetic/DESIGN.md`. The supplied screens must be integrated as the default frontend rather than replaced with, or visually blended into, the old UI. The intended system includes: sidebar navigation, six-stage workflow, right slide-over, command palette, AI banner, notifications, findings with severity donut + attack-surface graph + KPIs, CVE/exploit sections in slide-over, Threat Intel interactive lookup, Report Known Vulnerabilities preview, workspace switcher, and a components gallery. It is the spec that implementation follows.
 
 ## 19.2 Testing
 
@@ -1753,7 +1757,7 @@ The old “Next 10–12 Sessions” title and ~31h remaining implication are sta
 2. **Blind Validation:** Timing delta check in Validator. Payload > 3s longer than baseline = `verified (blind)`. (~3h) — **DONE (session 74)**
 3. **The Retest Loop (§32.5):** `whaxon retest <job_id> <seq>`. Flip status to `fixed` or `still_vulnerable`. (~2h) — **DONE (session 75)**
 4. **Coverage Ledger (§32.4):** Runner logs skipped items. Report renders them + a Confidence Score. (~4h) — **DONE (session 76)**
-5. **Three-Tab UI / supplied design integration (§32.12):** **PARTIAL — design assets are in the repository; live integration and full interaction acceptance remain open.**
+5. **New default UI / supplied design integration (§32.12):** **PARTIAL — design assets are in the repository; new frontend integration, default-entry-point switch, backend wiring and interaction acceptance remain open. Previous UIs are deprecated reference-only and must remain unchanged.**
    - Service layer + CLI/web route parity test.
    - **Discover** (Scope, Run, Findings, Attack Surface, Catalog).
    - **Operate** (Validate, Access, Retest queue, Coverage gaps) - WCAG 1.4.1, keyboard paths.
@@ -1941,7 +1945,7 @@ The following items are deferred until v1.0 is fully deployed. They represent th
 - [ ] **Validation trust boundary:** test SQL/error-marker, reflected-XSS, timing/blind, observation-probe and request-context replay paths. Candidate/inconclusive results must not be reported as verified; the LLM must never set verification status. Record timing caveats.
 - [ ] **Retest semantics:** verify that retest accepts only eligible previously verified findings and produces the documented `fixed`, `still_vulnerable`, or `inconclusive` result with a reason. Align the older “flip status” language in §§32–34 with the current implementation.
 - [ ] **Coverage honesty:** prove that skipped/failed/unrequested work is not silently counted as tested. Confirm the report's coverage section and confidence claims are based on persisted evidence; if this is not implemented end to end, mark it as a blocker rather than DONE.
-- [ ] **UI integration:** integrate the checked-in design assets into the existing Flask UI without changing the intended visual design. Map screens to routes; ensure every visible action has a real effect or is hidden/disabled; update `docs/WEB_UI_INTERACTION_AUDIT.md`; add/execute Playwright tests for navigation, scope, run, cancellation/streaming, findings, validate, retest, approvals, and report exports.
+- [ ] **New default UI:** implement the supplied design as WHAXON's default frontend, matching the checked-in HTML/PNG references and design system. Connect supported actions to the framework/services; hide/disable unsupported controls in the live UI; add/execute Playwright navigation, interaction and visual regression tests. Create a separate new-UI interaction audit. Preserve all previous UI templates, CSS/JS, mockups, screenshots and `docs/WEB_UI_INTERACTION_AUDIT.md` unchanged as deprecated reference material.
 - [ ] **Security regressions:** run the scope fail-closed, target-boundary, auth fail-closed, job cancellation/descendant termination and request-context regression tests. Document residual deployment constraints (including external egress enforcement and DNS rebinding/pinning limitations).
 - [ ] **Packaging:** build wheel and sdist; install the wheel in a clean environment; verify CLI help, packaged payload/catalog resources, scope initialization, and local observation-validation smoke test.
 - [ ] **CI and release workflow:** verify all required Python-version jobs are green on the candidate commit; resolve or explicitly disposition any open CI blocker. A workflow definition or a past green run is not proof of current green status.
