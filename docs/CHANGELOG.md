@@ -7,6 +7,7 @@
 **Security and execution**
 - Tool processes run in their own POSIX process group; timeout and cancellation terminate descendants so scans are not left running after the parent tool exits.
 - Web-submitted tool jobs use the guarded core runner and re-check scope at execution time; web cancellation is routed to the job's owning event loop.
+- Runner rejects whitespace-split targets and target-shaped extra arguments that could introduce an additional destination after scope validation.
 - Remote web listeners require a non-default username and bcrypt-backed credentials with a cost factor of at least 12.
 - Scope hostname checks fail closed when resolution fails and compare resolved addresses against IP/CIDR exclusions. This is a preflight check, not a connection-time DNS pin; beta deployments must enforce egress restrictions outside WHAXON.
 
