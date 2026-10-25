@@ -19,7 +19,7 @@ class _Flaky(BaseHTTPRequestHandler):
         #   calls 1-3: baseline,  calls 4-6: injected.
         # revalidate() likewise makes 6 calls: 7-9 baseline, 10-12 injected.
         # Marker only on the injected calls of validate() (4-6),
-        # so validate() verifies and revalidate() refutes.
+        # so validate() verifies, but revalidate() cannot prove the issue is fixed.
         if 4 <= _Flaky._calls["n"] <= 6:
             body = b"You have an error in your SQL syntax"
         else:
@@ -33,7 +33,7 @@ class _Flaky(BaseHTTPRequestHandler):
         pass
 
 
-def test_revalidate_reports_fixed_after_patch():
+def test_revalidate_reports_inconclusive_when_proof_disappears():
     _Flaky._calls["n"] = 0
     srv = HTTPServer(("127.0.0.1", 0), _Flaky)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -48,7 +48,7 @@ def test_revalidate_reports_fixed_after_patch():
         status, _ = v.validate(f, target_url=url)
         assert status == "verified"
         retest_status, reason = v.revalidate(f, target_url=url)
-        assert retest_status == "fixed", reason
+        assert retest_status == "inconclusive", reason
     finally:
         srv.shutdown()
 
