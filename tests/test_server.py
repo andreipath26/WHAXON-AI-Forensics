@@ -639,3 +639,20 @@ def test_loopback_listener_rejects_cross_site_get_requests(tmp_path, monkeypatch
     )
     assert response.status_code == 403
     assert "cross-origin" in response.get_json()["error"]
+
+# ---------------------------------------------------------------- malformed run request handling
+
+def test_run_rejects_malformed_request_fields(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    payloads = [
+        [],
+        "not-an-object",
+        {"tool_id": [], "target": "127.0.0.1"},
+        {"tool_id": "echo", "target": []},
+        {"tool_id": "echo", "target": "x" * 2049},
+    ]
+    for payload in payloads:
+        response = client.post("/api/run", json=payload)
+        assert response.status_code == 400, payload
+        assert "error" in response.get_json()
