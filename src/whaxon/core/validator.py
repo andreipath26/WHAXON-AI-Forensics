@@ -145,8 +145,6 @@ class Validator:
             if delta >= self.timing_threshold else None
         )
 
-        baseline_l = (baseline or "").lower()
-        injected_l = (injected or "").lower()
         baseline_bodies = [(sample[0] or "").lower() for sample in baseline_samples]
         injected_bodies = [(sample[0] or "").lower() for sample in injected_samples]
         for m in markers:
