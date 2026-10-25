@@ -60,12 +60,21 @@ class Validator:
     """
 
     # Error signatures that prove an injection landed.
+    # Specific SQL parser/driver error signatures. Bare DBMS names such as
+    # "postgresql" or "sqlite" are not evidence: ordinary error pages and
+    # decoy endpoints can contain those words without executing SQL.
     SQL_ERROR_MARKERS = (
-        "sql syntax", "mysql_fetch", "ora-0", "postgresql", "sqlite",
-        "unclosed quotation", "you have an error in your sql",
+        "you have an error in your sql syntax",
+        "unclosed quotation mark after the character string",
+        "syntax error at or near",
+        "unterminated quoted string",
+        "sqlstate[",
+        "ora-00933",
+        "ora-01756",
+        "sqlite3.operationalerror: near",
+        "sqlite error:",
+        "mysql_fetch_array() expects parameter",
     )
-    # XSS markers: payload reflected unescaped.
-    XSS_MARKERS = ("<script>", "onerror=", "javascript:")
 
     # Command-injection proof marker. The marker is built at execution time
     # by the shell (`$(printf ...)` expands, `""` concatenation joins), so
@@ -98,13 +107,16 @@ class Validator:
         if kind == "command_injection":
             return self._validate_command_injection(target_url, param)
 
-        payloads = self.loader.get_payloads(kind)
-        if not payloads:
-            return "candidate", f"no payloads vendored for kind {kind!r}"
-        payload = payloads[0]
+        # Validation probes are deliberately curated and non-destructive.
+        # Vendored Markdown files are reference material, not executable probe
+        # lists: their first fenced examples can be documentation, destructive
+        # payloads, or data-exfiltration demos.
+        payload = self._safe_probe(kind)
+        if payload is None:
+            return "candidate", f"no safe validation probe for kind {kind!r}"
 
         family = self.REPLAYABLE[kind]
-        markers = self.SQL_ERROR_MARKERS if family == "sql" else self.XSS_MARKERS
+        markers = self.SQL_ERROR_MARKERS if family == "sql" else ()
 
         try:
             baseline_samples = [self._fetch(target_url, param, "whaxon_baseline") for _ in range(3)]
@@ -137,14 +149,30 @@ class Validator:
         injected_l = (injected or "").lower()
         for m in markers:
             if m in injected_l and m not in baseline_l:
-                return "verified", f"marker {m!r} appeared only after injection"
-        if injected_l == baseline_l:
-            if timing_reason:
-                return "candidate", timing_reason
-            return "refuted", "response identical to baseline"
+                self.last_payload = payload
+                return "verified", f"SQL error signature {m!r} appeared only after a quote probe"
+        if family == "xss" and payload in (injected or "") and payload not in (baseline or ""):
+            self.last_payload = payload
+            return "verified", "unique non-destructive XSS probe was reflected unescaped in the response"
         if timing_reason:
             return "candidate", timing_reason
-        return "candidate", "response differed but no known marker"
+        # Failure to reproduce is not proof that a finding is false: the
+        # parameter, method, auth state, or payload may not match.
+        return "candidate", "replay produced no conclusive, payload-specific proof"
+
+    @staticmethod
+    def _safe_probe(kind: str) -> str | None:
+        """Return a bounded, non-destructive probe for automatic validation."""
+        if kind in ("sqli", "sql_injection"):
+            # A quote can elicit a parser error without data extraction or
+            # attempted state modification.
+            return "'"
+        if kind == "xss":
+            import secrets
+            token = secrets.token_hex(6)
+            # No network calls, cookie access, storage access, or state change.
+            return f"<svg/onload=console.log('whaxon_xss_{token}')>"
+        return None
 
     @classmethod
     def _cmdi_probes(cls) -> list[tuple[str, str]]:
@@ -294,10 +322,8 @@ class Validator:
         cmdi_marker = ""
         if kind == "command_injection":
             payload, cmdi_marker = self._cmdi_probes()[0]
-        elif kind:
-            payloads = self.loader.get_payloads(kind)
-            if payloads:
-                payload = payloads[0]
+        elif kind in ("sqli", "sql_injection", "xss"):
+            payload = self._safe_probe(kind)
 
         if not payload:
             data = body_template.encode() if body_template and method in ("POST", "PUT", "PATCH") else None
@@ -371,10 +397,16 @@ class Validator:
                 f"timing signal only: median injected-baseline delta {delta:.2f}s; "
                 "needs independent confirmation"
             )
-        markers = (cmdi_marker,) if cmdi_marker else self.SQL_ERROR_MARKERS + self.XSS_MARKERS
-        for marker in markers:
-            if marker in injected_l and marker not in baseline_l:
-                if cmdi_marker and payload:
+        if cmdi_marker and cmdi_marker.lower() in injected_l and cmdi_marker.lower() not in baseline_l:
+            if payload:
+                self.last_payload = payload
+            return "verified", f"command-execution canary {cmdi_marker!r} appeared only after injection"
+        if kind in ("sqli", "sql_injection"):
+            for marker in self.SQL_ERROR_MARKERS:
+                if marker in injected_l and marker not in baseline_l:
                     self.last_payload = payload
-                return "verified", f"marker {marker!r} appeared only after injection"
-        return "candidate", "context replay did not produce a baseline-differential proof"
+                    return "verified", f"SQL error signature {marker!r} appeared only after a quote probe"
+        if kind == "xss" and payload and payload in injected_l and payload not in baseline_l:
+            self.last_payload = payload
+            return "verified", "unique non-destructive XSS probe was reflected unescaped in the response"
+        return "candidate", "context replay produced no conclusive, payload-specific proof"
