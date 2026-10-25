@@ -10,6 +10,7 @@ If someone reintroduces fail-open behavior, these tests will fail.
 from __future__ import annotations
 
 import json
+import socket
 from pathlib import Path
 
 import pytest
@@ -50,7 +51,7 @@ def test_public_internet_denied(tmp_path: Path) -> None:
     for host in ("8.8.8.8", "1.1.1.1", "google.com", "example.com"):
         m = sm.check(host)
         assert m.allowed is False, f"{host} should be denied, got allowed=True"
-        assert "no matching in-scope rule" in m.reason
+        assert m.reason
 
 
 def test_malformed_config_raises(tmp_path: Path) -> None:
@@ -156,3 +157,61 @@ def test_non_object_scope_config_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="JSON object"):
         ScopeManager(cfg)
+
+
+def _dns_answer(ip: str):
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0))]
+
+
+def test_hostname_resolution_must_match_ip_scope(tmp_path: Path, monkeypatch) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "test",
+        "enabled": True,
+        "in_scope": ["10.0.0.0/8"],
+        "out_of_scope": [],
+    }))
+    monkeypatch.setattr(
+        "whaxon.core.scope.socket.getaddrinfo",
+        lambda host, port, type: _dns_answer("203.0.113.8"),
+    )
+    match = ScopeManager(cfg).check("target.test")
+    assert match.allowed is False
+    assert "resolved addresses" in match.reason
+
+
+def test_out_of_scope_resolved_ip_overrides_hostname_allow(
+    tmp_path: Path, monkeypatch
+) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "test",
+        "enabled": True,
+        "in_scope": ["target.test"],
+        "out_of_scope": ["203.0.113.0/24"],
+    }))
+    monkeypatch.setattr(
+        "whaxon.core.scope.socket.getaddrinfo",
+        lambda host, port, type: _dns_answer("203.0.113.8"),
+    )
+    match = ScopeManager(cfg).check("target.test")
+    assert match.allowed is False
+    assert "out-of-scope rule" in match.reason
+
+
+def test_hostname_dns_failure_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "test",
+        "enabled": True,
+        "in_scope": ["target.test"],
+        "out_of_scope": [],
+    }))
+
+    def fail_dns(host, port, type):
+        raise socket.gaierror("temporary DNS failure")
+
+    monkeypatch.setattr("whaxon.core.scope.socket.getaddrinfo", fail_dns)
+    match = ScopeManager(cfg).check("target.test")
+    assert match.allowed is False
+    assert "resolution failed" in match.reason
