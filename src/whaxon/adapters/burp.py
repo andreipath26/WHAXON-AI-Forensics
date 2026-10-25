@@ -38,7 +38,7 @@ class BurpAdapter(Adapter):
     def parse_file(self, path: Path) -> list[Finding]:
         try:
             tree = ET.parse(str(path))
-        except (ET.ParseError, FileNotFoundError, OSError, DefusedXmlException):
+        except (ET.ParseError, OSError, DefusedXmlException):
             return []
         root = tree.getroot()
         issues = [root] if root.tag == "issue" else root.findall(".//issue")
