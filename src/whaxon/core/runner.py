@@ -87,14 +87,22 @@ class ToolRunner:
             raise ValueError(f"refusing to build argv for unsafe target: {target!r}")
         template = tool.args or "{target}"
 
-        # If extra_args already provides a URL (-u or --url=), drop the
-        # catalog's -u {target} so the user's URL wins. This lets
-        # `whaxon run sqlmap X --extra "-u http://... --data=..."` work
-        # without passing a target to sqlmap twice.
-        extra_l = (extra_args or "").lower()
-        user_has_url = (" -u " in f" {extra_l} " or "--url=" in extra_l or "-u=" in extra_l)
+        # The positional target is the single source of truth for scope
+        # enforcement. Never let extra_args silently replace it with a second
+        # destination (e.g. sqlmap -u https://out-of-scope.example).
+        try:
+            extra_tokens = shlex.split(extra_args) if extra_args and extra_args.strip() else []
+        except ValueError as e:
+            raise ValueError(f"bad extra args: {e}") from e
+        user_has_url = any(
+            token in ("-u", "--url") or token.startswith("--url=") or token.startswith("-u=")
+            for token in extra_tokens
+        )
         if user_has_url and "-u {target}" in template:
-            template = template.replace("-u {target}", "").strip()
+            raise ValueError(
+                "extra_args cannot override the target URL; pass the authorized target "
+                "as the positional target argument"
+            )
 
         try:
             parts = shlex.split(template.format(target=target))
@@ -106,11 +114,8 @@ class ToolRunner:
             parts += [flag, str(outfile)]
 
         argv = [tool.binary, *parts]
-        if extra_args and extra_args.strip():
-            try:
-                argv.extend(shlex.split(extra_args))
-            except ValueError as e:
-                raise ValueError(f"bad extra args: {e}") from e
+        if extra_tokens:
+            argv.extend(extra_tokens)
         return argv
 
     async def run_tool(
