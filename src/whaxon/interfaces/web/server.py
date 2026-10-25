@@ -176,11 +176,39 @@ def _run_job_blocking(core: Core, registry: JobRegistry, tool_id: str, target: s
     t_out = threading.Thread(target=pump, args=(proc.stdout, "stdout"), daemon=True)
     t_err = threading.Thread(target=pump, args=(proc.stderr, "stderr"), daemon=True)
     t_out.start(); t_err.start()
-    proc.wait()
-    t_out.join(timeout=2); t_err.join(timeout=2)
+    # Bound external-tool runtime so a hung scanner cannot occupy a worker
+    # indefinitely. Invalid configuration falls back to the conservative
+    # 15-minute default; termination escalates to kill after a short grace.
+    try:
+        timeout_s = float(_os.environ.get("WHAXON_JOB_TIMEOUT_S", "900"))
+        if timeout_s <= 0:
+            timeout_s = 900.0
+    except (TypeError, ValueError):
+        timeout_s = 900.0
 
-    with _PROCS_LOCK:
-        _PROCS.pop(job_id, None)
+    timed_out = False
+    try:
+        proc.wait(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+    finally:
+        t_out.join(timeout=5)
+        t_err.join(timeout=5)
+        with _PROCS_LOCK:
+            _PROCS.pop(job_id, None)
+
+    if timed_out:
+        core.bus.publish(JobFailed(
+            job_id=job_id,
+            error=f"tool timed out after {timeout_s:.1f}s and was terminated",
+        ))
+        return
 
     core.bus.publish(JobFinished(
         job_id=job_id,
