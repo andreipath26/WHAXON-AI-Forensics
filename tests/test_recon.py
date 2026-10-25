@@ -72,7 +72,6 @@ def test_recon_robots_emits_disallow_and_sitemap(tmp_path, monkeypatch):
     from whaxon.core.recon_checks import check_robots
     runner.register("robots", check_robots)
 
-    import urllib.request as _ur
 
     class _FakeResp:
         def __init__(self, body, url):
@@ -121,7 +120,6 @@ def test_recon_security_txt_present(tmp_path, monkeypatch):
     from whaxon.core.recon_checks import check_security_txt
     runner.register("security_txt", check_security_txt)
 
-    import urllib.request as _ur
 
     class _FakeResp:
         def __init__(self, body, url):
@@ -165,7 +163,6 @@ def test_recon_security_txt_missing(tmp_path, monkeypatch):
     from whaxon.core.recon_checks import check_security_txt
     runner.register("security_txt", check_security_txt)
 
-    import urllib.request as _ur
 
     def fake_urlopen(req, timeout=None):
         raise OSError("404 Not Found")
@@ -185,7 +182,6 @@ def test_recon_cookies_flags_missing_attributes(tmp_path, monkeypatch):
     from whaxon.core.recon_checks import check_cookies
     runner.register("cookies", check_cookies)
 
-    import urllib.request as _ur
     from email.message import Message
 
     class _FakeHeaders:
@@ -301,7 +297,6 @@ def test_recon_waf_detects_cloudflare(tmp_path, monkeypatch):
     from whaxon.core.recon_checks import check_waf
     runner.register("waf", check_waf)
 
-    import urllib.request as _ur
     from email.message import Message
 
     class _FakeHeaders:
@@ -347,7 +342,6 @@ def test_recon_waf_no_match(tmp_path, monkeypatch):
     from whaxon.core.recon_checks import check_waf
     runner.register("waf", check_waf)
 
-    import urllib.request as _ur
     from email.message import Message
 
     class _FakeHeaders:
