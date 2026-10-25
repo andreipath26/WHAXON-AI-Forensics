@@ -92,6 +92,14 @@ The old ffuf/gobuster adapter metadata assigned a generic discovered path HTTP 2
 
 **Release action:** preserve the raw status, size, tool source, and original line; require a separate evidence-backed finding before assigning vulnerability severity or a CVSS score. Existing historical engagement artefacts should be treated as records of the older parser, not rewritten in place.
 
+### E-A11 — Request-context replay must not treat captured URLs as authorization
+
+During the current-source cross-check, `Validator.validate()` was found to send a request-context URL when the caller omitted `target_url`. The CLI and web API already scope-check their engagement target, but the validator's reusable method could be called directly with an untrusted finding and thereby make an HTTP request to a URL that had not been tied to an authorized target. A captured request is evidence about a scan, not permission to replay it.
+
+**Change made outside the protected folder:** request-context replay now returns `candidate` without making a network request unless the caller supplies the authorized engagement target. The replay helper enforces the same requirement itself, and the regression tests cover both entry points. The context replay test now explicitly supplies the authorized target URL.
+
+**Release action:** keep scope checks at the CLI/web boundary and retain the validator-level guard as defense in depth. Recheck this invariant whenever new validation entry points are added.
+
 ## 3. Evidence quality and reproducibility limits
 
 - The benchmark has only 12 labelled cases and one payload family per kind; its metrics are useful counterexamples, not a reliable estimate of real-world scanner accuracy.
