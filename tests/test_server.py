@@ -318,20 +318,23 @@ def test_ui_renders(tmp_path, monkeypatch):
     assert b"WHAXON" in r.get_data()
 
 
-def test_root_redirects_to_ui(tmp_path, monkeypatch):
+def test_root_serves_new_default_ui(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
     r = client.get("/")
-    assert r.status_code in (301, 302)
+    assert r.status_code == 200
+    body = r.get_data(as_text=True)
+    assert "WHAXON · Security Operations" in body
+    assert 'id="main-nav"' in body
 
 
 # ---------------------------------------------------------------- scope wiring
 
 
-def test_scope_page_has_wiring_hooks(tmp_path, monkeypatch):
+def test_legacy_scope_page_has_wiring_hooks(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
-    r = client.get("/ui")
+    r = client.get("/ui/legacy")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert 'id="scope-rules"' in body
@@ -344,10 +347,10 @@ def test_scope_page_has_wiring_hooks(tmp_path, monkeypatch):
 # ---------------------------------------------------------------- findings wiring
 
 
-def test_findings_page_has_wiring_hooks(tmp_path, monkeypatch):
+def test_legacy_findings_page_has_wiring_hooks(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
-    r = client.get("/ui")
+    r = client.get("/ui/legacy")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert 'id="findings-tbody"' in body
