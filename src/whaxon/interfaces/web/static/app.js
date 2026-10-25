@@ -57,6 +57,12 @@
     document.querySelectorAll('#findings-table .row-cb').forEach(cb => cb.checked = selectAll.checked);
     updateBulk();
   });
+  const bulkClear = document.getElementById('bulk-clear-btn');
+  if (bulkClear) bulkClear.addEventListener('click', () => {
+    document.querySelectorAll('#findings-table .row-cb').forEach(cb => { cb.checked = false; });
+    if (selectAll) selectAll.checked = false;
+    updateBulk();
+  });
 
   // copy buttons
   document.querySelectorAll('.copy-btn').forEach(btn => {
@@ -248,10 +254,47 @@
 
   let sortKey = 'severity';
   let sortAsc = true;
+  let activeFilter = 'all';
 
   document.addEventListener('whaxon:findings-resort', () => {
     renderTable(sortRows(window._whaxonFindings || [], sortKey, sortAsc));
+    applyFilter();
   });
+
+  const filterChips = Array.from(document.querySelectorAll('#page-findings .toolbar .chip[data-filter]'));
+  filterChips.forEach(chip => chip.addEventListener('click', () => {
+    activeFilter = chip.dataset.filter || 'all';
+    filterChips.forEach(item => item.classList.toggle('on', item === chip));
+    applyFilter();
+  }));
+
+  function applyFilter() {
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const severity = tr.dataset.severity || 'info';
+      const status = tr.dataset.status || 'candidate';
+      const matches = activeFilter === 'all'
+        || severity === activeFilter
+        || (activeFilter === 'low' && severity === 'info')
+        || status === activeFilter;
+      tr.style.display = matches ? '' : 'none';
+    });
+  }
+
+  function updateFilterCounts(rows) {
+    const counts = {
+      all: rows.length,
+      critical: rows.filter(f => f.severity === 'critical').length,
+      high: rows.filter(f => f.severity === 'high').length,
+      medium: rows.filter(f => f.severity === 'medium').length,
+      low: rows.filter(f => f.severity === 'low' || f.severity === 'info').length,
+      verified: rows.filter(f => f.status === 'verified').length,
+      candidate: rows.filter(f => f.status === 'candidate').length
+    };
+    Object.entries(counts).forEach(([key, value]) => {
+      const el = document.getElementById('filter-count-' + key);
+      if (el) el.textContent = String(value);
+    });
+  }
 
   document.querySelectorAll('.tbl thead th[data-sort]').forEach(th => {
     th.addEventListener('click', () => {
@@ -372,13 +415,17 @@
       tr.dataset.target = f.target;
       tr.dataset.source = f.source;
       tr.dataset.status = f.status;
+      tr.dataset.jobId = f.job_id;
+      tr.dataset.seq = String(f.seq);
       if (f._raw && f._raw.raw_line) tr.dataset.rawLine = f._raw.raw_line;
       if (f._raw && f._raw.data) {
         if (f._raw.data.description) tr.dataset.description = f._raw.data.description;
         if (f._raw.data.remediation) tr.dataset.remediation = f._raw.data.remediation;
       }
       tr.addEventListener('click', e => {
-        if (e.target.closest('.checkbox-col')) return;
+        if (e.target.closest('.checkbox-col') || e.target.closest('.copy-btn')) return;
+        tbody.querySelectorAll('tr.selected').forEach(row => row.classList.remove('selected'));
+        tr.classList.add('selected');
         openSlideover(tr);
       });
       tbody.appendChild(tr);
@@ -510,7 +557,9 @@
 
         const rows = flattenFindings(data.jobs);
         window._whaxonFindings = rows;
+        updateFilterCounts(rows);
         renderTable(sortRows(rows, sortKey, sortAsc));
+        applyFilter();
       })
       .catch(err => {
         tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--critical);">Failed to load findings: ' + err + '</td></tr>';
