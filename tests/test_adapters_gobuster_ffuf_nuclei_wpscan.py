@@ -69,9 +69,9 @@ def test_ffuf_parses_status_lines():
 def test_ffuf_handles_silent_mode_without_status():
     lines = _stdout(["admin", "login", "index.html"])
     findings = FfufAdapter().parse(lines)
-    # No status given, defaults to 200, kept
+    # Silent mode reports paths, not HTTP status codes. Do not invent 200s.
     assert len(findings) == 3
-    assert all(f.data["status"] == 200 for f in findings)
+    assert all(f.data["status"] is None for f in findings)
 
 
 # ---------------------------------------------------------------- nuclei
