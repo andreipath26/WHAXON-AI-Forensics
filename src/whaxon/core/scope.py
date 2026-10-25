@@ -135,16 +135,14 @@ def _validate_scope_rule(rule: str) -> bool:
     if not host or "*" in host or len(host) > 253:
         return False
     labels = host.rstrip(".").split(".")
-    if any(
+    return not any(
         not label
         or len(label) > 63
         or not label[0].isalnum()
         or not label[-1].isalnum()
         or any(not (char.isalnum() or char == "-") for char in label)
         for label in labels
-    ):
-        return False
-    return True
+    )
 
 
 
