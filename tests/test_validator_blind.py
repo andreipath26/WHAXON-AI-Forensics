@@ -34,7 +34,7 @@ def _serve():
     return srv, f"http://127.0.0.1:{srv.server_address[1]}/search"
 
 
-def test_blind_timing_is_verified():
+def test_blind_timing_remains_candidate_without_marker():
     srv, url = _serve()
     try:
         # Force the loader to return a SLEEP payload by bypassing the cache.
@@ -46,8 +46,8 @@ def test_blind_timing_is_verified():
             data={"parameter": "q"}, raw_line="",
         )
         status, reason = v.validate(f, target_url=url)
-        assert status == "verified", reason
-        assert "timing delta" in reason
+        assert status == "candidate", reason
+        assert "timing-only result is inconclusive" in reason
     finally:
         srv.shutdown()
 
