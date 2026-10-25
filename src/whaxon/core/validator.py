@@ -98,7 +98,13 @@ class Validator:
         kind = finding.kind
         if kind in self.OBSERVATION_KINDS:
             return self._validate_observation(finding, target_url)
-        ctx = (finding.data or {}).get("_request_context")
+        # Finding.request_context is the canonical adapter contract. Keep the
+        # legacy data["_request_context"] shape as a compatibility fallback
+        # for stored findings created before the field was introduced.
+        ctx = getattr(finding, "request_context", None)
+        if not isinstance(ctx, dict) or not ctx.get("url"):
+            legacy_ctx = (finding.data or {}).get("_request_context")
+            ctx = legacy_ctx if isinstance(legacy_ctx, dict) else None
         if ctx and ctx.get("url"):
             if not target_url:
                 return (
