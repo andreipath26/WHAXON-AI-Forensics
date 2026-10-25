@@ -511,3 +511,12 @@ def test_web_validation_refuses_out_of_scope_job_target(tmp_path, monkeypatch):
     )
     assert response.status_code == 403
     assert "out of scope" in response.get_json()["error"].lower()
+
+def test_tool_catalog_reports_adapter_availability(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/tools")
+    assert response.status_code == 200
+    tools = response.get_json()
+    assert isinstance(tools, list)
+    assert tools
+    assert all(isinstance(tool.get("adapter_available"), bool) for tool in tools)
