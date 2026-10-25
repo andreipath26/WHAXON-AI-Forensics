@@ -29,6 +29,9 @@ def test_new_ui_navigation_switches_views(page, live_server):
     page.click('.nav-item[data-view="evidence"]')
     assert page.locator("#view-evidence").is_visible()
     assert page.locator("#evidence-note-form").count() == 1
+    page.click('.nav-item[data-view="attack-surface"]')
+    assert page.locator("#view-attack-surface").is_visible()
+    page.wait_for_function("() => document.querySelector('#graph-edge-count')?.textContent !== '—'", timeout=5000)
 
 
 def test_new_ui_loads_live_tools_and_scope(page, live_server):
