@@ -445,8 +445,22 @@ class JobStore:
             rows = c.execute("SELECT id, tool, target, status, exit_code, duration_s FROM jobs WHERE status IN ('finished','failed') ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
             out = []
             for r in rows:
-                n = c.execute("SELECT COUNT(*) AS n FROM lines WHERE job_id=?", (r["id"],)).fetchone()["n"]
-                out.append({"id": r["id"], "tool": r["tool"], "target": r["target"], "status": r["status"], "exit_code": r["exit_code"], "duration_s": r["duration_s"], "line_count": n})
+                line_count = c.execute(
+                    "SELECT COUNT(*) AS n FROM lines WHERE job_id=?", (r["id"],)
+                ).fetchone()["n"]
+                findings_count = c.execute(
+                    "SELECT COUNT(*) AS n FROM findings WHERE job_id=?", (r["id"],)
+                ).fetchone()["n"]
+                out.append({
+                    "id": r["id"],
+                    "tool": r["tool"],
+                    "target": r["target"],
+                    "status": r["status"],
+                    "exit_code": r["exit_code"],
+                    "duration_s": r["duration_s"],
+                    "line_count": line_count,
+                    "findings_count": findings_count,
+                })
             return out
         finally: c.close()
 
