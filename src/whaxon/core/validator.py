@@ -123,8 +123,15 @@ class Validator:
         injected = injected_samples[0][0]
 
         delta = inj_t - base_t
-        if delta >= self.timing_threshold:
-            return "verified", f"timing delta (median of 3) {delta:.2f}s >= {self.timing_threshold:.1f}s"
+        # Timing alone is evidence for a blind-injection hypothesis, not
+        # proof: network jitter and target load can produce the same delta.
+        # Keep it as a candidate unless a payload-specific marker confirms
+        # the issue. This avoids upgrading timing-only observations to verified.
+        timing_reason = (
+            f"timing delta (median of 3) {delta:.2f}s >= "
+            f"{self.timing_threshold:.1f}s; timing-only result is inconclusive"
+            if delta >= self.timing_threshold else None
+        )
 
         baseline_l = (baseline or "").lower()
         injected_l = (injected or "").lower()
@@ -132,7 +139,11 @@ class Validator:
             if m in injected_l and m not in baseline_l:
                 return "verified", f"marker {m!r} appeared only after injection"
         if injected_l == baseline_l:
+            if timing_reason:
+                return "candidate", timing_reason
             return "refuted", "response identical to baseline"
+        if timing_reason:
+            return "candidate", timing_reason
         return "candidate", "response differed but no known marker"
 
     @classmethod
