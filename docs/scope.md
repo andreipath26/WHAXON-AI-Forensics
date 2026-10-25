@@ -89,6 +89,10 @@ The AI planner obeys the same fail-closed scope checker as everything else. `WHA
 - tests/test_scope_failclosed.py - default scope covers IPv4 loopback CIDR and IPv6 (::1, fe80::/10, fc00::/7); 127.0.0.1 and RFC1918 allowed; external hosts denied.
 - tests/test_scope.py - out_of_scope precedence, wildcards, exact hosts, fail-closed on missing file.
 
+## Broad CIDR warning
+
+An enabled scope containing `0.0.0.0/0` or `::/0` emits a warning when loaded because it effectively permits every IPv4 or IPv6 address in that family. WHAXON does not silently rewrite an explicitly configured rule, but operators should treat it as a global-scope decision and verify that the engagement authorization truly covers that reach.
+
 ## DNS and connection-time enforcement limits
 
 When the scope contains IP/CIDR rules, hostname checks resolve the hostname and compare the current A/AAAA answers against the configured rules. Resolution errors fail closed, and an out-of-scope address overrides an allow rule. This is a **preflight check**, not a guarantee about the address ultimately contacted: DNS answers can change between the check and a tool's connection, and many external tools resolve the hostname independently.
