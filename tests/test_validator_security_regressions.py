@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from whaxon.core.findings import Finding
 from whaxon.core.validator import Validator
 
 
@@ -69,6 +70,20 @@ def test_context_replay_requires_authorized_target_before_network(
         target_url=None,
         kind="sqli",
     )
+    assert status == "candidate"
+    assert "authorized target URL required" in reason
+    assert "no request sent" in reason
+
+    finding = Finding(
+        kind="sqli",
+        severity="high",
+        source="test",
+        data={"parameter": "q", "_request_context": {
+            "method": "GET", "url": "http://127.0.0.1:9/", "parameter": "q",
+        }},
+        raw_line="",
+    )
+    status, reason = validator.validate(finding, target_url=None)
     assert status == "candidate"
     assert "authorized target URL required" in reason
     assert "no request sent" in reason
