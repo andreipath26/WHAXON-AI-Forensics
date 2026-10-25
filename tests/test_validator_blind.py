@@ -39,7 +39,7 @@ def test_blind_timing_remains_candidate_without_marker():
     try:
         # Force the loader to return a SLEEP payload by bypassing the cache.
         v = Validator(PAYLOAD_DIR)
-        v.loader.get_payloads = lambda kind: ["1' AND SLEEP(4)-- -"]
+        v._safe_probe = lambda kind: "1' AND SLEEP(4)-- -"
 
         f = Finding(
             kind="sqli", severity="high", source="test",
