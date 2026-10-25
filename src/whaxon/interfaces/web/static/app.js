@@ -86,7 +86,6 @@
   document.getElementById('help-trigger').addEventListener('click', () => kbdLegend.classList.add('open'));
 
   // workspace
-  document.querySelector('.sb-workspace').addEventListener('click', () => document.getElementById('ws-modal').classList.add('open'));
 
   // table sort
 
@@ -122,7 +121,6 @@
   });
 
   palette.addEventListener('click', e => { if (e.target === palette) palette.classList.remove('open'); });
-  document.getElementById('ws-modal').addEventListener('click', e => { if (e.target.id === 'ws-modal') e.target.classList.remove('open'); });
 })();
 
 
@@ -555,6 +553,8 @@
         if (summaryEl) {
           summaryEl.textContent = findingCount + ' findings across ' + jobCount + ' jobs';
         }
+        const findingsBadge = document.getElementById('findings-badge');
+        if (findingsBadge) findingsBadge.textContent = String(findingCount);
         if (donutSummary) {
           donutSummary.textContent = findingCount + ' total · ' + jobCount + ' jobs · ' + categories + ' categories';
         }
@@ -746,7 +746,15 @@
       .then(({ ok, status, body }) => {
         if (!ok) {
           setRunning(false);
-          if (status === 403) showScopePill('denied', 'Out of scope');
+          if (status === 403) {
+            showScopePill('denied', 'Out of scope');
+            const modal = document.getElementById('scope-modal');
+            const targetLabel = modal && modal.querySelector('[data-scope-target]');
+            const reasonLabel = modal && modal.querySelector('[data-scope-reason]');
+            if (targetLabel) targetLabel.textContent = target;
+            if (reasonLabel) reasonLabel.textContent = body.error || 'Target is not in the active scope.';
+            if (modal) modal.classList.add('open');
+          }
           appendLine('stderr', body.error || ('error ' + status));
           return;
         }
@@ -1188,7 +1196,7 @@
       });
       if (r.ok) {
         if (modal) modal.classList.remove('open');
-        alert('Override logged for ' + target);
+        alert('Override request logged for ' + target + '. The scan was not launched; update the active scope before retrying.');
       } else {
         const data = await r.json();
         alert('Override failed: ' + (data.error || r.status));
