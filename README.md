@@ -10,7 +10,7 @@ Its design emphasizes explicit target scope and controlled execution. AI suggest
 
 Most automated scanners stop at "this looks vulnerable." WHAXON adds conservative deterministic validation for supported finding types. It uses non-destructive SQL error probes, checks that an XSS canary parses as an active SVG event handler, and requires a command-execution canary that is not present in the submitted payload. It also supports read-only observation probes for TCP ports, missing HTTP headers, insecure cookie flags, and invalid TLS certificates. Evidence must be repeatable across samples; timing alone and failure to reproduce remain `candidate`, not proof. Validation is deliberately incomplete for unsupported finding kinds and is not universal confirmation.
 
-No LLM decides if a finding is real. The proof does.
+No LLM decides a finding's verdict. Deterministic checks attach repeatable evidence for supported cases, but their coverage is limited and the evidence still requires analyst review.
 
 > **UI image note:** the UI v4 images in [docs/assets](docs/assets/) are design references, not live screenshots or evidence from a current engagement. Current-runtime screenshots still need to be captured and verified before release.
 
