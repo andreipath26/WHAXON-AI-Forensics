@@ -124,6 +124,29 @@ def _is_ip_rule(rule: str) -> bool:
         return False
 
 
+def _validate_scope_rule(rule: str) -> bool:
+    """Accept only valid IP/CIDR or hostname/wildcard rules."""
+    if _is_ip_rule(rule):
+        return True
+    # A malformed network or address must not silently become a hostname rule.
+    if "/" in rule or ":" in rule or "[" in rule or "]" in rule:
+        return False
+    host = rule[2:] if rule.startswith("*.") else rule
+    if not host or "*" in host or len(host) > 253:
+        return False
+    labels = host.rstrip(".").split(".")
+    if any(
+        not label
+        or len(label) > 63
+        or not label[0].isalnum()
+        or not label[-1].isalnum()
+        or any(not (char.isalnum() or char == "-") for char in label)
+        for label in labels
+    ):
+        return False
+    return True
+
+
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -220,7 +243,13 @@ class ScopeManager:
                     f"scope config at {self.path} has invalid '{key}'; "
                     "expected a list of non-empty strings"
                 )
-            return [item.strip() for item in value]
+            normalized = [item.strip() for item in value]
+            if any(not _validate_scope_rule(item) for item in normalized):
+                raise RuntimeError(
+                    f"scope config at {self.path} has malformed '{key}' rule; "
+                    "expected a valid hostname, wildcard, IP address, or CIDR"
+                )
+            return normalized
 
         engagement = raw.get("engagement", "")
         notes = raw.get("notes", "")
