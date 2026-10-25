@@ -9,6 +9,40 @@
 - **URGENT** — do before other queued work
 - **OUT** — explicitly excluded, never built
 
+## Repository reality check — 2026-10-25 (reconciled against source tree)
+
+This section supersedes stale progress estimates and any older status statements below where they conflict. It is a repository inspection, not a claim that every capability has passed end-to-end acceptance testing.
+
+**Inspected repository:** `andreipath26/WHAXON-AI-Forensics`, `main` at `21db85a83fa2a8d643570434ec8ad1b75a903cfa` (merge of UI asset upload PR #9). The separate `WHAXON` repository is not the source of truth for this review. The experimental folder `whaxon-experiment-2026-10-25/` is intentionally excluded from this roadmap reconciliation and must remain untouched.
+
+### Framework work present in the repository
+
+| Area | Evidence in this repository | Roadmap status after reconciliation |
+|---|---|---|
+| Request-context validation | `core/validator.py`, adapter request-context support, `tests/test_request_context.py`, `tests/test_validator_request_context_contract.py` | Implemented; retain regression coverage. Do not describe as future work. |
+| Blind/time-based validation | `tests/test_validator_blind.py`; validator uses multiple baseline/injected samples and median comparison | Implemented, but timing evidence has inherent false-positive/target-variance risk; keep as a qualified evidence type, not a universal guarantee. |
+| Observation probes | `tests/test_validator_observation.py` and observation-validation code/tests | Present in code and tests; verify supported observation types and end-to-end CLI/web behavior before claiming full acceptance. |
+| Retest lifecycle | `interfaces/cli/retest_cmd.py`, `tests/test_validator_retest.py`, `tests/test_web_findings.py` | CLI/core and web route paths exist. Full finding-state lifecycle, scheduling, and client-facing workflow remain distinct from a working retest command. |
+| Scope and execution hardening | `tests/test_scope_failclosed.py`, `tests/test_runner.py`, `tests/test_executor_target_lock.py`, `tests/test_web_auth_fail_closed.py`; current changelog documents guarded web execution, cancellation, and listener credential checks | Implemented controls are present; still require release-level regression and deployment checks. DNS preflight is not connection-time DNS pinning; external egress restrictions remain required for beta deployments. |
+| Passive reconnaissance | `core/recon.py`, `core/recon_checks.py`, `interfaces/cli/recon_cmd.py`, `tests/test_recon.py` | Phase 1 and passive Phase 2 are implemented in the repository. Third-party data providers and active checks remain future work. |
+| Reporting and severity | `core/report.py`, `core/report.html`, `core/report_charts.py`, report and business-impact tests; standalone HTML/PDF/Markdown/JSON paths | Report generation, severity enrichment, deduplication, and business-impact work are present. Coverage disclosure and reproducible proof artifacts must be separately acceptance-tested against the v1.0 definition. |
+| CLI, web, TUI, GUI | `interfaces/cli/`, `interfaces/web/`, `interfaces/tui/`, `interfaces/gui/`; web, TUI, server, and route tests | Multiple interfaces exist. Their existence does not prove feature parity or a completed redesign. |
+| Quality and packaging | `pyproject.toml` declares package version `1.0.0`; CI/release workflows exist; changelog describes clean-wheel smoke tests and metadata checks | Release metadata/workflow work is present. Do not infer that a public v1.0 release, tag, publication, or green current CI run exists without checking those live states. |
+
+### UI design assets versus shipped UI
+
+The repository now contains a substantial design package under `web ui files and rendering/`, including 32 HTML screen files, 32 PNG renderings, and `obsidian_kinetic/DESIGN.md`. Treat these as the supplied design source and visual acceptance references, not disposable mockups. They are **not evidence that those screens have been integrated into Flask or wired to real backend behavior**.
+
+The existing implementation remains under `src/whaxon/interfaces/web/templates/`, `static/app.js`, and `static/style.css`. The existing `docs/WEB_UI_INTERACTION_AUDIT.md` explicitly marks several elements as mockups/hidden and several routes as wired but not yet browser-verified. That audit is useful baseline evidence but must be rerun against the new designs; do not assume it describes the new screen files.
+
+### Corrected v1.0 interpretation
+
+The framework has advanced substantially beyond the older `docs/STATE.md` snapshot (last updated 2026-10-21, version 0.11.12, 797 tests). The state file is historical until refreshed. The current roadmap must not treat the old ~71-hour / 8–10-session estimate as remaining work: key framework units in §34.2 are already represented in source/tests. The remaining path is primarily **evidence-led integration and release acceptance**: map the actual implemented framework to the v1.0 stopping condition, integrate the supplied UI without redesigning it, wire or hide unsupported controls in the live interface while preserving source assets, run browser/CLI end-to-end checks, resolve release blockers, then verify the actual release artifacts and CI state.
+
+**Status vocabulary for this reconciliation:** “Implemented in source” means code/tests exist; “verified” means the relevant automated or end-to-end check was actually observed passing; “released” means a release artifact/tag/publication was independently confirmed. These statuses are not interchangeable.
+
+---
+
 ---
 
 ## TABLE OF CONTENTS
@@ -31,7 +65,7 @@
 16. MCP / competitor reference
 17. Team-ready capabilities
 18. Company-grade platform
-19. UI redesign (URGENT)
+19. UI integration and interaction acceptance (URGENT; design assets now in repo)
 20. Market coverage (20.1 URGENT)
 21. Report and UI quality issues
 22. Session log
@@ -45,7 +79,7 @@
 35. Portfolio R&D Pipeline
 36. Web-Check-Style Recon Stage
 37. Post-v1.0 Strategic Pivots
-38. v1.0 Release Blockers
+38. v1.0 Release Blockers and acceptance checklist
 
 ---
 
@@ -606,9 +640,13 @@ Near-term roadmap remains §§4–10 + §17 MCP/knowledge graph/verification/tea
 
 ---
 
-# 19. UI REDESIGN — ALL FOUR INTERFACES (URGENT)
+# 19. UI INTEGRATION AND INTERACTION ACCEPTANCE (URGENT)
 
-**Status: URGENT. Not deferred. Do before other queued work.**
+**Status: DESIGN ASSETS PRESENT; integration and acceptance remain open.** The original “redesign not started” framing is stale. The repository now contains the supplied Obsidian Kinetic design system, 32 HTML screens, and 32 matching renderings under `web ui files and rendering/`. Preserve these files and treat the renderings as visual acceptance references. Do not replace the design with a new interpretation.
+
+**Acceptance rule:** each intended production screen must be mapped to its source design, integrated into the existing Flask application, connected to a real backend route/service where supported, and covered by browser tests. Unsupported controls must be hidden or clearly disabled in the live UI; do not delete the source designs. Existing `docs/WEB_UI_INTERACTION_AUDIT.md` is a baseline only and must be updated after auditing the integrated UI.
+
+**Do not count uploading HTML/PNG assets as completing the UI redesign.**
 
 **Problem:** Interfaces cluttered as features accumulated across sessions 1–54. No information hierarchy.
 
@@ -629,7 +667,7 @@ Near-term roadmap remains §§4–10 + §17 MCP/knowledge graph/verification/tea
 
 **Recommendation:** B for web, C for TUI, CLI output consistency pass.
 
-**Design artifact:** mockups/ui-v4.html on the founder's Desktop is the canonical design. It is a self-contained HTML file (no external CSS, no external JS, no CDN) that renders the full system: sidebar navigation, six-stage workflow, right slide-over, command palette, AI banner, notifications, findings with severity donut + attack-surface graph + KPIs, CVE/exploit sections in slide-over, Threat Intel interactive lookup, Report Known Vulnerabilities preview, workspace switcher, and a components gallery. It is the spec that implementation follows.
+**Design artifact (superseded):** the old reference to `mockups/ui-v4.html` on the founder's Desktop is no longer the current design source. Use the checked-in files under `web ui files and rendering/` and `obsidian_kinetic/DESIGN.md` as the design source. The checked-in screens currently use standalone HTML and must be integrated rather than served as unrelated static mockups. The intended system includes: sidebar navigation, six-stage workflow, right slide-over, command palette, AI banner, notifications, findings with severity donut + attack-surface graph + KPIs, CVE/exploit sections in slide-over, Threat Intel interactive lookup, Report Known Vulnerabilities preview, workspace switcher, and a components gallery. It is the spec that implementation follows.
 
 ## 19.2 Testing
 
@@ -1705,27 +1743,30 @@ To beat Sn1per, HunterX, and the AI agents, we cannot out-tool them. We must out
 - **vs AI Agents (XBOW, Shannon):** They hallucinate. We win because our Validator uses urllib and deterministic baselines. No LLM decides if a bug is real.
 - **vs HunterX:** They have "proof contracts" but are heavy. We win by being a single, air-gapped, stdlib-only package.
 
-## 34.2 The Solo V1.0 Execution Path (Next 10-12 Sessions)
-*No new features until this list is done. No Enterprise, No MCP, No Clawbrowser.*
+## 34.2 The Solo V1.0 Execution Path — reconciled 2026-10-25
+
+*No unrelated feature expansion until the v1.0 acceptance checks below are complete. No Enterprise, no MCP expansion, no Clawbrowser expansion.*
+
+The old “Next 10–12 Sessions” title and ~31h remaining implication are stale. Steps 1–4 and the core Trust Layer have implementation evidence in the current repository. Their original DONE labels mean code was reported as landed, not that every v1.0 end-to-end acceptance criterion is closed. The UI step is **not complete** merely because a prior UI pass landed or the design assets were uploaded.
 
 1. **Adapter Request Context:** Finding model gains `request_context` (method, url, headers, body). Adapters populate it. Validator uses it to replay POST and authenticated endpoints. (~4h) — **DONE (session 73)**
 2. **Blind Validation:** Timing delta check in Validator. Payload > 3s longer than baseline = `verified (blind)`. (~3h) — **DONE (session 74)**
 3. **The Retest Loop (§32.5):** `whaxon retest <job_id> <seq>`. Flip status to `fixed` or `still_vulnerable`. (~2h) — **DONE (session 75)**
 4. **Coverage Ledger (§32.4):** Runner logs skipped items. Report renders them + a Confidence Score. (~4h) — **DONE (session 76)**
-5. **Three-Tab UI Redesign (§32.12):** ~14h (not 4h). Full unit: — **DONE (session 77)** — **DONE (session 77)**
+5. **Three-Tab UI / supplied design integration (§32.12):** **PARTIAL — design assets are in the repository; live integration and full interaction acceptance remain open.**
    - Service layer + CLI/web route parity test.
    - **Discover** (Scope, Run, Findings, Attack Surface, Catalog).
    - **Operate** (Validate, Access, Retest queue, Coverage gaps) - WCAG 1.4.1, keyboard paths.
    - **Report** (report builder, business impact, coverage disclosure, export).
    - Sidebar restructure. Playwright tests updated in the same PR.
-6. **Layer 2 & 3 Trust Layer (§33.1):** Human exception gate + LLM triage for ambiguous candidates. — **DONE (session 77)** — **DONE (session 77)**
+6. **Layer 2 & 3 Trust Layer (§33.1):** Core/web approval and triage paths are present with tests. **PARTIAL acceptance:** verify ambiguous findings end to end; ensure no LLM path can promote a finding to verified.
 
-**Total: ~31h / 10-12 sessions.** The earlier "5 sessions" estimate shrank the UI unit and ignored the parity test.
+**Remaining effort:** do not use the old ~31h / 10–12 session estimate as current remaining work. Estimate only after the release checklist below is evidenced; prioritize integration/verification rather than rebuilding framework components that already exist.
 
-## 34.3 The Launch Sequence (Post-Solo V1.0)
+## 34.3 The Launch Sequence (after acceptance, not merely after implementation)
 
-1. **Dogfood:** Run on DVWA, Juice Shop, bWAPP. Verify blind SQLi and context retention.
-2. **Artifact:** Generate report with `verified` finding + `curl --reproduce` proof.
+1. **Dogfood:** run controlled lab targets (DVWA, Juice Shop, bWAPP as available) and preserve reproducible logs; distinguish tests actually run from historical notes.
+2. **Artifact:** generate reports with verification status/reasons and inspect whether each reported proof artifact is genuinely reproducible. Do not claim `curl --reproduce` support until a real artifact is emitted and tested.
 3. **Content:** Write "Why AI scanners have a trust problem".
 4. **Launch:** Post to HN (regular submission), then "Show HN", then r/SideProject and r/cybersecurity.
 
@@ -1737,7 +1778,7 @@ To beat Sn1per, HunterX, and the AI agents, we cannot out-tool them. We must out
 ## 34.5 Versioning Cadence (Supersedes §12)
 - **Patch (v0.11.x):** Bugfixes.
 - **Minor (v0.12.0):** New CLI verb (`retest`, `coverage`) or major feature.
-- **Major (v1.0.0):** §34.2 complete, ready for HN launch.
+- **Major (v1.0.0):** all release blockers in §38 closed, CI/release workflow verified, package/tag/publication state confirmed, and v1.0 acceptance evidence recorded. Version metadata alone does not constitute a release.
 
 ---
 
@@ -1888,3 +1929,23 @@ The following items are deferred until v1.0 is fully deployed. They represent th
 
 ---
 
+
+
+---
+
+# 38. V1.0 RELEASE BLOCKERS AND ACCEPTANCE CHECKLIST
+
+**Status: OPEN until each item has evidence recorded.** This section is the operational release gate and supersedes optimistic DONE labels elsewhere when acceptance evidence is missing.
+
+- [ ] **Framework-to-roadmap crosswalk:** map each v1.0 stopping-condition stage (recon, enumeration, vulnerability discovery, initial access where supported, deterministic validation, findings, coverage/non-testing disclosure, reporting, retest) to the actual source path and automated test(s). Mark unsupported scope explicitly; do not claim zero false positives as a universal property.
+- [ ] **Validation trust boundary:** test SQL/error-marker, reflected-XSS, timing/blind, observation-probe and request-context replay paths. Candidate/inconclusive results must not be reported as verified; the LLM must never set verification status. Record timing caveats.
+- [ ] **Retest semantics:** verify that retest accepts only eligible previously verified findings and produces the documented `fixed`, `still_vulnerable`, or `inconclusive` result with a reason. Align the older “flip status” language in §§32–34 with the current implementation.
+- [ ] **Coverage honesty:** prove that skipped/failed/unrequested work is not silently counted as tested. Confirm the report's coverage section and confidence claims are based on persisted evidence; if this is not implemented end to end, mark it as a blocker rather than DONE.
+- [ ] **UI integration:** integrate the checked-in design assets into the existing Flask UI without changing the intended visual design. Map screens to routes; ensure every visible action has a real effect or is hidden/disabled; update `docs/WEB_UI_INTERACTION_AUDIT.md`; add/execute Playwright tests for navigation, scope, run, cancellation/streaming, findings, validate, retest, approvals, and report exports.
+- [ ] **Security regressions:** run the scope fail-closed, target-boundary, auth fail-closed, job cancellation/descendant termination and request-context regression tests. Document residual deployment constraints (including external egress enforcement and DNS rebinding/pinning limitations).
+- [ ] **Packaging:** build wheel and sdist; install the wheel in a clean environment; verify CLI help, packaged payload/catalog resources, scope initialization, and local observation-validation smoke test.
+- [ ] **CI and release workflow:** verify all required Python-version jobs are green on the candidate commit; resolve or explicitly disposition any open CI blocker. A workflow definition or a past green run is not proof of current green status.
+- [ ] **Release identity:** confirm the intended tag matches `pyproject.toml`, the release workflow succeeds, and the intended package index shows the expected version. Do not state “released” until checked.
+- [ ] **Docs synchronization:** refresh `docs/STATE.md` after the above checks; update the UI audit and this roadmap with observed results and commit/test references. Remove stale estimates only when the replacement evidence is recorded.
+
+**Release decision rule:** any unchecked item that affects correctness, safety, the user-visible UI, report honesty, or installability blocks calling the product release-ready. Deferred commercial/team features are not blockers unless required by the agreed solo v1.0 scope.
