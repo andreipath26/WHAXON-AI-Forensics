@@ -39,8 +39,9 @@ def test_xss_reflected_is_verified():
         f = Finding(kind="xss", severity="high", source="test",
                     data={"parameter": "q"}, raw_line="")
         status, reason = v.validate(f, target_url=url)
-        # The vendored first XSS payload should reflect and contain a marker.
-        assert status in ("verified", "candidate"), reason
+        # Reflection by itself is not proof of executable XSS. The local
+        # fixture reflects input without executing it, so this must not verify.
+        assert status == "candidate", reason
     finally:
         srv.shutdown()
 
