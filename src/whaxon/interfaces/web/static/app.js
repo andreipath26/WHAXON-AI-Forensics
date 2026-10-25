@@ -76,8 +76,117 @@
     });
   });
 
-  // palette
-  document.getElementById('palette-trigger').addEventListener('click', () => { palette.classList.add('open'); paletteInput.focus(); });
+  // Command palette: navigation plus live finding/tool search. Selecting a result
+  // navigates or opens evidence; it never launches a security tool by itself.
+  const paletteResults = palette.querySelector('.palette-results');
+  const palettePages = [
+    {id: 'findings', label: 'Findings', detail: 'Review and validate findings'},
+    {id: 'run', label: 'Run', detail: 'Select a tool and target'},
+    {id: 'scope', label: 'Scope', detail: 'Review authorization rules'},
+    {id: 'report', label: 'Report', detail: 'Generate an engagement report'},
+    {id: 'retest', label: 'Retest', detail: 'Recheck verified findings'},
+    {id: 'approvals', label: 'Approvals', detail: 'Review candidate findings'},
+    {id: 'sessions', label: 'Sessions', detail: 'View active sessions'},
+    {id: 'graph', label: 'Attack Surface', detail: 'View attack-surface status'},
+    {id: 'monitoring', label: 'Coverage', detail: 'Review skipped coverage'},
+    {id: 'catalog', label: 'Catalog', detail: 'Browse available tools'}
+  ];
+
+  function addPaletteItem(group, label, detail, action) {
+    const item = document.createElement('div');
+    item.className = 'palette-item';
+    item.setAttribute('role', 'button');
+    item.tabIndex = 0;
+    const title = document.createElement('span');
+    title.textContent = label;
+    const description = document.createElement('span');
+    description.className = 'palette-detail';
+    description.textContent = detail || '';
+    item.appendChild(title);
+    item.appendChild(description);
+    const choose = () => {
+      action();
+      palette.classList.remove('open');
+      paletteInput.value = '';
+    };
+    item.addEventListener('click', choose);
+    item.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        choose();
+      }
+    });
+    group.appendChild(item);
+  }
+
+  function renderPalette(query) {
+    if (!paletteResults) return;
+    const term = (query || '').trim().toLowerCase();
+    paletteResults.innerHTML = '';
+    const addGroup = label => {
+      const heading = document.createElement('div');
+      heading.className = 'palette-group';
+      heading.textContent = label;
+      paletteResults.appendChild(heading);
+      return heading;
+    };
+    const navMatches = palettePages.filter(p => !term || (p.label + ' ' + p.detail).toLowerCase().includes(term));
+    if (navMatches.length) {
+      const group = addGroup('Navigate');
+      navMatches.forEach(p => addPaletteItem(group, p.label, p.detail, () => {
+        document.querySelector('.sb-item[data-page="' + p.id + '"]')?.click();
+      }));
+    }
+    if (term) {
+      const findingMatches = (window._whaxonFindings || []).filter(f =>
+        [f.title, f.target, f.source, f.status].some(value => String(value || '').toLowerCase().includes(term))
+      ).slice(0, 8);
+      if (findingMatches.length) {
+        const group = addGroup('Findings');
+        findingMatches.forEach(f => addPaletteItem(group, f.title, [f.target, f.source, f.status].filter(Boolean).join(' · '), () => {
+          document.querySelector('#page-findings .chip[data-filter="all"]')?.click();
+          document.querySelector('.sb-item[data-page="findings"]')?.click();
+          const row = Array.from(document.querySelectorAll('#findings-tbody tr')).find(el =>
+            el.dataset.jobId === f.job_id && el.dataset.seq === String(f.seq)
+          );
+          if (row) {
+            row.style.display = '';
+            row.click();
+          }
+        }));
+      }
+      const toolMatches = (window._whaxonTools || []).filter(t =>
+        [t.id, t.name, t.category, t.description].some(value => String(value || '').toLowerCase().includes(term))
+      ).slice(0, 8);
+      if (toolMatches.length) {
+        const group = addGroup('Tools');
+        toolMatches.forEach(tool => addPaletteItem(group, tool.name || tool.id, tool.category || tool.binary || '', () => {
+          document.querySelector('.sb-item[data-page="run"]')?.click();
+          const item = Array.from(document.querySelectorAll('#run-catalog .tool-item')).find(el => el.dataset.toolId === tool.id);
+          if (item) item.click();
+        }));
+      }
+    }
+    if (!paletteResults.querySelector('.palette-item')) {
+      const empty = document.createElement('div');
+      empty.className = 'palette-item';
+      empty.textContent = term ? 'No matching pages, findings, or tools.' : 'Type to search pages, findings, and tools.';
+      paletteResults.appendChild(empty);
+    }
+  }
+
+  document.getElementById('palette-trigger').addEventListener('click', () => {
+    renderPalette(paletteInput.value);
+    palette.classList.add('open');
+    paletteInput.focus();
+  });
+  paletteInput.addEventListener('input', () => renderPalette(paletteInput.value));
+  paletteInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      paletteResults.querySelector('.palette-item[role="button"]')?.click();
+    }
+  });
 
   // notifications
   document.getElementById('notif-trigger').addEventListener('click', e => { e.stopPropagation(); notifPanel.classList.toggle('open'); });
@@ -619,6 +728,7 @@
   }
 
   function renderCatalog(tools) {
+    window._whaxonTools = Array.isArray(tools) ? tools : [];
     catalogEl.innerHTML = '';
     (tools || []).forEach(tool => {
       const item = document.createElement('div');
