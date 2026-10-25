@@ -65,9 +65,12 @@ whaxon-tui = "whaxon.interfaces.tui.app:main"
 whaxon-gui = "whaxon.interfaces.gui.app:main"
 
 [tool.hatch.build.targets.wheel]
-# Include the complete package tree, including non-Python runtime resources.
-only-include = ["src/whaxon"]
-sources = ["src"]
+packages = ["src/whaxon"]
+# Package selection and forced resource inclusion must not add the same files twice.
+exclude = ["src/whaxon/data/**"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/whaxon/data" = "whaxon/data"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
