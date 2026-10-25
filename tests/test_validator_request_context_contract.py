@@ -90,3 +90,16 @@ def test_sqlmap_adapter_populates_canonical_request_context():
         "url": "https://example.test/item?id=1",
         "parameter": "id",
     }
+
+def test_store_round_trips_canonical_request_context(tmp_path):
+    from whaxon.core.store import JobStore
+
+    context = {"url": "https://example.test/item?id=1", "method": "GET", "parameter": "id"}
+    finding = _finding(request_context=context)
+    store = JobStore(tmp_path / "whaxon.sqlite3")
+    store.create("job-context")
+    store.append_finding("job-context", finding, 0)
+
+    saved = store.get_findings("job-context")
+    assert saved is not None
+    assert saved[0]["request_context"] == context
