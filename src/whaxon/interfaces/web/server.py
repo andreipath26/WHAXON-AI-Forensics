@@ -108,6 +108,7 @@ class AsyncRunner:
 
 
 _PROCS: dict[str, subprocess.Popen] = {}
+_RUN_LOOPS: dict[str, object] = {}
 _PROCS_LOCK = threading.Lock()
 
 
@@ -146,6 +147,7 @@ def _run_job_blocking(
     from whaxon.core.events import JobFailed
     from whaxon.core.scope import OutOfScopeError
 
+    loop = asyncio.new_event_loop()
     try:
         try:
             timeout_s = float(_os.environ.get("WHAXON_JOB_TIMEOUT_S", "900"))
@@ -153,7 +155,10 @@ def _run_job_blocking(
             timeout_s = 900.0
         if timeout_s <= 0:
             timeout_s = 900.0
-        asyncio.run(core.runner.run_tool(
+        with _PROCS_LOCK:
+            _RUN_LOOPS[job_id] = loop
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(core.runner.run_tool(
             tool_id=tool_id,
             target=target,
             job_id=job_id,
@@ -162,7 +167,6 @@ def _run_job_blocking(
             phase="web",
         ))
     except OutOfScopeError as exc:
-        # Scope is checked again by ToolRunner immediately before process launch.
         core.bus.publish(JobFailed(job_id=job_id, error=f"target blocked by scope: {exc}"))
     except FileNotFoundError:
         # ToolRunner already publishes JobFailed for missing executables.
@@ -171,17 +175,32 @@ def _run_job_blocking(
         import traceback
         traceback.print_exc()
         core.bus.publish(JobFailed(job_id=job_id, error=f"job execution failed: {exc}"))
+    finally:
+        with _PROCS_LOCK:
+            _RUN_LOOPS.pop(job_id, None)
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 
 def _cancel_job_blocking(core: Core, job_id: str) -> bool:
-    """Cancel through the shared runner so child processes are cleaned up too."""
+    """Cancel through the job's owning event loop to clean up its process tree."""
     import asyncio
+
+    with _PROCS_LOCK:
+        loop = _RUN_LOOPS.get(job_id)
     proc = core.runner._procs.get(job_id)
-    if proc is None or proc.returncode is not None:
+    if loop is None or proc is None or proc.returncode is not None:
         return False
-    asyncio.run(core.runner.cancel(job_id))
-    return True
+    if not getattr(loop, "is_running", lambda: False)():
+        return False
+    future = asyncio.run_coroutine_threadsafe(core.runner.cancel(job_id), loop)
+    try:
+        future.result(timeout=5)
+        return True
+    except Exception:
+        return False
+
 
 
 import base64 as _b64
