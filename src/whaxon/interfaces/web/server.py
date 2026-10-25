@@ -443,20 +443,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             if request_hostname.lower().rstrip(".") not in allowed_hosts:
                 return {"error": "invalid Host for local request"}, 403
 
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-            fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
-            if fetch_site in {"cross-site", "same-site"}:
-                return {"error": "cross-origin state-changing request rejected"}, 403
-            origin = request.headers.get("Origin")
-            if origin:
-                supplied = _urlsplit(origin)
-                current = _urlsplit(request.host_url)
-                if (
-                    supplied.scheme.lower() != current.scheme.lower()
-                    or (supplied.hostname or "").lower() != (current.hostname or "").lower()
-                    or supplied.port != current.port
-                ):
-                    return {"error": "cross-origin state-changing request rejected"}, 403
+        fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
+        if fetch_site in {"cross-site", "same-site"}:
+            return {"error": "cross-origin browser request rejected"}, 403
+        origin = request.headers.get("Origin")
+        if origin:
+            supplied = _urlsplit(origin)
+            current = _urlsplit(request.host_url)
+            if (
+                supplied.scheme.lower() != current.scheme.lower()
+                or (supplied.hostname or "").lower() != (current.hostname or "").lower()
+                or supplied.port != current.port
+            ):
+                return {"error": "cross-origin browser request rejected"}, 403
 
         if request.remote_addr in ("127.0.0.1", "::1"):
             return None
