@@ -134,7 +134,6 @@ include = [
 exclude = [
     "archive",
     "assets",
-    "data",
     "docs/assets",
     "tests",
     "scripts",
