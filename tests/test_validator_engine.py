@@ -57,7 +57,7 @@ def test_xss_reflected_is_verified():
         # the validator should identify the explicit XSS marker, not pass on
         # timing alone or accept either verdict.
         assert status == "verified", reason
-        assert "marker" in reason.lower(), reason
+        assert "XSS probe" in reason, reason
     finally:
         srv.shutdown()
 
@@ -121,6 +121,37 @@ def test_replay_ctx_injects_payload_from_request_context():
         )
         status, reason = v.validate(f, target_url=None)
         assert status == "verified", reason
-        assert "<script>" in reason
+        assert "XSS probe" in reason
+    finally:
+        srv.shutdown()
+
+class _DatabaseNameDecoy(BaseHTTPRequestHandler):
+    """Mentions a DBMS name but does not execute SQL or produce a parser error."""
+    def do_GET(self):
+        from urllib.parse import parse_qs, urlparse
+        q = parse_qs(urlparse(self.path).query).get("q", [""])[0]
+        if q == "'":
+            body = "Database driver error: postgresql backend unavailable"
+        else:
+            body = "Search page"
+        raw = body.encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def log_message(self, *a):
+        pass
+
+
+def test_database_name_alone_does_not_verify_sqli():
+    srv, url = _serve(_DatabaseNameDecoy)
+    try:
+        v = Validator(PAYLOAD_DIR)
+        f = Finding(kind="sqli", severity="high", source="test",
+                    data={"parameter": "q"}, raw_line="")
+        status, reason = v.validate(f, target_url=url)
+        assert status == "candidate", reason
+        assert "postgresql" not in reason.lower()
     finally:
         srv.shutdown()
