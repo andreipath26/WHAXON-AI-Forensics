@@ -228,6 +228,26 @@ def _hash_pw(pw: str) -> str:
     return _hashlib.sha256(pw.encode("utf-8")).hexdigest()
 
 
+def _remote_auth_ready(user: str, password: str, password_hash: str) -> bool:
+    """Require non-default credentials and bcrypt for network-facing deployments."""
+    if not user or user == "whaxon":
+        return False
+    if password_hash:
+        if _bcrypt is None:
+            return False
+        parts = password_hash.split("$")
+        if (
+            len(parts) != 4
+            or parts[1] not in {"2a", "2b", "2y"}
+            or not parts[2].isdigit()
+            or int(parts[2]) < 12
+            or len(password_hash) != 60
+        ):
+            return False
+        return True
+    return bool(password and password != "whaxon" and _bcrypt is not None)
+
+
 def _check_auth(header: str | None) -> bool:
     creds = _get_credentials()
     # Missing credentials must never disable authentication implicitly.
@@ -1599,11 +1619,9 @@ def create_app_factory(host: str | None = None, port: int | None = None):
         loopback = host.lower() == "localhost"
     configured_user = os.environ.get("WHAXON_AUTH_USER", "").strip()
     configured_pass = os.environ.get("WHAXON_AUTH_PASS", "")
-    has_hash = bool(os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip())
-    if not loopback and (
-        not configured_user
-        or configured_user == "whaxon"
-        or (not has_hash and (not configured_pass or configured_pass == "whaxon"))
+    configured_hash = os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip()
+    if not loopback and not _remote_auth_ready(
+        configured_user, configured_pass, configured_hash
     ):
         raise RuntimeError(
             "Refusing to expose WHAXON on a non-loopback host without "
@@ -1639,11 +1657,9 @@ def main(args: list[str] | None = None) -> None:
     if not loopback:
         configured_user = os.environ.get("WHAXON_AUTH_USER", "").strip()
         configured_pass = os.environ.get("WHAXON_AUTH_PASS", "")
-        has_hash = bool(os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip())
-        if (
-            not configured_user
-            or configured_user == "whaxon"
-            or (not has_hash and (not configured_pass or configured_pass == "whaxon"))
+        configured_hash = os.environ.get("WHAXON_AUTH_PASS_HASH", "").strip()
+        if not _remote_auth_ready(
+            configured_user, configured_pass, configured_hash
         ):
             raise SystemExit(
                 "Refusing network exposure without explicit non-default "
