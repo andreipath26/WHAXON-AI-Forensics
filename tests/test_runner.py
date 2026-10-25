@@ -382,3 +382,38 @@ async def test_run_caps_excessive_subprocess_output():
     assert "output truncated" in output[-1]
     assert len(rec.events["finished"]) == 1
     assert rec.events["failed"] == []
+
+async def test_tool_output_uses_private_random_directory_and_is_cleaned(tmp_path):
+    import shlex
+    import sys
+
+    script = (
+        "import pathlib,sys; "
+        "p=pathlib.Path(sys.argv[sys.argv.index('--out')+1]); "
+        "p.write_text('tool output', encoding='utf-8')"
+    )
+    tool = Tool(
+        id="out", name="Output tool", category="test",
+        binary=sys.executable,
+        args="-c " + shlex.quote(script) + " {target}",
+        outfile_flag="--out",
+    )
+    runner, _, _ = _runner(tools=[tool])
+    observed = {}
+
+    def capture(_tool_id, _job_id, _lines, *, argv=(), target="", outfile=None):
+        observed["argv"] = list(argv)
+        observed["outfile"] = outfile
+        observed["exists_during_parse"] = bool(outfile and outfile.is_file())
+        observed["contents"] = outfile.read_text(encoding="utf-8") if outfile and outfile.is_file() else ""
+
+    runner._publish_findings = capture
+    await runner.run_tool("out", "127.0.0.1", timeout_s=5)
+
+    outpath = observed["outfile"]
+    assert outpath is not None
+    assert outpath.name == "output.json"
+    assert outpath.parent.name.startswith("whaxon-")
+    assert observed["exists_during_parse"] is True
+    assert observed["contents"] == "tool output"
+    assert not outpath.parent.exists(), "private temporary output directory should be removed"
