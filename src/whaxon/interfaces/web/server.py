@@ -1692,7 +1692,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   async function wireFindings() {
     hideButtonByText('mark fixed');
     hideButtonByText('export proof to issue tracker');
-    hideButtonByText('send to approvals');
+    if (page !== 'trust-layer-approvals-queue-modal') hideButtonByText('send to approvals');
     const initialReplay = document.getElementById('replay-btn');
     if (initialReplay) initialReplay.disabled = true;
     const cards = Array.from({length:4}, function (_, i) {
