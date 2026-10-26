@@ -74,7 +74,8 @@ def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
     page.goto(f"{live_server}/ui/run-and-orchestration", wait_until="domcontentloaded")
     page.wait_for_timeout(400)
     assert page.locator('input[placeholder*="Target host"]').is_visible()
-    assert page.locator('select[aria-label="Tool to run"]').count() == 1
+    assert page.locator('select[aria-label="Tool to run"]').count() == 0
+    assert page.locator('button').filter(has_text="Re-run").count() >= 1
 
 
 def test_history_page_renders_live_job_rows(page, live_server):
@@ -90,3 +91,14 @@ def test_catalog_page_renders_live_tools(page, live_server):
     assert matrix.is_visible()
     assert matrix.locator(".adapter-card").count() >= 1
 
+
+
+def test_reports_page_wires_native_preview_to_live_report(page, live_server):
+    page.goto(f"{live_server}/ui/ptes-coverage-and-reports", wait_until="domcontentloaded")
+    preview_button = page.get_by_role("button", name="Preview Markdown")
+    assert preview_button.is_visible()
+    preview_button.click()
+    preview = page.locator("#previewModal pre")
+    assert preview.is_visible()
+    assert "seed-job-1" in preview.inner_text()
+    assert "ENG-2026-X892" not in preview.inner_text()

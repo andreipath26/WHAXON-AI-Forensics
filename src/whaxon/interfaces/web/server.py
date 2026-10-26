@@ -1808,8 +1808,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         const label = replay.querySelector('span:last-child');
         if (label && first) label.textContent = first.dataset.status === 'verified' ? 'Replay Test (Retest)' : 'Validate Finding';
       }
-      const replayAction = document.getElementById('replay-btn');
-      if (replayAction) replayAction.disabled = true;
       const replayReady = Array.from(document.querySelectorAll('span')).find(function (el) { return /Replay Ready:/.test(el.textContent || ''); });
       if (replayReady) replayReady.hidden = true;
       const fakeMarker = Array.from(document.querySelectorAll('span')).find(function (el) { return /Matched Pattern: DB_PASSWORD/.test(el.textContent || ''); });
@@ -1944,57 +1942,105 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     }
   }
   async function wireReports() {
-    wireUnavailablePage();
+    const previewButton = document.getElementById('previewBtn');
+    const closeButton = document.getElementById('closePreviewBtn');
+    const modal = document.getElementById('previewModal');
+    const preview = modal && modal.querySelector('pre');
+    const title = modal && modal.querySelector('h3 code');
+    const buttons = Array.from(document.querySelectorAll('main button'));
+    const exportJson = buttons.find(function (button) { return /Export Findings \(\.json\)/i.test(button.textContent || ''); });
+    const exportPdf = buttons.find(function (button) { return /Download Full Report \(\.pdf\)/i.test(button.textContent || ''); });
+    function setBusy(button, busy) { if (button) button.disabled = busy; }
+    async function fetchMarkdown() {
+      const response = await fetch('/api/report?format=md');
+      if (!response.ok) throw new Error('Report request failed (HTTP ' + response.status + ')');
+      return response.text();
+    }
+    if (previewButton) previewButton.onclick = async function () {
+      setBusy(previewButton, true);
+      try {
+        const markdown = await fetchMarkdown();
+        if (preview) preview.textContent = markdown || 'No report content is available yet.';
+        if (title) title.textContent = 'whaxon-report.md';
+        if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+      } catch (error) {
+        window.alert('Unable to load the report preview: ' + error.message);
+      } finally { setBusy(previewButton, false); }
+    };
+    if (closeButton) closeButton.onclick = function () {
+      if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+    };
+    if (exportJson) exportJson.onclick = function () { window.location.assign('/api/report?format=json'); };
+    if (exportPdf) exportPdf.onclick = function () { window.location.assign('/api/report?format=pdf'); };
+    // Never represent hard-coded sample engagement values or proof as live data.
+    document.querySelectorAll('main span, main h2, main h3, main p').forEach(function (element) {
+      const value = (element.textContent || '').trim();
+      if (/ENG-2026-X892|api\.internal\.corp|Sample Deterministic Proof|ENGAGEMENT HASH MANIFEST|41 automated vulnerability templates|6 vulnerabilities were deterministically verified/i.test(value)) {
+        const container = element.closest('.bg-surface-container-lowest, .bg-surface-container-low, section');
+        if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) container.hidden = true;
+      }
+    });
+    try { await requestJson('/api/report?format=json'); }
+    catch (_) {
+      [previewButton, exportJson, exportPdf].forEach(function (button) { if (button) button.disabled = true; });
+    }
   }
   async function wireRun() {
     const targetInput = document.querySelector('input[placeholder*="Target host"]');
-    if (targetInput) targetInput.value = '';
     const output = document.getElementById('terminal-stdout');
-    if (output) output.textContent = 'Ready. Choose an available tool and a target permitted by the configured scope.';
     let selectedJob = null, stream = null;
+    if (targetInput) targetInput.value = '';
+    if (output) output.textContent = 'Ready. Choose a registered tool and a target permitted by the configured scope.';
     let tools = [];
     try {
-      tools = await requestJson('/api/tools');
-      if (!Array.isArray(tools)) tools = tools.tools || [];
-    } catch (error) {
-      wireUnavailablePage();
-      return;
-    }
+      const response = await requestJson('/api/tools');
+      tools = Array.isArray(response) ? response : (response.tools || []);
+    } catch (_) { wireUnavailablePage(); return; }
     const usable = tools.filter(function (tool) { return tool && tool.id && tool.available !== false; });
-    const inputParent = targetInput && targetInput.parentElement;
-    if (targetInput && inputParent && usable.length) {
-      const select = document.createElement('select');
-      select.setAttribute('aria-label', 'Tool to run');
-      select.className = 'bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40';
-      const chooseTool = document.createElement('option');
-      chooseTool.value = ''; chooseTool.textContent = 'Select a registered tool'; chooseTool.selected = true; chooseTool.disabled = true;
-      select.appendChild(chooseTool);
-      usable.forEach(function (tool) {
-        const option = document.createElement('option');
-        option.value = tool.id;
-        option.textContent = tool.name || tool.id;
-        select.appendChild(option);
+    const runButtons = Array.from(document.querySelectorAll('main button')).filter(function (button) {
+      return (button.textContent || '').trim().toLowerCase() === 're-run';
+    });
+    function norm(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    function findTool(card) {
+      const title = card.querySelector('h2,h3,h4,[class*="font-semibold"]');
+      const normalized = norm(title ? title.textContent : card.textContent);
+      return usable.find(function (tool) {
+        const id = norm(tool.id), name = norm(tool.name || tool.id);
+        return normalized.includes(id) || normalized.includes(name) ||
+          normalized.includes(id.replace(/\d+$/, '')) || normalized.includes(name.replace(/\d+$/, ''));
+      }) || null;
+    }
+    let wiredCount = 0;
+    runButtons.forEach(function (button) {
+      const card = button.closest('.bg-surface-container-low.rounded-lg');
+      if (!card) { button.hidden = true; return; }
+      const tool = findTool(card);
+      if (!tool) { card.hidden = true; return; }
+      wiredCount += 1;
+      const fakeStatus = Array.from(card.querySelectorAll('span')).find(function (span) {
+        return /^(COMPLETED|RUNNING.*|QUEUED.*|READY)$/i.test((span.textContent || '').trim());
       });
-      inputParent.insertBefore(select, targetInput.nextSibling);
-      hideButtonByText('dispatch passive recon');
-      const runButtons = Array.from(document.querySelectorAll('button')).filter(function (button) {
-        return (button.textContent || '').toLowerCase().includes('run active pipeline');
+      if (fakeStatus) fakeStatus.textContent = 'REGISTERED';
+      card.querySelectorAll('.grid.grid-cols-3, .absolute.top-0').forEach(function (node) { node.hidden = true; });
+      card.querySelectorAll('span').forEach(function (span) {
+        if (/PID:|services found|templates|req\/s|Candidates|Awaiting .* completion|Concurrency cap/i.test(span.textContent || '')) {
+          const parent = span.closest('.grid, .bg-surface-container-lowest');
+          if (parent) parent.hidden = true; else span.hidden = true;
+        }
       });
-      runButtons.forEach(function (button) { const label = button.querySelector('span:last-child'); if (label) label.textContent = 'Run Selected Tool'; });
-      async function startRun(button) {
-        const target = targetInput.value.trim();
+      button.onclick = async function () {
+        const target = targetInput && targetInput.value.trim();
         if (!target) { window.alert('Enter a target that is included in the configured scope.'); return; }
-        if (!select.value) { window.alert('No runnable tool is available.'); return; }
-        runButtons.forEach(function (item) { item.disabled = true; });
-        if (output) output.textContent = 'Submitting ' + select.value + ' against ' + target + '…';
+        button.disabled = true;
+        if (output) output.textContent = 'Submitting ' + tool.id + ' against ' + target + '…';
         try {
           const result = await requestJson('/api/run', {
             method:'POST', headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({tool_id:select.value, target:target})
+            body:JSON.stringify({tool_id:tool.id, target:target})
           });
           selectedJob = result.job_id;
-          const id = document.getElementById('job-id');
-          if (id) id.textContent = selectedJob;
+          const jobLabel = document.getElementById('job-id');
+          if (jobLabel) jobLabel.textContent = selectedJob || '—';
           if (stream) stream.close();
           stream = new EventSource('/api/jobs/' + encodeURIComponent(selectedJob) + '/stream');
           stream.onmessage = function (event) {
@@ -2008,57 +2054,45 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
               output.appendChild(line);
               output.scrollTop = output.scrollHeight;
             } else if (message.type === 'status') {
-              const line = document.createElement('div'); line.textContent = 'Status: ' + (message.status || 'unknown'); output.appendChild(line);
+              const line = document.createElement('div');
+              line.textContent = 'Status: ' + (message.status || 'unknown');
+              output.appendChild(line);
             } else if (message.type === 'finished' || message.type === 'failed') {
               const line = document.createElement('div');
               line.textContent = message.type === 'finished' ? 'Finished (exit ' + message.exit_code + ')' : 'Failed: ' + (message.error || 'unknown error');
               output.appendChild(line);
-              stream.close(); stream = null;
-              runButtons.forEach(function (item) { item.disabled = false; });
+              stream.close(); stream = null; button.disabled = false;
             }
           };
-          stream.onerror = function () {
-            if (stream) { stream.close(); stream = null; }
-            runButtons.forEach(function (item) { item.disabled = false; });
-          };
+          stream.onerror = function () { if (stream) { stream.close(); stream = null; } button.disabled = false; };
         } catch (error) {
           if (output) output.textContent = 'Run rejected: ' + error.message;
-          runButtons.forEach(function (item) { item.disabled = false; });
+          button.disabled = false;
         }
-      }
-      runButtons.forEach(function (button) { button.onclick = function (event) { event.preventDefault(); startRun(button); }; });
-      document.querySelectorAll('button').forEach(function (button) {
-        if (!(button.textContent || '').toLowerCase().includes('kill leader')) return;
-        button.onclick = async function () {
-          if (!selectedJob) { window.alert('There is no active WHAXON job to cancel.'); return; }
-          try {
-            const result = await requestJson('/api/jobs/' + encodeURIComponent(selectedJob) + '/cancel', {method:'POST'});
-            if (output) output.appendChild(document.createTextNode('\\nCancellation requested: ' + String(result.ok)));
-          } catch (error) { window.alert('Cancellation failed: ' + error.message); }
-        };
-      });
-    } else {
-      hideButtonByText('run active pipeline');
-      hideButtonByText('dispatch passive recon');
-    }
-    hideButtonByText('dispatch passive recon');
-    hideButtonByText('inject payload');
-    hideButtonByText('spawn sub-tool');
-    hideButtonByText('emergency abort');
-    hideButtonByText('engage replay');
-    hideButtonByText('re-run');
-    hideButtonByText('pause');
-    hideButtonByText('abort');
-    hideButtonByText('explore whatweb');
-    hideButtonByText('gobuster');
-    hideButtonByText('wpscan');
-    hideButtonByText('execute');
-    const probeCheckbox = document.querySelector('input[type="checkbox"]:not(#ai-planner-toggle)');
-    const probeGrid = probeCheckbox && probeCheckbox.closest('.grid');
-    if (probeGrid) probeGrid.hidden = true;
+      };
+    });
+    // Use only controls that exist in the supplied design; do not inject a tool selector.
+    ['run active pipeline','dispatch passive recon','inject payload','spawn sub-tool','emergency abort','engage replay','explore whatweb','gobuster','wpscan','execute','pause pipeline','pause','abort'].forEach(hideButtonByText);
     ['ai-planner-toggle','toggle-planner-gate'].forEach(function (id) {
       const control = document.getElementById(id);
       if (control) { const label = control.closest('label') || control.closest('div'); if (label) label.hidden = true; else control.hidden = true; }
+    });
+    const probeCheckbox = document.querySelector('input[type="checkbox"]:not(#ai-planner-toggle)');
+    const probeGrid = probeCheckbox && probeCheckbox.closest('.grid');
+    if (probeGrid) probeGrid.hidden = true;
+    if (!targetInput || wiredCount === 0) {
+      runButtons.forEach(function (button) { button.hidden = true; });
+      if (output) output.textContent = 'No registered tool has a matching control in this design. No scan was started.';
+    }
+    document.querySelectorAll('button').forEach(function (button) {
+      if (!(button.textContent || '').toLowerCase().includes('kill leader')) return;
+      button.onclick = async function () {
+        if (!selectedJob) { window.alert('There is no active WHAXON job to cancel.'); return; }
+        try {
+          const result = await requestJson('/api/jobs/' + encodeURIComponent(selectedJob) + '/cancel', {method:'POST'});
+          if (output) output.appendChild(document.createTextNode('\\nCancellation requested: ' + String(result.ok)));
+        } catch (error) { window.alert('Cancellation failed: ' + error.message); }
+      };
     });
   }
   async function wireDashboard() {
