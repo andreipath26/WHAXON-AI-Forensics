@@ -1781,7 +1781,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
               });
             }
           }
-          const proof = document.getElementById('curl-proof-payload');
           if (proof) {
             const raw = card.dataset.rawLine;
             proof.textContent = raw || 'No raw proof line was recorded for this finding.';
