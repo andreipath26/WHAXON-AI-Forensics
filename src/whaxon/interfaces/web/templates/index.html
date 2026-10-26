@@ -264,15 +264,15 @@
       <!-- APPROVALS -->
       <section class="page" id="page-approvals">
         <div class="page-head">
-          <div class="ph-main"><h1 class="page-title">Approvals</h1><p class="page-sub" id="approvals-summary">Loading…</p></div>
+          <div class="ph-main"><h1 class="page-title">Approvals</h1><p class="page-sub" id="approvals-summary" role="status" aria-live="polite">Loading pending decisions…</p></div>
           <div class="page-actions">
-            <input class="form-input" id="approvals-owner" placeholder="filter by owner (blank = all)" style="width:240px;">
-            <button class="btn btn-ghost btn-sm" id="approvals-refresh">Refresh</button>
+            <label class="sr-only" for="approvals-owner">Filter AI runs by owner</label><input class="form-input" id="approvals-owner" placeholder="filter by owner (blank = all)" style="width:240px;">
+            <button class="btn btn-ghost btn-sm" id="approvals-refresh" type="button">Refresh</button>
           </div>
         </div>
         <div class="card card-pad-lg" style="margin-bottom:16px;">
           <div class="card-title">Findings pending review <span class="badge" id="pending-findings-count">0</span></div>
-          <div class="card-sub">Candidates the deterministic engine could not resolve. Mark them verified or refuted.</div>
+          <div class="card-sub" id="pending-findings-summary" role="status" aria-live="polite">Loading candidates…</div>
           <div id="pending-findings-list" style="margin-top:12px;"></div>
         </div>
         <div class="card-title" style="margin-bottom:8px;">AI runs awaiting a decision</div>

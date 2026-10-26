@@ -773,3 +773,13 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 
 /* Components is an internal design reference, not an operational workspace page. */
 #page-components { display: none !important; }
+
+
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+
+/* Approvals interactions */
+#page-approvals .approvals-empty { padding: 16px; white-space: normal; }
+#page-approvals .approvals-actions { display:flex; gap:8px; margin-top:12px; align-items:center; flex-wrap:wrap; }
+#page-approvals .approvals-actions .form-input { flex:1; min-width:180px; }
+#page-approvals .approvals-actions button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }

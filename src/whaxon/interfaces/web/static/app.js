@@ -1172,6 +1172,119 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   if (document.readyState !== 'loading') { loadCatalog(); loadRecent(); }
 })();
 
+// ---- Approvals page wiring ----
+(function () {
+  const list = document.getElementById('approvals-list');
+  const pendingList = document.getElementById('pending-findings-list');
+  if (!list || !pendingList) return;
+  const ownerInput = document.getElementById('approvals-owner');
+  const summary = document.getElementById('approvals-summary');
+  const refresh = document.getElementById('approvals-refresh');
+  const pendingCount = document.getElementById('pending-findings-count');
+  const pendingSummary = document.getElementById('pending-findings-summary');
+  const badge = document.getElementById('approvals-badge');
+  let loading = false;
+
+  function empty(container, message, role) {
+    container.replaceChildren();
+    const note = document.createElement('div'); note.className = 'card-sub approvals-empty'; note.textContent = message;
+    if (role) note.setAttribute('role', role);
+    container.appendChild(note);
+  }
+  async function loadApprovals() {
+    const owner = (ownerInput && ownerInput.value || '').trim();
+    try {
+      const response = await fetch('/api/ai/pending' + (owner ? '?owner=' + encodeURIComponent(owner) : ''));
+      let rows = []; if (!response.ok) { let body={}; try{body=await response.json();}catch(_){} throw new Error(body.error || ('HTTP '+response.status)); }
+      rows = await response.json();
+      if (!Array.isArray(rows)) throw new Error('Invalid pending-approval response');
+      if (badge) { badge.textContent = String(rows.length); badge.style.display = rows.length ? '' : 'none'; }
+      if (summary) summary.textContent = rows.length + ' AI run' + (rows.length === 1 ? '' : 's') + ' awaiting a decision';
+      if (!rows.length) { empty(list, 'No AI runs are waiting for a decision.'); return; }
+      list.replaceChildren();
+      rows.forEach(run => {
+        const question = run.pending_question || {};
+        const card = document.createElement('div'); card.className = 'card approvals-item'; card.style.marginBottom = '12px';
+        const title = document.createElement('div'); title.className = 'card-title'; title.textContent = String(question.rationale || '(No rationale supplied)');
+        const detail = document.createElement('div'); detail.className = 'card-sub';
+        detail.textContent = 'Run ' + String(run.id || '—') + ' · owner ' + String(run.owner || 'local') + ' · confidence ' + (typeof question.confidence === 'number' ? question.confidence.toFixed(2) : '—') + (question.proposed_phase ? ' · proposed phase ' + String(question.proposed_phase) : '');
+        const actions = document.createElement('div'); actions.className = 'approvals-actions';
+        const answer = document.createElement('input'); answer.className = 'form-input'; answer.placeholder = 'Answer or decision'; answer.setAttribute('aria-label','Answer for run '+String(run.id||''));
+        const button = document.createElement('button'); button.type='button'; button.className='btn btn-primary btn-sm'; button.textContent='Submit answer';
+        button.addEventListener('click', async () => {
+          const value = answer.value.trim();
+          if (!value) { answer.focus(); if(summary)summary.textContent='Enter an answer before submitting.'; return; }
+          button.disabled=true; answer.disabled=true;
+          try {
+            const response = await fetch('/api/ai/runs/'+encodeURIComponent(String(run.id))+'/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answer:value,user:owner||'web'})});
+            let body={};try{body=await response.json();}catch(_){}
+            if (!response.ok && response.status !== 409) throw new Error(body.error||('HTTP '+response.status));
+            await loadApprovals();
+          } catch(err) {
+            if(summary)summary.textContent='Could not submit answer: '+String(err&&err.message||err);
+            button.disabled=false; answer.disabled=false;
+          }
+        });
+        actions.append(answer,button); card.append(title,detail,actions); list.appendChild(card);
+      });
+    } catch(err) {
+      empty(list,'Could not load AI approvals: '+String(err&&err.message||err),'alert');
+      if(summary)summary.textContent='AI approvals unavailable.';
+    }
+  }
+  async function loadPendingFindings() {
+    if (pendingSummary) pendingSummary.textContent='Loading findings awaiting review…';
+    try {
+      const response=await fetch('/api/report?format=json');
+      if(!response.ok)throw new Error('HTTP '+response.status);
+      const data=await response.json(), pending=[];
+      (Array.isArray(data.jobs)?data.jobs:[]).forEach(entry=>{
+        const job=entry.job||{};
+        (Array.isArray(entry.findings)?entry.findings:[]).forEach(f=>{
+          if((f.verification_status||'candidate')==='candidate')pending.push({job,f});
+        });
+      });
+      if(pendingCount)pendingCount.textContent=String(pending.length);
+      if(!pending.length){empty(pendingList,'No findings are waiting for human review.');if(pendingSummary)pendingSummary.textContent='0 candidate findings';return;}
+      pendingList.replaceChildren();
+      pending.slice(0,50).forEach(({job,f})=>{
+        const card=document.createElement('div');card.className='card approvals-item';card.style.marginBottom='8px';
+        const title=document.createElement('div');title.className='card-title';title.textContent=String(f.title||f.kind||f.raw_line||'(finding)');
+        const detail=document.createElement('div');detail.className='card-sub';detail.textContent='Job '+String(job.id||'—')+' · target '+String(job.target||'—')+' · '+String(f.severity||'info');
+        const actions=document.createElement('div');actions.className='approvals-actions';
+        ['verified','refuted'].forEach(status=>{
+          const button=document.createElement('button');button.type='button';button.className='btn btn-sm '+(status==='verified'?'btn-primary':'btn-ghost');button.textContent=status==='verified'?'Mark verified':'Mark refuted';
+          button.addEventListener('click',async()=>{
+            button.disabled=true;
+            try{
+              const response=await fetch('/api/approvals/'+encodeURIComponent(String(job.id))+'/'+encodeURIComponent(String(Number.isInteger(f.seq)?f.seq:0))+'/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status,user:'web'})});
+              let body={};try{body=await response.json();}catch(_){}
+              if(!response.ok)throw new Error(body.error||('HTTP '+response.status));
+              if(pendingSummary)pendingSummary.textContent='Finding marked '+status+'. Refreshing queue…';
+              await loadPendingFindings();
+            }catch(err){if(pendingSummary)pendingSummary.textContent='Could not update finding: '+String(err&&err.message||err);button.disabled=false;}
+          });
+          actions.appendChild(button);
+        });
+        card.append(title,detail,actions);pendingList.appendChild(card);
+      });
+      if(pendingSummary)pendingSummary.textContent=pending.length+' candidate finding(s) awaiting review'+(pending.length>50?' (showing first 50)':'')+'.';
+    }catch(err){empty(pendingList,'Could not load pending findings: '+String(err&&err.message||err),'alert');if(pendingSummary)pendingSummary.textContent='Pending findings unavailable.';if(pendingCount)pendingCount.textContent='—';}
+  }
+  async function loadAll() {
+    if(loading)return;loading=true;
+    if(refresh){refresh.disabled=true;refresh.textContent='Refreshing…';}
+    await Promise.all([loadApprovals(),loadPendingFindings()]);
+    loading=false;
+    if(refresh){refresh.disabled=false;refresh.textContent='Refresh';}
+  }
+  if(refresh)refresh.addEventListener('click',loadAll);
+  if(ownerInput)ownerInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();loadApprovals();}});
+  document.querySelectorAll('.sb-item[data-page="approvals"]').forEach(item=>item.addEventListener('click',loadAll));
+  document.addEventListener('DOMContentLoaded',loadAll);
+  if(document.readyState!=='loading')loadAll();
+})();
+
 // ---- Coverage page wiring (§34.2 step 4) ----
 (function () {
   const tbody = document.getElementById('coverage-tbody');
