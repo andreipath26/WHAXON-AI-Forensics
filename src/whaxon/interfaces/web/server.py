@@ -1989,7 +1989,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const value = (element.textContent || '').trim();
       if (!/ENG-2026-X892|api\.internal\.corp|Sample Deterministic Proof|ENGAGEMENT HASH MANIFEST|41 automated vulnerability templates|6 vulnerabilities were deterministically verified/i.test(value)) return;
       const container = element.closest('.bg-surface-container-lowest, .bg-surface-container-low');
-      if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) setHidden(container, true);
+      if (container && !container.contains(previewButton) && !(modal && modal.contains(container))) setHidden(container, true);
       else if (!container) setHidden(element, true);
     });
     // The coverage matrix and SIEM rule recommendations in this design are
