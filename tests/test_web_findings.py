@@ -191,3 +191,17 @@ def test_sort_headers_support_keyboard_activation(page, live_server):
     after = page.locator('#findings-tbody tr[data-job-id]').evaluate_all("rows => rows.map(r => r.dataset.title)")
     assert before != after
     assert header.get_attribute("aria-sort") in ("ascending", "descending")
+
+
+def test_selection_survives_sorting_findings(page, live_server):
+    _open_findings(page, live_server)
+    first = page.locator('#findings-tbody tr[data-job-id]').first
+    selected_key = first.get_attribute('data-job-id') + ':' + first.get_attribute('data-seq')
+    first.locator('.row-cb').check()
+    page.locator('th[data-sort="title"]').click()
+    selected_rows = page.locator('#findings-tbody tr[data-job-id]').evaluate_all(
+        "rows => rows.filter(row => row.querySelector('.row-cb').checked)"
+    )
+    assert len(selected_rows) == 1
+    assert selected_rows[0]['dataset']['jobId'] + ':' + selected_rows[0]['dataset']['seq'] == selected_key
+    assert page.locator('#bulk-count').text_content().strip() == '1'

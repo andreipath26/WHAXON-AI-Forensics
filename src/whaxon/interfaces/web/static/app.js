@@ -710,6 +710,12 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   });
 
   function renderTable(findings) {
+    // Keep selected findings selected when sorting or refreshing the table.
+    const selectedKeys = new Set(Array.from(tbody.querySelectorAll('.row-cb:checked'))
+      .map(box => {
+        const row = box.closest('tr');
+        return row ? row.dataset.jobId + ':' + row.dataset.seq : '';
+      }).filter(Boolean));
     tbody.innerHTML = '';
     if (!findings.length) {
       const row = document.createElement('tr');
@@ -783,7 +789,10 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         if (f._raw.data.remediation) tr.dataset.remediation = f._raw.data.remediation;
       }
       const rowCheckbox = tr.querySelector('.row-cb');
-      if (rowCheckbox) rowCheckbox.addEventListener('change', updateSelection);
+      if (rowCheckbox) {
+        rowCheckbox.checked = selectedKeys.has(f.job_id + ':' + f.seq);
+        rowCheckbox.addEventListener('change', updateSelection);
+      }
       tr.addEventListener('click', e => {
         if (e.target.closest('input, button, a, label, .checkbox-col, .copy-btn')) return;
         tbody.querySelectorAll('tr.selected').forEach(row => row.classList.remove('selected'));
