@@ -133,6 +133,8 @@ def test_reports_page_wires_native_preview_to_live_report(page, live_server):
     assert "ENG-2026-X892" not in visible_text
     assert "6 curl-verified" not in visible_text
     assert "Sample Deterministic Proof: FINDING-SQLI-001" not in visible_text
+    assert "PTES Certified Evidence Locker" not in visible_text
+    assert "Correlate Standards & Compliance Matrix" not in visible_text
     assert "7f83b165" not in visible_text
     preview_button.click()
     page.wait_for_function("document.querySelector('#previewModal')?.classList.contains('flex')")
