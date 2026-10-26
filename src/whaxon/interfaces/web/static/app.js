@@ -1455,3 +1455,64 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     finally { btn.disabled = false; }
   });
 })();
+
+
+// ---- Live attack-surface relationship table ----
+(function () {
+  const tbody = document.getElementById('pivot-graph-tbody');
+  const summary = document.getElementById('pivot-graph-summary');
+  const refresh = document.getElementById('pivot-graph-refresh');
+  if (!tbody || !summary) return;
+
+  function cell(row, value) {
+    const td = document.createElement('td');
+    td.textContent = String(value == null || value === '' ? '—' : value);
+    row.appendChild(td);
+    return td;
+  }
+
+  async function loadPivotGraph() {
+    if (refresh) {
+      refresh.disabled = true;
+      refresh.textContent = 'Loading…';
+    }
+    summary.textContent = 'Loading relationship data…';
+    tbody.replaceChildren();
+    try {
+      const response = await fetch('/api/pivot/graph', { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      const edges = Array.isArray(data.edges) ? data.edges : [];
+      summary.textContent = edges.length + ' recorded relationship(s). This view shows stored pivot edges only; it does not infer missing relationships.';
+      if (!edges.length) {
+        whaxonRenderMessageRow(tbody, 5, 'No pivot relationships have been recorded for this engagement.', 'muted');
+        return;
+      }
+      edges.forEach(edge => {
+        const row = document.createElement('tr');
+        const parent = edge.parent || {};
+        const child = edge.child || {};
+        cell(row, (parent.kind || 'unknown') + ': ' + (parent.id || '—'));
+        cell(row, edge.relation || '—');
+        cell(row, (child.kind || 'unknown') + ': ' + (child.id || '—'));
+        cell(row, edge.evidence || '—');
+        const recorded = edge.created_at ? new Date(Number(edge.created_at) * 1000) : null;
+        cell(row, recorded && !Number.isNaN(recorded.getTime()) ? recorded.toLocaleString() : '—');
+        tbody.appendChild(row);
+      });
+    } catch (error) {
+      summary.textContent = 'Could not load attack-surface relationships.';
+      whaxonRenderMessageRow(tbody, 5, 'Failed to load relationship data: ' + error, 'error');
+    } finally {
+      if (refresh) {
+        refresh.disabled = false;
+        refresh.textContent = 'Refresh';
+      }
+    }
+  }
+
+  if (refresh) refresh.addEventListener('click', loadPivotGraph);
+  document.querySelectorAll('.sb-item[data-page="graph"]').forEach(item => item.addEventListener('click', loadPivotGraph));
+  document.addEventListener('DOMContentLoaded', loadPivotGraph);
+  if (document.readyState !== 'loading') loadPivotGraph();
+})();
