@@ -62,8 +62,13 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   // bulk selection
   function updateBulk() {
     const checked = document.querySelectorAll('#findings-table .row-cb:checked').length;
-    bulkCount.textContent = checked;
-    bulkBar.classList.toggle('on', checked > 0);
+    if (bulkCount) bulkCount.textContent = checked;
+    if (bulkBar) bulkBar.hidden = checked === 0;
+    if (selectAll) {
+      const boxes = Array.from(document.querySelectorAll('#findings-table .row-cb'));
+      selectAll.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
+      selectAll.indeterminate = checked > 0 && !selectAll.checked;
+    }
   }
   const findingsTable = document.getElementById('findings-table');
   if (findingsTable) findingsTable.addEventListener('change', event => {
@@ -76,7 +81,7 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   const bulkClear = document.getElementById('bulk-clear-btn');
   if (bulkClear) bulkClear.addEventListener('click', () => {
     document.querySelectorAll('#findings-table .row-cb').forEach(cb => { cb.checked = false; });
-    if (selectAll) selectAll.checked = false;
+    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
     updateBulk();
   });
 
@@ -580,6 +585,83 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     return out;
   }
 
+  function updateSelection() {
+    const selected = Array.from(tbody.querySelectorAll('.row-cb:checked'));
+    const bar = document.getElementById('bulk-bar');
+    const count = document.getElementById('bulk-count');
+    if (count) count.textContent = String(selected.length);
+    if (bar) bar.hidden = selected.length === 0;
+    const selectAll = document.getElementById('select-all');
+    const boxes = Array.from(tbody.querySelectorAll('.row-cb'));
+    if (selectAll) {
+      selectAll.checked = boxes.length > 0 && boxes.every(box => box.checked);
+      selectAll.indeterminate = boxes.some(box => box.checked) && !selectAll.checked;
+    }
+  }
+
+  function selectedFindings() {
+    const keys = new Set(Array.from(tbody.querySelectorAll('.row-cb:checked'))
+      .map(box => {
+        const row = box.closest('tr');
+        return row ? row.dataset.jobId + ':' + row.dataset.seq : '';
+      }));
+    return (window._whaxonFindings || []).filter(f => keys.has(f.job_id + ':' + f.seq));
+  }
+
+  function renderSurface(findings) {
+    const list = document.getElementById('findings-surface-list');
+    const summary = document.getElementById('findings-surface-summary');
+    if (!list) return;
+    const counts = new Map();
+    findings.forEach(f => {
+      const target = (f.target || '').trim();
+      if (target) counts.set(target, (counts.get(target) || 0) + 1);
+    });
+    const entries = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    list.replaceChildren();
+    if (summary) summary.textContent = counts.size
+      ? counts.size + ' target(s) represented in loaded findings; not a network discovery graph.'
+      : 'No target information is available in the loaded findings.';
+    if (!entries.length) {
+      const empty = document.createElement('p');
+      empty.className = 'card-sub';
+      empty.textContent = 'No observed targets to summarize yet.';
+      list.appendChild(empty);
+      return;
+    }
+    entries.forEach(([target, count]) => {
+      const item = document.createElement('div');
+      item.className = 'surface-list-item';
+      const name = document.createElement('span');
+      name.className = 'mono';
+      name.textContent = target;
+      const total = document.createElement('span');
+      total.className = 'pill pill-info';
+      total.textContent = count + (count === 1 ? ' finding' : ' findings');
+      item.append(name, total);
+      list.appendChild(item);
+    });
+  }
+
+  const exportSelected = document.getElementById('bulk-export-btn');
+  if (exportSelected) exportSelected.addEventListener('click', () => {
+    const rows = selectedFindings();
+    if (!rows.length) return;
+    const payload = rows.map(f => ({
+      severity: f.severity, title: f.title, target: f.target, source: f.source,
+      status: f.status, job_id: f.job_id, sequence: f.seq, finding: f._raw
+    }));
+    const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), count: payload.length, findings: payload }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'whaxon-selected-findings.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  });
+
   function renderTable(findings) {
     tbody.innerHTML = '';
     findings.forEach(f => {
@@ -610,6 +692,8 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         if (f._raw.data.description) tr.dataset.description = f._raw.data.description;
         if (f._raw.data.remediation) tr.dataset.remediation = f._raw.data.remediation;
       }
+      const rowCheckbox = tr.querySelector('.row-cb');
+      if (rowCheckbox) rowCheckbox.addEventListener('change', updateSelection);
       tr.addEventListener('click', e => {
         if (e.target.closest('.checkbox-col') || e.target.closest('.copy-btn')) return;
         tbody.querySelectorAll('tr.selected').forEach(row => row.classList.remove('selected'));
@@ -618,6 +702,7 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       });
       tbody.appendChild(tr);
     });
+    updateSelection();
   }
 
   function openSlideover(tr) {
@@ -750,6 +835,7 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         window._whaxonFindings = rows;
         updateFilterCounts(rows);
         renderTable(sortRows(rows, sortKey, sortAsc));
+        renderSurface(rows);
         applyFilter();
       })
       .catch(err => {
