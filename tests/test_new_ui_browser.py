@@ -97,6 +97,12 @@ def test_reports_page_wires_native_preview_to_live_report(page, live_server):
     page.goto(f"{live_server}/ui/ptes-coverage-and-reports", wait_until="domcontentloaded")
     preview_button = page.get_by_role("button", name="Preview Markdown")
     assert preview_button.is_visible()
+    visible_text = page.locator("body").inner_text()
+    assert "Target: api.internal.corp" not in visible_text
+    assert "ENG-2026-X892" not in visible_text
+    assert "6 curl-verified" not in visible_text
+    assert "Sample Deterministic Proof: FINDING-SQLI-001" not in visible_text
+    assert "7f83b165" not in visible_text
     preview_button.click()
     page.wait_for_function("document.querySelector('#previewModal')?.classList.contains('flex')")
     preview = page.locator("#previewModal pre")
