@@ -1,4 +1,5 @@
 """Browser smoke tests for the canonical roadmap UI served at /ui."""
+
 import pytest
 
 
