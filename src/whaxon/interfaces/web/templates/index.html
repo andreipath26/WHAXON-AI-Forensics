@@ -204,11 +204,16 @@
 
       <!-- ATTACK SURFACE -->
       <section class="page" id="page-graph">
-        <div class="page-head"><div class="ph-main"><h1 class="page-title">Attack Surface</h1><p class="page-sub">Relationship visualization for hosts, services, and findings.</p></div></div>
+        <div class="page-head"><div class="ph-main"><h1 class="page-title">Attack Surface</h1><p class="page-sub">Observed pivot relationships from this engagement. Only recorded relationships are shown.</p></div><div class="page-actions"><button class="btn btn-ghost btn-sm" id="pivot-graph-refresh">Refresh</button></div></div>
         <div class="card card-pad-lg">
-          <div class="card-title">Live graph unavailable</div>
-          <p class="card-sub">The graph visualization is not yet connected to the engagement data. The previous illustration used hardcoded sample hosts and findings, so it has been removed rather than presented as live assessment evidence.</p>
-          <p>Use the Scope, Findings, and Coverage pages for current data.</p>
+          <div class="card-title">Recorded relationships</div>
+          <p class="card-sub" id="pivot-graph-summary" role="status" aria-live="polite">Loading relationship data…</p>
+          <div class="table-wrap">
+            <table class="tbl" id="pivot-graph-table">
+              <thead><tr><th>Parent</th><th>Relationship</th><th>Child</th><th>Evidence</th><th>Recorded</th></tr></thead>
+              <tbody id="pivot-graph-tbody"><tr><td colspan="5" style="padding:16px;color:var(--text-dim);">Loading…</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
