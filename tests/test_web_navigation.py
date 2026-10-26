@@ -68,3 +68,15 @@ def test_sidebar_collapse_toggle(page, live_server):
     page.click("#collapse-btn")
     page.wait_for_timeout(200)
     assert not page.locator("#app").evaluate("el => el.classList.contains('collapsed')")
+
+
+def test_attack_surface_uses_live_pivot_endpoint(page, live_server):
+    page.goto(f"{live_server}/ui")
+    page.click('.sb-item[data-page="graph"]')
+    page.wait_for_function(
+        "() => document.getElementById('pivot-graph-summary').textContent !== 'Loading relationship data…'",
+        timeout=5000,
+    )
+    assert page.locator("#pivot-graph-table").count() == 1
+    assert page.locator("#pivot-graph-summary").text_content().strip()
+    assert page.locator("#pivot-graph-tbody tr").count() >= 1
