@@ -150,3 +150,15 @@ def test_attack_chain_page_hides_static_chain_when_no_recorded_edges(page, live_
     page.goto(f"{live_server}/ui/correlated-attack-chains", wait_until="domcontentloaded")
     page.wait_for_timeout(200)
     assert "Postgres Remote Code Execution via dblink/COPY" not in page.locator("body").inner_text()
+
+
+def test_approval_modal_uses_selected_real_finding_and_hides_fake_signing(page, live_server):
+    page.goto(f"{live_server}/ui/trust-layer-approvals-queue-modal", wait_until="domcontentloaded")
+    send = page.get_by_role("button", name="Send to Approvals")
+    assert send.is_visible()
+    send.click()
+    modal = page.locator("#approvals-modal")
+    assert modal.is_visible()
+    assert "CND-9402" not in modal.inner_text()
+    assert page.get_by_role("button", name="Refute / False Positive").is_visible()
+    assert page.get_by_role("button", name="Approve as Verified (Sign Proof)").is_hidden()

@@ -2546,7 +2546,72 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     wireUnavailablePage();
   }
   async function wireAiApprovals() {
-    wireUnavailablePage();
+    const modal = document.getElementById('approvals-modal');
+    if (!modal) { wireUnavailablePage(); return; }
+    setHidden(modal, true);
+    await wireFindings();
+    const main = document.querySelector('main');
+    const firstCard = document.getElementById('finding-card-1');
+    if (firstCard && !firstCard.hidden) firstCard.click();
+    const sendButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /Send to Approvals/i.test(button.textContent || '');
+    });
+    const title = modal.querySelector('h3');
+    const description = modal.querySelector('.border-b p');
+    const body = modal.querySelector('.p-space-xl.overflow-y-auto');
+    const refute = Array.from(modal.querySelectorAll('button')).find(function (button) {
+      return /Refute \/ False Positive/i.test(button.textContent || '');
+    });
+    const hold = Array.from(modal.querySelectorAll('button')).find(function (button) {
+      return /Hold for Retest/i.test(button.textContent || '');
+    });
+    const skip = Array.from(modal.querySelectorAll('button')).find(function (button) {
+      return /Skip Item/i.test(button.textContent || '');
+    });
+    const approve = Array.from(modal.querySelectorAll('button')).find(function (button) {
+      return /Approve as Verified/i.test(button.textContent || '');
+    });
+    const close = modal.querySelector('button[onclick*="approvals-modal"]');
+    if (body) setHidden(body, true);
+    [hold, skip, approve].forEach(function (button) { if (button) setHidden(button, true); });
+    const remaining = Array.from(modal.querySelectorAll('span')).find(function (span) {
+      return /Remaining in queue:/i.test(span.textContent || '');
+    });
+    if (remaining && remaining.parentElement) setHidden(remaining.parentElement, true);
+    modal.querySelectorAll('span, p').forEach(function (element) {
+      if (/CND-9402|11 CANDIDATES PENDING|QUEUE GATED: STRICT|OP\/\/7749-ALPHA|Awaiting Review for|Item 1 of 11/i.test(element.textContent || '')) setHidden(element, true);
+    });
+    if (sendButton) {
+      setHidden(sendButton, false);
+      sendButton.onclick = function () {
+        const selected = window.__whaxonSelectedFinding;
+        if (!selected || !selected.jobId || selected.seq == null) {
+          window.alert('Select a recorded finding before opening review.'); return;
+        }
+        if (title) title.textContent = 'Manual Review — ' + String(selected.finding.title || selected.finding.kind || 'Finding');
+        if (description) description.textContent = String(selected.finding.raw_line || selected.finding.reason || 'Review the recorded finding evidence before resolving it.');
+        setHidden(modal, false);
+      };
+    }
+    if (close) close.onclick = function () { setHidden(modal, true); };
+    if (refute) refute.onclick = async function () {
+      const selected = window.__whaxonSelectedFinding;
+      if (!selected || !selected.jobId || selected.seq == null) {
+        window.alert('Select a recorded finding first.'); return;
+      }
+      refute.disabled = true;
+      try {
+        await requestJson('/api/approvals/' + encodeURIComponent(selected.jobId) + '/' + encodeURIComponent(selected.seq) + '/resolve', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({status:'refuted', user:'human'})
+        });
+        setHidden(modal, true);
+        window.location.reload();
+      } catch (error) {
+        window.alert('Finding resolution failed: ' + error.message);
+        refute.disabled = false;
+      }
+    };
   }
   async function wireAiStrategyGate() {
     let pending = [];
