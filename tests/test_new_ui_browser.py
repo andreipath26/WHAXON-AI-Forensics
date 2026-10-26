@@ -46,12 +46,17 @@ def test_legacy_ui_is_still_reachable(page, live_server):
     assert response is not None and response.status == 200
     assert page.locator(".sb-brand .label-text").inner_text() == "WHAXON"
 
-def test_dashboard_renders_live_job_rows(page, live_server):
+def test_dashboard_renders_live_job_rows_and_routes_new_engagement(page, live_server):
     page.goto(f"{live_server}/ui", wait_until="domcontentloaded")
     page.wait_for_timeout(500)
     assert page.locator("main").is_visible()
     assert page.locator("main table tbody tr").count() >= 1
     assert "seed-job-1" in page.locator("main").inner_text()
+    start = page.get_by_role("button", name="Start New Engagement")
+    assert start.is_visible()
+    start.click()
+    page.wait_for_url("**/ui/run-and-orchestration")
+    assert page.locator('input[placeholder*="Target host"]').is_visible()
 
 
 def test_scope_page_renders_real_scope_rules_and_hides_inert_controls(page, live_server):
