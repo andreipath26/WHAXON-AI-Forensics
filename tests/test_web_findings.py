@@ -201,7 +201,8 @@ def test_selection_survives_sorting_findings(page, live_server):
     page.locator('th[data-sort="title"]').click()
     selected_rows = page.locator('#findings-tbody tr[data-job-id]').evaluate_all(
         "rows => rows.filter(row => row.querySelector('.row-cb').checked)"
+        ".map(row => ({jobId: row.dataset.jobId, seq: row.dataset.seq}))"
     )
     assert len(selected_rows) == 1
-    assert selected_rows[0]['dataset']['jobId'] + ':' + selected_rows[0]['dataset']['seq'] == selected_key
+    assert selected_rows[0]['jobId'] + ':' + selected_rows[0]['seq'] == selected_key
     assert page.locator('#bulk-count').text_content().strip() == '1'
