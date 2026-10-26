@@ -5,7 +5,7 @@ from __future__ import annotations
 def _open_scope_v2(page, live_server):
     page.goto(f"{live_server}/ui-v2/scope")
     page.wait_for_function(
-        "() => document.querySelectorAll('#scope-in-table tr').length > 0",
+        "() => document.querySelector('#scope-kpi-in').textContent.trim() !== '—'",
         timeout=5000,
     )
 
