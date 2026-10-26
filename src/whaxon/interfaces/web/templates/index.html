@@ -166,10 +166,10 @@
 
       <!-- SESSIONS -->
       <section class="page" id="page-sessions">
-        <div class="page-head"><div class="ph-main"><h1 class="page-title">Sessions</h1><p class="page-sub">Live Meterpreter and shell sessions from Metasploit.</p></div></div>
+        <div class="page-head"><div class="ph-main"><h1 class="page-title">Sessions</h1><p class="page-sub">Live Meterpreter and shell sessions from Metasploit.</p><p class="card-sub" id="sessions-summary" role="status" aria-live="polite">Loading sessions…</p></div><div class="page-actions"><button class="btn btn-ghost btn-sm" id="sessions-refresh" type="button">Refresh</button></div></div>
         <div class="card card-pad-none">
-          <table class="tbl">
-            <thead><tr><th>Session</th><th>Host</th><th>Type</th><th>Info</th><th></th></tr></thead>
+          <table class="tbl" aria-label="Metasploit sessions">
+            <thead><tr><th>Session</th><th>Host</th><th>Type</th><th>Info</th><th>Status</th></tr></thead>
             <tbody id="sessions-tbody">
               <tr><td colspan="5" style="padding:16px; color:var(--text-dim);">Loading…</td></tr>
             </tbody>

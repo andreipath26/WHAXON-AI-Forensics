@@ -1470,49 +1470,60 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
 (function () {
   const tbody = document.getElementById('sessions-tbody');
   if (!tbody) return;
-
+  const summary = document.getElementById('sessions-summary');
+  const refresh = document.getElementById('sessions-refresh');
+  let loading = false;
+  function showMessage(text, role) {
+    tbody.replaceChildren();
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 5; td.className = 'sessions-empty'; td.textContent = text;
+    if (role) td.setAttribute('role', role);
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
   async function load() {
+    if (loading) return;
+    loading = true;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing…'; }
+    if (summary) summary.textContent = 'Loading sessions…';
     try {
-      const r = await fetch('/api/msf/sessions');
-      if (!r.ok) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; color:var(--text-dim);">Metasploit RPC unreachable.</td></tr>';
-        return;
-      }
-      const data = await r.json();
-      const live = Object.entries(data.live || {}).map(([sid, info]) => ({ sid, info, status: 'live' }));
-      const stored = (data.stored || []).map(s => ({ sid: s.id, info: s.info || s, status: s.status || 'stored' }));
+      const response = await fetch('/api/msf/sessions');
+      let data = {}; try { data = await response.json(); } catch (_) {}
+      if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
+      const live = Object.entries(data.live || {}).map(([sid, info]) => ({ sid, info: info || {}, status: 'live' }));
+      const stored = (Array.isArray(data.stored) ? data.stored : []).map(s => ({ sid: s.id, info: s.info || s, status: s.status || 'stored' }));
       const entries = live.concat(stored);
+      tbody.replaceChildren();
       if (!entries.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; color:var(--text-dim);">No sessions (live or stored).</td></tr>';
+        showMessage(data.available === false ? 'Metasploit RPC is unavailable. Configure it to view live sessions.' : 'No live or stored sessions were returned.');
+        if (summary) summary.textContent = data.available === false ? 'Metasploit RPC unavailable' : '0 sessions';
         return;
       }
-      tbody.innerHTML = '';
-      entries.forEach(({ sid, info, status }) => {
+      entries.forEach(({sid, info, status}) => {
         const tr = document.createElement('tr');
-        const pillCls = status === 'live' ? 'pill-success' : 'pill-neutral';
-        tr.innerHTML =
-          '<td><span class="mono"></span></td>' +
-          '<td><span class="target"></span></td>' +
-          '<td><span class="pill pill-accent"><span class="dot"></span><span class="session-type"></span></span></td>' +
-          '<td><span class="mono"></span></td>' +
-          '<td><span class="pill ' + pillCls + ' session-status"></span></td>';
-        tr.querySelector('.mono').textContent = sid;
-        tr.querySelector('.target').textContent = (info && info.target_host) || (info && info.tunnel_peer) || '';
-        tr.querySelector('.session-type').textContent = String((info && info.type) || '?');
-        tr.querySelector('.session-status').textContent = String(status);
-        tr.querySelectorAll('.mono')[1].textContent = (info && info.info) || '';
-        tbody.appendChild(tr);
+        const session = document.createElement('td'), sessionId = document.createElement('span');
+        sessionId.className = 'mono'; sessionId.textContent = String(sid); session.appendChild(sessionId);
+        const host = document.createElement('td'); host.className = 'target'; host.textContent = String(info.target_host || info.tunnel_peer || info.session_host || '—');
+        const type = document.createElement('td'), typePill = document.createElement('span');
+        typePill.className = 'pill pill-accent'; typePill.textContent = String(info.type || info.session_type || 'unknown'); type.appendChild(typePill);
+        const infoCell = document.createElement('td'); infoCell.className = 'mono'; infoCell.textContent = String(info.info || info.platform || '—');
+        const state = document.createElement('td'), statusPill = document.createElement('span');
+        statusPill.className = 'pill ' + (status === 'live' ? 'pill-success' : 'pill-neutral'); statusPill.textContent = String(status); state.appendChild(statusPill);
+        tr.append(session, host, type, infoCell, state); tbody.appendChild(tr);
       });
-    } catch (e) {
-      whaxonRenderMessageRow(tbody, 5, 'Failed to load sessions: ' + e);
+      if (summary) summary.textContent = entries.length + ' session record(s): ' + live.length + ' live, ' + stored.length + ' stored.';
+    } catch (err) {
+      showMessage('Could not load sessions: ' + String(err && err.message || err), 'alert');
+      if (summary) summary.textContent = 'Session data unavailable.';
+    } finally {
+      loading = false;
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
     }
   }
-
+  if (refresh) refresh.addEventListener('click', load);
   document.querySelectorAll('.sb-item[data-page="sessions"]').forEach(el => el.addEventListener('click', load));
   document.addEventListener('DOMContentLoaded', load);
   if (document.readyState !== 'loading') load();
 })();
-
 // ---- Catalog page wiring ----
 (function () {
   const tbody = document.getElementById('catalog-tbody');
