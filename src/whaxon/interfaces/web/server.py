@@ -2703,6 +2703,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       hideButtonByText('mock test');
       hideButtonByText('re-sign');
       hideButtonByText('save configuration');
+      // Keep the real catalog and filters; suppress static trust and configuration claims.
+      const catalogKpis = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+        const value = grid.textContent || '';
+        return /TOTAL ADAPTERS/.test(value) && /TRUST SIGNATURES/.test(value) && /BINARY ENVIRONMENT/.test(value);
+      });
+      if (catalogKpis) setHidden(catalogKpis, true);
+      const catalogAside = document.querySelector('main aside');
+      if (catalogAside) setHidden(catalogAside, true);
+      const signatureLabel = Array.from(document.querySelectorAll('main span')).find(function (el) {
+        return /LIVE ENTRY POINT SIGNATURE PIPELINE/i.test(el.textContent || '');
+      });
+      const signatureFooter = signatureLabel && signatureLabel.closest('.bg-surface-container-lowest');
+      if (signatureFooter) setHidden(signatureFooter, true);
       document.querySelectorAll('button').forEach(function (button) {
         if ((button.textContent || '').trim().toLowerCase().startsWith('configure')) setHidden(button, true);
       });
@@ -3078,6 +3091,44 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     document.querySelectorAll('main button').forEach(function (button) {
       if (/^(PING|TEST|INSPECT|PROBE|CHECK)$/i.test((button.textContent || '').trim())) setHidden(button, true);
     });
+    // The health API exposes readiness/status JSON only. Remove prototype-only
+    // daemon metrics, HSM/kernel/storage claims, and the simulated telemetry footer.
+    const healthKpis = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+      const value = grid.textContent || '';
+      return /System Status/.test(value) && /Worker Pod Cluster/.test(value) && /Metasploit RPC/.test(value);
+    });
+    if (healthKpis) setHidden(healthKpis, true);
+    const architectureGrid = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+      const value = grid.textContent || '';
+      return /Kernel Namespace Pods/.test(value) && /Cryptographic Roots/.test(value) && /Loopback Tunnel Array/.test(value);
+    });
+    if (architectureGrid) setHidden(architectureGrid, true);
+    function hideHealthPanel(pattern) {
+      const leaf = Array.from(document.querySelectorAll('main span, main p, main h2, main h3, main div')).find(function (el) {
+        return el.children.length === 0 && pattern.test((el.textContent || '').trim());
+      });
+      let node = leaf && leaf.parentElement;
+      while (node && node !== document.querySelector('main')) {
+        const classes = node.classList;
+        const panelBackground = classes.contains('bg-surface-container') ||
+          classes.contains('bg-surface-container-low') || classes.contains('bg-surface-container-lowest');
+        const panelRadius = classes.contains('rounded') || classes.contains('rounded-lg') || classes.contains('rounded-xl');
+        if (panelBackground && panelRadius) { setHidden(node, true); return; }
+        node = node.parentElement;
+      }
+      if (leaf) setHidden(leaf, true);
+    }
+    [
+      /Active Daemon.*Subsystem Matrix/i,
+      /16-Core Live Load Topology/i,
+      /MSF RPC Daemon.*Listeners/i,
+      /Evidence Locker & NVMe Storage Allocation/i
+    ].forEach(hideHealthPanel);
+    const probeBadge = Array.from(document.querySelectorAll('main span')).find(function (el) { return /PROBING ENGINE DAEMONS/i.test(el.textContent || ''); });
+    if (probeBadge) setHidden(probeBadge, true);
+    const streamStatus = Array.from(document.querySelectorAll('main span')).find(function (el) { return /STREAM ACTIVE: 60 FPS/i.test(el.textContent || ''); });
+    const streamFooter = streamStatus && streamStatus.closest('.bg-surface-container-high');
+    if (streamFooter) setHidden(streamFooter, true);
     async function loadHealth() {
       const results = await Promise.all([
         requestJson('/api/health').catch(function (error) { return {error:error.message}; }),
@@ -3128,13 +3179,38 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       } catch (_) {}
     }
     // The supplied evidence design contains sample artifacts and sample hashes.
-    // If this installation has no real evidence, hide the page rather than
-    // presenting those samples as recorded engagement data.
-    if (!selectedJob || !evidence.length) { wireUnavailablePage(); return; }
+    // When there are no recorded artifacts, keep the native list shell and show
+    // an honest empty state instead of a blank page or fabricated sample rows.
     const tree = Array.from(document.querySelectorAll('div')).find(function (element) {
       return element.classList.contains('max-h-[460px]') && element.classList.contains('overflow-y-auto');
     });
     if (!tree) { wireUnavailablePage(); return; }
+    if (!selectedJob || !evidence.length) {
+      const firstCategory = tree.firstElementChild;
+      const headerTemplate = firstCategory && firstCategory.firstElementChild;
+      tree.replaceChildren();
+      if (headerTemplate) {
+        const header = headerTemplate.cloneNode(true);
+        Array.from(header.querySelectorAll('span')).forEach(function (span) {
+          if (/Reconnaissance|Evidence|Proof|Loot/i.test(span.textContent || '')) span.textContent = 'Recorded Evidence';
+          else if (/^\\d+$/.test((span.textContent || '').trim())) span.textContent = '0';
+        });
+        tree.appendChild(header);
+      }
+      const emptyRow = document.createElement('div');
+      emptyRow.className = 'flex items-center gap-1.5 px-2 py-1.5 rounded text-outline';
+      emptyRow.textContent = 'No recorded evidence yet.';
+      tree.appendChild(emptyRow);
+      const layout = tree.parentElement && tree.parentElement.parentElement;
+      if (layout && layout.children.length > 1) {
+        Array.from(layout.children).forEach(function (child) { if (!child.contains(tree)) setHidden(child, true); });
+      }
+      ['Sync Merkle Tree','Export TAR.GZ','Verify SHA-256 Hash','Re-parse into Finding Model','Send to Issue Tracker','Trace Proof'].forEach(hideButtonByText);
+      document.querySelectorAll('main .grid').forEach(function (grid) {
+        if (/Stored Artifacts|128\\.4 MB|1,842,912|840 KB/i.test(grid.textContent || '')) setHidden(grid, true);
+      });
+      return;
+    }
     const firstCategory = tree.firstElementChild;
     const headerTemplate = firstCategory && firstCategory.firstElementChild;
     const selectedTemplate = tree.querySelector('.bg-surface-container-high.shadow-xs');
