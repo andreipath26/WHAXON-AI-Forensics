@@ -1668,8 +1668,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     }
   }
   function hideButtonByText(needle) {
+    const normalizedNeedle = String(needle || '').toLowerCase();
     document.querySelectorAll('button').forEach(function (button) {
-      if ((button.textContent || '').toLowerCase().includes(needle)) {
+      if ((button.textContent || '').toLowerCase().includes(normalizedNeedle)) {
         setHidden(button, true);
         button.setAttribute('aria-hidden', 'true');
       }
