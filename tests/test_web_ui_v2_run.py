@@ -47,4 +47,4 @@ def test_run_v2_shows_only_implemented_navigation(page, live_server):
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
     assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
-    assert not page.locator('a[data-path="ptes-coverage-and-reports"]').is_visible()
+    assert page.locator('a[data-path="ptes-coverage-and-reports"]').is_visible()
