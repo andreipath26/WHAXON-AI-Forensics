@@ -170,6 +170,8 @@ def test_attack_surface_renders_recorded_targets_not_cloud_demo(page, live_serve
     assert "assets-backup-archive.s3.amazonaws.com" not in visible_text
     assert "142 of 142 Assets Active" not in visible_text
     assert "DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE" not in visible_text
+    assert "14m ago" not in visible_text
+    assert "46m" not in visible_text
 
 
 def test_approval_modal_uses_selected_real_finding_and_hides_fake_signing(page, live_server):
