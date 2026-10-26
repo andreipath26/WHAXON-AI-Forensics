@@ -1455,3 +1455,95 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     finally { btn.disabled = false; }
   });
 })();
+
+
+// ---- Functional appearance preferences and threat-intel search ----
+(function () {
+  const themeSelect = document.getElementById('settings-theme');
+  const densityButtons = Array.from(document.querySelectorAll('[data-density]'));
+  const storageKey = 'whaxon-ui-preferences';
+  const defaults = { theme: 'dark', density: 'comfortable' };
+  let prefs = { ...defaults };
+  try { prefs = { ...defaults, ...JSON.parse(localStorage.getItem(storageKey) || '{}') }; } catch (_) {}
+
+  function applyTheme(theme) {
+    const resolved = theme === 'system'
+      ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+      : theme;
+    document.documentElement.dataset.theme = resolved;
+    if (themeSelect) themeSelect.value = theme;
+  }
+  function applyDensity(density) {
+    document.documentElement.dataset.density = density;
+    densityButtons.forEach(button => {
+      const active = button.dataset.density === density;
+      button.classList.toggle('on', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+  function savePrefs() {
+    try { localStorage.setItem(storageKey, JSON.stringify(prefs)); } catch (_) {}
+  }
+  applyTheme(prefs.theme);
+  applyDensity(prefs.density);
+  if (themeSelect) themeSelect.addEventListener('change', () => {
+    prefs.theme = ['dark', 'light', 'system'].includes(themeSelect.value) ? themeSelect.value : 'dark';
+    applyTheme(prefs.theme); savePrefs();
+  });
+  densityButtons.forEach(button => button.addEventListener('click', () => {
+    prefs.density = button.dataset.density === 'compact' ? 'compact' : 'comfortable';
+    applyDensity(prefs.density); savePrefs();
+  }));
+  if (window.matchMedia) {
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    media.addEventListener?.('change', () => { if (prefs.theme === 'system') applyTheme('system'); });
+  }
+
+  const queryInput = document.getElementById('intel-query');
+  const searchButton = document.getElementById('intel-search');
+  const status = document.getElementById('intel-status');
+  const result = document.getElementById('intel-results');
+  if (!queryInput || !searchButton || !status || !result) return;
+  let source = 'nvd';
+  document.querySelectorAll('[data-intel-source]').forEach(button => {
+    button.addEventListener('click', () => {
+      source = button.dataset.intelSource === 'exploit' ? 'exploit' : 'nvd';
+      document.querySelectorAll('[data-intel-source]').forEach(item => {
+        const active = item === button;
+        item.classList.toggle('on', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+      status.textContent = source === 'nvd'
+        ? 'Search National Vulnerability Database (NVD).'
+        : 'Search Exploit-DB for published exploit references.';
+    });
+  });
+  function searchIntel() {
+    const query = queryInput.value.trim();
+    if (!query) {
+      status.textContent = 'Enter a CVE identifier, product name, or version first.';
+      queryInput.focus();
+      return;
+    }
+    const url = source === 'nvd'
+      ? 'https://nvd.nist.gov/vuln/search/results?query=' + encodeURIComponent(query) + '&search_type=all'
+      : 'https://www.exploit-db.com/search?text=' + encodeURIComponent(query);
+    result.replaceChildren();
+    const title = document.createElement('div');
+    title.className = 'card-title';
+    title.textContent = source === 'nvd' ? 'NVD search' : 'Exploit-DB search';
+    const description = document.createElement('p');
+    description.className = 'card-sub';
+    description.textContent = 'Search query: ' + query + '. Results are provided by the external source and are not independently verified by this page.';
+    const link = document.createElement('a');
+    link.className = 'btn btn-primary';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = source === 'nvd' ? 'Open results on NVD' : 'Open results on Exploit-DB';
+    result.append(title, description, link);
+    status.textContent = 'Search prepared. Open the source results to view current records.';
+  }
+  searchButton.addEventListener('click', searchIntel);
+  queryInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchIntel(); });
+})();
