@@ -2615,11 +2615,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     // asset monitor. Keep the original ledger, but suppress the demo telemetry
     // and actions that imply cloud discovery, drift detection, or remediation.
     document.querySelectorAll('main section').forEach(function (section) {
-      if (!section.contains(container)) setHidden(section, true);
+      if (!section.contains(container) && !/ATTACK SURFACE & CONTINUOUS MONITORING/i.test(section.textContent || '')) {
+        setHidden(section, true);
+      }
     });
     document.querySelectorAll('main span, main p, main strong').forEach(function (element) {
       const value = (element.textContent || '').trim();
-      if (/DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|142 of 142 Assets Active|Critical Root Risk Path Active|SYN-ACK received|0 new hosts found|assets-backup-archive\.s3\.amazonaws\.com|api\.staging\.internal|54\.210\.42\.19/i.test(value)) {
+      if (/DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|LAST RUN:|NEXT SYNC:|^14m ago$|^46m$|142 of 142 Assets Active|Critical Root Risk Path Active|SYN-ACK received|0 new hosts found|assets-backup-archive\.s3\.amazonaws\.com|api\.staging\.internal|54\.210\.42\.19/i.test(value)) {
         setHidden(element, true);
       }
     });
