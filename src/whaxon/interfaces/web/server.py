@@ -1593,7 +1593,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         "trust-layer-approvals-queue-modal": "trust_layer_approvals_queue_modal/code.html",
         "ptes-coverage-and-reports": "ptes_coverage_reports/code.html",
         "bas-and-detection-validation": "bas_detection_validation/code.html",
-        "bas-detection-validation": "bas_detection_validation/code.html",
         "compliance-and-framework-crosswalk": "compliance_framework_crosswalk/code.html",
         "threat-intel-and-exploit-arsenal": "threat_intel_exploit_arsenal/code.html",
         "ai-strategy-gate": "ai_strategy_gate_human_in_the_loop/code.html",
@@ -3225,7 +3224,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       ['bug-bounty-and-live-browser-studio', 'bug-bounty-live-browser'],
       ['ptaas-client-portal'],
       ['cryptographic-audit-log'],
-      ['bas-and-detection-validation', 'bas-detection-validation'],
+      ['bas-and-detection-validation'],
       ['compliance-and-framework-crosswalk'],
       ['threat-intel-and-exploit-arsenal'],
       ['attack-surface-and-continuous-monitoring'],
@@ -3267,7 +3266,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   if (page === 'run-and-orchestration' || page === 'run-orchestration') wireRun();
   if (page === 'dashboard-zero-state') wireDashboard();
   if (page === 'ptes-coverage-and-reports' || page === 'ptes-coverage-reports') wireReports();
-  if (page === 'bas-and-detection-validation' || page === 'bas-detection-validation') wireCoverage();
+  if (page === 'bas-and-detection-validation') wireCoverage();
   if (page === 'compliance-and-framework-crosswalk') wireUnavailablePage();
   if (page === 'threat-intel-and-exploit-arsenal') wireThreatIntel();
   if (page === 'job-execution-history') wireHistory();
