@@ -2285,12 +2285,15 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       hideButtonByText('configure filters');
       hideButtonByText('load workspace');
       hideButtonByText('audit pack');
-      const startEngagement = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      const startEngagement = Array.from(document.querySelectorAll('button')).find(function (button) {
         return /start new engagement/i.test(button.textContent || '');
       });
-      if (startEngagement) startEngagement.onclick = function () {
-        window.location.assign('/ui/run-and-orchestration');
-      };
+      if (startEngagement) {
+        setHidden(startEngagement, false);
+        startEngagement.onclick = function () {
+          window.location.assign('/ui/run-and-orchestration');
+        };
+      }
       hideButtonByText('upload artifact');
       hideButtonByText('export archive');
       hideButtonByText('switch target session');
