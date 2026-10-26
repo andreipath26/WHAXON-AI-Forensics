@@ -819,7 +819,9 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     const sevEl = document.getElementById('so-sev');
     if (sevEl) {
       sevEl.className = 'pill ' + (SEV_PILL[sev] || 'pill-info');
-      sevEl.innerHTML = '<span class="dot"></span>' + (SEV_LABEL[sev] || 'Info');
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      sevEl.replaceChildren(dot, document.createTextNode(SEV_LABEL[sev] || 'Info'));
     }
     const titleEl = document.getElementById('so-title');
     if (titleEl) titleEl.textContent = tr.dataset.title || '';
