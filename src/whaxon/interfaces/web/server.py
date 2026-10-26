@@ -2416,8 +2416,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   if (page === 'settings-and-api-explorer' || page === 'settings-and-secrets-vault' || page === 'settings-secrets-vault') wireSettings();
   if (page === 'bug-bounty-and-live-browser-studio' || page === 'bug-bounty-live-browser' || page === 'ptaas-client-portal' || page === 'cryptographic-audit-log') wireUnavailablePage();
 })();
-</script>""";
-    }
+</script>"""
 
     def _serve_new_ui(page: str):
         from flask import abort
