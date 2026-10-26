@@ -1980,6 +1980,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) container.hidden = true;
       else if (!container) element.hidden = true;
     });
+    // The coverage matrix and SIEM rule recommendations in this design are
+    // static examples; this backend does not produce those telemetry claims.
+    document.querySelectorAll('main h2, main h3, main span').forEach(function (element) {
+      const value = (element.textContent || '').trim();
+      if (/Coverage Gap Matrix|Rule Recommendations|3 DOCUMENTED EXCLUSIONS|SEC-AZ-992|CROWDSTRIKE|SPLUNK & SENTINEL|FIN7 \/ APT29/i.test(value)) {
+        const container = element.closest('.bg-surface-container-low.rounded-lg, .bg-surface-container-lowest.rounded-lg');
+        if (container && !container.contains(previewButton)) container.hidden = true;
+        else element.hidden = true;
+      }
+    });
     try { await requestJson('/api/report?format=json'); }
     catch (_) {
       [previewButton, exportJson, exportPdf].forEach(function (button) { if (button) button.disabled = true; });

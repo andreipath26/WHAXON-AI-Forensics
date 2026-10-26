@@ -122,3 +122,9 @@ def test_evidence_page_never_shows_static_sample_artifacts(page, live_server):
 def test_unwired_approval_page_hides_demo_modal_outside_main(page, live_server):
     page.goto(f"{live_server}/ui/trust-layer-approvals-queue-modal", wait_until="domcontentloaded")
     assert page.locator("#approvals-modal").is_hidden()
+
+
+def test_reports_page_hides_static_coverage_and_rule_claims(page, live_server):
+    page.goto(f"{live_server}/ui/ptes-coverage-and-reports", wait_until="domcontentloaded")
+    assert page.get_by_text("Coverage Gap Matrix", exact=True).is_hidden()
+    assert page.get_by_text("Rule Recommendations", exact=True).is_hidden()
