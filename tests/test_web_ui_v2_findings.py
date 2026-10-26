@@ -36,5 +36,4 @@ def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, l
     )
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
     assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
-    assert not page.locator('a[data-path="run-and-orchestration"]').is_visible()
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
