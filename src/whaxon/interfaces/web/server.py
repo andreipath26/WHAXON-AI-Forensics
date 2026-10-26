@@ -2408,7 +2408,100 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     }
   }
   async function wireRetest() {
-    wireUnavailablePage();
+    const search = document.querySelector('input[placeholder*="Filter Finding"]');
+    const queue = Array.from(document.querySelectorAll('div')).find(function (element) {
+      return element.classList.contains('max-h-[820px]') && element.classList.contains('overflow-y-auto');
+    });
+    if (!queue || !queue.firstElementChild) { wireUnavailablePage(); return; }
+    const template = queue.firstElementChild.cloneNode(true);
+    let rows = [], selected = null;
+    try {
+      const report = await requestJson('/api/report?format=json');
+      rows = flattenFindings(report).filter(function (item) {
+        return item.job && (item.job.id || item.job.job_id) && item.finding && item.finding.seq != null;
+      });
+    } catch (_) { wireUnavailablePage(); return; }
+    if (!rows.length) { wireUnavailablePage(); return; }
+    queue.replaceChildren();
+    const entries = [];
+    rows.forEach(function (item) {
+      const job = item.job, finding = item.finding;
+      const card = template.cloneNode(true);
+      card.hidden = false;
+      card.dataset.jobId = String(job.id || job.job_id);
+      card.dataset.seq = String(finding.seq);
+      card.dataset.status = String(finding.verification_status || 'candidate').toLowerCase();
+      const id = card.querySelector('.font-code-md');
+      if (id) id.textContent = card.dataset.jobId + ':' + card.dataset.seq;
+      Array.from(card.querySelectorAll('span')).forEach(function (span) {
+        const value = (span.textContent || '').trim();
+        if (/^PRIOR:/i.test(value)) span.textContent = 'PRIOR: ' + status(finding.verification_status);
+        if (/^AUTHOR:/i.test(value)) span.textContent = 'SOURCE: ' + String(finding.source || 'unknown');
+        if (/STILL_VULNERABLE|FIXED|INCONCLUSIVE/i.test(value)) span.textContent = status(finding.verification_status);
+      });
+      const title = card.querySelector('.font-body-md');
+      if (title) title.textContent = String(finding.title || finding.kind || 'Finding');
+      const target = card.querySelector('.font-code-sm.text-secondary');
+      if (target) target.textContent = String(finding.url || finding.endpoint || finding.target || job.target || 'Target not recorded');
+      const reasonBlock = card.querySelector('.mt-1.p-space-xs');
+      if (reasonBlock) {
+        const reasonLabels = reasonBlock.querySelectorAll('span');
+        const reason = finding.verification_reason || finding.reason || 'No verification reason recorded';
+        if (reasonLabels.length) reasonLabels[reasonLabels.length - 1].textContent = String(reason);
+      }
+      card.querySelectorAll('span, p').forEach(function (element) {
+        if (/Median-of-3|pg_sleep\(5\)|Jitter Rejection|Audit C-01|HASH ATTESTED|5,042ms|Δ \+5,009ms/i.test(element.textContent || '')) element.hidden = true;
+      });
+      card.addEventListener('click', function () {
+        selected = item;
+        entries.forEach(function (entry) {
+          entry.card.classList.remove('border-primary','border-error/50','shadow-[0_0_14px_rgba(239,68,68,0.15)]');
+        });
+        card.classList.add('border-primary');
+      });
+      queue.appendChild(card);
+      entries.push({card:card,item:item});
+    });
+    selected = rows[0];
+    if (entries[0]) entries[0].card.click();
+    if (search) search.oninput = function () {
+      const q = search.value.toLowerCase();
+      entries.forEach(function (entry) { entry.card.hidden = !entry.card.textContent.toLowerCase().includes(q); });
+    };
+    // This backend exposes single-finding validate/retest, not the design's
+    // claimed 3x timing protocol or cryptographic three-way verdict ledger.
+    ['BATCH REPLAY','RE-EXECUTE IMMEDIATE PROBE','COMMIT 3-WAY VERDICT TO AUDIT LEDGER','FILTER BY 3-WAY VERDICT'].forEach(hideButtonByText);
+    const replayButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /Re-Execute Replay/i.test(button.textContent || '');
+    });
+    if (replayButton) {
+      const label = replayButton.querySelector('span:last-child');
+      if (label) label.textContent = 'Validate / Retest Selected';
+      replayButton.onclick = async function () {
+        if (!selected) { window.alert('Select a recorded finding first.'); return; }
+        const jobId = selected.job.id || selected.job.job_id;
+        const finding = selected.finding;
+        const action = String(finding.verification_status || '').toLowerCase() === 'verified' ? 'retest' : 'validate';
+        replayButton.disabled = true;
+        try {
+          const result = await requestJson('/api/' + action + '/' + encodeURIComponent(jobId) + '/' + encodeURIComponent(finding.seq), {method:'POST'});
+          window.alert(action + ': ' + (result.status || 'completed') + (result.reason ? '\n' + result.reason : ''));
+          window.location.reload();
+        } catch (error) { window.alert(action + ' failed: ' + error.message); }
+        finally { replayButton.disabled = false; }
+      };
+    }
+    const exportButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /EXPORT PROOF AUDIT JSON/i.test(button.textContent || '');
+    });
+    if (exportButton) exportButton.onclick = function () {
+      if (!selected) { window.alert('Select a recorded finding first.'); return; }
+      window.location.assign('/api/jobs/' + encodeURIComponent(selected.job.id || selected.job.job_id) + '/findings.json');
+    };
+    document.querySelectorAll('main .bg-surface-container-low.rounded-xl').forEach(function (element) { element.hidden = true; });
+    document.querySelectorAll('main span, main p').forEach(function (element) {
+      if (/ENG-2026-X892|api\.internal\.corp|Median-of-3 pg_sleep|FINDING-SQLI-001|FINDING-XSS-004|FINDING-BOLA-009/i.test(element.textContent || '')) element.hidden = true;
+    });
   }
   async function wireAttackSurface() {
     wireUnavailablePage();

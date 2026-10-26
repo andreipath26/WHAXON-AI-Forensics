@@ -128,3 +128,12 @@ def test_reports_page_hides_static_coverage_and_rule_claims(page, live_server):
     page.goto(f"{live_server}/ui/ptes-coverage-and-reports", wait_until="domcontentloaded")
     assert page.get_by_text("Coverage Gap Matrix", exact=True).is_hidden()
     assert page.get_by_text("Rule Recommendations", exact=True).is_hidden()
+
+
+def test_retest_page_renders_real_findings_and_hides_batch_claims(page, live_server):
+    page.goto(f"{live_server}/ui/remediation-retest-studio", wait_until="domcontentloaded")
+    queue = page.locator("div.max-h-\\[820px\\]")
+    assert queue.is_visible()
+    assert queue.locator(":scope > div").count() >= 1
+    assert page.get_by_role("button", name="Validate / Retest Selected").is_visible()
+    assert page.get_by_role("button", name="BATCH REPLAY (3x BASELINE + 3x INJECTED)").is_hidden()
