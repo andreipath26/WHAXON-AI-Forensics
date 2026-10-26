@@ -2783,20 +2783,25 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (paragraph) paragraph.textContent = edge.evidence ? String(edge.evidence) : 'No evidence note is recorded for this relationship.';
       const code = card.querySelector('.font-code-sm');
       if (code) code.textContent = describe(edge.parent) + ' → ' + describe(edge.child);
+      const codeBlock = card.querySelector('.bg-surface-container-lowest.rounded.p-space-sm');
+      if (codeBlock) codeBlock.textContent = 'Recorded relationship: ' + describe(edge.parent) + ' → ' + describe(edge.child);
+      card.querySelectorAll('span, p').forEach(function (element) {
+        if (/uid=0\(root\)|appuser:x:|AKIAIOS|9a4f21b7|CVE-2021-41773|staging-api\.corp\.net/i.test(element.textContent || '')) setHidden(element, true);
+      });
       card.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
       if (insertBefore && insertBefore.parentElement === container) container.insertBefore(card, insertBefore);
       else container.appendChild(card);
     });
     // Other chain summaries on this page are hard-coded attack narratives.
     // Retain the original heading and the edge cards populated above only.
-    const graphSection = container.closest('section');
+    const graphSection = container.closest('section') || container;
     document.querySelectorAll('main section').forEach(function (section) {
-      if (!section.contains(template) && !section.contains(document.getElementById('btn-recompute'))) setHidden(section, true);
+      if (section !== graphSection && !section.contains(document.getElementById('btn-recompute'))) setHidden(section, true);
     });
     document.querySelectorAll('main span, main p, main h2, main h3').forEach(function (element) {
       if (/3 Lethal Paths|CVSS Compound: 10\.0|CHAIN #AC-09|CHAIN #AC-04|CHAIN #AC-01|100% Deterministic Link|94% Telemetry Correlated|ACTIVE EXPLOIT DETECTED|uid=0\(root\)|api\.internal\.corp|db\.internal/i.test(element.textContent || '')) {
         const card = element.closest('.bg-surface-container-low.rounded-xl, .bg-surface-container.rounded-xl');
-        if (card && !card.contains(template) && !card.contains(document.getElementById('btn-recompute'))) setHidden(card, true);
+        if (card && !card.contains(container) && !card.contains(document.getElementById('btn-recompute'))) setHidden(card, true);
         else if (!card) setHidden(element, true);
       }
     });
