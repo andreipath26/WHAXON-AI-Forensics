@@ -158,6 +158,19 @@ def test_attack_chain_page_hides_static_chain_when_no_recorded_edges(page, live_
     assert "Postgres Remote Code Execution via dblink/COPY" not in page.locator("body").inner_text()
 
 
+def test_attack_surface_renders_recorded_targets_not_cloud_demo(page, live_server):
+    page.goto(f"{live_server}/ui/attack-surface-and-continuous-monitoring", wait_until="domcontentloaded")
+    page.wait_for_timeout(300)
+    ledger = page.locator("#asset-ledger-container")
+    assert ledger.is_visible()
+    assert ledger.locator("article.asset-card").count() >= 1
+    visible_text = page.locator("body").inner_text()
+    assert "127.0.0.1" in visible_text
+    assert "assets-backup-archive.s3.amazonaws.com" not in visible_text
+    assert "142 of 142 Assets Active" not in visible_text
+    assert "DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE" not in visible_text
+
+
 def test_approval_modal_uses_selected_real_finding_and_hides_fake_signing(page, live_server):
     page.goto(f"{live_server}/ui/trust-layer-approvals-queue-modal", wait_until="domcontentloaded")
     send = page.get_by_role("button", name="Send to Approvals")
