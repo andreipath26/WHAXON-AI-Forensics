@@ -2509,7 +2509,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (!selected) { window.alert('Select a recorded finding first.'); return; }
       window.location.assign('/api/jobs/' + encodeURIComponent(selected.job.id || selected.job.job_id) + '/findings.json');
     };
-    document.querySelectorAll('main .bg-surface-container-low.rounded-xl').forEach(function (element) { setHidden(element, true); });
+    document.querySelectorAll('main .bg-surface-container-low.rounded-xl').forEach(function (element) {
+      if (/Status: FIXED|HASH ATTESTED|Status: STILL_VULNERABLE|ACTIVE TARGETS/i.test(element.textContent || '') &&
+          !element.querySelector('button')) setHidden(element, true);
+    });
     document.querySelectorAll('main span, main p').forEach(function (element) {
       if (/ENG-2026-X892|api\.internal\.corp|Median-of-3 pg_sleep|FINDING-SQLI-001|FINDING-XSS-004|FINDING-BOLA-009/i.test(element.textContent || '')) setHidden(element, true);
     });
