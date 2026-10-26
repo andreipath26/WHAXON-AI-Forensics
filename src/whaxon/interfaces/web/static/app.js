@@ -213,7 +213,8 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
 
 
   // chips
-  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+  // Functional chips manage their own state; only decorative chips use the generic toggle.
+  document.querySelectorAll('.chip:not([data-filter]):not([data-intel-source])').forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
 
   // accordion
   document.querySelectorAll('.acc-head').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
