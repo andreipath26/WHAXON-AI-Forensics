@@ -1879,108 +1879,73 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (body) {
         body.replaceChildren();
         const rows = [
-          ...(data.in_scope || []).map(function (target) { return {target:target, state:'IN SCOPE', allowed:true}; }),
-          ...(data.out_of_scope || []).map(function (target) { return {target:target, state:'EXCLUDED', allowed:false}; })
+          ...(data.in_scope || []).map(function (target) { return {target:target, allowed:true}; }),
+          ...(data.out_of_scope || []).map(function (target) { return {target:target, allowed:false}; })
         ];
         const table = body.closest('table');
-        if (table) table.querySelectorAll('thead th').forEach(function (cell, index) { if (index > 0 && index < 6) cell.hidden = true; });
+        if (table) table.querySelectorAll('thead th').forEach(function (cell, index) {
+          if (index > 0 && index < 6) cell.hidden = true;
+        });
         rows.forEach(function (item) {
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-surface-container/60 transition-colors';
           const target = document.createElement('td');
           target.className = 'py-2.5 px-space-md font-semibold';
           target.textContent = item.target;
-          const state = document.createElement('td'); state.className = 'py-2.5 px-space-md text-right'; state.textContent = item.state;
+          tr.appendChild(target);
+          for (let i = 1; i < 6; i++) {
+            const hiddenCell = document.createElement('td');
+            hiddenCell.hidden = true;
+            tr.appendChild(hiddenCell);
+          }
+          const state = document.createElement('td');
+          state.className = 'py-2.5 px-space-md text-right';
+          state.textContent = item.allowed ? 'IN SCOPE' : 'EXCLUDED';
           state.classList.add(item.allowed ? 'text-primary' : 'text-error');
-          for (let i = 1; i < 6; i++) { const hiddenCell = document.createElement('td'); hiddenCell.hidden = true; tr.appendChild(hiddenCell); }
-          tr.insertBefore(target, tr.firstChild);
           tr.appendChild(state);
           body.appendChild(tr);
         });
         if (!rows.length) {
           const tr = document.createElement('tr'), td = document.createElement('td');
-          td.colSpan = 7; td.className = 'p-space-lg text-outline'; td.textContent = 'No scope rules configured. The scope guard remains authoritative.';
-          tr.appendChild(td); body.appendChild(tr);
+          td.colSpan = 7;
+          td.className = 'p-space-lg text-outline';
+          td.textContent = 'No scope rules configured.';
+          tr.appendChild(td);
+          body.appendChild(tr);
         }
         const filter = document.getElementById('targetFilterInput');
         if (filter) filter.oninput = function () {
           const q = filter.value.toLowerCase();
-          body.querySelectorAll('tr').forEach(function (tr) { tr.hidden = !tr.textContent.toLowerCase().includes(q); });
+          body.querySelectorAll('tr').forEach(function (tr) {
+            tr.hidden = !tr.textContent.toLowerCase().includes(q);
+          });
         };
       }
-      hideButtonByText('commit to scope');
-      hideButtonByText('import & parse rules');
-      hideButtonByText('add deny rule');
-      hideButtonByText('add target');
-      hideButtonByText('import scope');
-      hideButtonByText('configure scope');
-      hideButtonByText('commit to scope');
-      hideButtonByText('import & parse rules');
-      hideButtonByText('add deny rule');
-      hideButtonByText('add target');
-      hideButtonByText('import scope');
-      hideButtonByText('configure scope');
-    } catch (error) { result.textContent = 'Scope check failed closed: ' + error.message; result.className = 'font-code-sm mt-space-md text-error'; }
-          finally { button.disabled = false; }
-        };
-        form.append(input, button); panel.append(heading, form, result); main.prepend(panel);
+      ['quick import','add in-scope target','next','view certificate san chain',
+       'mark out-of-scope exclusion','promote to scope','add boundary exclusion',
+       'commit to scope','import & parse rules'].forEach(hideButtonByText);
+      document.querySelectorAll('button').forEach(function (button) {
+        const label = (button.textContent || '').toLowerCase();
+        if (!/commit to scope|import & parse rules|add in-scope target|add boundary exclusion/.test(label)) return;
+        const modal = button.closest('.fixed');
+        if (modal) modal.hidden = true;
+      });
+      const targetModal = document.getElementById('modalTargetInput');
+      if (targetModal) {
+        const modal = targetModal.closest('.fixed');
+        if (modal) modal.hidden = true;
+      }
+      const importText = document.querySelector('textarea[placeholder*="target"]');
+      if (importText) {
+        const modal = importText.closest('.fixed');
+        if (modal) modal.hidden = true;
       }
     } catch (error) {
       wireUnavailablePage();
     }
   }
   async function wireReports() {
-    if (page !== 'ptes-coverage-and-reports' && page !== 'ptes-coverage-reports') {
-      document.querySelectorAll('button').forEach(function (button) {
-        const label = (button.textContent || '').toLowerCase();
-        if (label.includes('report') && !label.includes('preview')) {
-          button.addEventListener('click', function (event) {
-            event.preventDefault();
-            window.location.href = '/api/report?format=md';
-          });
-        }
-      });
-      return;
-    }
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Engagement Report';
-    const summary = document.createElement('p'); summary.className = 'font-code-sm text-outline mb-space-md'; summary.textContent = 'Loading report data…';
-    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
-    const actions = document.createElement('div'); actions.className = 'flex flex-wrap gap-space-sm mt-space-md';
-    [['Markdown','md'],['HTML','html'],['PDF','pdf'],['JSON','json']].forEach(function (item) {
-      const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; button.textContent = 'Download ' + item[0];
-      button.onclick = function () { window.location.href = '/api/report?format=' + item[1]; }; actions.appendChild(button);
-    });
-    const previewButton = document.createElement('button'); previewButton.className = 'px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; previewButton.textContent = 'Preview Markdown';
-    const preview = document.createElement('pre'); preview.className = 'mt-space-md p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm whitespace-pre-wrap overflow-x-auto'; preview.hidden = true;
-    previewButton.onclick = async function () {
-      previewButton.disabled = true;
-      try { const response = await fetch('/api/report?format=md'); if (!response.ok) throw new Error('HTTP ' + response.status); preview.textContent = await response.text(); preview.hidden = false; }
-      catch (error) { preview.textContent = 'Report preview unavailable: ' + error.message; preview.hidden = false; }
-      finally { previewButton.disabled = false; }
-    };
-    actions.appendChild(previewButton);
-    panel.append(heading, summary, list, actions, preview);
-    Array.from(main.children).forEach(function (child) { child.hidden = true; });
-    main.appendChild(panel);
-    try {
-      const report = await requestJson('/api/report?format=json');
-      const jobs = report.job_count == null ? (report.jobs || []).length : report.job_count;
-      const count = report.finding_count == null ? flattenFindings(report).length : report.finding_count;
-      const findings = flattenFindings(report);
-      const verified = findings.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
-      summary.textContent = jobs + ' job(s) · ' + count + ' finding(s) · ' + verified + ' verified';
-      findings.slice(0, 12).forEach(function (item) {
-        const f = item.finding, job = item.job;
-        const row = document.createElement('div'); row.className = 'p-space-md rounded bg-surface-container border border-outline-variant/20';
-        const title = document.createElement('div'); title.className = 'font-code-sm text-on-surface'; title.textContent = f.title || f.kind || 'Finding';
-        const meta = document.createElement('div'); meta.className = 'font-code-sm text-outline mt-1'; meta.textContent = [String(f.severity || 'info').toUpperCase(), f.verification_status || f.status || 'candidate', job.id, f.target || job.target].filter(Boolean).join(' · ');
-        row.append(title, meta); list.appendChild(row);
-      });
-      if (!findings.length) list.textContent = 'No findings are available for this report yet.';
-    } catch (error) { summary.textContent = 'Report data unavailable: ' + error.message; }
+    wireUnavailablePage();
   }
   async function wireRun() {
     const targetInput = document.querySelector('input[placeholder*="Target host"]');
@@ -2115,20 +2080,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const active = history.filter(function (job) { return /running|queued|active/i.test(String(job.status || '')); }).length;
       const verified = findings.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
       const candidate = findings.filter(function (item) { return /candidate|pending/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
-      const coverageResults = await Promise.all(history.slice(0, 10).map(function (job) {
-        const id = job.id || job.job_id;
-        return id ? requestJson('/api/coverage/' + encodeURIComponent(id)).catch(function () { return {gaps:[], unavailable:true}; }) : Promise.resolve({gaps:[], unavailable:true});
-      }));
-      const gapCount = coverageResults.reduce(function (sum, item) { return sum + (item.gaps || []).length; }, 0);
-      const unavailableCoverageCount = coverageResults.filter(function (item) { return item.unavailable; }).length;
       const metrics = {
         'Active Scans':active,
         'Verified Findings':verified,
         'Candidate Findings':candidate,
-        'Remediation Retest':verified,
-        'Active Adapters':tools.filter(function (tool) { return !!tool.adapter_available; }).length,
-        'Active Session Buffer':sessions.live_count || 0,
-        'PTES Coverage':gapCount
+        'Active Adapters':tools.filter(function (tool) { return !!tool.adapter_available; }).length
       };
       document.querySelectorAll('span').forEach(function (label) {
         const key = (label.textContent || '').trim();
@@ -2175,6 +2131,33 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           tr.appendChild(td); body.appendChild(tr);
         }
       }
+      const remLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Remediation Retest'; });
+      if (remLabel) { const card = remLabel.closest('.rounded-lg'); if (card) card.hidden = true; }
+      const coverageLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'PTES Coverage'; });
+      if (coverageLabel) { const card = coverageLabel.closest('.rounded-lg'); if (card) card.hidden = true; }
+      const sessionBufferLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Session Buffer'; });
+      if (sessionBufferLabel) { const bar = sessionBufferLabel.closest('.rounded-lg'); if (bar) bar.hidden = true; }
+      const falsePositiveLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /FALSE POSITIVES/.test(el.textContent || ''); });
+      if (falsePositiveLabel) {
+        falsePositiveLabel.hidden = true;
+        const card = falsePositiveLabel.closest('.rounded-lg');
+        const progress = card && card.querySelector('.mt-2.h-1');
+        if (progress) progress.hidden = true;
+      }
+      const roeLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'ROE SIGN-OFF'; });
+      if (roeLabel) { const checklist = roeLabel.closest('.grid'); if (checklist) checklist.hidden = true; }
+      const activeScansLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Scans'; });
+      if (activeScansLabel) {
+        const card = activeScansLabel.closest('.rounded-lg');
+        const sublabel = card && Array.from(card.querySelectorAll('span')).find(function (el) { return /RUNNING/.test(el.textContent || ''); });
+        if (sublabel) sublabel.textContent = active + ' RUNNING';
+      }
+      const adaptersLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Adapters'; });
+      if (adaptersLabel) {
+        const card = adaptersLabel.closest('.rounded-lg');
+        const sublabel = card && Array.from(card.querySelectorAll('span')).find(function (el) { return /PLUGINS READY/.test(el.textContent || ''); });
+        if (sublabel) sublabel.textContent = 'ADAPTERS AVAILABLE';
+      }
       const search = document.querySelector('input[placeholder*="Filter by ID"]');
       if (search && body) search.oninput = function () {
         const q = search.value.toLowerCase();
@@ -2210,7 +2193,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       hideButtonByText('continue setup');
       hideButtonByText('inspect ledger');
       hideButtonByText('cli help');
-      wireReports();
+      // Report page wiring is dispatched only on its own route; do not alter the dashboard.
       const statusLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'ENGINE STATUS'; });
       if (statusLabel && statusData.ok === false) statusLabel.textContent = 'ENGINE DEGRADED';
     } catch (error) {
@@ -2388,57 +2371,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     wireUnavailablePage();
   }
   async function wireAiApprovals() {
-    try {
-      const pending = await requestJson('/api/ai/pending');
-      const items = Array.isArray(pending) ? pending : (pending.items || pending.pending || []);
-      const candidates = document.querySelectorAll('button');
-      candidates.forEach(function (button) {
-        const label = (button.textContent || '').toLowerCase();
-        if (label.includes('authorize & execute') || label.includes('reject & re-plan')) {
-          button.hidden = true;
-          button.setAttribute('aria-hidden', 'true');
-        }
-      });
-      const main = document.querySelector('main');
-      if (!main) return;
-      const summary = document.createElement('section');
-      summary.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-      const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live AI Approval Queue';
-      summary.appendChild(heading);
-      Array.from(main.children).forEach(function (child) { child.hidden = true; });
-      if (!items.length) {
-        const empty = document.createElement('p'); empty.className = 'font-code-sm text-outline'; empty.textContent = 'No pending AI runs require a decision.';
-        summary.appendChild(empty);
-      }
-      items.forEach(function (item) {
-        const row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-space-md py-space-sm border-t border-outline-variant/20';
-        const info = document.createElement('div'); info.className = 'flex flex-col gap-1';
-        const title = document.createElement('span'); title.className = 'font-code-sm'; title.textContent = item.run_id || item.id || 'AI run';
-        const detail = document.createElement('span'); detail.className = 'text-outline font-code-sm'; detail.textContent = item.goal || item.status || 'Awaiting review';
-        info.append(title, detail);
-        const actions = document.createElement('div'); actions.className = 'flex gap-space-sm';
-        [['Approve','approve'],['Reject','reject']].forEach(function (choice) {
-          const button = document.createElement('button'); button.className = 'px-space-md py-1 rounded bg-surface-container-high font-code-sm'; button.textContent = choice[0];
-          button.onclick = async function () {
-            button.disabled = true;
-            try {
-              await requestJson('/api/ai/runs/' + encodeURIComponent(item.run_id || item.id) + '/answer', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body:JSON.stringify({answer:choice[1], user:'local', note:'Resolved from WHAXON UI'})
-              });
-              row.remove();
-            } catch (error) { button.title = error.message; button.disabled = false; }
-          };
-          actions.appendChild(button);
-        });
-        row.append(info, actions); summary.appendChild(row);
-      });
-      main.prepend(summary);
-    } catch (error) {
-      hideButtonByText('authorize & execute');
-      hideButtonByText('reject & re-plan');
-      wireUnavailablePage();
-    }
+    wireUnavailablePage();
   }
   async function wireHealth() {
     wireUnavailablePage();
