@@ -1172,6 +1172,68 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   if (document.readyState !== 'loading') { loadCatalog(); loadRecent(); }
 })();
 
+// ---- Attack Surface graph wiring ----
+(function () {
+  const tbody = document.getElementById('graph-tbody');
+  if (!tbody) return;
+  const summary = document.getElementById('graph-summary');
+  const refresh = document.getElementById('graph-refresh');
+  let loading = false;
+  function showMessage(message, role) {
+    tbody.replaceChildren();
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 5; td.className = 'graph-empty'; td.textContent = message;
+    if (role) td.setAttribute('role', role);
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
+  function nodeText(node) {
+    if (!node || typeof node !== 'object') return '—';
+    return String(node.kind || 'node') + ': ' + String(node.id || '—');
+  }
+  function render(edges) {
+    tbody.replaceChildren();
+    if (!edges.length) {
+      showMessage('No stored pivot relationships yet. Relationships appear after WHAXON records them.');
+      if (summary) summary.textContent = '0 recorded relationships';
+      return;
+    }
+    edges.forEach(edge => {
+      const tr = document.createElement('tr');
+      const parent = document.createElement('td'); parent.textContent = nodeText(edge.parent);
+      const relation = document.createElement('td'); relation.textContent = String(edge.relation || '—');
+      const child = document.createElement('td'); child.textContent = nodeText(edge.child);
+      const evidence = document.createElement('td'); evidence.textContent = String(edge.evidence || '—');
+      const recorded = document.createElement('td');
+      const stamp = Number(edge.created_at);
+      recorded.textContent = Number.isFinite(stamp) && stamp > 0 ? new Date(stamp * 1000).toLocaleString() : '—';
+      tr.append(parent, relation, child, evidence, recorded); tbody.appendChild(tr);
+    });
+    if (summary) summary.textContent = edges.length + ' stored relationship(s). This view contains recorded data only.';
+  }
+  async function load() {
+    if (loading) return;
+    loading = true;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing…'; }
+    if (summary) summary.textContent = 'Loading recorded relationships…';
+    try {
+      const response = await fetch('/api/pivot/graph');
+      let data = {}; try { data = await response.json(); } catch (_) {}
+      if (!response.ok) throw new Error(data.error || ('HTTP ' + response.status));
+      render(Array.isArray(data.edges) ? data.edges : []);
+    } catch (err) {
+      showMessage('Could not load stored relationships: ' + String(err && err.message || err), 'alert');
+      if (summary) summary.textContent = 'Relationship data unavailable.';
+    } finally {
+      loading = false;
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    }
+  }
+  if (refresh) refresh.addEventListener('click', load);
+  document.querySelectorAll('.sb-item[data-page="graph"]').forEach(el => el.addEventListener('click', load));
+  document.addEventListener('DOMContentLoaded', load);
+  if (document.readyState !== 'loading') load();
+})();
+
 // ---- Coverage page wiring (§34.2 step 4) ----
 (function () {
   const tbody = document.getElementById('coverage-tbody');

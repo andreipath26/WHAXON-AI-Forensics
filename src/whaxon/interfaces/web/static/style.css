@@ -743,3 +743,8 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 /* Sessions list states */
 #page-sessions .sessions-empty { padding: 16px; color: var(--text-dim); white-space: normal; }
 #page-sessions #sessions-refresh:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+/* Attack Surface graph states */
+#page-graph .graph-empty { padding: 16px; color: var(--text-dim); white-space: normal; }
+#page-graph #graph-refresh:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
