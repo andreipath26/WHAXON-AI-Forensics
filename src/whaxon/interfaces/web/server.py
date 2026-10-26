@@ -1677,6 +1677,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       }
     });
   }
+  // Shared header controls have no corresponding backend actions yet.
+  // Hide them on every page rather than leave inert, misleading affordances.
+  ['terminal log', 'emergency halt scan'].forEach(hideButtonByText);
   // Remove hard-coded demo identity and global actions that have no backend route.
   document.querySelectorAll('span, button').forEach(function (element) {
     const label = (element.textContent || '').trim();
@@ -1933,7 +1936,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       }
       ['quick import','add in-scope target','next','view certificate san chain',
        'mark out-of-scope exclusion','promote to scope','add boundary exclusion',
-       'commit to scope','import & parse rules'].forEach(hideButtonByText);
+       'commit to scope','import & parse rules','terminal log','emergency halt scan'].forEach(hideButtonByText);
+    document.querySelectorAll('.toggle-scope-status, #authConfirmCheckbox').forEach(function (control) {
+      const label = control.closest('label') || control.parentElement;
+      setHidden(label || control, true);
+    });
       document.querySelectorAll('button').forEach(function (button) {
         const label = (button.textContent || '').toLowerCase();
         if (!/commit to scope|import & parse rules|add in-scope target|add boundary exclusion/.test(label)) return;

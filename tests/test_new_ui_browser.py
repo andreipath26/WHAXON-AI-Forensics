@@ -54,13 +54,16 @@ def test_dashboard_renders_live_job_rows(page, live_server):
     assert "seed-job-1" in page.locator("main").inner_text()
 
 
-def test_scope_page_renders_real_scope_rules(page, live_server):
+def test_scope_page_renders_real_scope_rules_and_hides_inert_controls(page, live_server):
     page.goto(f"{live_server}/ui/scope-and-targets", wait_until="domcontentloaded")
     page.wait_for_timeout(300)
     body = page.locator("#targetTableBody")
     assert body.is_visible()
     assert body.locator("tr").count() >= 1
     assert "127.0.0.0/8" in body.inner_text()
+    assert page.locator(".toggle-scope-status:visible").count() == 0
+    assert page.get_by_role("button", name="Emergency Halt Scan").is_hidden()
+    assert page.get_by_role("button", name="Quick Import").is_hidden()
 
 
 def test_findings_page_renders_real_findings(page, live_server):
