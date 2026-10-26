@@ -2715,8 +2715,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         return /TOTAL ADAPTERS/.test(value) && /TRUST SIGNATURES/.test(value) && /BINARY ENVIRONMENT/.test(value);
       });
       if (catalogKpis) setHidden(catalogKpis, true);
-      const catalogAside = document.querySelector('main aside');
-      if (catalogAside) setHidden(catalogAside, true);
+      const catalogDrawerTitle = document.getElementById('drawer-title');
+      const catalogDrawer = catalogDrawerTitle && catalogDrawerTitle.closest('.bg-surface-container-low.rounded');
+      if (catalogDrawer) setHidden(catalogDrawer, true);
       const signatureLabel = Array.from(document.querySelectorAll('main span')).find(function (el) {
         return /LIVE ENTRY POINT SIGNATURE PIPELINE/i.test(el.textContent || '');
       });
@@ -3199,7 +3200,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         const header = headerTemplate.cloneNode(true);
         Array.from(header.querySelectorAll('span')).forEach(function (span) {
           if (/Reconnaissance|Evidence|Proof|Loot/i.test(span.textContent || '')) span.textContent = 'Recorded Evidence';
-          else if (/^\\d+$/.test((span.textContent || '').trim())) span.textContent = '0';
+          else if (/^\d+$/.test((span.textContent || '').trim())) span.textContent = '0';
         });
         tree.appendChild(header);
       }
@@ -3213,7 +3214,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       }
       ['Sync Merkle Tree','Export TAR.GZ','Verify SHA-256 Hash','Re-parse into Finding Model','Send to Issue Tracker','Trace Proof'].forEach(hideButtonByText);
       document.querySelectorAll('main .grid').forEach(function (grid) {
-        if (/Stored Artifacts|128\\.4 MB|1,842,912|840 KB/i.test(grid.textContent || '')) setHidden(grid, true);
+        if (/Stored Artifacts|128\.4 MB|1,842,912|840 KB/i.test(grid.textContent || '')) setHidden(grid, true);
       });
       return;
     }
