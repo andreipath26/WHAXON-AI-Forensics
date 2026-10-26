@@ -102,3 +102,11 @@ def test_reports_page_wires_native_preview_to_live_report(page, live_server):
     assert preview.is_visible()
     assert "seed-job-1" in preview.inner_text()
     assert "ENG-2026-X892" not in preview.inner_text()
+
+
+def test_health_page_shows_real_health_payload_and_hides_fake_controls(page, live_server):
+    page.goto(f"{live_server}/ui/system-diagnostics-and-health", wait_until="domcontentloaded")
+    stream = page.locator("#diagnostic-stream")
+    assert stream.is_visible()
+    assert "readiness" in stream.inner_text()
+    assert page.locator("#btn-restart-daemons").is_hidden()

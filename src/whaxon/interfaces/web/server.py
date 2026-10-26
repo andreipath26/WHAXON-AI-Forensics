@@ -2407,7 +2407,50 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     wireUnavailablePage();
   }
   async function wireHealth() {
-    wireUnavailablePage();
+    const runButton = document.getElementById('btn-run-diag');
+    const exportButton = document.getElementById('btn-export-json');
+    const stream = document.getElementById('diagnostic-stream');
+    const coreGrid = document.getElementById('cores-grid');
+    if (coreGrid) coreGrid.hidden = true;
+    const restart = document.getElementById('btn-restart-daemons');
+    if (restart) { restart.hidden = true; restart.setAttribute('aria-hidden', 'true'); }
+    ['Test MSF RPC Handshake','Benchmark SQLite Write Speed','Probe Ollama LLM Socket','Check eBPF Filter Integrity'].forEach(hideButtonByText);
+    document.querySelectorAll('main button').forEach(function (button) {
+      if (/^(PING|TEST|INSPECT|PROBE|CHECK)$/i.test((button.textContent || '').trim())) button.hidden = true;
+    });
+    async function loadHealth() {
+      const results = await Promise.all([
+        requestJson('/api/health').catch(function (error) { return {error:error.message}; }),
+        requestJson('/api/health/simple').catch(function (error) { return {error:error.message}; }),
+        requestJson('/api/status').catch(function (error) { return {error:error.message}; })
+      ]);
+      const data = {readiness:results[0], capabilities:results[1], status:results[2]};
+      if (stream) stream.textContent = JSON.stringify(data, null, 2);
+      return data;
+    }
+    if (runButton) runButton.onclick = async function () {
+      runButton.disabled = true;
+      if (stream) stream.textContent = 'Running supported health checks…';
+      try { await loadHealth(); }
+      catch (error) { if (stream) stream.textContent = 'Health checks failed: ' + error.message; }
+      finally { runButton.disabled = false; }
+    };
+    if (exportButton) exportButton.onclick = async function () {
+      exportButton.disabled = true;
+      try {
+        const data = await loadHealth();
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = 'whaxon-health.json';
+        document.body.appendChild(link); link.click(); link.remove();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        window.alert('Health report export failed: ' + error.message);
+      } finally { exportButton.disabled = false; }
+    };
+    try { await loadHealth(); }
+    catch (error) { if (stream) stream.textContent = 'Health checks failed: ' + error.message; }
   }
   async function wireEvidence() {
     wireUnavailablePage();
