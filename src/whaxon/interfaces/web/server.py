@@ -2003,7 +2003,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       setHidden(proofHeading || sampleProofTitle, true);
     }
     document.querySelectorAll('main p, main span').forEach(function (element) {
-      if (/Verified deterministically without LLM ambiguity|HTTP\\/2 200 OK|PostgreSQL 15\\.4/i.test((element.textContent || '').trim())) {
+      if (/Verified deterministically without LLM ambiguity|HTTP\/2 200 OK|PostgreSQL 15\.4/i.test((element.textContent || '').trim())) {
         setHidden(element, true);
       }
     });
