@@ -161,7 +161,7 @@ def test_coverage_page_uses_recorded_gap_ledger_not_demo_claims(page, live_serve
              '{"seq":2,"tool_id":"httpx","target":"https://example.test","kind":"not_configured","detail":"HTTP probing unavailable","phase":"discovery"}]}'))
     page.goto(f"{live_server}/ui/bas-and-detection-validation", wait_until="domcontentloaded")
     page.wait_for_function("document.body.innerText.includes('RECORDED COVERAGE GAPS')")
-    assert page.locator('[data-path="bas-detection-validation"]').is_visible()
+    assert page.locator('[data-path="bas-detection-validation"]').get_attribute("href") == "/ui/bas-detection-validation"
     assert page.locator("main .font-headline-xl").first.inner_text() == "2"
     visible_text = page.locator("main").inner_text()
     assert "coverage-job-1" in visible_text
