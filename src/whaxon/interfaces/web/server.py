@@ -1581,6 +1581,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         from flask import render_template as _rt
         return _rt("settings.html")
 
+    @app.get("/ui-v2")
+    @app.get("/ui-v2/findings")
+    def ui_v2_findings():
+        """Canonical findings design, wired to live report and validation APIs."""
+        return render_template("ui_v2_findings.html")
+
     @app.get("/ui")
     def ui():
         return render_template("index.html")
