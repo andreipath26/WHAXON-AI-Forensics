@@ -26,6 +26,7 @@ WORKDIR /app
 # Copy project files
 COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY src/ ./src/
+COPY ["web ui files and rendering/", "/app/web ui files and rendering/"]
 COPY data/ ./data/
 
 # Install into the venv (no --break-system-packages needed)

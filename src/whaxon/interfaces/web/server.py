@@ -1581,9 +1581,1287 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         from flask import render_template as _rt
         return _rt("settings.html")
 
+    # The source-of-truth designs live in the repository's existing
+    # "web ui files and rendering" directory. Serve those files directly so
+    # their layout and visual design are preserved; keep the prior UI available
+    # unchanged at /legacy-ui.
+    _NEW_UI_PAGES = {
+        "dashboard-zero-state": "dashboard_engagement_hub_zero_state/code.html",
+        "scope-and-targets": "scope_targets_forensics_hardened/code.html",
+        "run-and-orchestration": "run_tool_orchestration_forensics_hardened/code.html",
+        "trust-layer-and-findings": "trust_layer_verified_findings/code.html",
+        "trust-layer-approvals-queue-modal": "trust_layer_approvals_queue_modal/code.html",
+        "ptes-coverage-and-reports": "ptes_coverage_reports/code.html",
+        "bas-and-detection-validation": "bas_detection_validation/code.html",
+        "compliance-and-framework-crosswalk": "compliance_framework_crosswalk/code.html",
+        "threat-intel-and-exploit-arsenal": "threat_intel_exploit_arsenal/code.html",
+        "ai-strategy-gate": "ai_strategy_gate_human_in_the_loop/code.html",
+        "remediation-retest-studio": "remediation_retest_studio_forensics_hardened/code.html",
+        "attack-surface-and-continuous-monitoring": "attack_surface_continuous_monitoring/code.html",
+        "correlated-attack-chains": "correlated_attack_chains/code.html",
+        "bug-bounty-and-live-browser-studio": "bug_bounty_live_browser_studio/code.html",
+        "ptaas-client-portal": "ptaas_client_portal/code.html",
+        "job-execution-history": "job_execution_history/code.html",
+        "evidence-file-inspector": "evidence_file_inspector/code.html",
+        "cryptographic-audit-log": "cryptographic_audit_log/code.html",
+        "system-diagnostics-and-health": "system_diagnostics_health/code.html",
+        "adapter-and-plugin-manager": "adapter_plugin_manager/code.html",
+        "settings-and-api-explorer": "settings_secrets_vault/code.html",
+        "settings-and-secrets-vault": "settings_secrets_vault/code.html",
+        "scope-targets": "scope_targets_forensics_hardened/code.html",
+        "run-orchestration": "run_tool_orchestration_forensics_hardened/code.html",
+        "trust-layer-findings": "trust_layer_verified_findings/code.html",
+        "ptes-coverage-reports": "ptes_coverage_reports/code.html",
+        "bug-bounty-live-browser": "bug_bounty_live_browser_studio/code.html",
+        "system-diagnostics-health": "system_diagnostics_health/code.html",
+        "adapter-plugin-manager": "adapter_plugin_manager/code.html",
+        "settings-secrets-vault": "settings_secrets_vault/code.html",
+    }
+
+    def _new_ui_script(page: str) -> str:
+        import json as _json
+        page_json = _json.dumps(page)
+        return r"""<script>
+(function () {
+  'use strict';
+  const page = """ + page_json + r""";
+  const pages = """ + _json.dumps(_NEW_UI_PAGES) + r""";
+  document.querySelectorAll('[data-path]').forEach(function (link) {
+    const slug = link.getAttribute('data-path');
+    if (pages[slug]) link.setAttribute('href', '/ui/' + slug);
+    else link.style.display = 'none';
+  });
+  async function requestJson(url, options) {
+    const response = await fetch(url, options || {});
+    let body = {};
+    try { body = await response.json(); } catch (_) {}
+    if (!response.ok) throw new Error(body.error || ('HTTP ' + response.status));
+    return body;
+  }
+  function flattenFindings(report) {
+    const result = [];
+    (report.jobs || []).forEach(function (entry) {
+      const job = entry.job || {};
+      (entry.findings || []).forEach(function (finding) {
+        result.push({job: job, finding: finding});
+      });
+    });
+    return result;
+  }
+  function severity(value) {
+    const v = String(value || 'info').toLowerCase();
+    return ({critical:'CRITICAL',high:'HIGH',medium:'MEDIUM',low:'LOW',info:'INFO'})[v] || v.toUpperCase();
+  }
+  function status(value) {
+    const v = String(value || 'candidate').toLowerCase();
+    return v.replace(/_/g, ' ').toUpperCase();
+  }
+  function hideButtonByText(needle) {
+    document.querySelectorAll('button').forEach(function (button) {
+      if ((button.textContent || '').toLowerCase().includes(needle)) {
+        button.hidden = true;
+        button.setAttribute('aria-hidden', 'true');
+      }
+    });
+  }
+  // Remove hard-coded demo identity and global actions that have no backend route.
+  document.querySelectorAll('span, button').forEach(function (element) {
+    const label = (element.textContent || '').trim();
+    if (label === 'OP//7749-ALPHA') element.textContent = 'LOCAL OPERATOR';
+    if (label === 'Lead Security Engineer') element.textContent = 'Local session';
+    if (label === 'ENGINE STANDBY') element.textContent = 'ENGINE STATUS';
+    if (label.includes('ENG-2026-X892')) {
+      element.hidden = true;
+      element.setAttribute('aria-hidden', 'true');
+    }
+  });
+  hideButtonByText('add new');
+  hideButtonByText('terminal log');
+  hideButtonByText('emergency halt scan');
+  async function wireFindings() {
+    hideButtonByText('mark fixed');
+    hideButtonByText('export proof to issue tracker');
+    hideButtonByText('send to approvals');
+    const initialReplay = document.getElementById('replay-btn');
+    if (initialReplay) initialReplay.disabled = true;
+    const cards = Array.from({length:4}, function (_, i) {
+      return document.getElementById('finding-card-' + (i + 1));
+    }).filter(Boolean);
+    const heading = Array.from(document.querySelectorAll('span')).find(function (el) {
+      return /Attack Surface Findings/.test(el.textContent || '');
+    });
+    try {
+      const report = await requestJson('/api/report?format=json');
+      const rows = flattenFindings(report);
+      const templateCard = cards[0];
+      while (templateCard && cards.length < rows.length) {
+        const clone = templateCard.cloneNode(true);
+        clone.id = 'finding-card-' + (cards.length + 1);
+        clone.hidden = false;
+        cards[cards.length - 1].after(clone);
+        cards.push(clone);
+      }
+      if (heading) heading.textContent = 'Attack Surface Findings (' + rows.length + ')';
+      cards.forEach(function (card, index) {
+        const item = rows[index];
+        if (!item) { card.hidden = true; card.dataset.hasFinding = 'false'; return; }
+        card.dataset.hasFinding = 'true';
+        const f = item.finding, job = item.job;
+        const line = card.querySelector('.flex.items-center.gap-space-sm');
+        const labels = line ? line.querySelectorAll('span') : [];
+        if (labels[0]) labels[0].textContent = severity(f.severity);
+        const stripe = card.querySelector('.absolute.left-0');
+        if (stripe) { stripe.classList.remove('bg-error','bg-tertiary','bg-secondary','bg-primary'); stripe.classList.add(({critical:'bg-error',high:'bg-error',medium:'bg-tertiary',low:'bg-secondary',info:'bg-primary'})[String(f.severity || 'info').toLowerCase()] || 'bg-primary'); }
+        if (labels[1]) labels[1].textContent = f.title || f.kind || f.raw_line || 'Finding';
+        if (labels[2]) labels[2].textContent = status(f.verification_status || f.status);
+        const target = card.querySelector('p');
+        if (target) target.textContent = f.target || job.target || f.url || f.endpoint || 'Target not recorded';
+        const meta = card.querySelector('.flex.flex-col.items-end');
+        if (meta) {
+          const metaLabels = meta.querySelectorAll('span');
+          if (metaLabels[0]) metaLabels[0].textContent = f.cvss != null ? 'CVSS ' + f.cvss : 'CVSS N/A';
+          if (metaLabels[1]) metaLabels[1].textContent = f.source || job.tool || 'WHAXON';
+        }
+        card.dataset.severity = String(f.severity || 'info').toLowerCase();
+        card.dataset.jobId = job.id || '';
+        card.dataset.seq = String(f.seq == null ? '' : f.seq);
+        card.dataset.status = String(f.verification_status || f.status || 'candidate').toLowerCase();
+        card.dataset.rawLine = f.raw_line || '';
+        card.dataset.description = (f.data && f.data.description) || f.description || '';
+        card.dataset.remediation = (f.data && f.data.remediation) || f.remediation || '';
+        card.onclick = function () {
+          cards.forEach(function (other) {
+            other.classList.remove('ring-1', 'ring-primary/40', 'bg-surface-container');
+            other.classList.add('bg-surface-container-low');
+          });
+          card.classList.add('ring-1', 'ring-primary/40', 'bg-surface-container');
+          card.classList.remove('bg-surface-container-low');
+          window.__whaxonSelectedFinding = {jobId:card.dataset.jobId, seq:card.dataset.seq, status:card.dataset.status, finding:f, job:job};
+          const proof = document.getElementById('curl-proof-payload');
+          if (proof) {
+            const raw = card.dataset.rawLine;
+            proof.textContent = raw || 'No raw proof line was recorded for this finding.';
+          }
+          const detailColumn = document.querySelector('.lg\\:col-span-7');
+          if (detailColumn) {
+            const headerCard = detailColumn.firstElementChild;
+            if (headerCard) {
+              const title = headerCard.querySelector('.font-code-lg');
+              if (title) title.textContent = f.title || f.kind || 'Finding';
+              const severityBadge = headerCard.querySelector('.bg-error-container');
+              if (severityBadge) severityBadge.textContent = severity(f.severity) + ' SEVERITY';
+              const endpointLabel = Array.from(headerCard.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'TARGET ENDPOINT'; });
+              const endpoint = endpointLabel && endpointLabel.parentElement.querySelectorAll('span')[1];
+              if (endpoint) endpoint.textContent = f.url || f.endpoint || f.target || job.target || 'Target not recorded';
+              const metadata = headerCard.querySelector('.font-code-sm.text-error.font-bold');
+              const cvss = f.cvss != null ? f.cvss : (f.data && f.data.cvss);
+              if (metadata) metadata.textContent = cvss != null ? String(cvss) : 'CVSS not provided';
+              const engineLabel = Array.from(headerCard.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'DETECTION ENGINE'; });
+              const engineValue = engineLabel && engineLabel.parentElement.querySelectorAll('span')[1];
+              if (engineValue) engineValue.textContent = f.source || job.tool || 'Not recorded';
+              const phaseLabel = Array.from(headerCard.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'PTES PHASE'; });
+              const phaseValue = phaseLabel && phaseLabel.parentElement.querySelectorAll('span')[1];
+              if (phaseValue) phaseValue.textContent = f.phase || (f.data && f.data.phase) || 'Not recorded';
+              const oldDetails = headerCard.querySelectorAll('[data-whaxon-detail]');
+              oldDetails.forEach(function (node) { node.remove(); });
+              const description = (f.data && f.data.description) || f.description || '';
+              const remediation = (f.data && f.data.remediation) || f.remediation || '';
+              [description, remediation].forEach(function (value, index) {
+                if (!value) return;
+                const block = document.createElement('p'); block.dataset.whaxonDetail = 'true';
+                block.className = 'font-body-sm text-body-sm text-on-surface-variant';
+                block.textContent = (index ? 'Remediation: ' : 'Description: ') + value;
+                headerCard.appendChild(block);
+              });
+            }
+            const proofPanel = detailColumn.children[1];
+            if (proofPanel) {
+              Array.from(proofPanel.children).forEach(function (child) {
+                const keep = child.contains(document.getElementById('curl-proof-payload')) || child.contains(document.getElementById('replay-btn'));
+                child.hidden = !keep;
+              });
+            }
+          }
+          const proof = document.getElementById('curl-proof-payload');
+          if (proof) {
+            const raw = card.dataset.rawLine;
+            proof.textContent = raw || 'No raw proof line was recorded for this finding.';
+            const proofSection = proof.closest('.flex.flex-col.gap-space-xs');
+            if (proofSection) proofSection.hidden = !raw;
+          }
+          const replay = document.getElementById('replay-btn');
+          if (replay) {
+            replay.disabled = !card.dataset.jobId || !card.dataset.seq || !['candidate','verified'].includes(card.dataset.status);
+            const label = replay.querySelector('span:last-child');
+            if (label) label.textContent = card.dataset.status === 'verified' ? 'Replay Test (Retest)' : 'Validate Finding';
+          }
+        };
+      });
+      const first = cards.find(function (card) { return !card.hidden; });
+      if (first) first.click();
+      const kpiLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Scans'; });
+      if (kpiLabel) {
+        const kpiGrid = kpiLabel.closest('.grid');
+        if (kpiGrid) kpiGrid.hidden = true;
+      }
+      const replay = document.getElementById('replay-btn');
+      if (replay) {
+        replay.disabled = !first || !first.dataset.jobId || !first.dataset.seq || !['candidate','verified'].includes(first.dataset.status);
+        const label = replay.querySelector('span:last-child');
+        if (label && first) label.textContent = first.dataset.status === 'verified' ? 'Replay Test (Retest)' : 'Validate Finding';
+      }
+      const replayAction = document.getElementById('replay-btn');
+      if (replayAction) replayAction.disabled = true;
+      const replayReady = Array.from(document.querySelectorAll('span')).find(function (el) { return /Replay Ready:/.test(el.textContent || ''); });
+      if (replayReady) replayReady.hidden = true;
+      const fakeMarker = Array.from(document.querySelectorAll('span')).find(function (el) { return /Matched Pattern: DB_PASSWORD/.test(el.textContent || ''); });
+      if (fakeMarker) { const box = fakeMarker.closest('.mt-space-md'); if (box) box.hidden = true; }
+      const methodology = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Methodology Step:'; });
+      if (methodology) { const box = methodology.closest('.mt-space-md'); if (box) box.hidden = true; }
+      const filterCounts = {
+        'ALL': rows.length,
+        'CRIT': rows.filter(function (item) { return String(item.finding.severity || '').toLowerCase() === 'critical'; }).length,
+        'HIGH': rows.filter(function (item) { return String(item.finding.severity || '').toLowerCase() === 'high'; }).length,
+        'MED': rows.filter(function (item) { return String(item.finding.severity || '').toLowerCase() === 'medium'; }).length,
+        'LOW': rows.filter(function (item) { return ['low','info'].includes(String(item.finding.severity || '').toLowerCase()); }).length,
+        'VERIFIED': rows.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length,
+        'CANDIDATE': rows.filter(function (item) { return /candidate|pending/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length
+      };
+      const searchInput = document.querySelector('input[placeholder*="Filter proof pattern"]');
+      let activeFilter = 'ALL';
+      function applyFindingFilters() {
+        const query = searchInput ? searchInput.value.toLowerCase() : '';
+        cards.forEach(function (card) {
+          if (card.dataset.hasFinding !== 'true') { card.hidden = true; return; }
+          const sev = String(card.dataset.severity || '').toLowerCase();
+          const state = String(card.dataset.status || '').toLowerCase();
+          const text = [card.textContent, card.dataset.rawLine, card.dataset.description, card.dataset.remediation].join(' ').toLowerCase();
+          const stateMatch = activeFilter === 'ALL' ? true :
+            activeFilter === 'CRIT' ? sev === 'critical' :
+            activeFilter === 'HIGH' ? sev === 'high' :
+            activeFilter === 'MED' ? sev === 'medium' :
+            activeFilter === 'LOW' ? ['low','info'].includes(sev) :
+            activeFilter === 'VERIFIED' ? state === 'verified' :
+            activeFilter === 'CANDIDATE' ? ['candidate','pending'].includes(state) :
+            ['candidate','pending'].includes(state);
+          card.hidden = !stateMatch || !text.includes(query);
+        });
+        const selected = cards.find(function (card) { return !card.hidden; });
+        if (selected) selected.click();
+      }
+      Array.from(document.querySelectorAll('button')).forEach(function (button) {
+        const match = (button.textContent || '').trim().match(/^(ALL|CRIT|HIGH|MED|LOW|VERIFIED|CANDIDATE|REVIEW NEEDED)/i);
+        if (!match) return;
+        const key = match[1].toUpperCase();
+        button.textContent = key === 'REVIEW NEEDED' ? key : key + ' (' + (filterCounts[key] || 0) + ')';
+        button.onclick = function () { activeFilter = key; applyFindingFilters(); };
+      });
+      if (searchInput) searchInput.oninput = applyFindingFilters;    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Findings unavailable: ' + error.message;
+    }
+    window.triggerReplayAction = async function () {
+      const selected = window.__whaxonSelectedFinding;
+      if (!selected || !['candidate','verified'].includes(selected.status)) return;
+      const action = selected.status === 'verified' ? 'retest' : 'validate';
+      const button = document.getElementById('replay-btn');
+      if (button) button.disabled = true;
+      try {
+        const result = await requestJson('/api/' + action + '/' + encodeURIComponent(selected.jobId) + '/' + encodeURIComponent(selected.seq), {method:'POST'});
+        window.alert(action + ': ' + (result.status || 'completed') + (result.reason ? '\\n' + result.reason : ''));
+        window.location.reload();
+      } catch (error) { window.alert('Retest failed: ' + error.message); }
+      finally { if (button) button.disabled = false; }
+    };
+  }
+  async function wireScope() {
+    try {
+      const data = await requestJson('/api/scope');
+      const body = document.getElementById('targetTableBody');
+      if (body) {
+        body.replaceChildren();
+        const rows = [
+          ...(data.in_scope || []).map(function (target) { return {target:target, state:'IN SCOPE', allowed:true}; }),
+          ...(data.out_of_scope || []).map(function (target) { return {target:target, state:'EXCLUDED', allowed:false}; })
+        ];
+        rows.forEach(function (item) {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-surface-container/60 transition-colors';
+          const target = document.createElement('td');
+          target.className = 'py-2.5 px-space-md font-semibold';
+          target.textContent = item.target;
+          const mode = document.createElement('td'); mode.className = 'py-2.5 px-space-md'; mode.textContent = 'Configured rule';
+          const ports = document.createElement('td'); ports.className = 'py-2.5 px-space-md text-on-surface-variant'; ports.textContent = 'Enforced by scope guard';
+          const rate = document.createElement('td'); rate.className = 'py-2.5 px-space-md text-on-surface-variant'; rate.textContent = 'Runner policy';
+          const auth = document.createElement('td'); auth.className = 'py-2.5 px-space-md'; auth.textContent = 'Not represented in scope config';
+          const replay = document.createElement('td'); replay.className = 'py-2.5 px-space-md'; replay.textContent = 'Requires runtime scope check';
+          const state = document.createElement('td'); state.className = 'py-2.5 px-space-md text-right'; state.textContent = item.state;
+          state.classList.add(item.allowed ? 'text-primary' : 'text-error');
+          tr.append(target, mode, ports, rate, auth, replay, state);
+          body.appendChild(tr);
+        });
+        if (!rows.length) {
+          const tr = document.createElement('tr'), td = document.createElement('td');
+          td.colSpan = 7; td.className = 'p-space-lg text-outline'; td.textContent = 'No scope rules configured. The scope guard remains authoritative.';
+          tr.appendChild(td); body.appendChild(tr);
+        }
+        const filter = document.getElementById('targetFilterInput');
+        if (filter) filter.oninput = function () {
+          const q = filter.value.toLowerCase();
+          body.querySelectorAll('tr').forEach(function (tr) { tr.hidden = !tr.textContent.toLowerCase().includes(q); });
+        };
+      }
+      hideButtonByText('commit to scope');
+      hideButtonByText('import & parse rules');
+      hideButtonByText('add deny rule');
+      hideButtonByText('add target');
+      hideButtonByText('import scope');
+      hideButtonByText('configure scope');
+      const main = document.querySelector('main');
+      if (main && !document.getElementById('whaxon-scope-check')) {
+        const panel = document.createElement('section'); panel.id = 'whaxon-scope-check'; panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+        const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Check a Target Against Scope';
+        const form = document.createElement('div'); form.className = 'flex flex-wrap gap-space-sm';
+        const input = document.createElement('input'); input.className = 'flex-1 min-w-48 bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40'; input.placeholder = 'Hostname, IP, or CIDR';
+        const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; button.textContent = 'Check Scope';
+        const result = document.createElement('p'); result.className = 'font-code-sm mt-space-md';
+        button.onclick = async function () {
+          if (!input.value.trim()) { result.textContent = 'Enter a target to check.'; return; }
+          button.disabled = true;
+          try {
+            const match = await requestJson('/api/scope/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target:input.value.trim()})});
+            result.textContent = (match.allowed ? 'IN SCOPE — ' : 'BLOCKED — ') + (match.reason || 'No reason returned') + (match.matched_rule ? ' · Rule: ' + match.matched_rule : '');
+            result.className = 'font-code-sm mt-space-md ' + (match.allowed ? 'text-primary' : 'text-error');
+          } catch (error) { result.textContent = 'Scope check failed closed: ' + error.message; result.className = 'font-code-sm mt-space-md text-error'; }
+          finally { button.disabled = false; }
+        };
+        form.append(input, button); panel.append(heading, form, result); main.prepend(panel);
+      }
+    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Scope configuration unavailable; no scope rule can be assumed. ' + error.message;
+    }
+  }
+  async function wireReports() {
+    if (page !== 'ptes-coverage-and-reports' && page !== 'ptes-coverage-reports') {
+      document.querySelectorAll('button').forEach(function (button) {
+        const label = (button.textContent || '').toLowerCase();
+        if (label.includes('report') && !label.includes('preview')) {
+          button.addEventListener('click', function (event) {
+            event.preventDefault();
+            window.location.href = '/api/report?format=md';
+          });
+        }
+      });
+      return;
+    }
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Engagement Report';
+    const summary = document.createElement('p'); summary.className = 'font-code-sm text-outline mb-space-md'; summary.textContent = 'Loading report data…';
+    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
+    const actions = document.createElement('div'); actions.className = 'flex flex-wrap gap-space-sm mt-space-md';
+    [['Markdown','md'],['HTML','html'],['PDF','pdf'],['JSON','json']].forEach(function (item) {
+      const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; button.textContent = 'Download ' + item[0];
+      button.onclick = function () { window.location.href = '/api/report?format=' + item[1]; }; actions.appendChild(button);
+    });
+    const previewButton = document.createElement('button'); previewButton.className = 'px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; previewButton.textContent = 'Preview Markdown';
+    const preview = document.createElement('pre'); preview.className = 'mt-space-md p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm whitespace-pre-wrap overflow-x-auto'; preview.hidden = true;
+    previewButton.onclick = async function () {
+      previewButton.disabled = true;
+      try { const response = await fetch('/api/report?format=md'); if (!response.ok) throw new Error('HTTP ' + response.status); preview.textContent = await response.text(); preview.hidden = false; }
+      catch (error) { preview.textContent = 'Report preview unavailable: ' + error.message; preview.hidden = false; }
+      finally { previewButton.disabled = false; }
+    };
+    actions.appendChild(previewButton);
+    panel.append(heading, summary, list, actions, preview);
+    Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    main.appendChild(panel);
+    try {
+      const report = await requestJson('/api/report?format=json');
+      const jobs = report.job_count == null ? (report.jobs || []).length : report.job_count;
+      const count = report.finding_count == null ? flattenFindings(report).length : report.finding_count;
+      const findings = flattenFindings(report);
+      const verified = findings.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
+      summary.textContent = jobs + ' job(s) · ' + count + ' finding(s) · ' + verified + ' verified';
+      findings.slice(0, 12).forEach(function (item) {
+        const f = item.finding, job = item.job;
+        const row = document.createElement('div'); row.className = 'p-space-md rounded bg-surface-container border border-outline-variant/20';
+        const title = document.createElement('div'); title.className = 'font-code-sm text-on-surface'; title.textContent = f.title || f.kind || 'Finding';
+        const meta = document.createElement('div'); meta.className = 'font-code-sm text-outline mt-1'; meta.textContent = [String(f.severity || 'info').toUpperCase(), f.verification_status || f.status || 'candidate', job.id, f.target || job.target].filter(Boolean).join(' · ');
+        row.append(title, meta); list.appendChild(row);
+      });
+      if (!findings.length) list.textContent = 'No findings are available for this report yet.';
+    } catch (error) { summary.textContent = 'Report data unavailable: ' + error.message; }
+  }
+  async function wireRun() {
+    const targetInput = document.querySelector('input[placeholder*="Target host"]');
+    if (targetInput) targetInput.value = '';
+    const output = document.getElementById('terminal-stdout');
+    if (output) output.textContent = 'Ready. Choose an available tool and a target permitted by the configured scope.';
+    let selectedJob = null, stream = null;
+    let tools = [];
+    try {
+      tools = await requestJson('/api/tools');
+      if (!Array.isArray(tools)) tools = tools.tools || [];
+    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Tool catalog unavailable; no run can be started. ' + error.message;
+      return;
+    }
+    const usable = tools.filter(function (tool) { return tool && tool.id && tool.available !== false; });
+    const inputParent = targetInput && targetInput.parentElement;
+    if (targetInput && inputParent && usable.length) {
+      const select = document.createElement('select');
+      select.setAttribute('aria-label', 'Tool to run');
+      select.className = 'bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40';
+      const chooseTool = document.createElement('option');
+      chooseTool.value = ''; chooseTool.textContent = 'Select a registered tool'; chooseTool.selected = true; chooseTool.disabled = true;
+      select.appendChild(chooseTool);
+      usable.forEach(function (tool) {
+        const option = document.createElement('option');
+        option.value = tool.id;
+        option.textContent = tool.name || tool.id;
+        select.appendChild(option);
+      });
+      inputParent.insertBefore(select, targetInput.nextSibling);
+      hideButtonByText('dispatch passive recon');
+      const runButtons = Array.from(document.querySelectorAll('button')).filter(function (button) {
+        return (button.textContent || '').toLowerCase().includes('run active pipeline');
+      });
+      runButtons.forEach(function (button) { const label = button.querySelector('span:last-child'); if (label) label.textContent = 'Run Selected Tool'; });
+      async function startRun(button) {
+        const target = targetInput.value.trim();
+        if (!target) { window.alert('Enter a target that is included in the configured scope.'); return; }
+        if (!select.value) { window.alert('No runnable tool is available.'); return; }
+        runButtons.forEach(function (item) { item.disabled = true; });
+        if (output) output.textContent = 'Submitting ' + select.value + ' against ' + target + '…';
+        try {
+          const result = await requestJson('/api/run', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({tool_id:select.value, target:target})
+          });
+          selectedJob = result.job_id;
+          const id = document.getElementById('job-id');
+          if (id) id.textContent = selectedJob;
+          if (stream) stream.close();
+          stream = new EventSource('/api/jobs/' + encodeURIComponent(selectedJob) + '/stream');
+          stream.onmessage = function (event) {
+            let message;
+            try { message = JSON.parse(event.data); } catch (_) { return; }
+            if (!output) return;
+            if (message.type === 'line') {
+              const line = document.createElement('div');
+              line.className = 'whitespace-pre-wrap break-words';
+              line.textContent = (message.stream ? '[' + message.stream + '] ' : '') + (message.text || message.line || '');
+              output.appendChild(line);
+              output.scrollTop = output.scrollHeight;
+            } else if (message.type === 'status') {
+              const line = document.createElement('div'); line.textContent = 'Status: ' + (message.status || 'unknown'); output.appendChild(line);
+            } else if (message.type === 'finished' || message.type === 'failed') {
+              const line = document.createElement('div');
+              line.textContent = message.type === 'finished' ? 'Finished (exit ' + message.exit_code + ')' : 'Failed: ' + (message.error || 'unknown error');
+              output.appendChild(line);
+              stream.close(); stream = null;
+              runButtons.forEach(function (item) { item.disabled = false; });
+            }
+          };
+          stream.onerror = function () {
+            if (stream) { stream.close(); stream = null; }
+            runButtons.forEach(function (item) { item.disabled = false; });
+          };
+        } catch (error) {
+          if (output) output.textContent = 'Run rejected: ' + error.message;
+          runButtons.forEach(function (item) { item.disabled = false; });
+        }
+      }
+      runButtons.forEach(function (button) { button.onclick = function (event) { event.preventDefault(); startRun(button); }; });
+      document.querySelectorAll('button').forEach(function (button) {
+        if (!(button.textContent || '').toLowerCase().includes('kill leader')) return;
+        button.onclick = async function () {
+          if (!selectedJob) { window.alert('There is no active WHAXON job to cancel.'); return; }
+          try {
+            const result = await requestJson('/api/jobs/' + encodeURIComponent(selectedJob) + '/cancel', {method:'POST'});
+            if (output) output.appendChild(document.createTextNode('\\nCancellation requested: ' + String(result.ok)));
+          } catch (error) { window.alert('Cancellation failed: ' + error.message); }
+        };
+      });
+    } else {
+      hideButtonByText('run active pipeline');
+      hideButtonByText('dispatch passive recon');
+    }
+    hideButtonByText('dispatch passive recon');
+    hideButtonByText('inject payload');
+    hideButtonByText('spawn sub-tool');
+    hideButtonByText('emergency abort');
+    hideButtonByText('engage replay');
+    hideButtonByText('re-run');
+    hideButtonByText('pause');
+    hideButtonByText('abort');
+    hideButtonByText('explore whatweb');
+    hideButtonByText('gobuster');
+    hideButtonByText('wpscan');
+    hideButtonByText('execute');
+    const probeCheckbox = document.querySelector('input[type="checkbox"]:not(#ai-planner-toggle)');
+    const probeGrid = probeCheckbox && probeCheckbox.closest('.grid');
+    if (probeGrid) probeGrid.hidden = true;
+    ['ai-planner-toggle','toggle-planner-gate'].forEach(function (id) {
+      const control = document.getElementById(id);
+      if (control) { const label = control.closest('label') || control.closest('div'); if (label) label.hidden = true; else control.hidden = true; }
+    });
+  }
+  async function wireDashboard() {
+    try {
+      const values = await Promise.all([
+        requestJson('/api/status'),
+        requestJson('/api/history'),
+        requestJson('/api/report?format=json'),
+        requestJson('/api/tools'),
+        requestJson('/api/msf/sessions').catch(function () { return {live_count:0}; })
+      ]);
+      const statusData = values[0] || {};
+      const history = Array.isArray(values[1]) ? values[1] : (values[1].jobs || values[1].history || []);
+      const report = values[2] || {};
+      const tools = Array.isArray(values[3]) ? values[3] : (values[3].tools || []);
+      const sessions = values[4] || {};
+      const findings = flattenFindings(report);
+      const active = history.filter(function (job) { return /running|queued|active/i.test(String(job.status || '')); }).length;
+      const verified = findings.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
+      const candidate = findings.filter(function (item) { return /candidate|pending/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
+      const coverageResults = await Promise.all(history.slice(0, 10).map(function (job) {
+        const id = job.id || job.job_id;
+        return id ? requestJson('/api/coverage/' + encodeURIComponent(id)).catch(function () { return {gaps:[], unavailable:true}; }) : Promise.resolve({gaps:[], unavailable:true});
+      }));
+      const gapCount = coverageResults.reduce(function (sum, item) { return sum + (item.gaps || []).length; }, 0);
+      const unavailableCoverageCount = coverageResults.filter(function (item) { return item.unavailable; }).length;
+      const metrics = {
+        'Active Scans':active,
+        'Verified Findings':verified,
+        'Candidate Findings':candidate,
+        'Remediation Retest':verified,
+        'Active Adapters':tools.filter(function (tool) { return !!tool.adapter_available; }).length,
+        'Active Session Buffer':sessions.live_count || 0,
+        'PTES Coverage':gapCount
+      };
+      document.querySelectorAll('span').forEach(function (label) {
+        const key = (label.textContent || '').trim();
+        if (key === '0 Findings') label.textContent = findings.length + ' Findings';
+        if (key === '0 Verified') label.textContent = verified + ' Verified';
+        if (!(key in metrics)) return;
+        const card = label.closest('.rounded-lg');
+        const value = card && card.querySelector('.font-headline-lg');
+        if (value) value.textContent = String(metrics[key]);
+        if (key === 'PTES Coverage') { label.textContent = 'Coverage Gaps (10 Recent Jobs)'; label.title = unavailableCoverageCount + ' coverage lookup(s) unavailable'; }
+      });
+      const table = document.querySelector('table');
+      const body = table && table.querySelector('tbody');
+      if (body) {
+        const headers = table.querySelectorAll('thead th');
+        const labels = ['Job ID','Target','Operator','Timeline','Findings','Status','Actions'];
+        headers.forEach(function (header, index) {
+          if (labels[index]) header.textContent = labels[index];
+          if (index === 2 || index === 6) header.hidden = true;
+        });
+        body.replaceChildren();
+        history.forEach(function (job) {
+          const values = [
+            job.id || job.job_id || '—',
+            job.target || '—',
+            '',
+            [job.created_at || job.started_at || '', job.duration_s != null ? job.duration_s + 's' : ''].filter(Boolean).join(' · ') || '—',
+            job.findings_count == null ? '—' : job.findings_count,
+            job.status || '—',
+            ''
+          ];
+          const tr = document.createElement('tr'); tr.className = 'border-b border-outline-variant/15 hover:bg-surface-container/50';
+          for (let i = 0; i < headers.length; i++) {
+            const td = document.createElement('td'); td.className = 'px-space-md py-space-sm font-code-sm';
+            td.textContent = String(values[i] == null ? '—' : values[i]);
+            if (i === 2 || i === 6) td.hidden = true;
+            tr.appendChild(td);
+          }
+          body.appendChild(tr);
+        });
+        if (!history.length) {
+          const tr = document.createElement('tr'), td = document.createElement('td');
+          td.colSpan = Math.max(1, headers.length); td.className = 'p-space-md text-outline'; td.textContent = 'No jobs recorded yet.';
+          tr.appendChild(td); body.appendChild(tr);
+        }
+      }
+      const search = document.querySelector('input[placeholder*="Filter by ID"]');
+      if (search && body) search.oninput = function () {
+        const q = search.value.toLowerCase();
+        body.querySelectorAll('tr').forEach(function (row) { row.hidden = !row.textContent.toLowerCase().includes(q); });
+      };
+      const sessionNote = Array.from(document.querySelectorAll('span,p')).find(function (el) { return /Awaiting Target Commit/.test(el.textContent || ''); });
+      if (sessionNote) sessionNote.textContent = sessions.live_count ? 'Live sessions reported by backend' : 'No active sessions reported';
+      const targetLabel = Array.from(document.querySelectorAll('span,p')).find(function (el) { return (el.textContent || '').trim() === 'Target: api.internal.corp'; });
+      if (targetLabel) targetLabel.hidden = true;
+      const storageLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /Storage:/.test(el.textContent || ''); });
+      if (storageLabel) storageLabel.hidden = true;
+      document.querySelectorAll('span').forEach(function (el) { if (/CRYPTO LOG INTEGRITY|MERKLE_ROOT_VERIFIED/.test(el.textContent || '')) el.hidden = true; });
+      const historyFooter = Array.from(document.querySelectorAll('span')).find(function (el) { return /historical engagement logs/i.test(el.textContent || ''); });
+      if (historyFooter) historyFooter.hidden = true;
+      hideButtonByText('deploy mock');
+      hideButtonByText('configure filters');
+      hideButtonByText('load workspace');
+      hideButtonByText('audit pack');
+      hideButtonByText('start new engagement');
+      hideButtonByText('upload artifact');
+      hideButtonByText('export archive');
+      hideButtonByText('switch target session');
+      hideButtonByText('update credentials');
+      hideButtonByText('launch wizard');
+      hideButtonByText('continue setup');
+      hideButtonByText('inspect ledger');
+      hideButtonByText('cli help');
+      hideButtonByText('update credentials');
+      hideButtonByText('launch wizard');
+      hideButtonByText('continue setup');
+      hideButtonByText('inspect ledger');
+      hideButtonByText('cli help');
+      wireReports();
+      const statusLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'ENGINE STATUS'; });
+      if (statusLabel && statusData.ok === false) statusLabel.textContent = 'ENGINE DEGRADED';
+    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Live dashboard data unavailable: ' + error.message;
+    }
+  }
+  async function wireHistory() {
+    try {
+      const result = await requestJson('/api/history');
+      const jobs = Array.isArray(result) ? result : (result.jobs || result.history || []);
+      const table = document.querySelector('table');
+      const body = table && table.querySelector('tbody');
+      if (!body) return;
+      const headers = table.querySelectorAll('thead th');
+      if (headers.length >= 7) {
+        ['Job ID / State','Tool','Target','Duration / Created'].forEach(function (label, index) { headers[index].textContent = label; });
+        headers.forEach(function (header, index) { if (index >= 4) header.hidden = true; });
+      }
+      body.replaceChildren();
+      jobs.forEach(function (job) {
+        const tr = document.createElement('tr'); tr.className = 'border-b border-outline-variant/15 hover:bg-surface-container/50';
+        const id = job.id || job.job_id || '—';
+        const tool = job.tool || job.tool_id || '—';
+        const target = job.target || '—';
+        const created = job.created_at || job.started_at || job.finished_at || '';
+        const duration = job.duration_s != null ? job.duration_s + 's' : '';
+        tr.dataset.id = String(id); tr.dataset.tool = String(tool).toLowerCase(); tr.dataset.target = String(target).toLowerCase();
+        tr.dataset.status = String(job.status || '').toLowerCase(); tr.dataset.created = String(created);
+        [String(id) + ' · ' + String(job.status || 'unknown'), tool, target, [duration, created].filter(Boolean).join(' · ') || '—'].forEach(function (value) {
+          const td = document.createElement('td'); td.className = 'px-space-md py-space-sm font-code-sm text-code-sm'; td.textContent = String(value); tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      });
+      if (!jobs.length) {
+        const tr = document.createElement('tr'), td = document.createElement('td');
+        td.colSpan = Math.max(1, headers.length); td.className = 'p-space-md text-outline'; td.textContent = 'No jobs recorded yet.';
+        tr.appendChild(td); body.appendChild(tr);
+      }
+      const search = document.querySelector('input[placeholder*="Filter by job ID"]');
+      const selects = Array.from(document.querySelectorAll('select'));
+      const toolFilter = selects[0], timeFilter = selects[1], modeFilter = selects[2];
+      if (toolFilter) {
+        const tools = Array.from(new Set(jobs.map(function (job) { return job.tool || job.tool_id; }).filter(Boolean))).sort();
+        toolFilter.replaceChildren();
+        const all = document.createElement('option'); all.value = 'all'; all.textContent = 'All Tools'; toolFilter.appendChild(all);
+        tools.forEach(function (tool) {
+          const option = document.createElement('option'); option.value = tool; option.textContent = tool + ' (' + jobs.filter(function (job) { return (job.tool || job.tool_id) === tool; }).length + ')'; toolFilter.appendChild(option);
+        });
+      }
+      if (modeFilter) { const wrapper = modeFilter.closest('div'); if (wrapper) wrapper.hidden = true; else modeFilter.hidden = true; }
+      function applyFilters() {
+        const q = search ? search.value.toLowerCase() : '';
+        const selectedTool = toolFilter ? toolFilter.value : 'all';
+        const range = timeFilter ? timeFilter.value : 'all';
+        const age = range === '24h' ? 24*60*60*1000 : range === '7d' ? 7*24*60*60*1000 : range === '30d' ? 30*24*60*60*1000 : 0;
+        body.querySelectorAll('tr').forEach(function (tr) {
+          const raw = tr.dataset.created;
+          let stamp = Date.parse(raw);
+          if (raw && Number.isFinite(Number(raw))) { const numeric = Number(raw); stamp = numeric > 1e12 ? numeric : numeric * 1000; }
+          const tooOld = age > 0 && Number.isFinite(stamp) && stamp > 0 && (Date.now() - stamp > age);
+          tr.hidden = !tr.textContent.toLowerCase().includes(q) ||
+            (selectedTool !== 'all' && tr.dataset.tool !== selectedTool.toLowerCase()) || tooOld;
+        });
+      }
+      if (search) search.oninput = applyFilters;
+      if (toolFilter) toolFilter.onchange = applyFilters;
+      if (timeFilter) timeFilter.onchange = applyFilters;
+      applyFilters();
+      hideButtonByText('verify integrity');
+      hideButtonByText('export ledger');
+      hideButtonByText('all (42)');
+      hideButtonByText('success (38)');
+      hideButtonByText('failed (3)');
+      hideButtonByText('scope-blocked (1)');
+      hideButtonByText('active / queued (0)');
+      document.querySelectorAll('span').forEach(function (el) {
+        if (/MERKLE_ROOT_VERIFIED|INTEGRITY VERIFIED|HASH MATCH|CRYPTO LOG INTEGRITY/i.test(el.textContent || '')) el.hidden = true;
+      });
+      const summaryLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /historical engagement logs/i.test(el.textContent || ''); });
+      if (summaryLabel) summaryLabel.hidden = true;
+    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Job history unavailable: ' + error.message;
+    }
+  }
+  async function wireCatalog() {
+    try {
+      const result = await requestJson('/api/tools');
+      const tools = Array.isArray(result) ? result : (result.tools || []);
+      const matrix = document.getElementById('adapter-matrix');
+      if (matrix) {
+        matrix.replaceChildren();
+        tools.forEach(function (tool) {
+          const card = document.createElement('div');
+          card.className = 'adapter-card p-space-md bg-surface-container-low hover:bg-surface-container rounded shadow-sm transition-all flex flex-col gap-space-sm border border-outline-variant/20';
+          card.dataset.search = [tool.id, tool.name, tool.category, tool.binary, tool.description].filter(Boolean).join(' ').toLowerCase();
+          card.dataset.status = tool.available === false || !tool.binary ? 'missing' : 'available';
+          card.dataset.category = String(tool.category || '').toLowerCase();
+          const header = document.createElement('div'); header.className = 'flex items-start justify-between gap-space-sm';
+          const name = document.createElement('span'); name.className = 'font-code-sm text-on-surface font-semibold'; name.textContent = tool.name || tool.id;
+          const unavailable = tool.available === false || !tool.binary;
+          const state = document.createElement('span'); state.className = 'font-label-sm text-label-sm ' + (unavailable ? 'text-error' : 'text-primary'); state.textContent = unavailable ? 'UNAVAILABLE' : 'REGISTERED';
+          header.append(name, state);
+          const id = document.createElement('div'); id.className = 'font-code-sm text-secondary'; id.textContent = tool.id || '';
+          const detail = document.createElement('p'); detail.className = 'font-body-sm text-body-sm text-on-surface-variant'; detail.textContent = tool.description || tool.category || 'No description provided by catalog.';
+          const meta = document.createElement('div'); meta.className = 'flex flex-wrap gap-space-sm font-code-sm text-outline';
+          const binary = document.createElement('span'); binary.textContent = 'Binary: ' + (tool.binary || 'not specified');
+          const adapter = document.createElement('span'); adapter.textContent = 'Adapter: ' + (tool.adapter_available ? 'available' : 'not available');
+          meta.append(binary, adapter); card.append(header, id, detail, meta); matrix.appendChild(card);
+        });
+        const search = document.getElementById('adapter-search');
+        const filter = document.getElementById('status-select');
+        if (filter) {
+          const availableCount = tools.filter(function (tool) { return tool.available !== false && !!tool.binary; }).length;
+          const missingCount = tools.length - availableCount;
+          Array.from(filter.options).forEach(function (option) {
+            if (option.value === 'binary_found') option.textContent = 'Available (' + availableCount + ')';
+            if (option.value === 'missing') option.textContent = 'Unavailable (' + missingCount + ')';
+            if (option.value === 'untrusted') option.hidden = true;
+          });
+        }
+        let selectedCategory = 'all';
+        function categoryMatches(category, key) {
+          if (key === 'all') return true;
+          if (key === 'recon') return /recon|discovery|enumerat/i.test(category);
+          if (key === 'vulnerability') return /vuln|scan|web/i.test(category);
+          if (key === 'exploitation') return /exploit|attack|post/i.test(category);
+          if (key === 'ingestion') return /ingest|import|parse|burp/i.test(category);
+          return false;
+        }
+        const categoryButtons = Array.from(document.querySelectorAll('button')).map(function (button) {
+          const match = (button.textContent || '').trim().match(/^(All|Recon|Vulnerability|Exploitation|Ingestion)\s*\(\d+\)/i);
+          return match ? {button:button,key:match[1].toLowerCase()} : null;
+        }).filter(Boolean);
+        categoryButtons.forEach(function (entry) {
+          const count = entry.key === 'all' ? tools.length : tools.filter(function (tool) { return categoryMatches(String(tool.category || '').toLowerCase(), entry.key); }).length;
+          entry.button.textContent = entry.key.charAt(0).toUpperCase() + entry.key.slice(1) + ' (' + count + ')';
+          entry.button.hidden = count === 0 && entry.key !== 'all';
+          entry.button.onclick = function () { selectedCategory = entry.key; applyFilter(); };
+        });
+        function applyFilter() {
+          const query = search ? search.value.toLowerCase() : '';
+          const state = filter ? filter.value : 'all';
+          matrix.querySelectorAll('.adapter-card').forEach(function (card) {
+            card.hidden = !card.dataset.search.includes(query) ||
+              (state === 'missing' && card.dataset.status !== 'missing') ||
+              (state === 'binary_found' && card.dataset.status !== 'available') ||
+              !categoryMatches(card.dataset.category, selectedCategory);
+          });
+        }
+        if (search) search.oninput = applyFilter;
+        if (filter) filter.onchange = applyFilter;
+        applyFilter();
+      }
+      hideButtonByText('sync upstream');
+      hideButtonByText('reload catalog');
+      hideButtonByText('register adapter');
+      hideButtonByText('mock test');
+      hideButtonByText('re-sign');
+      hideButtonByText('save configuration');
+      document.querySelectorAll('button').forEach(function (button) {
+        if ((button.textContent || '').trim().toLowerCase().startsWith('configure')) button.hidden = true;
+      });
+      ['btn-sync','btn-reload','btn-register','btn-mock-test','btn-resign','btn-save-conf'].forEach(function (id) {
+        const button = document.getElementById(id);
+        if (button) { button.hidden = true; button.setAttribute('aria-hidden', 'true'); }
+      });
+    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Tool catalog unavailable: ' + error.message;
+    }
+  }
+  async function wireRetest() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Verified Findings — Retest Queue';
+    const summary = document.createElement('p'); summary.className = 'font-code-sm text-outline mb-space-md'; summary.textContent = 'Loading verified findings…';
+    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
+    panel.append(heading, summary, list);
+    Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    main.appendChild(panel);
+    try {
+      const report = await requestJson('/api/report?format=json');
+      const verified = flattenFindings(report).filter(function (item) {
+        return /verified/i.test(String(item.finding.verification_status || item.finding.status || ''));
+      });
+      summary.textContent = verified.length + ' verified finding(s) available for deterministic retest.';
+      if (!verified.length) { list.textContent = 'No verified findings are currently queued for retest.'; return; }
+      verified.forEach(function (item) {
+        const f = item.finding, job = item.job;
+        const row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-space-md p-space-md rounded bg-surface-container border border-outline-variant/20';
+        const info = document.createElement('div'); info.className = 'flex flex-col gap-1 min-w-0';
+        const title = document.createElement('span'); title.className = 'font-code-sm text-on-surface'; title.textContent = f.title || f.kind || 'Finding';
+        const detail = document.createElement('span'); detail.className = 'font-code-sm text-outline'; detail.textContent = [job.id, job.tool, f.target || job.target, f.severity].filter(Boolean).join(' · ');
+        info.append(title, detail);
+        const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; button.textContent = 'Retest';
+        button.onclick = async function () {
+          button.disabled = true; button.textContent = 'Retesting…';
+          try {
+            const result = await requestJson('/api/retest/' + encodeURIComponent(job.id) + '/' + encodeURIComponent(f.seq), {method:'POST'});
+            button.textContent = result.status || 'Complete';
+            const reason = document.createElement('span'); reason.className = 'font-code-sm text-outline'; reason.textContent = result.reason || '';
+            row.appendChild(reason);
+          } catch (error) { button.textContent = 'Failed'; button.title = error.message; }
+          finally { button.disabled = false; }
+        };
+        row.append(info, button); list.appendChild(row);
+      });
+    } catch (error) { summary.textContent = 'Retest queue unavailable: ' + error.message; }
+  }
+  async function wireAttackSurface() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section');
+    panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Pivot / Attack-Surface Graph';
+    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
+    panel.append(heading, list);
+    Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    main.appendChild(panel);
+    try {
+      const data = await requestJson('/api/pivot/graph');
+      heading.textContent = 'Live Pivot / Attack-Surface Graph · ' + (data.count || 0) + ' recorded edges';
+      if (!(data.edges || []).length) {
+        const empty = document.createElement('p'); empty.className = 'text-outline font-code-sm';
+        empty.textContent = 'No recorded pivot edges. WHAXON will show relationships after the backend records exploit/session/forward events.';
+        list.appendChild(empty);
+      } else {
+        (data.edges || []).forEach(function (edge) {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between gap-space-md px-space-md py-space-sm border-b border-outline-variant/20 font-code-sm';
+          const left = document.createElement('span');
+          left.textContent = edge.parent.kind + ':' + edge.parent.id + ' → ' + edge.child.kind + ':' + edge.child.id;
+          const right = document.createElement('span'); right.className = 'text-secondary'; right.textContent = edge.relation;
+          row.append(left, right); list.appendChild(row);
+        });
+      }
+      hideButtonByText('trigger delta recon');
+      hideButtonByText('configure cloud');
+      hideButtonByText('auto-remediate acl');
+      hideButtonByText('trigger acme renew');
+      hideButtonByText('harden ciphers');
+      hideButtonByText('launch nuclei probe');
+    } catch (error) {
+      list.textContent = 'Attack-surface graph unavailable: ' + error.message;
+    }
+  }
+  async function wireAiApprovals() {
+    try {
+      const pending = await requestJson('/api/ai/pending');
+      const items = Array.isArray(pending) ? pending : (pending.items || pending.pending || []);
+      const candidates = document.querySelectorAll('button');
+      candidates.forEach(function (button) {
+        const label = (button.textContent || '').toLowerCase();
+        if (label.includes('authorize & execute') || label.includes('reject & re-plan')) {
+          button.hidden = true;
+          button.setAttribute('aria-hidden', 'true');
+        }
+      });
+      const main = document.querySelector('main');
+      if (!main) return;
+      const summary = document.createElement('section');
+      summary.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+      const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live AI Approval Queue';
+      summary.appendChild(heading);
+      Array.from(main.children).forEach(function (child) { child.hidden = true; });
+      if (!items.length) {
+        const empty = document.createElement('p'); empty.className = 'font-code-sm text-outline'; empty.textContent = 'No pending AI runs require a decision.';
+        summary.appendChild(empty);
+      }
+      items.forEach(function (item) {
+        const row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-space-md py-space-sm border-t border-outline-variant/20';
+        const info = document.createElement('div'); info.className = 'flex flex-col gap-1';
+        const title = document.createElement('span'); title.className = 'font-code-sm'; title.textContent = item.run_id || item.id || 'AI run';
+        const detail = document.createElement('span'); detail.className = 'text-outline font-code-sm'; detail.textContent = item.goal || item.status || 'Awaiting review';
+        info.append(title, detail);
+        const actions = document.createElement('div'); actions.className = 'flex gap-space-sm';
+        [['Approve','approve'],['Reject','reject']].forEach(function (choice) {
+          const button = document.createElement('button'); button.className = 'px-space-md py-1 rounded bg-surface-container-high font-code-sm'; button.textContent = choice[0];
+          button.onclick = async function () {
+            button.disabled = true;
+            try {
+              await requestJson('/api/ai/runs/' + encodeURIComponent(item.run_id || item.id) + '/answer', {
+                method:'POST', headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({answer:choice[1], user:'local', note:'Resolved from WHAXON UI'})
+              });
+              row.remove();
+            } catch (error) { button.title = error.message; button.disabled = false; }
+          };
+          actions.appendChild(button);
+        });
+        row.append(info, actions); summary.appendChild(row);
+      });
+      main.prepend(summary);
+    } catch (error) {
+      hideButtonByText('authorize & execute');
+      hideButtonByText('reject & re-plan');
+      wireUnavailablePage();
+    }
+  }
+  async function wireHealth() {
+    try {
+      const data = await requestJson('/api/health');
+      const stream = document.getElementById('diagnostic-stream');
+      const main = document.querySelector('main');
+      if (main && stream) {
+        const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+        const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Health Endpoint';
+        stream.textContent = JSON.stringify(data, null, 2); panel.append(heading, stream);
+        Array.from(main.children).forEach(function (child) { child.hidden = true; }); main.appendChild(panel);
+      } else if (stream) stream.textContent = JSON.stringify(data, null, 2);
+      hideButtonByText('restart engine daemons');
+      hideButtonByText('run full diagnostic');
+      hideButtonByText('test msf rpc handshake');
+      hideButtonByText('benchmark sqlite');
+      hideButtonByText('probe ollama');
+      hideButtonByText('check ebpf');
+    } catch (error) {
+      wireUnavailablePage();
+      const notice = document.querySelector('main section:last-child');
+      if (notice) notice.textContent = 'Health endpoint unavailable: ' + error.message;
+    }
+  }
+  async function wireEvidence() {
+    const search = document.querySelector('input[placeholder*="Search filename"]');
+    const host = document.querySelector('main');
+    if (!host) return;
+    const panel = document.createElement('section');
+    panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const title = document.createElement('h2'); title.className = 'font-headline-md text-headline-md mb-space-md'; title.textContent = 'Live Evidence from WHAXON Jobs';
+    const select = document.createElement('select'); select.className = 'bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40';
+    const list = document.createElement('div'); list.className = 'mt-space-md flex flex-col gap-space-sm';
+    panel.append(title, select, list);
+    host.prepend(panel);
+    Array.from(host.children).forEach(function (child) { if (child !== panel) child.hidden = true; });
+    try {
+      const history = await requestJson('/api/history');
+      const jobs = Array.isArray(history) ? history : (history.jobs || history.history || []);
+      jobs.forEach(function (job) {
+        const id = job.id || job.job_id;
+        if (!id) return;
+        const option = document.createElement('option'); option.value = id;
+        option.textContent = id + ' · ' + (job.tool || job.tool_id || 'job') + ' · ' + (job.target || 'target');
+        select.appendChild(option);
+      });
+      async function loadEvidence() {
+        list.replaceChildren();
+        if (!select.value) { list.textContent = 'No jobs are available.'; return; }
+        try {
+          const items = await requestJson('/api/jobs/' + encodeURIComponent(select.value) + '/evidence');
+          if (!Array.isArray(items) || !items.length) { list.textContent = 'No evidence is recorded for this job.'; return; }
+          items.forEach(function (item) {
+            const row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-space-md p-space-sm rounded bg-surface-container border border-outline-variant/20';
+            const info = document.createElement('div'); info.className = 'flex flex-col gap-1';
+            const name = document.createElement('span'); name.className = 'font-code-sm text-on-surface'; name.textContent = item.filename || item.name || item.kind || ('Evidence #' + (item.seq || '?'));
+            const meta = document.createElement('span'); meta.className = 'font-code-sm text-outline'; meta.textContent = [item.kind, item.sha256, item.created_at].filter(Boolean).join(' · ');
+            info.append(name, meta); row.appendChild(info);
+            if (item.seq != null) {
+              const link = document.createElement('a'); link.className = 'px-space-md py-1 rounded bg-surface-container-high text-on-surface font-code-sm';
+              link.href = '/api/jobs/' + encodeURIComponent(select.value) + '/evidence/' + encodeURIComponent(item.seq) + '/download'; link.textContent = 'Download'; row.appendChild(link);
+            }
+            list.appendChild(row);
+          });
+        } catch (error) { list.textContent = 'Evidence unavailable: ' + error.message; }
+      }
+      select.addEventListener('change', loadEvidence);
+      if (search) search.addEventListener('input', function () {
+        list.querySelectorAll('div').forEach(function (row) { row.hidden = !row.textContent.toLowerCase().includes(search.value.toLowerCase()); });
+      });
+      await loadEvidence();
+    } catch (error) { list.textContent = 'Job list unavailable: ' + error.message; }
+    hideButtonByText('sync merkle tree');
+    hideButtonByText('export tar.gz');
+    hideButtonByText('re-parse into finding model');
+    hideButtonByText('send to issue tracker');
+  }
+  async function wireChains() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Recorded Attack Chains';
+    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
+    panel.append(heading, list); main.prepend(panel);
+    Array.from(main.children).forEach(function (child) { if (child !== panel) child.hidden = true; });
+    try {
+      const report = await requestJson('/api/report?format=json');
+      const chains = report.chains || [];
+      if (!chains.length) { list.textContent = 'No correlated attack chains are recorded yet.'; }
+      chains.forEach(function (chain) {
+        const row = document.createElement('div'); row.className = 'p-space-sm rounded bg-surface-container border border-outline-variant/20 font-code-sm';
+        row.textContent = JSON.stringify(chain);
+        list.appendChild(row);
+      });
+    } catch (error) { list.textContent = 'Attack chain data unavailable: ' + error.message; }
+      hideButtonByText('replay chain');
+      hideButtonByText('execute chain');
+      hideButtonByText('auto-exploit');
+  }
+  async function wireSettings() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live WHAXON Settings';
+    const pre = document.createElement('pre'); pre.className = 'p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm overflow-x-auto whitespace-pre-wrap';
+    panel.append(heading, pre); main.prepend(panel);
+    Array.from(main.children).forEach(function (child) { if (child !== panel) child.hidden = true; });
+    try {
+      const settings = await requestJson('/api/settings');
+      function redact(value, key) {
+        if (/secret|password|token|api.?key|credential|private.?key/i.test(String(key || ''))) return '[REDACTED]';
+        if (Array.isArray(value)) return value.map(function (item) { return redact(item, ''); });
+        if (value && typeof value === 'object') {
+          const safe = {};
+          Object.keys(value).forEach(function (name) { safe[name] = redact(value[name], name); });
+          return safe;
+        }
+        return value;
+      }
+      pre.textContent = JSON.stringify(redact(settings, ''), null, 2);
+    } catch (error) { pre.textContent = 'Settings unavailable: ' + error.message; }
+    hideButtonByText('rotate key');
+    hideButtonByText('save secrets');
+    hideButtonByText('create token');
+    hideButtonByText('revoke token');
+    hideButtonByText('test connection');
+  }
+  async function wireCoverage() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section');
+    panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Validation & Coverage';
+    const summary = document.createElement('p'); summary.className = 'font-code-sm text-outline mb-space-md'; summary.textContent = 'Loading findings and coverage gaps…';
+    const select = document.createElement('select'); select.className = 'bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40';
+    const list = document.createElement('div'); list.className = 'mt-space-md flex flex-col gap-space-sm';
+    const actions = document.createElement('div'); actions.className = 'flex flex-wrap gap-space-sm mt-space-md';
+    [['Markdown','md'],['HTML','html'],['PDF','pdf'],['JSON','json']].forEach(function (item) {
+      const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; button.textContent = 'Export ' + item[0];
+      button.onclick = function () { window.location.href = '/api/report?format=' + item[1]; }; actions.appendChild(button);
+    });
+    panel.append(heading, summary, select, list, actions);
+    Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    main.appendChild(panel);
+    try {
+      const result = await requestJson('/api/history');
+      const jobs = Array.isArray(result) ? result : (result.jobs || result.history || []);
+      const report = await requestJson('/api/report?format=json');
+      const findings = flattenFindings(report);
+      const verified = findings.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
+      summary.textContent = findings.length + ' findings · ' + verified + ' verified · coverage is reported only where a job has recorded gap data.';
+      jobs.forEach(function (job) {
+        const id = job.id || job.job_id;
+        if (!id) return;
+        const option = document.createElement('option'); option.value = id;
+        option.textContent = id + ' · ' + (job.tool || job.tool_id || 'job') + ' · ' + (job.target || 'target');
+        select.appendChild(option);
+      });
+      async function loadCoverage() {
+        list.replaceChildren();
+        if (!select.value) { list.textContent = 'No jobs are available to inspect.'; return; }
+        try {
+          const coverage = await requestJson('/api/coverage/' + encodeURIComponent(select.value));
+          heading.textContent = 'Live Validation & Coverage · ' + select.value;
+          if (!(coverage.gaps || []).length) { list.textContent = 'No coverage gaps are recorded for this job.'; return; }
+          coverage.gaps.forEach(function (gap) {
+            const row = document.createElement('div'); row.className = 'p-space-md rounded bg-surface-container border border-outline-variant/20';
+            const title = document.createElement('div'); title.className = 'font-code-sm text-on-surface'; title.textContent = gap.phase || gap.category || gap.kind || 'Coverage gap';
+            const detail = document.createElement('div'); detail.className = 'font-code-sm text-outline mt-1'; detail.textContent = gap.reason || gap.detail || gap.message || JSON.stringify(gap);
+            row.append(title, detail); list.appendChild(row);
+          });
+        } catch (error) { list.textContent = 'Coverage unavailable: ' + error.message; }
+      }
+      select.addEventListener('change', loadCoverage);
+      await loadCoverage();
+    } catch (error) { summary.textContent = 'Validation data unavailable: ' + error.message; }
+    hideButtonByText('detonate sequence');
+    hideButtonByText('query blue telemetry');
+    hideButtonByText('configure vector filters');
+    hideButtonByText('push rule to siem');
+    hideButtonByText('deploy to sentinel');
+    hideButtonByText('deploy to splunk');
+  }
+  async function wireThreatIntel() {
+    const main = document.querySelector('main');
+    if (!main) return;
+    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Metasploit Module Arsenal';
+    const status = document.createElement('p'); status.className = 'font-code-sm text-outline mb-space-md'; status.textContent = 'Load modules from the configured Metasploit RPC service.';
+    const controls = document.createElement('div'); controls.className = 'flex flex-wrap gap-space-sm mb-space-md';
+    const type = document.createElement('select'); type.className = 'bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40';
+    [['exploit','Exploit'],['auxiliary','Auxiliary'],['post','Post']].forEach(function (entry) { const option = document.createElement('option'); option.value = entry[0]; option.textContent = entry[1]; type.appendChild(option); });
+    const search = document.createElement('input'); search.className = 'flex-1 min-w-48 bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40'; search.placeholder = 'Filter module paths';
+    const load = document.createElement('button'); load.className = 'px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; load.textContent = 'Load Modules';
+    controls.append(type, search, load);
+    const list = document.createElement('div'); list.className = 'max-h-80 overflow-y-auto flex flex-col gap-1';
+    const selected = document.createElement('p'); selected.className = 'font-code-sm text-primary mt-space-md'; selected.textContent = 'No module selected.';
+    const target = document.createElement('input'); target.className = 'w-full mt-space-sm bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40'; target.placeholder = 'Target host or IP (must be in configured scope)';
+    const optionsLabel = document.createElement('label'); optionsLabel.className = 'block font-code-sm text-outline mt-space-md'; optionsLabel.textContent = 'Module options (JSON object)';
+    const options = document.createElement('textarea'); options.className = 'w-full min-h-24 mt-1 bg-surface-container-lowest text-on-surface font-code-sm p-space-sm rounded border border-outline-variant/40'; options.value = '{}';
+    const run = document.createElement('button'); run.className = 'mt-space-md px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; run.textContent = 'Run Selected Module'; run.disabled = true;
+    const result = document.createElement('pre'); result.className = 'mt-space-md p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm whitespace-pre-wrap overflow-x-auto'; result.textContent = 'No module has been run.';
+    const pivotButton = document.createElement('button'); pivotButton.className = 'mt-space-md ml-space-sm px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; pivotButton.textContent = 'Load Pivot Candidates';
+    const pivotResult = document.createElement('pre'); pivotResult.className = 'mt-space-sm p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm whitespace-pre-wrap overflow-x-auto'; pivotResult.hidden = true;
+    panel.append(heading, status, controls, list, selected, target, optionsLabel, options, run, result, pivotButton, pivotResult);
+    Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    main.appendChild(panel);
+    let modulePaths = [], selectedPath = '';
+    function renderModules() {
+      list.replaceChildren();
+      const q = search.value.toLowerCase();
+      const filtered = modulePaths.filter(function (path) { return path.toLowerCase().includes(q); });
+      if (!filtered.length) { list.textContent = 'No matching modules loaded.'; return; }
+      filtered.forEach(function (path) {
+        const button = document.createElement('button');
+        button.className = 'text-left px-space-sm py-1.5 rounded font-code-sm hover:bg-surface-container-high ' + (path === selectedPath ? 'bg-primary/15 text-primary' : 'text-on-surface');
+        button.textContent = path;
+        button.onclick = function () { selectedPath = path; selected.textContent = 'Selected module: ' + path; run.disabled = false; renderModules(); };
+        list.appendChild(button);
+      });
+    }
+    async function loadModules() {
+      load.disabled = true; status.textContent = 'Loading ' + type.value + ' modules…';
+      try {
+        const response = await requestJson('/api/msf/modules/' + encodeURIComponent(type.value));
+        modulePaths = (Array.isArray(response) ? response : (response.modules || [])).map(function (item) {
+          let path = typeof item === 'string' ? item : (item.fullname || item.name || item.path || '');
+          if (path.startsWith(type.value + '/')) path = path.slice(type.value.length + 1);
+          return path;
+        }).filter(Boolean);
+        selectedPath = ''; run.disabled = true; selected.textContent = 'No module selected.';
+        status.textContent = modulePaths.length + ' module(s) returned by Metasploit RPC.';
+        renderModules();
+      } catch (error) {
+        modulePaths = []; selectedPath = ''; run.disabled = true; list.textContent = 'Metasploit modules unavailable: ' + error.message;
+        status.textContent = 'Metasploit RPC is unavailable or returned an error.';
+      } finally { load.disabled = false; }
+    }
+    load.onclick = loadModules;
+    type.onchange = loadModules;
+    search.oninput = renderModules;
+    run.onclick = async function () {
+      if (!selectedPath) { result.textContent = 'Select a module first.'; return; }
+      if (!target.value.trim()) { result.textContent = 'Enter an in-scope target before execution.'; return; }
+      let parsedOptions;
+      try { parsedOptions = JSON.parse(options.value || '{}'); }
+      catch (_) { result.textContent = 'Module options must be valid JSON.'; return; }
+      if (!parsedOptions || typeof parsedOptions !== 'object' || Array.isArray(parsedOptions)) { result.textContent = 'Module options must be a JSON object.'; return; }
+      run.disabled = true; result.textContent = 'Checking scope…';
+      try {
+        const scope = await requestJson('/api/scope/check', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:target.value.trim()})});
+        if (!scope.allowed) { result.textContent = 'BLOCKED by scope guard: ' + (scope.reason || 'target is not allowed'); return; }
+        result.textContent = 'Submitting scoped Metasploit request…';
+        const response = await requestJson('/api/msf/run', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({module_type:type.value,module_path:selectedPath,target:target.value.trim(),options:parsedOptions})});
+        result.textContent = JSON.stringify(response, null, 2);
+      } catch (error) { result.textContent = 'Metasploit run rejected: ' + error.message; }
+      finally { run.disabled = false; }
+    };
+    pivotButton.onclick = async function () {
+      pivotButton.disabled = true;
+      try { pivotResult.textContent = JSON.stringify(await requestJson('/api/pivot/candidates'), null, 2); pivotResult.hidden = false; }
+      catch (error) { pivotResult.textContent = 'Pivot candidates unavailable: ' + error.message; pivotResult.hidden = false; }
+      finally { pivotButton.disabled = false; }
+    };
+  }
+  function wireUnavailablePage() {
+    const main = document.querySelector('main');
+    if (main) {
+      Array.from(main.children).forEach(function (child) { child.hidden = true; });
+      const notice = document.createElement('section');
+      notice.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
+      notice.textContent = 'This feature has a design prototype, but WHAXON does not currently expose the backend operations required to make it functional. The prototype is preserved; its mock data and unsupported controls are hidden.';
+      main.appendChild(notice);
+    }
+  }
+  if (page === 'trust-layer-and-findings') wireFindings();
+  if (page === 'trust-layer-findings') wireFindings();
+  if (page === 'trust-layer-approvals-queue-modal') wireAiApprovals();
+  if (page === 'scope-and-targets' || page === 'scope-targets') wireScope();
+  if (page === 'run-and-orchestration' || page === 'run-orchestration') wireRun();
+  if (page === 'dashboard-zero-state') wireDashboard();
+  if (page === 'ptes-coverage-and-reports' || page === 'ptes-coverage-reports') wireReports();
+  if (page === 'bas-and-detection-validation') wireCoverage();
+  if (page === 'compliance-and-framework-crosswalk') wireUnavailablePage();
+  if (page === 'threat-intel-and-exploit-arsenal') wireThreatIntel();
+  if (page === 'job-execution-history') wireHistory();
+  if (page === 'adapter-and-plugin-manager' || page === 'adapter-plugin-manager') wireCatalog();
+  if (page === 'remediation-retest-studio') wireRetest();
+  if (page === 'attack-surface-and-continuous-monitoring') wireAttackSurface();
+  if (page === 'ai-strategy-gate') wireAiApprovals();
+  if (page === 'system-diagnostics-and-health' || page === 'system-diagnostics-health') wireHealth();
+  if (page === 'evidence-file-inspector') wireEvidence();
+  if (page === 'correlated-attack-chains') wireChains();
+  if (page === 'settings-and-api-explorer' || page === 'settings-and-secrets-vault' || page === 'settings-secrets-vault') wireSettings();
+  if (page === 'bug-bounty-and-live-browser-studio' || page === 'bug-bounty-live-browser' || page === 'ptaas-client-portal' || page === 'cryptographic-audit-log') wireUnavailablePage();
+})();
+</script>""";
+    }
+
+    def _serve_new_ui(page: str):
+        from flask import abort
+        source = _NEW_UI_PAGES.get(page)
+        if source is None:
+            return abort(404)
+        # The source folder is deliberately outside the Python package. Resolve
+        # only allowlisted design paths; never accept a user-supplied filesystem path.
+        repo_root = Path(__file__).resolve().parents[4]
+        design_root = (repo_root / "web ui files and rendering").resolve()
+        if not design_root.is_dir():
+            # Wheels include only the existing HTML design sources needed at runtime.
+            design_root = (Path(__file__).resolve().parents[2] / "ui_source").resolve()
+        design_path = (design_root / source).resolve()
+        if not design_path.is_relative_to(design_root) or not design_path.is_file():
+            return {"error": "source UI design files are unavailable in this checkout"}, 503
+        html = design_path.read_text(encoding="utf-8")
+        script = _new_ui_script(page)
+        if "</body>" in html:
+            html = html.replace("</body>", script + "</body>", 1)
+        else:
+            html += script
+        return app.response_class(html, mimetype="text/html")
+
+    @app.get("/legacy-ui")
+    def legacy_ui():
+        return render_template("index.html")
+
     @app.get("/ui")
     def ui():
-        return render_template("index.html")
+        return _serve_new_ui("dashboard-zero-state")
+
+    @app.get("/ui/<page>")
+    def ui_page(page: str):
+        return _serve_new_ui(page)
 
     @app.post("/api/jobs/<job_id>/cancel")
     def cancel_job(job_id: str):

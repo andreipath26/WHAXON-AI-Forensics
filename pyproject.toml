@@ -71,6 +71,27 @@ exclude = ["src/whaxon/data/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/whaxon/data" = "whaxon/data"
+"web ui files and rendering/dashboard_engagement_hub_zero_state/code.html" = "whaxon/ui_source/dashboard_engagement_hub_zero_state/code.html"
+"web ui files and rendering/scope_targets_forensics_hardened/code.html" = "whaxon/ui_source/scope_targets_forensics_hardened/code.html"
+"web ui files and rendering/run_tool_orchestration_forensics_hardened/code.html" = "whaxon/ui_source/run_tool_orchestration_forensics_hardened/code.html"
+"web ui files and rendering/trust_layer_verified_findings/code.html" = "whaxon/ui_source/trust_layer_verified_findings/code.html"
+"web ui files and rendering/trust_layer_approvals_queue_modal/code.html" = "whaxon/ui_source/trust_layer_approvals_queue_modal/code.html"
+"web ui files and rendering/ptes_coverage_reports/code.html" = "whaxon/ui_source/ptes_coverage_reports/code.html"
+"web ui files and rendering/ai_strategy_gate_human_in_the_loop/code.html" = "whaxon/ui_source/ai_strategy_gate_human_in_the_loop/code.html"
+"web ui files and rendering/remediation_retest_studio_forensics_hardened/code.html" = "whaxon/ui_source/remediation_retest_studio_forensics_hardened/code.html"
+"web ui files and rendering/attack_surface_continuous_monitoring/code.html" = "whaxon/ui_source/attack_surface_continuous_monitoring/code.html"
+"web ui files and rendering/correlated_attack_chains/code.html" = "whaxon/ui_source/correlated_attack_chains/code.html"
+"web ui files and rendering/bug_bounty_live_browser_studio/code.html" = "whaxon/ui_source/bug_bounty_live_browser_studio/code.html"
+"web ui files and rendering/ptaas_client_portal/code.html" = "whaxon/ui_source/ptaas_client_portal/code.html"
+"web ui files and rendering/job_execution_history/code.html" = "whaxon/ui_source/job_execution_history/code.html"
+"web ui files and rendering/evidence_file_inspector/code.html" = "whaxon/ui_source/evidence_file_inspector/code.html"
+"web ui files and rendering/cryptographic_audit_log/code.html" = "whaxon/ui_source/cryptographic_audit_log/code.html"
+"web ui files and rendering/system_diagnostics_health/code.html" = "whaxon/ui_source/system_diagnostics_health/code.html"
+"web ui files and rendering/adapter_plugin_manager/code.html" = "whaxon/ui_source/adapter_plugin_manager/code.html"
+"web ui files and rendering/settings_secrets_vault/code.html" = "whaxon/ui_source/settings_secrets_vault/code.html"
+"web ui files and rendering/bas_detection_validation/code.html" = "whaxon/ui_source/bas_detection_validation/code.html"
+"web ui files and rendering/compliance_framework_crosswalk/code.html" = "whaxon/ui_source/compliance_framework_crosswalk/code.html"
+"web ui files and rendering/threat_intel_exploit_arsenal/code.html" = "whaxon/ui_source/threat_intel_exploit_arsenal/code.html"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -130,6 +151,7 @@ include = [
     "src/whaxon/data",
     "pyproject.toml",
     "docs/CHANGELOG.md",
+    "web ui files and rendering/**/*.html",
 ]
 exclude = [
     "archive",
