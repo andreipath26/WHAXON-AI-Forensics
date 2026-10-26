@@ -1975,10 +1975,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     // Never represent hard-coded sample engagement values or proof as live data.
     document.querySelectorAll('main span, main h2, main h3, main p').forEach(function (element) {
       const value = (element.textContent || '').trim();
-      if (/ENG-2026-X892|api\.internal\.corp|Sample Deterministic Proof|ENGAGEMENT HASH MANIFEST|41 automated vulnerability templates|6 vulnerabilities were deterministically verified/i.test(value)) {
-        const container = element.closest('.bg-surface-container-lowest, .bg-surface-container-low, section');
-        if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) container.hidden = true;
-      }
+      if (!/ENG-2026-X892|api\.internal\.corp|Sample Deterministic Proof|ENGAGEMENT HASH MANIFEST|41 automated vulnerability templates|6 vulnerabilities were deterministically verified/i.test(value)) return;
+      const container = element.closest('.bg-surface-container-lowest, .bg-surface-container-low');
+      if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) container.hidden = true;
+      else if (!container) element.hidden = true;
     });
     try { await requestJson('/api/report?format=json'); }
     catch (_) {

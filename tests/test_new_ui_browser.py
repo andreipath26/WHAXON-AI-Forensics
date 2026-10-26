@@ -98,6 +98,7 @@ def test_reports_page_wires_native_preview_to_live_report(page, live_server):
     preview_button = page.get_by_role("button", name="Preview Markdown")
     assert preview_button.is_visible()
     preview_button.click()
+    page.wait_for_function("document.querySelector('#previewModal')?.classList.contains('flex')")
     preview = page.locator("#previewModal pre")
     assert preview.is_visible()
     assert "seed-job-1" in preview.inner_text()
