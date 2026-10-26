@@ -3203,13 +3203,44 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     try { graph = await requestJson('/api/pivot/graph'); }
     catch (_) { wireUnavailablePage(); return; }
     const edges = Array.isArray(graph.edges) ? graph.edges : [];
-    if (!edges.length) { wireUnavailablePage(); return; }
     const cards = Array.from(document.querySelectorAll('main .bg-surface-container.rounded-xl.p-space-md.shadow-sm'));
     const template = cards.find(function (card) {
-      return /SQL Injection|Postgres Remote Code Execution|Tenant IDOR/i.test(card.textContent || '');
+      return /SQL Injection|Postgres Remote Code Execution|Tenant IDOR|Unauthenticated RCE/i.test(card.textContent || '');
     });
     if (!template || !template.parentElement) { wireUnavailablePage(); return; }
     const container = template.parentElement;
+    if (!edges.length) {
+      // No graph edges is a valid empty state, not an unavailable page. Reuse
+      // one native chain card for the empty message and remove sample narratives.
+      Array.from(container.children).forEach(function (card) {
+        if (card !== template) setHidden(card, true);
+      });
+      setHidden(template, false);
+      const emptyHeading = Array.from(template.querySelectorAll('span,h3,h4')).find(function (element) {
+        return /SQL Injection|Postgres Remote Code Execution|Tenant IDOR|Unauthenticated RCE/i.test(element.textContent || '');
+      });
+      if (emptyHeading) emptyHeading.textContent = 'No recorded attack chains';
+      const emptyBadge = Array.from(template.querySelectorAll('span')).find(function (element) {
+        return /LETHAL COMPROMISE|LATERAL MOVEMENT|INITIAL ACCESS|PRIVILEGE ESCALATION|PIVOT/i.test(element.textContent || '');
+      });
+      if (emptyBadge) emptyBadge.textContent = 'NO DATA';
+      const emptyParagraph = template.querySelector('p');
+      if (emptyParagraph) emptyParagraph.textContent = 'WHAXON has not recorded linked attack relationships for the available jobs.';
+      const emptyCode = template.querySelector('.bg-surface-container-lowest.rounded.p-space-sm');
+      if (emptyCode) emptyCode.textContent = 'No recorded pivot relationships are available.';
+      template.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
+      document.querySelectorAll('main span, main p, main h2, main h3').forEach(function (element) {
+        if (/3 Lethal Paths|CVSS Compound: 10\\.0|CHAIN #AC-09|CHAIN #AC-04|CHAIN #AC-01|100% Deterministic Link|94% Telemetry Correlated|ACTIVE EXPLOIT DETECTED|uid=0\\(root\\)|api\\.internal\\.corp|db\\.internal/i.test(element.textContent || '')) {
+          const card = element.closest('.bg-surface-container-low.rounded-xl, .bg-surface-container.rounded-xl');
+          if (card && card !== template) setHidden(card, true);
+          else if (!card) setHidden(element, true);
+        }
+      });
+      const recomputeEmpty = document.getElementById('btn-recompute');
+      if (recomputeEmpty) setHidden(recomputeEmpty, true);
+      ['Add Custom Mitigation Rule','Generate Red Team Retest Script','Trace Proof'].forEach(hideButtonByText);
+      return;
+    }
     const cardSelector = function (element) {
       return element.classList.contains('bg-surface-container') &&
         element.classList.contains('rounded-xl') && element.classList.contains('p-space-md') &&

@@ -241,10 +241,13 @@ def test_ai_strategy_gate_does_not_show_demo_proposal_without_pending_run(page, 
     assert page.locator("#btn-reject").is_hidden()
 
 
-def test_attack_chain_page_hides_static_chain_when_no_recorded_edges(page, live_server):
+def test_attack_chain_page_shows_native_empty_state_when_no_recorded_edges(page, live_server):
     page.goto(f"{live_server}/ui/correlated-attack-chains", wait_until="domcontentloaded")
     page.wait_for_timeout(200)
-    assert "Postgres Remote Code Execution via dblink/COPY" not in page.locator("body").inner_text()
+    body = page.locator("body").inner_text()
+    assert "No recorded attack chains" in body
+    assert "Postgres Remote Code Execution via dblink/COPY" not in body
+    assert "CHAIN #AC-09" not in body
 
 
 def test_attack_surface_renders_recorded_targets_not_cloud_demo(page, live_server):
