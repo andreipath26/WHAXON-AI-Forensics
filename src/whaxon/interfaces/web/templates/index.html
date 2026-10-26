@@ -42,27 +42,9 @@
 
           <div class="card card-pad-lg">
             <div class="card-title">Attack surface</div>
-            <div class="card-sub">Hover to isolate · click to filter</div>
-            <div class="asg">
-              <svg viewBox="0 0 200 200">
-                <circle cx="100" cy="100" r="90" fill="none" stroke="var(--border)" stroke-dasharray="2 4"/>
-                <circle cx="100" cy="100" r="60" fill="none" stroke="var(--border)" stroke-dasharray="2 4"/>
-                <circle cx="100" cy="100" r="30" fill="none" stroke="var(--border)" stroke-dasharray="2 4"/>
-                <line class="asg-edge" x1="100" y1="100" x2="100" y2="40" stroke="var(--accent)" stroke-width="1.5" opacity="0.6"/>
-                <line class="asg-edge" x1="100" y1="100" x2="152" y2="130" stroke="var(--accent)" stroke-width="1.5" opacity="0.6"/>
-                <line class="asg-edge" x1="100" y1="100" x2="48" y2="130" stroke="var(--accent)" stroke-width="1.5" opacity="0.6"/>
-                <line class="asg-edge" x1="100" y1="40" x2="100" y2="14" stroke="var(--critical)" stroke-width="1" opacity="0.5"/>
-                <line class="asg-edge" x1="100" y1="40" x2="125" y2="20" stroke="var(--high)" stroke-width="1" opacity="0.5"/>
-                <line class="asg-edge" x1="152" y1="130" x2="184" y2="135" stroke="var(--high)" stroke-width="1" opacity="0.5"/>
-                <line class="asg-edge" x1="152" y1="130" x2="170" y2="158" stroke="var(--medium)" stroke-width="1" opacity="0.5"/>
-                <line class="asg-edge" x1="48" y1="130" x2="16" y2="130" stroke="var(--medium)" stroke-width="1" opacity="0.5"/>
-                <line class="asg-edge" x1="48" y1="130" x2="30" y2="158" stroke="var(--low)" stroke-width="1" opacity="0.5"/>
-                <circle cx="100" cy="100" r="10" fill="var(--accent)"/><text x="100" y="104" text-anchor="middle" font-size="8" fill="white" font-weight="700" font-family="var(--font-sans)">EN</text>
-                <g class="asg-node" data-node="host"><circle cx="100" cy="40" r="7" fill="var(--critical)"/><text x="100" y="30" text-anchor="middle">127.0.0.1</text></g>
-                <g class="asg-node" data-node="http"><circle cx="152" cy="130" r="6" fill="var(--accent)"/><text x="152" y="148" text-anchor="middle">:80 http</text></g>
-                <g class="asg-node" data-node="tls"><circle cx="48" cy="130" r="6" fill="var(--accent)"/><text x="48" y="148" text-anchor="middle">:443 tls</text></g>
-                <circle cx="100" cy="14" r="3" fill="var(--critical)"/><circle cx="125" cy="20" r="3" fill="var(--high)"/><circle cx="184" cy="135" r="3" fill="var(--high)"/><circle cx="170" cy="158" r="3" fill="var(--medium)"/><circle cx="16" cy="130" r="3" fill="var(--medium)"/><circle cx="30" cy="158" r="3" fill="var(--low)"/>
-              </svg>
+            <div class="card-sub" id="findings-surface-summary">Derived from the findings currently loaded below.</div>
+            <div id="findings-surface-list" class="surface-list" aria-live="polite">
+              <p class="card-sub">Loading observed targets…</p>
             </div>
           </div>
         </div>
@@ -96,13 +78,11 @@
           
         </div>
 
-        <div class="bulk-bar" id="bulk-bar">
+        <div class="bulk-bar" id="bulk-bar" hidden aria-live="polite">
           <span class="bcount"><span id="bulk-count">0</span> selected</span>
           <div class="divider-v"></div>
-          <button class="btn btn-sm btn-success" style="display:none;">Mark verified</button>
-          <button class="btn btn-sm btn-ghost" style="display:none;">Export</button>
-          <button class="btn btn-sm btn-danger" style="display:none;">Delete</button>
-          <button class="btn btn-sm btn-ghost" id="bulk-clear-btn">Clear</button>
+          <button class="btn btn-sm btn-ghost" id="bulk-export-btn" type="button">Export selected</button>
+          <button class="btn btn-sm btn-ghost" id="bulk-clear-btn" type="button">Clear selection</button>
         </div>
       </section>
  
