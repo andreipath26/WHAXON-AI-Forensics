@@ -52,6 +52,11 @@ def test_dashboard_renders_live_job_rows_and_routes_new_engagement(page, live_se
     assert page.locator("main").is_visible()
     assert page.locator("main table tbody tr").count() >= 1
     assert "seed-job-1" in page.locator("main").inner_text()
+    visible_text = page.locator("main").inner_text()
+    assert "Quickstart Target Scope Wizard" not in visible_text
+    assert "Import Existing Assessment Profile" not in visible_text
+    assert "Explore Lab Environments" not in visible_text
+    assert "ALL HARD ENFORCEMENTS ACTIVE" not in visible_text
     start = page.get_by_role("button", name="Start New Engagement")
     assert start.is_visible()
     start.click()
@@ -81,11 +86,27 @@ def test_findings_page_renders_real_findings(page, live_server):
 
 
 def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
+    page.route("**/api/run", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"job_id":"browser-test-job"}'))
+    page.route("**/api/jobs/browser-test-job/stream", lambda route: route.fulfill(
+        status=200, content_type="text/event-stream",
+        body='data: {"type":"finished","exit_code":0}\\n\\n'))
     page.goto(f"{live_server}/ui/run-and-orchestration", wait_until="domcontentloaded")
     page.wait_for_timeout(400)
-    assert page.locator('input[placeholder*="Target host"]').is_visible()
+    target = page.locator('input[placeholder*="Target host"]')
+    assert target.is_visible()
     assert page.locator('select[aria-label="Tool to run"]').count() == 0
-    assert page.locator('button').filter(has_text="Re-run").count() >= 1
+    assert "VULN_CANDIDATE" not in page.locator("main").inner_text()
+    assert "staging-api.corp.net" not in page.locator("main").inner_text()
+    rerun = page.locator("main button").filter(has_text="Re-run")
+    assert rerun.count() >= 1
+    assert rerun.first.is_visible()
+    target.fill("127.0.0.1")
+    with page.expect_request("**/api/run") as request_info:
+        rerun.first.click()
+    payload = request_info.value.post_data_json
+    assert payload["target"] == "127.0.0.1"
+    assert payload["tool_id"]
 
 
 def test_history_page_renders_live_job_rows(page, live_server):

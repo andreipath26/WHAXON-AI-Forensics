@@ -2050,23 +2050,61 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     let selectedJob = null, stream = null;
     if (targetInput) targetInput.value = '';
     if (output) output.textContent = 'Ready. Choose a registered tool and a target permitted by the configured scope.';
+    // Clear prototype-only event telemetry and the hard-coded stream URL.
+    const fakeEvent = Array.from(document.querySelectorAll('main div')).find(function (element) {
+      return element.classList.contains('bg-surface-container-high') &&
+        /VULN_CANDIDATE|CVE-2023-38606|QUEUED_REPLAY/.test(element.textContent || '');
+    });
+    if (fakeEvent) setHidden(fakeEvent, true);
+    const streamLabel = Array.from(document.querySelectorAll('main span')).find(function (element) {
+      return /\/api\/v1\/stream\/WX-8492/.test(element.textContent || '');
+    });
+    if (streamLabel) setHidden(streamLabel.closest('.flex.items-center.gap-space-xs') || streamLabel, true);
+    hideButtonByText('view stdout');
+    const clearBuffer = document.querySelector('button[onclick*="clearLog"]');
+    if (clearBuffer) clearBuffer.onclick = function () {
+      if (output) output.textContent = 'Output cleared.';
+    };
     let tools = [];
     try {
       const response = await requestJson('/api/tools');
       tools = Array.isArray(response) ? response : (response.tools || []);
     } catch (_) { wireUnavailablePage(); return; }
     const usable = tools.filter(function (tool) { return tool && tool.id && tool.available !== false; });
+    // Replace the hard-coded recent-job label with the real latest recorded job.
+    const recentLabel = Array.from(document.querySelectorAll('main span')).find(function (element) {
+      return (element.textContent || '').trim() === 'Recent Job:';
+    });
+    const recentRow = recentLabel && recentLabel.parentElement;
+    if (recentRow) {
+      const values = recentRow.querySelectorAll(':scope > span');
+      try {
+        const history = await requestJson('/api/history');
+        const jobs = Array.isArray(history) ? history : (history.jobs || history.history || []);
+        const latest = jobs.find(function (job) { return job && (job.id || job.job_id); });
+        if (values[1]) values[1].textContent = latest
+          ? String(latest.id || latest.job_id) + ' · ' + String(latest.target || 'target not recorded')
+          : 'No jobs recorded';
+        if (values[2]) values[2].textContent = latest ? status(latest.status) : '—';
+      } catch (_) {
+        setHidden(recentRow, true);
+      }
+    }
     const runButtons = Array.from(document.querySelectorAll('main button')).filter(function (button) {
       return (button.textContent || '').trim().toLowerCase() === 're-run';
     });
     function norm(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
     function findTool(card) {
       const title = card.querySelector('h2,h3,h4,[class*="font-semibold"]');
-      const normalized = norm(title ? title.textContent : card.textContent);
+      const normalizedTitle = norm(title ? title.textContent : '');
+      const normalizedCard = norm(card.textContent);
       return usable.find(function (tool) {
         const id = norm(tool.id), name = norm(tool.name || tool.id);
-        return normalized.includes(id) || normalized.includes(name) ||
-          normalized.includes(id.replace(/\d+$/, '')) || normalized.includes(name.replace(/\d+$/, ''));
+        const candidates = [id, name].filter(Boolean);
+        return candidates.some(function (candidate) {
+          return normalizedTitle.includes(candidate) || normalizedCard.includes(candidate) ||
+            (candidate.length >= 3 && candidate.includes(normalizedTitle));
+        });
       }) || null;
     }
     let wiredCount = 0;
@@ -2236,6 +2274,25 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           td.colSpan = Math.max(1, headers.length); td.className = 'p-space-md text-outline'; td.textContent = 'No jobs recorded yet.';
           tr.appendChild(td); body.appendChild(tr);
         }
+      }
+      // These three engagement cards and the pre-flight checklist are static
+      // prototype content, not backed by the current API. Keep the canonical
+      // source untouched but remove the unsupported claims from the live view.
+      ['Quickstart Target Scope Wizard', 'Import Existing Assessment Profile', 'Explore Lab Environments'].forEach(function (headingText) {
+        const heading = Array.from(document.querySelectorAll('main h2, main h3')).find(function (el) {
+          return (el.textContent || '').trim() === headingText;
+        });
+        if (heading) {
+          const card = heading.closest('.rounded-xl');
+          if (card) setHidden(card, true);
+        }
+      });
+      const preflight = Array.from(document.querySelectorAll('main h2, main h3')).find(function (el) {
+        return /Pre-Flight Boundary Checklist/i.test(el.textContent || '');
+      });
+      if (preflight) {
+        const section = preflight.closest('.rounded-xl');
+        if (section) setHidden(section, true);
       }
       const remLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Remediation Retest'; });
       if (remLabel) { const card = remLabel.closest('.rounded-lg'); if (card) setHidden(card, true); }
