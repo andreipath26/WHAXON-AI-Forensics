@@ -257,6 +257,8 @@ def test_ai_strategy_gate_does_not_show_demo_proposal_without_pending_run(page, 
 
 
 def test_attack_chain_page_shows_native_empty_state_when_no_recorded_edges(page, live_server):
+    page.route("**/api/pivot/graph", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"edges":[],"count":0}'))
     page.goto(f"{live_server}/ui/correlated-attack-chains", wait_until="domcontentloaded")
     page.wait_for_timeout(200)
     body = page.locator("body").inner_text()
