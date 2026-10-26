@@ -3048,8 +3048,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (description) setHidden(description, true);
       const sampleDetails = Array.from(card.querySelectorAll('div')).find(function (element) {
         return element.classList.contains('flex-wrap') && element.classList.contains('justify-between') &&
-          element.classList.contains('pt-space-xs') &&
-          /In Scope:/.test(element.textContent || '') && /MSF:/.test(element.textContent || '');
+          element.classList.contains('pt-space-xs') && /In Scope:/.test(element.textContent || '');
       });
       if (sampleDetails) setHidden(sampleDetails, true);
       card.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
@@ -3062,6 +3061,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     if (workspace) Array.from(workspace.children).forEach(function (child) {
       if (!child.contains(workbench)) setHidden(child, true);
     });
+    const kpiGrid = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+      return /Verified Modules/.test(grid.textContent || '') && /Shadow Advisories/.test(grid.textContent || '');
+    });
+    if (kpiGrid) setHidden(kpiGrid, true);
+    document.querySelectorAll('main span').forEach(function (span) {
+      if (/^(CISA KEV:|LOCAL DB:|EXPLOIT-DB:|EPSS MODEL:)$/i.test((span.textContent || '').trim())) {
+        setHidden(span.parentElement || span, true);
+      }
+    });
+    const sortSelect = document.querySelector('main select');
+    if (sortSelect) {
+      const sortBox = sortSelect.closest('div.flex.items-center.gap-1.shrink-0');
+      setHidden(sortBox || sortSelect, true);
+    }
     const inspector = document.getElementById('inspector-cve-id');
     if (inspector) {
       let column = inspector;
