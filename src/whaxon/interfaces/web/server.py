@@ -1592,6 +1592,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Canonical scope design, wired to the live scope APIs."""
         return render_template("ui_v2_scope.html")
 
+    @app.get("/ui-v2/run")
+    def ui_v2_run():
+        """Canonical run design, wired to guarded tool execution APIs."""
+        return render_template("ui_v2_run.html")
+
     @app.get("/ui")
     def ui():
         return render_template("index.html")
