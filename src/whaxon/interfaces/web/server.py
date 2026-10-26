@@ -2125,6 +2125,31 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       return /\/api\/v1\/stream\/WX-8492/.test(element.textContent || '');
     });
     if (streamLabel) setHidden(streamLabel.closest('.flex.items-center.gap-space-xs') || streamLabel, true);
+    const falseFooter = Array.from(document.querySelectorAll('main div')).filter(function (element) {
+      const value = element.textContent || '';
+      return value.includes('184,209') && value.includes('31 Validated') &&
+        value.includes('Recon: 100% | Enum: 72%') && value.includes('data/runs/WX-8492');
+    }).sort(function (a, b) { return (a.textContent || '').length - (b.textContent || '').length; })[0];
+    if (falseFooter) setHidden(falseFooter, true);
+    const phaseHeading = Array.from(document.querySelectorAll('main h2, main h3')).find(function (element) {
+      return /Phase 0: Passive Reconnaissance Stage/.test(element.textContent || '');
+    });
+    if (phaseHeading) phaseHeading.textContent = 'Registered Tool Execution';
+    document.querySelectorAll('main span').forEach(function (element) {
+      const value = (element.textContent || '').trim();
+      if (['v0.11.16','10-CHECK DISPATCHER','Passive Check Pipeline (All 10 Parallel)','10/10 Enabled'].includes(value)) {
+        setHidden(element.closest('div.flex.items-center.justify-between') || element, true);
+      }
+      if (value.includes('ThreadPoolExecutor')) {
+        setHidden(element.closest('.bg-surface-container-lowest') || element, true);
+      }
+      if (value.startsWith('CLI: whaxon recon')) setHidden(element, true);
+    });
+    document.querySelectorAll('main .bg-surface-container-low.rounded-lg').forEach(function (card) {
+      if (/Process Group & Descendant Monitor|WMI \/ SMB Execution Module|AI Strategy Planner \(Local\)/i.test(card.textContent || '')) {
+        setHidden(card, true);
+      }
+    });
     hideButtonByText('view stdout');
     const clearBuffer = document.querySelector('button[onclick*="clearLog"]');
     if (clearBuffer) clearBuffer.onclick = function () {
