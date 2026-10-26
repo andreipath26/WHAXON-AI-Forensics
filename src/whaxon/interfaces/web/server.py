@@ -2553,6 +2553,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   function wireUnavailablePage() {
     const main = document.querySelector('main');
     if (main) Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    // Some supplied designs place demo modals outside <main>. Hide those too
+    // whenever their native workflow has no real backend wiring.
+    document.querySelectorAll('[id]').forEach(function (element) {
+      if (/modal/i.test(element.id)) {
+        element.hidden = true;
+        element.setAttribute('aria-hidden', 'true');
+      }
+    });
   }
   if (page === 'trust-layer-and-findings') wireFindings();
   if (page === 'trust-layer-findings') wireFindings();

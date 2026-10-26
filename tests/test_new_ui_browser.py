@@ -117,3 +117,8 @@ def test_evidence_page_never_shows_static_sample_artifacts(page, live_server):
     page.goto(f"{live_server}/ui/evidence-file-inspector", wait_until="domcontentloaded")
     page.wait_for_timeout(250)
     assert "raw_nmap_syn_scan.xml" not in page.locator("body").inner_text()
+
+
+def test_unwired_approval_page_hides_demo_modal_outside_main(page, live_server):
+    page.goto(f"{live_server}/ui/trust-layer-approvals-queue-modal", wait_until="domcontentloaded")
+    assert page.locator("#approvals-modal").is_hidden()
