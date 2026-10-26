@@ -1547,3 +1547,76 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   searchButton.addEventListener('click', searchIntel);
   queryInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchIntel(); });
 })();
+
+
+// ---- Attack surface / pivot relationship view ----
+(function () {
+  const tbody = document.getElementById('graph-tbody');
+  const summary = document.getElementById('graph-summary');
+  const refresh = document.getElementById('graph-refresh');
+  if (!tbody || !summary) return;
+
+  function cell(text, className) {
+    const td = document.createElement('td');
+    if (className) {
+      const span = document.createElement('span');
+      span.className = className;
+      span.textContent = text || '—';
+      td.appendChild(span);
+    } else {
+      td.textContent = text || '—';
+    }
+    return td;
+  }
+  function nodeLabel(node) {
+    return node ? String(node.kind || 'node') + ': ' + String(node.id || '') : '—';
+  }
+  async function loadGraph() {
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing…'; }
+    summary.textContent = 'Loading stored pivot relationships…';
+    tbody.replaceChildren();
+    try {
+      const response = await fetch('/api/pivot/graph', { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      const edges = Array.isArray(data.edges) ? data.edges : [];
+      summary.textContent = edges.length + ' recorded relationship' + (edges.length === 1 ? '' : 's') + '.';
+      if (!edges.length) {
+        const tr = document.createElement('tr');
+        const td = cell('No pivot relationships have been recorded for this workspace yet.');
+        td.colSpan = 5;
+        td.style.padding = '16px';
+        td.style.color = 'var(--text-dim)';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+      edges.forEach(edge => {
+        const tr = document.createElement('tr');
+        tr.append(
+          cell(nodeLabel(edge.parent), 'mono'),
+          cell(String(edge.relation || '')),
+          cell(nodeLabel(edge.child), 'mono'),
+          cell(String(edge.evidence || '')),
+          cell(edge.created_at ? new Date(Number(edge.created_at) * 1000).toLocaleString() : '—', 'mono')
+        );
+        tbody.appendChild(tr);
+      });
+    } catch (error) {
+      summary.textContent = 'Could not load pivot relationships.';
+      const tr = document.createElement('tr');
+      const td = cell('Request failed: ' + (error && error.message ? error.message : error));
+      td.colSpan = 5;
+      td.style.padding = '16px';
+      td.style.color = 'var(--critical)';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    } finally {
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
+    }
+  }
+  refresh?.addEventListener('click', loadGraph);
+  document.querySelectorAll('.sb-item[data-page="graph"]').forEach(item => item.addEventListener('click', loadGraph));
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadGraph);
+  else loadGraph();
+})();
