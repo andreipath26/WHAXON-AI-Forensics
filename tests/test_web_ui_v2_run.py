@@ -13,7 +13,7 @@ def _open_run_v2(page, live_server):
 def test_run_v2_loads_live_catalog_and_history(page, live_server):
     _open_run_v2(page, live_server)
     assert int(page.locator("#run-kpi-tools").text_content()) > 0
-    assert page.locator("#run-history").is_visible()
+    assert page.locator("#run-recent-job").is_visible()
     assert page.locator('[data-tool-id="echo"]').count() == 1
 
 
@@ -26,7 +26,7 @@ def test_run_v2_executes_echo_through_backend(page, live_server):
         "() => document.querySelector('#run-job-label').textContent.includes('finished')",
         timeout=10000,
     )
-    assert "127.0.0.1" in page.locator("#run-output").text_content()
+    assert "127.0.0.1" in page.locator("#terminal-stdout").text_content()
 
 
 def test_run_v2_rejects_out_of_scope_target_before_starting_job(page, live_server):
