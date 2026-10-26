@@ -1635,7 +1635,13 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     });
   }
   function savePrefs() {
-    try { localStorage.setItem(storageKey, JSON.stringify(prefs)); } catch (_) {}
+    const statusEl = document.getElementById('settings-save-status');
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(prefs));
+      if (statusEl) statusEl.textContent = 'Appearance preferences saved in this browser.';
+    } catch (_) {
+      if (statusEl) statusEl.textContent = 'Appearance changed for this session, but browser storage is unavailable.';
+    }
   }
   applyTheme(prefs.theme);
   applyDensity(prefs.density);

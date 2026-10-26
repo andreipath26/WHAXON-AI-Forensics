@@ -249,16 +249,10 @@
         <div class="grid-2">
           <div class="card card-pad-lg">
             <div class="card-title">Appearance</div><div class="card-sub">Theme and density</div>
-            <div class="form-row"><label class="form-label">Theme</label><select id="settings-theme" class="tb-select" style="width:100%;"><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></div>
-            <div class="form-row"><label class="form-label">Density</label><div class="density-toggle"><button class="on" data-density="comfortable">Comfortable</button><button data-density="compact">Compact</button></div></div>
+            <div class="form-row"><label class="form-label" for="settings-theme">Theme</label><select id="settings-theme" class="tb-select" style="width:100%;"><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></div>
+            <div class="form-row"><span class="form-label" id="settings-density-label">Density</span><div class="density-toggle" role="group" aria-labelledby="settings-density-label"><button type="button" class="on" data-density="comfortable" aria-pressed="true">Comfortable</button><button type="button" data-density="compact" aria-pressed="false">Compact</button></div></div><p class="form-hint" id="settings-save-status" role="status" aria-live="polite">Appearance preferences are saved in this browser when storage is available.</p>
           </div>
-          <div class="card card-pad-lg">
-            <div class="card-title">Workspace members <span class="badge">4</span></div><div class="card-sub">Path26 Security</div>
-            <div class="kv"><span class="k">andreipath</span><span class="v">Owner</span></div>
-            <div class="kv"><span class="k">peter</span><span class="v">Pentester</span></div>
-            <div class="kv"><span class="k">maria</span><span class="v">Reviewer</span></div>
-            <div class="kv"><span class="k">client@acme</span><span class="v">Client-viewer</span></div>
-          </div>
+          <div class="card card-pad-lg"><div class="card-title">Workspace configuration</div><p class="card-sub">Workspace-member management is not connected to this release. No sample users or permissions are shown as live account data.</p></div>
         </div>
       </section>
             <!-- COMPONENTS -->
