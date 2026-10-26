@@ -2716,8 +2716,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       });
       if (catalogKpis) setHidden(catalogKpis, true);
       const catalogDrawerTitle = document.getElementById('drawer-title');
-      const catalogDrawer = catalogDrawerTitle && catalogDrawerTitle.closest('.bg-surface-container-low.rounded');
+      const catalogDrawer = catalogDrawerTitle && catalogDrawerTitle.closest('.bg-surface-container-low.rounded.shadow-md');
       if (catalogDrawer) setHidden(catalogDrawer, true);
+      // Some versions of the supplied page duplicate the drawer title in a
+      // nested header. Hide by visible label as well as the canonical ID.
+      document.querySelectorAll('main span, main h2, main h3').forEach(function (element) {
+        if ((element.textContent || '').trim() === 'Nuclei Configuration') {
+          const panel = element.closest('.bg-surface-container-low.rounded.shadow-md');
+          setHidden(panel || element, true);
+        }
+      });
       const signatureLabel = Array.from(document.querySelectorAll('main span')).find(function (el) {
         return /LIVE ENTRY POINT SIGNATURE PIPELINE/i.test(el.textContent || '');
       });
