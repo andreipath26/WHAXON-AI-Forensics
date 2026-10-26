@@ -44,3 +44,49 @@ def test_legacy_ui_is_still_reachable(page, live_server):
     response = page.goto(f"{live_server}/legacy-ui", wait_until="domcontentloaded")
     assert response is not None and response.status == 200
     assert page.locator(".sb-brand .label-text").inner_text() == "WHAXON"
+
+def test_dashboard_renders_live_job_rows(page, live_server):
+    page.goto(f"{live_server}/ui", wait_until="domcontentloaded")
+    page.wait_for_timeout(500)
+    assert page.locator("main").is_visible()
+    assert page.locator("main table tbody tr").count() >= 1
+    assert "seed-job-1" in page.locator("main").inner_text()
+
+
+def test_scope_page_renders_real_scope_rules(page, live_server):
+    page.goto(f"{live_server}/ui/scope-and-targets", wait_until="domcontentloaded")
+    page.wait_for_timeout(300)
+    body = page.locator("#targetTableBody")
+    assert body.is_visible()
+    assert body.locator("tr").count() >= 1
+    assert "127.0.0.1" in body.inner_text()
+
+
+def test_findings_page_renders_real_findings(page, live_server):
+    page.goto(f"{live_server}/ui/trust-layer-and-findings", wait_until="domcontentloaded")
+    page.wait_for_timeout(500)
+    card = page.locator("#finding-card-1")
+    assert card.is_visible()
+    assert "SQL injection on /login" in card.inner_text()
+
+
+def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
+    page.goto(f"{live_server}/ui/run-and-orchestration", wait_until="domcontentloaded")
+    page.wait_for_timeout(400)
+    assert page.locator('input[placeholder*="Target host"]').is_visible()
+    assert page.locator('select[aria-label="Tool to run"]').count() == 1
+
+
+def test_history_page_renders_live_job_rows(page, live_server):
+    page.goto(f"{live_server}/ui/job-execution-history", wait_until="domcontentloaded")
+    page.wait_for_timeout(400)
+    assert "seed-job-1" in page.locator("body").inner_text()
+
+
+def test_catalog_page_renders_live_tools(page, live_server):
+    page.goto(f"{live_server}/ui/adapter-and-plugin-manager", wait_until="domcontentloaded")
+    page.wait_for_timeout(400)
+    matrix = page.locator("#adapter-matrix")
+    assert matrix.is_visible()
+    assert matrix.locator(".adapter-card").count() >= 1
+
