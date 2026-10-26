@@ -1110,7 +1110,7 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         else if (msg.status === 'queued') setStatus('Job queued…', 'running');
         else if (msg.status === 'cancelled') finishJob('Job cancelled.', 'info');
       } else if (msg.type === 'line') appendLine(msg.stream, msg.text);
-      else if (msg.type === 'finished') finishJob('Finished (exit ' + msg.exit_code + ').', msg.exit_code === 0 ? 'success' : 'error');
+      else if (msg.type === 'finished') finishJob('finished (exit ' + msg.exit_code + ').', msg.exit_code === 0 ? 'success' : 'error');
       else if (msg.type === 'failed') finishJob('Job failed: ' + String(msg.error || 'unknown error'), 'error');
     };
     es.onerror = () => {
