@@ -3099,6 +3099,38 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     };
   }
   function wireUnavailablePage() {
+    // Remove navigation entry points for workflows whose required backend is
+    // unavailable. Direct routes remain safe, but users should not be invited
+    // into a page that has no working data source.
+    const aliasGroups = [
+      ['settings-and-api-explorer', 'settings-and-secrets-vault', 'settings-secrets-vault'],
+      ['bug-bounty-and-live-browser-studio', 'bug-bounty-live-browser'],
+      ['ptaas-client-portal'],
+      ['cryptographic-audit-log'],
+      ['bas-and-detection-validation'],
+      ['compliance-and-framework-crosswalk'],
+      ['threat-intel-and-exploit-arsenal'],
+      ['attack-surface-and-continuous-monitoring'],
+      ['correlated-attack-chains'],
+      ['evidence-file-inspector'],
+      ['system-diagnostics-and-health', 'system-diagnostics-health'],
+      ['adapter-and-plugin-manager', 'adapter-plugin-manager'],
+      ['scope-and-targets', 'scope-targets'],
+      ['run-and-orchestration', 'run-orchestration'],
+      ['trust-layer-and-findings', 'trust-layer-findings'],
+      ['ptes-coverage-and-reports', 'ptes-coverage-reports'],
+      ['remediation-retest-studio'],
+      ['ai-strategy-gate'],
+      ['job-execution-history'],
+      ['dashboard-zero-state']
+    ];
+    const unavailableSlugs = new Set([page]);
+    aliasGroups.forEach(function (group) {
+      if (group.includes(page)) group.forEach(function (slug) { unavailableSlugs.add(slug); });
+    });
+    document.querySelectorAll('[data-path]').forEach(function (link) {
+      if (unavailableSlugs.has(link.getAttribute('data-path'))) setHidden(link, true);
+    });
     const main = document.querySelector('main');
     if (main) Array.from(main.children).forEach(function (child) { setHidden(child, true); });
     // Some supplied designs place demo modals outside <main>. Hide those too
