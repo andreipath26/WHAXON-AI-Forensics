@@ -1199,7 +1199,7 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       rows = await response.json();
       if (!Array.isArray(rows)) throw new Error('Invalid pending-approval response');
       if (badge) { badge.textContent = String(rows.length); badge.style.display = rows.length ? '' : 'none'; }
-      if (summary) summary.textContent = rows.length + ' AI run' + (rows.length === 1 ? '' : 's') + ' awaiting a decision';
+      if (summary) summary.textContent = rows.length + ' run' + (rows.length === 1 ? '' : 's') + ' awaiting a decision';
       if (!rows.length) { empty(list, 'No AI runs are waiting for a decision.'); return; }
       list.replaceChildren();
       rows.forEach(run => {
