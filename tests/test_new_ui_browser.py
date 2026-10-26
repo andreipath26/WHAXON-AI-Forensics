@@ -162,6 +162,7 @@ def test_attack_surface_renders_recorded_targets_not_cloud_demo(page, live_serve
     page.goto(f"{live_server}/ui/attack-surface-and-continuous-monitoring", wait_until="domcontentloaded")
     page.wait_for_timeout(300)
     ledger = page.locator("#asset-ledger-container")
+    assert page.get_by_text("ATTACK SURFACE & CONTINUOUS MONITORING", exact=True).is_visible()
     assert ledger.is_visible()
     assert ledger.locator("article.asset-card").count() >= 1
     visible_text = page.locator("body").inner_text()
