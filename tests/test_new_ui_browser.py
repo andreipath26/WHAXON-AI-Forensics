@@ -111,7 +111,7 @@ def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
     assert "staging-api.corp.net" not in run_text
     assert "Process Group & Descendant Monitor" not in run_text
     assert "Network Packets" not in run_text
-    passive = page.get_by_role("button", name="Dispatch Passive Recon")
+    passive = page.get_by_role("button", name="Run Nmap Scan")
     assert passive.is_visible()
     assert page.get_by_role("button", name="Run Active Pipeline").is_hidden()
     target.fill("127.0.0.1")

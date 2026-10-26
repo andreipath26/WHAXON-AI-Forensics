@@ -2273,6 +2273,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     });
     const passiveTool = usable.find(function (tool) { return norm(tool.id) === 'nmap' || norm(tool.name) === 'nmap'; });
     if (passiveButton && passiveTool && targetInput) {
+      // The selected Nmap command performs an active scan, not passive OSINT.
+      // Preserve the native button styling but make its action label accurate.
+      const passiveLabel = Array.from(passiveButton.querySelectorAll('span')).find(function (span) {
+        return /dispatch passive recon/i.test(span.textContent || '');
+      });
+      if (passiveLabel) passiveLabel.textContent = 'Run Nmap Scan';
       passiveButton.onclick = async function () {
         const target = targetInput.value.trim();
         if (!target) { window.alert('Enter a target that is included in the configured scope.'); return; }
