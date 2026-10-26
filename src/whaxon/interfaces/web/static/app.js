@@ -1588,45 +1588,58 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   const tbody = document.getElementById('catalog-tbody');
   if (!tbody) return;
   const summaryEl = document.getElementById('catalog-summary');
-
+  const refresh = document.getElementById('catalog-refresh');
+  let loading = false;
+  function showMessage(message, role) {
+    tbody.replaceChildren();
+    const tr = document.createElement('tr'), td = document.createElement('td');
+    td.colSpan = 5; td.className = 'catalog-empty'; td.textContent = message;
+    if (role) td.setAttribute('role', role);
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
   async function load() {
+    if (loading) return;
+    loading = true;
+    if (refresh) { refresh.disabled = true; refresh.textContent = 'Refreshing…'; }
+    if (summaryEl) summaryEl.textContent = 'Loading tools…';
     try {
-      const tools = await (await fetch('/api/tools')).json();
-      const arr = tools.tools || tools || [];
-      if (summaryEl) summaryEl.textContent = arr.length + ' tools in the catalog.';
-      if (!arr.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:16px; color:var(--text-dim);">No tools in catalog.</td></tr>';
+      const response = await fetch('/api/tools');
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const payload = await response.json();
+      const tools = Array.isArray(payload) ? payload : (payload && Array.isArray(payload.tools) ? payload.tools : []);
+      tbody.replaceChildren();
+      if (!tools.length) {
+        showMessage('No tools are currently registered in the catalog.');
+        if (summaryEl) summaryEl.textContent = '0 tools in the catalog.';
         return;
       }
-      tbody.innerHTML = '';
-      arr.forEach(tool => {
+      tools.forEach(tool => {
         const tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td><span class="mono"></span></td>' +
-          '<td><span class="pill pill-neutral"></span></td>' +
-          '<td><span class="mono"></span></td>' +
-          '<td><span class="pill adapter-status"></span></td>' +
-          '<td><span class="mono"></span></td>';
-        const monos = tr.querySelectorAll('.mono');
-        monos[0].textContent = tool.id || '';
-        tr.querySelector('.pill').textContent = tool.category || '';
-        const adapterStatus = tr.querySelector('.adapter-status');
-        adapterStatus.textContent = tool.adapter_available ? 'Available' : 'Not registered';
-        adapterStatus.classList.add(tool.adapter_available ? 'pill-success' : 'pill-neutral');
-        monos[1].textContent = tool.binary || '';
-        monos[2].textContent = tool.package || '';
-        tbody.appendChild(tr);
+        const id = document.createElement('td'), idText = document.createElement('span');
+        idText.className = 'mono'; idText.textContent = String(tool.id || '—'); id.appendChild(idText);
+        const category = document.createElement('td'), categoryPill = document.createElement('span');
+        categoryPill.className = 'pill pill-neutral'; categoryPill.textContent = String(tool.category || '—'); category.appendChild(categoryPill);
+        const binary = document.createElement('td'); binary.className = 'mono'; binary.textContent = String(tool.binary || '—');
+        const adapter = document.createElement('td'), adapterPill = document.createElement('span');
+        adapterPill.className = 'pill ' + (tool.adapter_available ? 'pill-success' : 'pill-neutral');
+        adapterPill.textContent = tool.adapter_available ? 'Available' : 'Not registered'; adapter.appendChild(adapterPill);
+        const pkg = document.createElement('td'); pkg.className = 'mono'; pkg.textContent = String(tool.package || '—');
+        tr.append(id, category, binary, adapter, pkg); tbody.appendChild(tr);
       });
-    } catch (e) {
-      whaxonRenderMessageRow(tbody, 5, 'Failed to load catalog: ' + e);
+      if (summaryEl) summaryEl.textContent = tools.length + ' tools in the catalog.';
+    } catch (err) {
+      showMessage('Could not load catalog: ' + String(err && err.message || err), 'alert');
+      if (summaryEl) summaryEl.textContent = 'Catalog unavailable.';
+    } finally {
+      loading = false;
+      if (refresh) { refresh.disabled = false; refresh.textContent = 'Refresh'; }
     }
   }
-
+  if (refresh) refresh.addEventListener('click', load);
   document.querySelectorAll('.sb-item[data-page="catalog"]').forEach(el => el.addEventListener('click', load));
   document.addEventListener('DOMContentLoaded', load);
   if (document.readyState !== 'loading') load();
 })();
-
 // ---- Scope override modal ----
 (function () {
   const btn = document.getElementById('scope-override-btn');
