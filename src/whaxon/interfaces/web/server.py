@@ -1656,10 +1656,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     const v = String(value || 'candidate').toLowerCase();
     return v.replace(/_/g, ' ').toUpperCase();
   }
+  function setHidden(element, hidden) {
+    if (!element) return;
+    element.hidden = !!hidden;
+    if (hidden) {
+      element.classList.add('hidden');
+      element.style.display = 'none';
+    } else {
+      element.classList.remove('hidden');
+      element.style.display = '';
+    }
+  }
   function hideButtonByText(needle) {
     document.querySelectorAll('button').forEach(function (button) {
       if ((button.textContent || '').toLowerCase().includes(needle)) {
-        button.hidden = true;
+        setHidden(button, true);
         button.setAttribute('aria-hidden', 'true');
       }
     });
@@ -1670,7 +1681,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     if (label === 'OP//7749-ALPHA' || label === 'Lead Security Engineer' ||
         label === 'ENGINE STANDBY' || label.includes('ENG-2026-X892') ||
         label === 'Target: api.internal.corp') {
-      element.hidden = true;
+      setHidden(element, true);
       element.setAttribute('aria-hidden', 'true');
     }
   });
@@ -1696,14 +1707,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       while (templateCard && cards.length < rows.length) {
         const clone = templateCard.cloneNode(true);
         clone.id = 'finding-card-' + (cards.length + 1);
-        clone.hidden = false;
+        setHidden(clone, false);
         cards[cards.length - 1].after(clone);
         cards.push(clone);
       }
       if (heading) heading.textContent = 'Attack Surface Findings (' + rows.length + ')';
       cards.forEach(function (card, index) {
         const item = rows[index];
-        if (!item) { card.hidden = true; card.dataset.hasFinding = 'false'; return; }
+        if (!item) { setHidden(card, true); card.dataset.hasFinding = 'false'; return; }
         card.dataset.hasFinding = 'true';
         const f = item.finding, job = item.job;
         const line = card.querySelector('.flex.items-center.gap-space-sm');
@@ -1777,7 +1788,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             if (proofPanel) {
               Array.from(proofPanel.children).forEach(function (child) {
                 const keep = child.contains(document.getElementById('curl-proof-payload')) || child.contains(document.getElementById('replay-btn'));
-                child.hidden = !keep;
+                setHidden(child, !keep);
               });
             }
           }
@@ -1785,7 +1796,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             const raw = card.dataset.rawLine;
             proof.textContent = raw || 'No raw proof line was recorded for this finding.';
             const proofSection = proof.closest('.flex.flex-col.gap-space-xs');
-            if (proofSection) proofSection.hidden = !raw;
+            if (proofSection) setHidden(proofSection, !raw);
           }
           const replay = document.getElementById('replay-btn');
           if (replay) {
@@ -1800,7 +1811,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const kpiLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Scans'; });
       if (kpiLabel) {
         const kpiGrid = kpiLabel.closest('.grid');
-        if (kpiGrid) kpiGrid.hidden = true;
+        if (kpiGrid) setHidden(kpiGrid, true);
       }
       const replay = document.getElementById('replay-btn');
       if (replay) {
@@ -1809,11 +1820,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if (label && first) label.textContent = first.dataset.status === 'verified' ? 'Replay Test (Retest)' : 'Validate Finding';
       }
       const replayReady = Array.from(document.querySelectorAll('span')).find(function (el) { return /Replay Ready:/.test(el.textContent || ''); });
-      if (replayReady) replayReady.hidden = true;
+      if (replayReady) setHidden(replayReady, true);
       const fakeMarker = Array.from(document.querySelectorAll('span')).find(function (el) { return /Matched Pattern: DB_PASSWORD/.test(el.textContent || ''); });
-      if (fakeMarker) { const box = fakeMarker.closest('.mt-space-md'); if (box) box.hidden = true; }
+      if (fakeMarker) { const box = fakeMarker.closest('.mt-space-md'); if (box) setHidden(box, true); }
       const methodology = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Methodology Step:'; });
-      if (methodology) { const box = methodology.closest('.mt-space-md'); if (box) box.hidden = true; }
+      if (methodology) { const box = methodology.closest('.mt-space-md'); if (box) setHidden(box, true); }
       const filterCounts = {
         'ALL': rows.length,
         'CRIT': rows.filter(function (item) { return String(item.finding.severity || '').toLowerCase() === 'critical'; }).length,
@@ -1828,7 +1839,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       function applyFindingFilters() {
         const query = searchInput ? searchInput.value.toLowerCase() : '';
         cards.forEach(function (card) {
-          if (card.dataset.hasFinding !== 'true') { card.hidden = true; return; }
+          if (card.dataset.hasFinding !== 'true') { setHidden(card, true); return; }
           const sev = String(card.dataset.severity || '').toLowerCase();
           const state = String(card.dataset.status || '').toLowerCase();
           const text = [card.textContent, card.dataset.rawLine, card.dataset.description, card.dataset.remediation].join(' ').toLowerCase();
@@ -1840,7 +1851,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             activeFilter === 'VERIFIED' ? state === 'verified' :
             activeFilter === 'CANDIDATE' ? ['candidate','pending'].includes(state) :
             ['candidate','pending'].includes(state);
-          card.hidden = !stateMatch || !text.includes(query);
+          setHidden(card, !stateMatch || !text.includes(query));
         });
         const selected = cards.find(function (card) { return !card.hidden; });
         if (selected) selected.click();
@@ -1881,7 +1892,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         ];
         const table = body.closest('table');
         if (table) table.querySelectorAll('thead th').forEach(function (cell, index) {
-          if (index > 0 && index < 6) cell.hidden = true;
+          if (index > 0 && index < 6) setHidden(cell, true);
         });
         rows.forEach(function (item) {
           const tr = document.createElement('tr');
@@ -1892,7 +1903,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           tr.appendChild(target);
           for (let i = 1; i < 6; i++) {
             const hiddenCell = document.createElement('td');
-            hiddenCell.hidden = true;
+            setHidden(hiddenCell, true);
             tr.appendChild(hiddenCell);
           }
           const state = document.createElement('td');
@@ -1914,7 +1925,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if (filter) filter.oninput = function () {
           const q = filter.value.toLowerCase();
           body.querySelectorAll('tr').forEach(function (tr) {
-            tr.hidden = !tr.textContent.toLowerCase().includes(q);
+            setHidden(tr, !tr.textContent.toLowerCase().includes(q));
           });
         };
       }
@@ -1925,17 +1936,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         const label = (button.textContent || '').toLowerCase();
         if (!/commit to scope|import & parse rules|add in-scope target|add boundary exclusion/.test(label)) return;
         const modal = button.closest('.fixed');
-        if (modal) modal.hidden = true;
+        if (modal) setHidden(modal, true);
       });
       const targetModal = document.getElementById('modalTargetInput');
       if (targetModal) {
         const modal = targetModal.closest('.fixed');
-        if (modal) modal.hidden = true;
+        if (modal) setHidden(modal, true);
       }
       const importText = document.querySelector('textarea[placeholder*="target"]');
       if (importText) {
         const modal = importText.closest('.fixed');
-        if (modal) modal.hidden = true;
+        if (modal) setHidden(modal, true);
       }
     } catch (error) {
       wireUnavailablePage();
@@ -1977,8 +1988,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const value = (element.textContent || '').trim();
       if (!/ENG-2026-X892|api\.internal\.corp|Sample Deterministic Proof|ENGAGEMENT HASH MANIFEST|41 automated vulnerability templates|6 vulnerabilities were deterministically verified/i.test(value)) return;
       const container = element.closest('.bg-surface-container-lowest, .bg-surface-container-low');
-      if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) container.hidden = true;
-      else if (!container) element.hidden = true;
+      if (container && !container.contains(previewButton) && !(modal && container.contains(modal))) setHidden(container, true);
+      else if (!container) setHidden(element, true);
     });
     // The coverage matrix and SIEM rule recommendations in this design are
     // static examples; this backend does not produce those telemetry claims.
@@ -1986,8 +1997,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const value = (element.textContent || '').trim();
       if (/Coverage Gap Matrix|Rule Recommendations|3 DOCUMENTED EXCLUSIONS|SEC-AZ-992|CROWDSTRIKE|SPLUNK & SENTINEL|FIN7 \/ APT29/i.test(value)) {
         const container = element.closest('.bg-surface-container-low.rounded-lg, .bg-surface-container-lowest.rounded-lg');
-        if (container && !container.contains(previewButton)) container.hidden = true;
-        else element.hidden = true;
+        if (container && !container.contains(previewButton)) setHidden(container, true);
+        else setHidden(element, true);
       }
     });
     try { await requestJson('/api/report?format=json'); }
@@ -2023,19 +2034,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     let wiredCount = 0;
     runButtons.forEach(function (button) {
       const card = button.closest('.bg-surface-container-low.rounded-lg');
-      if (!card) { button.hidden = true; return; }
+      if (!card) { setHidden(button, true); return; }
       const tool = findTool(card);
-      if (!tool) { card.hidden = true; return; }
+      if (!tool) { setHidden(card, true); return; }
       wiredCount += 1;
       const fakeStatus = Array.from(card.querySelectorAll('span')).find(function (span) {
         return /^(COMPLETED|RUNNING.*|QUEUED.*|READY)$/i.test((span.textContent || '').trim());
       });
       if (fakeStatus) fakeStatus.textContent = 'REGISTERED';
-      card.querySelectorAll('.grid.grid-cols-3, .absolute.top-0').forEach(function (node) { node.hidden = true; });
+      card.querySelectorAll('.grid.grid-cols-3, .absolute.top-0').forEach(function (node) { setHidden(node, true); });
       card.querySelectorAll('span').forEach(function (span) {
         if (/PID:|services found|templates|req\/s|Candidates|Awaiting .* completion|Concurrency cap/i.test(span.textContent || '')) {
           const parent = span.closest('.grid, .bg-surface-container-lowest');
-          if (parent) parent.hidden = true; else span.hidden = true;
+          if (parent) setHidden(parent, true); else setHidden(span, true);
         }
       });
       button.onclick = async function () {
@@ -2085,13 +2096,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     ['run active pipeline','dispatch passive recon','inject payload','spawn sub-tool','emergency abort','engage replay','explore whatweb','gobuster','wpscan','execute','pause pipeline','pause','abort'].forEach(hideButtonByText);
     ['ai-planner-toggle','toggle-planner-gate'].forEach(function (id) {
       const control = document.getElementById(id);
-      if (control) { const label = control.closest('label') || control.closest('div'); if (label) label.hidden = true; else control.hidden = true; }
+      if (control) { const label = control.closest('label') || control.closest('div'); if (label) setHidden(label, true); else setHidden(control, true); }
     });
     const probeCheckbox = document.querySelector('input[type="checkbox"]:not(#ai-planner-toggle)');
     const probeGrid = probeCheckbox && probeCheckbox.closest('.grid');
-    if (probeGrid) probeGrid.hidden = true;
+    if (probeGrid) setHidden(probeGrid, true);
     if (!targetInput || wiredCount === 0) {
-      runButtons.forEach(function (button) { button.hidden = true; });
+      runButtons.forEach(function (button) { setHidden(button, true); });
       if (output) output.textContent = 'No registered tool has a matching control in this design. No scan was started.';
     }
     document.querySelectorAll('button').forEach(function (button) {
@@ -2146,7 +2157,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         const labels = ['Job ID','Target','Operator','Timeline','Findings','Status','Actions'];
         headers.forEach(function (header, index) {
           if (labels[index]) header.textContent = labels[index];
-          if (index === 2 || index === 6) header.hidden = true;
+          if (index === 2 || index === 6) setHidden(header, true);
         });
         body.replaceChildren();
         history.forEach(function (job) {
@@ -2163,7 +2174,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           for (let i = 0; i < headers.length; i++) {
             const td = document.createElement('td'); td.className = 'px-space-md py-space-sm font-code-sm';
             td.textContent = String(values[i] == null ? '—' : values[i]);
-            if (i === 2 || i === 6) td.hidden = true;
+            if (i === 2 || i === 6) setHidden(td, true);
             tr.appendChild(td);
           }
           body.appendChild(tr);
@@ -2175,20 +2186,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         }
       }
       const remLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Remediation Retest'; });
-      if (remLabel) { const card = remLabel.closest('.rounded-lg'); if (card) card.hidden = true; }
+      if (remLabel) { const card = remLabel.closest('.rounded-lg'); if (card) setHidden(card, true); }
       const coverageLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'PTES Coverage'; });
-      if (coverageLabel) { const card = coverageLabel.closest('.rounded-lg'); if (card) card.hidden = true; }
+      if (coverageLabel) { const card = coverageLabel.closest('.rounded-lg'); if (card) setHidden(card, true); }
       const sessionBufferLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Session Buffer'; });
-      if (sessionBufferLabel) { const bar = sessionBufferLabel.closest('.rounded-lg'); if (bar) bar.hidden = true; }
+      if (sessionBufferLabel) { const bar = sessionBufferLabel.closest('.rounded-lg'); if (bar) setHidden(bar, true); }
       const falsePositiveLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /FALSE POSITIVES/.test(el.textContent || ''); });
       if (falsePositiveLabel) {
-        falsePositiveLabel.hidden = true;
+        setHidden(falsePositiveLabel, true);
         const card = falsePositiveLabel.closest('.rounded-lg');
         const progress = card && card.querySelector('.mt-2.h-1');
-        if (progress) progress.hidden = true;
+        if (progress) setHidden(progress, true);
       }
       const roeLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'ROE SIGN-OFF'; });
-      if (roeLabel) { const checklist = roeLabel.closest('.grid'); if (checklist) checklist.hidden = true; }
+      if (roeLabel) { const checklist = roeLabel.closest('.grid'); if (checklist) setHidden(checklist, true); }
       const activeScansLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Scans'; });
       if (activeScansLabel) {
         const card = activeScansLabel.closest('.rounded-lg');
@@ -2204,7 +2215,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const search = document.querySelector('input[placeholder*="Filter by ID"]');
       if (search && body) search.oninput = function () {
         const q = search.value.toLowerCase();
-        body.querySelectorAll('tr').forEach(function (row) { row.hidden = !row.textContent.toLowerCase().includes(q); });
+        body.querySelectorAll('tr').forEach(function (row) { setHidden(row, !row.textContent.toLowerCase().includes(q)); });
       };
       const sessionNote = Array.from(document.querySelectorAll('span,p')).find(function (el) { return /Awaiting Target Commit/.test(el.textContent || ''); });
       if (sessionNote) {
@@ -2212,12 +2223,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         else sessionNote.textContent = sessions.live_count ? 'Live sessions reported by backend' : 'No active sessions reported';
       }
       const targetLabel = Array.from(document.querySelectorAll('span,p')).find(function (el) { return (el.textContent || '').trim() === 'Target: api.internal.corp'; });
-      if (targetLabel) { targetLabel.hidden = true; targetLabel.setAttribute('aria-hidden','true'); }
+      if (targetLabel) { setHidden(targetLabel, true); targetLabel.setAttribute('aria-hidden','true'); }
       const storageLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /Storage:/.test(el.textContent || ''); });
-      if (storageLabel) storageLabel.hidden = true;
-      document.querySelectorAll('span').forEach(function (el) { if (/CRYPTO LOG INTEGRITY|MERKLE_ROOT_VERIFIED/.test(el.textContent || '')) el.hidden = true; });
+      if (storageLabel) setHidden(storageLabel, true);
+      document.querySelectorAll('span').forEach(function (el) { if (/CRYPTO LOG INTEGRITY|MERKLE_ROOT_VERIFIED/.test(el.textContent || '')) setHidden(el, true); });
       const historyFooter = Array.from(document.querySelectorAll('span')).find(function (el) { return /historical engagement logs/i.test(el.textContent || ''); });
-      if (historyFooter) historyFooter.hidden = true;
+      if (historyFooter) setHidden(historyFooter, true);
       hideButtonByText('deploy mock');
       hideButtonByText('configure filters');
       hideButtonByText('load workspace');
@@ -2253,7 +2264,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const headers = table.querySelectorAll('thead th');
       if (headers.length >= 7) {
         ['Job ID / State','Tool','Target','Duration / Created'].forEach(function (label, index) { headers[index].textContent = label; });
-        headers.forEach(function (header, index) { if (index >= 4) header.hidden = true; });
+        headers.forEach(function (header, index) { if (index >= 4) setHidden(header, true); });
       }
       body.replaceChildren();
       jobs.forEach(function (job) {
@@ -2286,7 +2297,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           const option = document.createElement('option'); option.value = tool; option.textContent = tool + ' (' + jobs.filter(function (job) { return (job.tool || job.tool_id) === tool; }).length + ')'; toolFilter.appendChild(option);
         });
       }
-      if (modeFilter) { const wrapper = modeFilter.closest('div'); if (wrapper) wrapper.hidden = true; else modeFilter.hidden = true; }
+      if (modeFilter) { const wrapper = modeFilter.closest('div'); if (wrapper) setHidden(wrapper, true); else setHidden(modeFilter, true); }
       function applyFilters() {
         const q = search ? search.value.toLowerCase() : '';
         const selectedTool = toolFilter ? toolFilter.value : 'all';
@@ -2297,8 +2308,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           let stamp = Date.parse(raw);
           if (raw && Number.isFinite(Number(raw))) { const numeric = Number(raw); stamp = numeric > 1e12 ? numeric : numeric * 1000; }
           const tooOld = age > 0 && Number.isFinite(stamp) && stamp > 0 && (Date.now() - stamp > age);
-          tr.hidden = !tr.textContent.toLowerCase().includes(q) ||
-            (selectedTool !== 'all' && tr.dataset.tool !== selectedTool.toLowerCase()) || tooOld;
+          setHidden(tr, !tr.textContent.toLowerCase().includes(q) ||
+            (selectedTool !== 'all' && tr.dataset.tool !== selectedTool.toLowerCase()) || tooOld);
         });
       }
       if (search) search.oninput = applyFilters;
@@ -2313,10 +2324,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       hideButtonByText('scope-blocked (1)');
       hideButtonByText('active / queued (0)');
       document.querySelectorAll('span').forEach(function (el) {
-        if (/MERKLE_ROOT_VERIFIED|INTEGRITY VERIFIED|HASH MATCH|CRYPTO LOG INTEGRITY/i.test(el.textContent || '')) el.hidden = true;
+        if (/MERKLE_ROOT_VERIFIED|INTEGRITY VERIFIED|HASH MATCH|CRYPTO LOG INTEGRITY/i.test(el.textContent || '')) setHidden(el, true);
       });
       const summaryLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /historical engagement logs/i.test(el.textContent || ''); });
-      if (summaryLabel) summaryLabel.hidden = true;
+      if (summaryLabel) setHidden(summaryLabel, true);
     } catch (error) {
       wireUnavailablePage();
     }
@@ -2354,7 +2365,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           Array.from(filter.options).forEach(function (option) {
             if (option.value === 'binary_found') option.textContent = 'Available (' + availableCount + ')';
             if (option.value === 'missing') option.textContent = 'Unavailable (' + missingCount + ')';
-            if (option.value === 'untrusted') option.hidden = true;
+            if (option.value === 'untrusted') setHidden(option, true);
           });
         }
         let selectedCategory = 'all';
@@ -2373,17 +2384,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         categoryButtons.forEach(function (entry) {
           const count = entry.key === 'all' ? tools.length : tools.filter(function (tool) { return categoryMatches(String(tool.category || '').toLowerCase(), entry.key); }).length;
           entry.button.textContent = entry.key.charAt(0).toUpperCase() + entry.key.slice(1) + ' (' + count + ')';
-          entry.button.hidden = count === 0 && entry.key !== 'all';
+          setHidden(entry.button, count === 0 && entry.key !== 'all');
           entry.button.onclick = function () { selectedCategory = entry.key; applyFilter(); };
         });
         function applyFilter() {
           const query = search ? search.value.toLowerCase() : '';
           const state = filter ? filter.value : 'all';
           matrix.querySelectorAll('.adapter-card').forEach(function (card) {
-            card.hidden = !card.dataset.search.includes(query) ||
+            setHidden(card, !card.dataset.search.includes(query) ||
               (state === 'missing' && card.dataset.status !== 'missing') ||
               (state === 'binary_found' && card.dataset.status !== 'available') ||
-              !categoryMatches(card.dataset.category, selectedCategory);
+              !categoryMatches(card.dataset.category, selectedCategory));
           });
         }
         if (search) search.oninput = applyFilter;
@@ -2397,11 +2408,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       hideButtonByText('re-sign');
       hideButtonByText('save configuration');
       document.querySelectorAll('button').forEach(function (button) {
-        if ((button.textContent || '').trim().toLowerCase().startsWith('configure')) button.hidden = true;
+        if ((button.textContent || '').trim().toLowerCase().startsWith('configure')) setHidden(button, true);
       });
       ['btn-sync','btn-reload','btn-register','btn-mock-test','btn-resign','btn-save-conf'].forEach(function (id) {
         const button = document.getElementById(id);
-        if (button) { button.hidden = true; button.setAttribute('aria-hidden', 'true'); }
+        if (button) { setHidden(button, true); button.setAttribute('aria-hidden', 'true'); }
       });
     } catch (error) {
       wireUnavailablePage();
@@ -2427,7 +2438,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     rows.forEach(function (item) {
       const job = item.job, finding = item.finding;
       const card = template.cloneNode(true);
-      card.hidden = false;
+      setHidden(card, false);
       card.dataset.jobId = String(job.id || job.job_id);
       card.dataset.seq = String(finding.seq);
       card.dataset.status = String(finding.verification_status || 'candidate').toLowerCase();
@@ -2450,7 +2461,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if (reasonLabels.length) reasonLabels[reasonLabels.length - 1].textContent = String(reason);
       }
       card.querySelectorAll('span, p').forEach(function (element) {
-        if (/Median-of-3|pg_sleep\(5\)|Jitter Rejection|Audit C-01|HASH ATTESTED|5,042ms|Δ \+5,009ms/i.test(element.textContent || '')) element.hidden = true;
+        if (/Median-of-3|pg_sleep\(5\)|Jitter Rejection|Audit C-01|HASH ATTESTED|5,042ms|Δ \+5,009ms/i.test(element.textContent || '')) setHidden(element, true);
       });
       card.addEventListener('click', function () {
         selected = item;
@@ -2466,7 +2477,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     if (entries[0]) entries[0].card.click();
     if (search) search.oninput = function () {
       const q = search.value.toLowerCase();
-      entries.forEach(function (entry) { entry.card.hidden = !entry.card.textContent.toLowerCase().includes(q); });
+      entries.forEach(function (entry) { setHidden(entry.card, !entry.card.textContent.toLowerCase().includes(q)); });
     };
     // This backend exposes single-finding validate/retest, not the design's
     // claimed 3x timing protocol or cryptographic three-way verdict ledger.
@@ -2498,9 +2509,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (!selected) { window.alert('Select a recorded finding first.'); return; }
       window.location.assign('/api/jobs/' + encodeURIComponent(selected.job.id || selected.job.job_id) + '/findings.json');
     };
-    document.querySelectorAll('main .bg-surface-container-low.rounded-xl').forEach(function (element) { element.hidden = true; });
+    document.querySelectorAll('main .bg-surface-container-low.rounded-xl').forEach(function (element) { setHidden(element, true); });
     document.querySelectorAll('main span, main p').forEach(function (element) {
-      if (/ENG-2026-X892|api\.internal\.corp|Median-of-3 pg_sleep|FINDING-SQLI-001|FINDING-XSS-004|FINDING-BOLA-009/i.test(element.textContent || '')) element.hidden = true;
+      if (/ENG-2026-X892|api\.internal\.corp|Median-of-3 pg_sleep|FINDING-SQLI-001|FINDING-XSS-004|FINDING-BOLA-009/i.test(element.textContent || '')) setHidden(element, true);
     });
   }
   async function wireAttackSurface() {
@@ -2514,12 +2525,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     const exportButton = document.getElementById('btn-export-json');
     const stream = document.getElementById('diagnostic-stream');
     const coreGrid = document.getElementById('cores-grid');
-    if (coreGrid) coreGrid.hidden = true;
+    if (coreGrid) setHidden(coreGrid, true);
     const restart = document.getElementById('btn-restart-daemons');
-    if (restart) { restart.hidden = true; restart.setAttribute('aria-hidden', 'true'); }
+    if (restart) { setHidden(restart, true); restart.setAttribute('aria-hidden', 'true'); }
     ['Test MSF RPC Handshake','Benchmark SQLite Write Speed','Probe Ollama LLM Socket','Check eBPF Filter Integrity'].forEach(hideButtonByText);
     document.querySelectorAll('main button').forEach(function (button) {
-      if (/^(PING|TEST|INSPECT|PROBE|CHECK)$/i.test((button.textContent || '').trim())) button.hidden = true;
+      if (/^(PING|TEST|INSPECT|PROBE|CHECK)$/i.test((button.textContent || '').trim())) setHidden(button, true);
     });
     async function loadHealth() {
       const results = await Promise.all([
@@ -2609,7 +2620,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const nameLabel = labels.find(function (span) { return /raw_nmap_syn_scan\.xml|subfinder_enum\.json|amass_active_intel\.txt|sqlmap_session_dump\.sqlite|burp_traffic_proxy_stream\.pcap/i.test(span.textContent || ''); }) || labels.find(function (span) { return !(span.textContent || '').trim().match(/^(description|data_object|notes|SELECTED)$/i); });
       if (nameLabel) nameLabel.textContent = filename;
       labels.forEach(function (span) {
-        if ((span.textContent || '').trim() === 'SELECTED') span.hidden = true;
+        if ((span.textContent || '').trim() === 'SELECTED') setHidden(span, true);
       });
       const meta = labels[labels.length - 1];
       if (meta) meta.textContent = [item.kind || 'evidence', item.added_at || ''].filter(Boolean).join(' • ');
@@ -2621,7 +2632,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     const search = document.querySelector('input[placeholder*="Search filename"]');
     if (search) search.oninput = function () {
       const q = search.value.toLowerCase();
-      rows.forEach(function (entry) { entry.row.hidden = !entry.row.textContent.toLowerCase().includes(q); });
+      rows.forEach(function (entry) { setHidden(entry.row, !entry.row.textContent.toLowerCase().includes(q)); });
     };
     const download = Array.from(document.querySelectorAll('main button')).find(function (button) {
       return /Download Raw/i.test(button.textContent || '');
@@ -2635,10 +2646,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     // ledger and raw-download action only, not fabricated XML, port, or hash data.
     const layout = tree.parentElement && tree.parentElement.parentElement;
     if (layout && layout.children.length > 1) {
-      Array.from(layout.children).forEach(function (child) { if (!child.contains(tree)) child.hidden = true; });
+      Array.from(layout.children).forEach(function (child) { if (!child.contains(tree)) setHidden(child, true); });
     }
     document.querySelectorAll('main .grid').forEach(function (grid) {
-      if (/Stored Artifacts|128\.4 MB|1,842,912|840 KB/i.test(grid.textContent || '')) grid.hidden = true;
+      if (/Stored Artifacts|128\.4 MB|1,842,912|840 KB/i.test(grid.textContent || '')) setHidden(grid, true);
     });
   }
   async function wireChains() {
@@ -2655,12 +2666,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   }
   function wireUnavailablePage() {
     const main = document.querySelector('main');
-    if (main) Array.from(main.children).forEach(function (child) { child.hidden = true; });
+    if (main) Array.from(main.children).forEach(function (child) { setHidden(child, true); });
     // Some supplied designs place demo modals outside <main>. Hide those too
     // whenever their native workflow has no real backend wiring.
     document.querySelectorAll('[id]').forEach(function (element) {
       if (/modal/i.test(element.id)) {
-        element.hidden = true;
+        setHidden(element, true);
         element.setAttribute('aria-hidden', 'true');
       }
     });
