@@ -137,3 +137,10 @@ def test_retest_page_renders_real_findings_and_hides_batch_claims(page, live_ser
     assert queue.locator(":scope > div").count() >= 1
     assert page.get_by_role("button", name="Validate / Retest Selected").is_visible()
     assert page.get_by_role("button", name="BATCH REPLAY (3x BASELINE + 3x INJECTED)").is_hidden()
+
+
+def test_ai_strategy_gate_does_not_show_demo_proposal_without_pending_run(page, live_server):
+    page.goto(f"{live_server}/ui/ai-strategy-gate", wait_until="domcontentloaded")
+    page.wait_for_timeout(200)
+    assert page.locator("#btn-authorize").is_hidden()
+    assert page.locator("#btn-reject").is_hidden()

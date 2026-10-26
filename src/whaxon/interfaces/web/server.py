@@ -2520,6 +2520,71 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   async function wireAiApprovals() {
     wireUnavailablePage();
   }
+  async function wireAiStrategyGate() {
+    let pending = [];
+    try {
+      const result = await requestJson('/api/ai/pending');
+      pending = Array.isArray(result) ? result : (result.pending || result.runs || []);
+    } catch (_) { wireUnavailablePage(); return; }
+    if (!pending.length) { wireUnavailablePage(); return; }
+    const current = pending[0];
+    const runId = current.id || current.run_id;
+    if (!runId) { wireUnavailablePage(); return; }
+    const main = document.querySelector('main');
+    const heading = main && main.querySelector('h1,h2,h3');
+    let authorize = document.getElementById('btn-authorize');
+    let reject = document.getElementById('btn-reject');
+    if (!main || !heading || !authorize || !reject) { wireUnavailablePage(); return; }
+    // Clone the native controls to remove the source file's demo listeners
+    // (including its fake dispatch alert and timeout-based "EXECUTED" state).
+    authorize = authorize.cloneNode(true); document.getElementById('btn-authorize').replaceWith(authorize);
+    reject = reject.cloneNode(true); document.getElementById('btn-reject').replaceWith(reject);
+    heading.textContent = String(current.goal || 'Pending AI action');
+    const question = current.pending_question;
+    const questionText = typeof question === 'string' ? question :
+      (question && (question.question || question.prompt)) || '';
+    const promptText = Array.from(main.querySelectorAll('p')).find(function (p) {
+      return /Execution halted by Kernel Enforcement|sign-off required/i.test(p.textContent || '');
+    });
+    if (promptText) promptText.textContent = String(questionText || 'This AI run is waiting for an operator decision.');
+    const authorizeLabel = authorize.querySelector('.font-label-md');
+    const rejectLabel = reject.querySelector('.font-label-md');
+    if (authorizeLabel) authorizeLabel.textContent = 'Approve Pending Step';
+    if (rejectLabel) rejectLabel.textContent = 'Reject Pending Step';
+    // Only the existing proposal header and decision controls remain visible;
+    // static reasoning, target telemetry and session history are demo content.
+    const activeSection = heading.closest('section');
+    main.querySelectorAll('section').forEach(function (section) {
+      if (section !== activeSection && !section.contains(heading) && !section.contains(authorize) && !section.contains(reject)) setHidden(section, true);
+    });
+    main.querySelectorAll('span, p, div').forEach(function (element) {
+      const value = (element.textContent || '').trim();
+      if (/ENG-2026-X892|api\.internal\.corp|OP\/\/7749-ALPHA|CVE-2023-38606|TARGET STABILITY|SCOPE DRIFT|PAYLOAD NOISE|85\.0% Exceeded|Confidence Score/i.test(value)) {
+        const container = element.closest('.bg-surface-container-lowest, .bg-surface-container-low.rounded-xl');
+        if (container && !container.contains(heading) && !container.contains(authorize) && !container.contains(reject)) setHidden(container, true);
+        else if (!container) setHidden(element, true);
+      }
+    });
+    async function answer(answer) {
+      authorize.disabled = true; reject.disabled = true;
+      try {
+        await requestJson('/api/ai/runs/' + encodeURIComponent(runId) + '/answer', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({answer:answer, note:'Decision submitted through WHAXON UI'})
+        });
+        window.location.reload();
+      } catch (error) {
+        window.alert('Could not submit the AI approval decision: ' + error.message);
+        authorize.disabled = false; reject.disabled = false;
+      }
+    }
+    authorize.onclick = function (event) { event.preventDefault(); answer('approve'); };
+    reject.onclick = function (event) { event.preventDefault(); answer('reject'); };
+    window.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') { event.preventDefault(); event.stopImmediatePropagation(); authorize.click(); }
+      if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); reject.click(); }
+    }, true);
+  }
   async function wireHealth() {
     const runButton = document.getElementById('btn-run-diag');
     const exportButton = document.getElementById('btn-export-json');
@@ -2690,7 +2755,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   if (page === 'adapter-and-plugin-manager' || page === 'adapter-plugin-manager') wireCatalog();
   if (page === 'remediation-retest-studio') wireRetest();
   if (page === 'attack-surface-and-continuous-monitoring') wireAttackSurface();
-  if (page === 'ai-strategy-gate') wireAiApprovals();
+  if (page === 'ai-strategy-gate') wireAiStrategyGate();
   if (page === 'system-diagnostics-and-health' || page === 'system-diagnostics-health') wireHealth();
   if (page === 'evidence-file-inspector') wireEvidence();
   if (page === 'correlated-attack-chains') wireChains();
