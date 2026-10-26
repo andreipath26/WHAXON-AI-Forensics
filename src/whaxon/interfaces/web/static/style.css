@@ -769,3 +769,7 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 
 /* Settings controls */
 #page-settings .density-toggle button:focus-visible, #page-settings #settings-theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+
+/* Components is an internal design reference, not an operational workspace page. */
+#page-components { display: none !important; }
