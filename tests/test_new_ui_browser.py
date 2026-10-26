@@ -91,11 +91,16 @@ def test_findings_page_renders_real_findings(page, live_server):
 
 
 def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
+    # Nmap is deliberately marked available here so this test checks the wired
+    # control path without depending on which scanner binaries CI has installed.
+    page.route("**/api/tools", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='[{"id":"nmap","name":"Nmap","available":true,"category":"recon"}]'))
     page.route("**/api/run", lambda route: route.fulfill(
         status=200, content_type="application/json", body='{"job_id":"browser-test-job"}'))
     page.route("**/api/jobs/browser-test-job/stream", lambda route: route.fulfill(
         status=200, content_type="text/event-stream",
-        body='data: {"type":"finished","exit_code":0}\\n\\n'))
+        body='data: {"type":"finished","exit_code":0}\n\n'))
     page.goto(f"{live_server}/ui/run-and-orchestration", wait_until="domcontentloaded")
     page.wait_for_timeout(400)
     target = page.locator('input[placeholder*="Target host"]')
