@@ -111,3 +111,9 @@ def test_health_page_shows_real_health_payload_and_hides_fake_controls(page, liv
     assert stream.is_visible()
     assert "readiness" in stream.inner_text()
     assert page.locator("#btn-restart-daemons").is_hidden()
+
+
+def test_evidence_page_never_shows_static_sample_artifacts(page, live_server):
+    page.goto(f"{live_server}/ui/evidence-file-inspector", wait_until="domcontentloaded")
+    page.wait_for_timeout(250)
+    assert "raw_nmap_syn_scan.xml" not in page.locator("body").inner_text()

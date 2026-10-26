@@ -2453,7 +2453,90 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     catch (error) { if (stream) stream.textContent = 'Health checks failed: ' + error.message; }
   }
   async function wireEvidence() {
-    wireUnavailablePage();
+    let jobs = [];
+    try {
+      const history = await requestJson('/api/history');
+      jobs = Array.isArray(history) ? history : (history.jobs || history.history || []);
+    } catch (_) { wireUnavailablePage(); return; }
+    let selectedJob = null, evidence = [];
+    for (const job of jobs.slice(0, 20)) {
+      const id = job && (job.id || job.job_id);
+      if (!id) continue;
+      try {
+        const items = await requestJson('/api/jobs/' + encodeURIComponent(id) + '/evidence');
+        if (Array.isArray(items) && items.length) { selectedJob = String(id); evidence = items; break; }
+      } catch (_) {}
+    }
+    // The supplied evidence design contains sample artifacts and sample hashes.
+    // If this installation has no real evidence, hide the page rather than
+    // presenting those samples as recorded engagement data.
+    if (!selectedJob || !evidence.length) { wireUnavailablePage(); return; }
+    const tree = Array.from(document.querySelectorAll('div')).find(function (element) {
+      return element.classList.contains('max-h-[460px]') && element.classList.contains('overflow-y-auto');
+    });
+    if (!tree) { wireUnavailablePage(); return; }
+    const firstCategory = tree.firstElementChild;
+    const headerTemplate = firstCategory && firstCategory.firstElementChild;
+    const selectedTemplate = tree.querySelector('.bg-surface-container-high.shadow-xs');
+    const rowTemplate = selectedTemplate || tree.querySelector('.group');
+    if (!headerTemplate || !rowTemplate) { wireUnavailablePage(); return; }
+    const header = headerTemplate.cloneNode(true);
+    const headerLabels = header.querySelectorAll('span');
+    Array.from(headerLabels).forEach(function (span) {
+      if (/Reconnaissance|Evidence|Proof|Loot/i.test(span.textContent || '')) span.textContent = 'Recorded Evidence';
+      else if (/^\d+$/.test((span.textContent || '').trim())) span.textContent = String(evidence.length);
+    });
+    tree.replaceChildren(header);
+    const rows = [];
+    let selected = evidence[0];
+    function selectItem(item, row) {
+      selected = item;
+      rows.forEach(function (entry) {
+        entry.row.classList.remove('bg-surface-container-high','shadow-xs');
+        entry.row.classList.add('hover:bg-surface-container-high/60');
+      });
+      row.classList.add('bg-surface-container-high','shadow-xs');
+      row.classList.remove('hover:bg-surface-container-high/60');
+    }
+    evidence.forEach(function (item) {
+      const row = rowTemplate.cloneNode(true);
+      row.className = 'flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-surface-container-high/60 cursor-pointer transition-colors group';
+      const labels = Array.from(row.querySelectorAll('span'));
+      const filename = String(item.name || item.path || ('evidence-' + item.seq));
+      const nameLabel = labels.find(function (span) { return /raw_nmap_syn_scan\.xml|subfinder_enum\.json|amass_active_intel\.txt|sqlmap_session_dump\.sqlite|burp_traffic_proxy_stream\.pcap/i.test(span.textContent || ''); }) || labels.find(function (span) { return !(span.textContent || '').trim().match(/^(description|data_object|notes|SELECTED)$/i); });
+      if (nameLabel) nameLabel.textContent = filename;
+      labels.forEach(function (span) {
+        if ((span.textContent || '').trim() === 'SELECTED') span.hidden = true;
+      });
+      const meta = labels[labels.length - 1];
+      if (meta) meta.textContent = [item.kind || 'evidence', item.added_at || ''].filter(Boolean).join(' • ');
+      row.addEventListener('click', function () { selectItem(item, row); });
+      tree.appendChild(row);
+      rows.push({item:item,row:row});
+    });
+    selectItem(selected, rows[0].row);
+    const search = document.querySelector('input[placeholder*="Search filename"]');
+    if (search) search.oninput = function () {
+      const q = search.value.toLowerCase();
+      rows.forEach(function (entry) { entry.row.hidden = !entry.row.textContent.toLowerCase().includes(q); });
+    };
+    const download = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /Download Raw/i.test(button.textContent || '');
+    });
+    if (download) download.onclick = function () {
+      if (!selected || selected.seq == null) { window.alert('Select a recorded evidence item first.'); return; }
+      window.location.assign('/api/jobs/' + encodeURIComponent(selectedJob) + '/evidence/' + encodeURIComponent(selected.seq) + '/download');
+    };
+    ['Sync Merkle Tree','Export TAR.GZ','Verify SHA-256 Hash','Re-parse into Finding Model','Send to Issue Tracker','Trace Proof'].forEach(hideButtonByText);
+    // Hide the sample inspector/KPI pane; this build exposes the real evidence
+    // ledger and raw-download action only, not fabricated XML, port, or hash data.
+    const layout = tree.parentElement && tree.parentElement.parentElement;
+    if (layout && layout.children.length > 1) {
+      Array.from(layout.children).forEach(function (child) { if (!child.contains(tree)) child.hidden = true; });
+    }
+    document.querySelectorAll('main .grid').forEach(function (grid) {
+      if (/Stored Artifacts|128\.4 MB|1,842,912|840 KB/i.test(grid.textContent || '')) grid.hidden = true;
+    });
   }
   async function wireChains() {
     wireUnavailablePage();
