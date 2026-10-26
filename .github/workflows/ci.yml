@@ -47,8 +47,11 @@ jobs:
       - name: Mypy
         run: mypy src
 
-      - name: Pytest
-        run: python -m pytest tests/ -q
+      - name: Pytest (unit and existing integration suite)
+        run: python -m pytest tests/ -q --ignore=tests/test_new_ui_browser.py
+
+      - name: New UI browser tests
+        run: python -m pytest -n 0 tests/test_new_ui_browser.py -q
 
       - name: Build distributions and validate metadata
         run: |
