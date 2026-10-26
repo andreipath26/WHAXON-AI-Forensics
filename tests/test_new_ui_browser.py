@@ -125,6 +125,10 @@ def test_threat_intel_page_uses_live_metasploit_module_names(page, live_server):
     assert "CVE-2024-6387" not in visible_text
     assert "CVE-2024-38077" not in visible_text
     assert "CISA KEV" not in visible_text
+    assert "194,821 CVEs" not in visible_text
+    assert "ACTIVE (2h ago)" not in visible_text
+    assert "IN SCOPE:" not in visible_text
+    assert "Async Python PoC Ready" not in visible_text
 
 
 def test_health_page_shows_real_health_payload_and_hides_fake_controls(page, live_server):
