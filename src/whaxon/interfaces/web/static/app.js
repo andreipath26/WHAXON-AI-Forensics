@@ -64,7 +64,10 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     const allBoxes = Array.from(document.querySelectorAll('#findings-table .row-cb'));
     const checked = allBoxes.filter(cb => cb.checked).length;
     if (bulkCount) bulkCount.textContent = checked;
-    if (bulkBar) bulkBar.hidden = checked === 0;
+    if (bulkBar) {
+      bulkBar.hidden = checked === 0;
+      bulkBar.classList.toggle('on', checked > 0);
+    }
     if (selectAll) {
       const visibleBoxes = Array.from(document.querySelectorAll('#findings-table tbody tr[data-job-id]'))
         .filter(row => row.style.display !== 'none')
@@ -627,7 +630,10 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     const bar = document.getElementById('bulk-bar');
     const count = document.getElementById('bulk-count');
     if (count) count.textContent = String(selected.length);
-    if (bar) bar.hidden = selected.length === 0;
+    if (bar) {
+      bar.hidden = selected.length === 0;
+      bar.classList.toggle('on', selected.length > 0);
+    }
     const selectAll = document.getElementById('select-all');
     const visibleBoxes = Array.from(tbody.querySelectorAll('tr[data-job-id]'))
       .filter(row => row.style.display !== 'none')

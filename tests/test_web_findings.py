@@ -156,3 +156,38 @@ def test_command_palette_search_navigates_to_catalog(page, live_server):
         "() => document.getElementById('page-catalog').classList.contains('active')",
         timeout=3000,
     )
+
+
+def test_filter_with_no_matches_shows_empty_state_and_recovers(page, live_server):
+    _open_findings(page, live_server)
+    page.locator('#page-findings .chip[data-filter="high"]').click()
+    empty = page.locator('#findings-tbody tr[data-filter-empty]')
+    assert empty.is_visible()
+    assert "No findings match this filter" in empty.text_content()
+    assert page.locator('#findings-tbody tr[data-job-id]:visible').count() == 0
+    page.locator('#page-findings .chip[data-filter="all"]').click()
+    assert page.locator('#findings-tbody tr[data-job-id]:visible').count() == 3
+    assert page.locator('#findings-tbody tr[data-filter-empty]').count() == 0
+
+
+def test_select_all_only_selects_visible_findings(page, live_server):
+    _open_findings(page, live_server)
+    page.locator('#page-findings .chip[data-filter="critical"]').click()
+    page.locator('#select-all').check()
+    assert page.locator('#findings-tbody .row-cb:checked').count() == 1
+    assert page.locator('#bulk-bar').is_visible()
+    assert page.locator('#bulk-bar').evaluate("el => el.classList.contains('on')")
+    page.locator('#bulk-clear-btn').click()
+    assert page.locator('#findings-tbody .row-cb:checked').count() == 0
+    assert not page.locator('#bulk-bar').evaluate("el => el.classList.contains('on')")
+
+
+def test_sort_headers_support_keyboard_activation(page, live_server):
+    _open_findings(page, live_server)
+    header = page.locator('th[data-sort="title"]')
+    before = page.locator('#findings-tbody tr[data-job-id]').evaluate_all("rows => rows.map(r => r.dataset.title)")
+    header.focus()
+    page.keyboard.press("Enter")
+    after = page.locator('#findings-tbody tr[data-job-id]').evaluate_all("rows => rows.map(r => r.dataset.title)")
+    assert before != after
+    assert header.get_attribute("aria-sort") in ("ascending", "descending")
