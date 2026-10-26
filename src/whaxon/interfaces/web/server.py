@@ -1992,6 +1992,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (container && !container.contains(previewButton) && !(modal && modal.contains(container))) setHidden(container, true);
       else if (!container) setHidden(element, true);
     });
+    // Keep the original report synthesis/export section; the phase tracker,
+    // evidence locker, and gap-matrix sections are static mock engagement data.
+    const previewSection = previewButton && previewButton.closest('section');
+    document.querySelectorAll('main section').forEach(function (section) {
+      if (!section.contains(previewButton)) setHidden(section, true);
+    });
+    document.querySelectorAll('main input[type="checkbox"]').forEach(function (input) {
+      const label = input.closest('label') || input.parentElement;
+      if (label && !label.contains(previewButton)) setHidden(label, true);
+    });
     // The coverage matrix and SIEM rule recommendations in this design are
     // static examples; this backend does not produce those telemetry claims.
     document.querySelectorAll('main h2, main h3, main span').forEach(function (element) {
@@ -2776,6 +2786,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       card.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
       if (insertBefore && insertBefore.parentElement === container) container.insertBefore(card, insertBefore);
       else container.appendChild(card);
+    });
+    // Other chain summaries on this page are hard-coded attack narratives.
+    // Retain the original heading and the edge cards populated above only.
+    const graphSection = container.closest('section');
+    document.querySelectorAll('main section').forEach(function (section) {
+      if (!section.contains(template) && !section.contains(document.getElementById('btn-recompute'))) setHidden(section, true);
+    });
+    document.querySelectorAll('main span, main p, main h2, main h3').forEach(function (element) {
+      if (/3 Lethal Paths|CVSS Compound: 10\.0|CHAIN #AC-09|CHAIN #AC-04|CHAIN #AC-01|100% Deterministic Link|94% Telemetry Correlated|ACTIVE EXPLOIT DETECTED|uid=0\(root\)|api\.internal\.corp|db\.internal/i.test(element.textContent || '')) {
+        const card = element.closest('.bg-surface-container-low.rounded-xl, .bg-surface-container.rounded-xl');
+        if (card && !card.contains(template) && !card.contains(document.getElementById('btn-recompute'))) setHidden(card, true);
+        else if (!card) setHidden(element, true);
+      }
     });
     ['Add Custom Mitigation Rule','Generate Red Team Retest Script','Trace Proof'].forEach(hideButtonByText);
     const recompute = document.getElementById('btn-recompute');
