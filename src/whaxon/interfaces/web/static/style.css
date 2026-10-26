@@ -300,6 +300,10 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 /* bulk-actions bar */
 .bulk-bar { position: absolute; bottom: var(--sp-5); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-elev-2); border: 1px solid var(--accent); border-radius: var(--r-lg); padding: var(--sp-3) var(--sp-4); display: flex; align-items: center; gap: var(--sp-4); box-shadow: var(--shadow-xl); opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 10; }
 .bulk-bar.on { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+.bulk-bar[hidden] { display: none !important; }
+.surface-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.surface-list-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--r-md); min-width: 0; }
+.surface-list-item .mono { overflow-wrap: anywhere; min-width: 0; }
 .bulk-bar .bcount { font-size: var(--t-sm); font-weight: 600; color: var(--accent-hover); }
 .bulk-bar .divider-v { height: 20px; }
 
