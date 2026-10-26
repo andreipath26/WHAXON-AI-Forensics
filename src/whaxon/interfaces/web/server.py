@@ -1667,10 +1667,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   // Remove hard-coded demo identity and global actions that have no backend route.
   document.querySelectorAll('span, button').forEach(function (element) {
     const label = (element.textContent || '').trim();
-    if (label === 'OP//7749-ALPHA') element.textContent = 'LOCAL OPERATOR';
-    if (label === 'Lead Security Engineer') element.textContent = 'Local session';
-    if (label === 'ENGINE STANDBY') element.textContent = 'ENGINE STATUS';
-    if (label.includes('ENG-2026-X892')) {
+    if (label === 'OP//7749-ALPHA' || label === 'Lead Security Engineer' ||
+        label === 'ENGINE STANDBY' || label.includes('ENG-2026-X892') ||
+        label === 'Target: api.internal.corp') {
       element.hidden = true;
       element.setAttribute('aria-hidden', 'true');
     }
@@ -1858,8 +1857,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       });
       if (searchInput) searchInput.oninput = applyFindingFilters;    } catch (error) {
       wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Findings unavailable: ' + error.message;
     }
     window.triggerReplayAction = async function () {
       const selected = window.__whaxonSelectedFinding;
@@ -1885,20 +1882,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           ...(data.in_scope || []).map(function (target) { return {target:target, state:'IN SCOPE', allowed:true}; }),
           ...(data.out_of_scope || []).map(function (target) { return {target:target, state:'EXCLUDED', allowed:false}; })
         ];
+        const table = body.closest('table');
+        if (table) table.querySelectorAll('thead th').forEach(function (cell, index) { if (index > 0 && index < 6) cell.hidden = true; });
         rows.forEach(function (item) {
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-surface-container/60 transition-colors';
           const target = document.createElement('td');
           target.className = 'py-2.5 px-space-md font-semibold';
           target.textContent = item.target;
-          const mode = document.createElement('td'); mode.className = 'py-2.5 px-space-md'; mode.textContent = 'Configured rule';
-          const ports = document.createElement('td'); ports.className = 'py-2.5 px-space-md text-on-surface-variant'; ports.textContent = 'Enforced by scope guard';
-          const rate = document.createElement('td'); rate.className = 'py-2.5 px-space-md text-on-surface-variant'; rate.textContent = 'Runner policy';
-          const auth = document.createElement('td'); auth.className = 'py-2.5 px-space-md'; auth.textContent = 'Not represented in scope config';
-          const replay = document.createElement('td'); replay.className = 'py-2.5 px-space-md'; replay.textContent = 'Requires runtime scope check';
           const state = document.createElement('td'); state.className = 'py-2.5 px-space-md text-right'; state.textContent = item.state;
           state.classList.add(item.allowed ? 'text-primary' : 'text-error');
-          tr.append(target, mode, ports, rate, auth, replay, state);
+          for (let i = 1; i < 6; i++) { const hiddenCell = document.createElement('td'); hiddenCell.hidden = true; tr.appendChild(hiddenCell); }
+          tr.insertBefore(target, tr.firstChild);
+          tr.appendChild(state);
           body.appendChild(tr);
         });
         if (!rows.length) {
@@ -1918,30 +1914,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       hideButtonByText('add target');
       hideButtonByText('import scope');
       hideButtonByText('configure scope');
-      const main = document.querySelector('main');
-      if (main && !document.getElementById('whaxon-scope-check')) {
-        const panel = document.createElement('section'); panel.id = 'whaxon-scope-check'; panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-        const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Check a Target Against Scope';
-        const form = document.createElement('div'); form.className = 'flex flex-wrap gap-space-sm';
-        const input = document.createElement('input'); input.className = 'flex-1 min-w-48 bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40'; input.placeholder = 'Hostname, IP, or CIDR';
-        const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; button.textContent = 'Check Scope';
-        const result = document.createElement('p'); result.className = 'font-code-sm mt-space-md';
-        button.onclick = async function () {
-          if (!input.value.trim()) { result.textContent = 'Enter a target to check.'; return; }
-          button.disabled = true;
-          try {
-            const match = await requestJson('/api/scope/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target:input.value.trim()})});
-            result.textContent = (match.allowed ? 'IN SCOPE — ' : 'BLOCKED — ') + (match.reason || 'No reason returned') + (match.matched_rule ? ' · Rule: ' + match.matched_rule : '');
-            result.className = 'font-code-sm mt-space-md ' + (match.allowed ? 'text-primary' : 'text-error');
-          } catch (error) { result.textContent = 'Scope check failed closed: ' + error.message; result.className = 'font-code-sm mt-space-md text-error'; }
+      hideButtonByText('commit to scope');
+      hideButtonByText('import & parse rules');
+      hideButtonByText('add deny rule');
+      hideButtonByText('add target');
+      hideButtonByText('import scope');
+      hideButtonByText('configure scope');
+    } catch (error) { result.textContent = 'Scope check failed closed: ' + error.message; result.className = 'font-code-sm mt-space-md text-error'; }
           finally { button.disabled = false; }
         };
         form.append(input, button); panel.append(heading, form, result); main.prepend(panel);
       }
     } catch (error) {
       wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Scope configuration unavailable; no scope rule can be assumed. ' + error.message;
     }
   }
   async function wireReports() {
@@ -2009,8 +1994,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (!Array.isArray(tools)) tools = tools.tools || [];
     } catch (error) {
       wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Tool catalog unavailable; no run can be started. ' + error.message;
       return;
     }
     const usable = tools.filter(function (tool) { return tool && tool.id && tool.available !== false; });
@@ -2121,7 +2104,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         requestJson('/api/history'),
         requestJson('/api/report?format=json'),
         requestJson('/api/tools'),
-        requestJson('/api/msf/sessions').catch(function () { return {live_count:0}; })
+        requestJson('/api/msf/sessions').catch(function () { return {unavailable:true}; })
       ]);
       const statusData = values[0] || {};
       const history = Array.isArray(values[1]) ? values[1] : (values[1].jobs || values[1].history || []);
@@ -2198,9 +2181,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         body.querySelectorAll('tr').forEach(function (row) { row.hidden = !row.textContent.toLowerCase().includes(q); });
       };
       const sessionNote = Array.from(document.querySelectorAll('span,p')).find(function (el) { return /Awaiting Target Commit/.test(el.textContent || ''); });
-      if (sessionNote) sessionNote.textContent = sessions.live_count ? 'Live sessions reported by backend' : 'No active sessions reported';
+      if (sessionNote) {
+        if (sessions.unavailable) sessionNote.textContent = 'Session status unavailable';
+        else sessionNote.textContent = sessions.live_count ? 'Live sessions reported by backend' : 'No active sessions reported';
+      }
       const targetLabel = Array.from(document.querySelectorAll('span,p')).find(function (el) { return (el.textContent || '').trim() === 'Target: api.internal.corp'; });
-      if (targetLabel) targetLabel.hidden = true;
+      if (targetLabel) { targetLabel.hidden = true; targetLabel.setAttribute('aria-hidden','true'); }
       const storageLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /Storage:/.test(el.textContent || ''); });
       if (storageLabel) storageLabel.hidden = true;
       document.querySelectorAll('span').forEach(function (el) { if (/CRYPTO LOG INTEGRITY|MERKLE_ROOT_VERIFIED/.test(el.textContent || '')) el.hidden = true; });
@@ -2229,8 +2215,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (statusLabel && statusData.ok === false) statusLabel.textContent = 'ENGINE DEGRADED';
     } catch (error) {
       wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Live dashboard data unavailable: ' + error.message;
     }
   }
   async function wireHistory() {
@@ -2309,8 +2293,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (summaryLabel) summaryLabel.hidden = true;
     } catch (error) {
       wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Job history unavailable: ' + error.message;
     }
   }
   async function wireCatalog() {
@@ -2397,85 +2379,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       });
     } catch (error) {
       wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Tool catalog unavailable: ' + error.message;
     }
   }
   async function wireRetest() {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Verified Findings — Retest Queue';
-    const summary = document.createElement('p'); summary.className = 'font-code-sm text-outline mb-space-md'; summary.textContent = 'Loading verified findings…';
-    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
-    panel.append(heading, summary, list);
-    Array.from(main.children).forEach(function (child) { child.hidden = true; });
-    main.appendChild(panel);
-    try {
-      const report = await requestJson('/api/report?format=json');
-      const verified = flattenFindings(report).filter(function (item) {
-        return /verified/i.test(String(item.finding.verification_status || item.finding.status || ''));
-      });
-      summary.textContent = verified.length + ' verified finding(s) available for deterministic retest.';
-      if (!verified.length) { list.textContent = 'No verified findings are currently queued for retest.'; return; }
-      verified.forEach(function (item) {
-        const f = item.finding, job = item.job;
-        const row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-space-md p-space-md rounded bg-surface-container border border-outline-variant/20';
-        const info = document.createElement('div'); info.className = 'flex flex-col gap-1 min-w-0';
-        const title = document.createElement('span'); title.className = 'font-code-sm text-on-surface'; title.textContent = f.title || f.kind || 'Finding';
-        const detail = document.createElement('span'); detail.className = 'font-code-sm text-outline'; detail.textContent = [job.id, job.tool, f.target || job.target, f.severity].filter(Boolean).join(' · ');
-        info.append(title, detail);
-        const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; button.textContent = 'Retest';
-        button.onclick = async function () {
-          button.disabled = true; button.textContent = 'Retesting…';
-          try {
-            const result = await requestJson('/api/retest/' + encodeURIComponent(job.id) + '/' + encodeURIComponent(f.seq), {method:'POST'});
-            button.textContent = result.status || 'Complete';
-            const reason = document.createElement('span'); reason.className = 'font-code-sm text-outline'; reason.textContent = result.reason || '';
-            row.appendChild(reason);
-          } catch (error) { button.textContent = 'Failed'; button.title = error.message; }
-          finally { button.disabled = false; }
-        };
-        row.append(info, button); list.appendChild(row);
-      });
-    } catch (error) { summary.textContent = 'Retest queue unavailable: ' + error.message; }
+    wireUnavailablePage();
   }
   async function wireAttackSurface() {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section');
-    panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Pivot / Attack-Surface Graph';
-    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
-    panel.append(heading, list);
-    Array.from(main.children).forEach(function (child) { child.hidden = true; });
-    main.appendChild(panel);
-    try {
-      const data = await requestJson('/api/pivot/graph');
-      heading.textContent = 'Live Pivot / Attack-Surface Graph · ' + (data.count || 0) + ' recorded edges';
-      if (!(data.edges || []).length) {
-        const empty = document.createElement('p'); empty.className = 'text-outline font-code-sm';
-        empty.textContent = 'No recorded pivot edges. WHAXON will show relationships after the backend records exploit/session/forward events.';
-        list.appendChild(empty);
-      } else {
-        (data.edges || []).forEach(function (edge) {
-          const row = document.createElement('div');
-          row.className = 'flex items-center justify-between gap-space-md px-space-md py-space-sm border-b border-outline-variant/20 font-code-sm';
-          const left = document.createElement('span');
-          left.textContent = edge.parent.kind + ':' + edge.parent.id + ' → ' + edge.child.kind + ':' + edge.child.id;
-          const right = document.createElement('span'); right.className = 'text-secondary'; right.textContent = edge.relation;
-          row.append(left, right); list.appendChild(row);
-        });
-      }
-      hideButtonByText('trigger delta recon');
-      hideButtonByText('configure cloud');
-      hideButtonByText('auto-remediate acl');
-      hideButtonByText('trigger acme renew');
-      hideButtonByText('harden ciphers');
-      hideButtonByText('launch nuclei probe');
-    } catch (error) {
-      list.textContent = 'Attack-surface graph unavailable: ' + error.message;
-    }
+    wireUnavailablePage();
   }
   async function wireAiApprovals() {
     try {
@@ -2531,278 +2441,26 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     }
   }
   async function wireHealth() {
-    try {
-      const data = await requestJson('/api/health');
-      const stream = document.getElementById('diagnostic-stream');
-      const main = document.querySelector('main');
-      if (main && stream) {
-        const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-        const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Health Endpoint';
-        stream.textContent = JSON.stringify(data, null, 2); panel.append(heading, stream);
-        Array.from(main.children).forEach(function (child) { child.hidden = true; }); main.appendChild(panel);
-      } else if (stream) stream.textContent = JSON.stringify(data, null, 2);
-      hideButtonByText('restart engine daemons');
-      hideButtonByText('run full diagnostic');
-      hideButtonByText('test msf rpc handshake');
-      hideButtonByText('benchmark sqlite');
-      hideButtonByText('probe ollama');
-      hideButtonByText('check ebpf');
-    } catch (error) {
-      wireUnavailablePage();
-      const notice = document.querySelector('main section:last-child');
-      if (notice) notice.textContent = 'Health endpoint unavailable: ' + error.message;
-    }
+    wireUnavailablePage();
   }
   async function wireEvidence() {
-    const search = document.querySelector('input[placeholder*="Search filename"]');
-    const host = document.querySelector('main');
-    if (!host) return;
-    const panel = document.createElement('section');
-    panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const title = document.createElement('h2'); title.className = 'font-headline-md text-headline-md mb-space-md'; title.textContent = 'Live Evidence from WHAXON Jobs';
-    const select = document.createElement('select'); select.className = 'bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40';
-    const list = document.createElement('div'); list.className = 'mt-space-md flex flex-col gap-space-sm';
-    panel.append(title, select, list);
-    host.prepend(panel);
-    Array.from(host.children).forEach(function (child) { if (child !== panel) child.hidden = true; });
-    try {
-      const history = await requestJson('/api/history');
-      const jobs = Array.isArray(history) ? history : (history.jobs || history.history || []);
-      jobs.forEach(function (job) {
-        const id = job.id || job.job_id;
-        if (!id) return;
-        const option = document.createElement('option'); option.value = id;
-        option.textContent = id + ' · ' + (job.tool || job.tool_id || 'job') + ' · ' + (job.target || 'target');
-        select.appendChild(option);
-      });
-      async function loadEvidence() {
-        list.replaceChildren();
-        if (!select.value) { list.textContent = 'No jobs are available.'; return; }
-        try {
-          const items = await requestJson('/api/jobs/' + encodeURIComponent(select.value) + '/evidence');
-          if (!Array.isArray(items) || !items.length) { list.textContent = 'No evidence is recorded for this job.'; return; }
-          items.forEach(function (item) {
-            const row = document.createElement('div'); row.className = 'flex flex-wrap items-center justify-between gap-space-md p-space-sm rounded bg-surface-container border border-outline-variant/20';
-            const info = document.createElement('div'); info.className = 'flex flex-col gap-1';
-            const name = document.createElement('span'); name.className = 'font-code-sm text-on-surface'; name.textContent = item.filename || item.name || item.kind || ('Evidence #' + (item.seq || '?'));
-            const meta = document.createElement('span'); meta.className = 'font-code-sm text-outline'; meta.textContent = [item.kind, item.sha256, item.created_at].filter(Boolean).join(' · ');
-            info.append(name, meta); row.appendChild(info);
-            if (item.seq != null) {
-              const link = document.createElement('a'); link.className = 'px-space-md py-1 rounded bg-surface-container-high text-on-surface font-code-sm';
-              link.href = '/api/jobs/' + encodeURIComponent(select.value) + '/evidence/' + encodeURIComponent(item.seq) + '/download'; link.textContent = 'Download'; row.appendChild(link);
-            }
-            list.appendChild(row);
-          });
-        } catch (error) { list.textContent = 'Evidence unavailable: ' + error.message; }
-      }
-      select.addEventListener('change', loadEvidence);
-      if (search) search.addEventListener('input', function () {
-        list.querySelectorAll('div').forEach(function (row) { row.hidden = !row.textContent.toLowerCase().includes(search.value.toLowerCase()); });
-      });
-      await loadEvidence();
-    } catch (error) { list.textContent = 'Job list unavailable: ' + error.message; }
-    hideButtonByText('sync merkle tree');
-    hideButtonByText('export tar.gz');
-    hideButtonByText('re-parse into finding model');
-    hideButtonByText('send to issue tracker');
+    wireUnavailablePage();
   }
   async function wireChains() {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Recorded Attack Chains';
-    const list = document.createElement('div'); list.className = 'flex flex-col gap-space-sm';
-    panel.append(heading, list); main.prepend(panel);
-    Array.from(main.children).forEach(function (child) { if (child !== panel) child.hidden = true; });
-    try {
-      const report = await requestJson('/api/report?format=json');
-      const chains = report.chains || [];
-      if (!chains.length) { list.textContent = 'No correlated attack chains are recorded yet.'; }
-      chains.forEach(function (chain) {
-        const row = document.createElement('div'); row.className = 'p-space-sm rounded bg-surface-container border border-outline-variant/20 font-code-sm';
-        row.textContent = JSON.stringify(chain);
-        list.appendChild(row);
-      });
-    } catch (error) { list.textContent = 'Attack chain data unavailable: ' + error.message; }
-      hideButtonByText('replay chain');
-      hideButtonByText('execute chain');
-      hideButtonByText('auto-exploit');
+    wireUnavailablePage();
   }
   async function wireSettings() {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live WHAXON Settings';
-    const pre = document.createElement('pre'); pre.className = 'p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm overflow-x-auto whitespace-pre-wrap';
-    panel.append(heading, pre); main.prepend(panel);
-    Array.from(main.children).forEach(function (child) { if (child !== panel) child.hidden = true; });
-    try {
-      const settings = await requestJson('/api/settings');
-      function redact(value, key) {
-        if (/secret|password|token|api.?key|credential|private.?key/i.test(String(key || ''))) return '[REDACTED]';
-        if (Array.isArray(value)) return value.map(function (item) { return redact(item, ''); });
-        if (value && typeof value === 'object') {
-          const safe = {};
-          Object.keys(value).forEach(function (name) { safe[name] = redact(value[name], name); });
-          return safe;
-        }
-        return value;
-      }
-      pre.textContent = JSON.stringify(redact(settings, ''), null, 2);
-    } catch (error) { pre.textContent = 'Settings unavailable: ' + error.message; }
-    hideButtonByText('rotate key');
-    hideButtonByText('save secrets');
-    hideButtonByText('create token');
-    hideButtonByText('revoke token');
-    hideButtonByText('test connection');
+    wireUnavailablePage();
   }
   async function wireCoverage() {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section');
-    panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Validation & Coverage';
-    const summary = document.createElement('p'); summary.className = 'font-code-sm text-outline mb-space-md'; summary.textContent = 'Loading findings and coverage gaps…';
-    const select = document.createElement('select'); select.className = 'bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40';
-    const list = document.createElement('div'); list.className = 'mt-space-md flex flex-col gap-space-sm';
-    const actions = document.createElement('div'); actions.className = 'flex flex-wrap gap-space-sm mt-space-md';
-    [['Markdown','md'],['HTML','html'],['PDF','pdf'],['JSON','json']].forEach(function (item) {
-      const button = document.createElement('button'); button.className = 'px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; button.textContent = 'Export ' + item[0];
-      button.onclick = function () { window.location.href = '/api/report?format=' + item[1]; }; actions.appendChild(button);
-    });
-    panel.append(heading, summary, select, list, actions);
-    Array.from(main.children).forEach(function (child) { child.hidden = true; });
-    main.appendChild(panel);
-    try {
-      const result = await requestJson('/api/history');
-      const jobs = Array.isArray(result) ? result : (result.jobs || result.history || []);
-      const report = await requestJson('/api/report?format=json');
-      const findings = flattenFindings(report);
-      const verified = findings.filter(function (item) { return /verified/i.test(String(item.finding.verification_status || item.finding.status || '')); }).length;
-      summary.textContent = findings.length + ' findings · ' + verified + ' verified · coverage is reported only where a job has recorded gap data.';
-      jobs.forEach(function (job) {
-        const id = job.id || job.job_id;
-        if (!id) return;
-        const option = document.createElement('option'); option.value = id;
-        option.textContent = id + ' · ' + (job.tool || job.tool_id || 'job') + ' · ' + (job.target || 'target');
-        select.appendChild(option);
-      });
-      async function loadCoverage() {
-        list.replaceChildren();
-        if (!select.value) { list.textContent = 'No jobs are available to inspect.'; return; }
-        try {
-          const coverage = await requestJson('/api/coverage/' + encodeURIComponent(select.value));
-          heading.textContent = 'Live Validation & Coverage · ' + select.value;
-          if (!(coverage.gaps || []).length) { list.textContent = 'No coverage gaps are recorded for this job.'; return; }
-          coverage.gaps.forEach(function (gap) {
-            const row = document.createElement('div'); row.className = 'p-space-md rounded bg-surface-container border border-outline-variant/20';
-            const title = document.createElement('div'); title.className = 'font-code-sm text-on-surface'; title.textContent = gap.phase || gap.category || gap.kind || 'Coverage gap';
-            const detail = document.createElement('div'); detail.className = 'font-code-sm text-outline mt-1'; detail.textContent = gap.reason || gap.detail || gap.message || JSON.stringify(gap);
-            row.append(title, detail); list.appendChild(row);
-          });
-        } catch (error) { list.textContent = 'Coverage unavailable: ' + error.message; }
-      }
-      select.addEventListener('change', loadCoverage);
-      await loadCoverage();
-    } catch (error) { summary.textContent = 'Validation data unavailable: ' + error.message; }
-    hideButtonByText('detonate sequence');
-    hideButtonByText('query blue telemetry');
-    hideButtonByText('configure vector filters');
-    hideButtonByText('push rule to siem');
-    hideButtonByText('deploy to sentinel');
-    hideButtonByText('deploy to splunk');
+    wireUnavailablePage();
   }
   async function wireThreatIntel() {
-    const main = document.querySelector('main');
-    if (!main) return;
-    const panel = document.createElement('section'); panel.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-    const heading = document.createElement('h2'); heading.className = 'font-headline-md text-headline-md mb-space-md'; heading.textContent = 'Live Metasploit Module Arsenal';
-    const status = document.createElement('p'); status.className = 'font-code-sm text-outline mb-space-md'; status.textContent = 'Load modules from the configured Metasploit RPC service.';
-    const controls = document.createElement('div'); controls.className = 'flex flex-wrap gap-space-sm mb-space-md';
-    const type = document.createElement('select'); type.className = 'bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40';
-    [['exploit','Exploit'],['auxiliary','Auxiliary'],['post','Post']].forEach(function (entry) { const option = document.createElement('option'); option.value = entry[0]; option.textContent = entry[1]; type.appendChild(option); });
-    const search = document.createElement('input'); search.className = 'flex-1 min-w-48 bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40'; search.placeholder = 'Filter module paths';
-    const load = document.createElement('button'); load.className = 'px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; load.textContent = 'Load Modules';
-    controls.append(type, search, load);
-    const list = document.createElement('div'); list.className = 'max-h-80 overflow-y-auto flex flex-col gap-1';
-    const selected = document.createElement('p'); selected.className = 'font-code-sm text-primary mt-space-md'; selected.textContent = 'No module selected.';
-    const target = document.createElement('input'); target.className = 'w-full mt-space-sm bg-surface-container-lowest text-on-surface font-code-sm px-space-sm py-1 rounded border border-outline-variant/40'; target.placeholder = 'Target host or IP (must be in configured scope)';
-    const optionsLabel = document.createElement('label'); optionsLabel.className = 'block font-code-sm text-outline mt-space-md'; optionsLabel.textContent = 'Module options (JSON object)';
-    const options = document.createElement('textarea'); options.className = 'w-full min-h-24 mt-1 bg-surface-container-lowest text-on-surface font-code-sm p-space-sm rounded border border-outline-variant/40'; options.value = '{}';
-    const run = document.createElement('button'); run.className = 'mt-space-md px-space-md py-1.5 rounded bg-primary text-on-primary font-code-sm'; run.textContent = 'Run Selected Module'; run.disabled = true;
-    const result = document.createElement('pre'); result.className = 'mt-space-md p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm whitespace-pre-wrap overflow-x-auto'; result.textContent = 'No module has been run.';
-    const pivotButton = document.createElement('button'); pivotButton.className = 'mt-space-md ml-space-sm px-space-md py-1.5 rounded bg-surface-container-high text-on-surface font-code-sm'; pivotButton.textContent = 'Load Pivot Candidates';
-    const pivotResult = document.createElement('pre'); pivotResult.className = 'mt-space-sm p-space-md rounded bg-surface-container-lowest text-on-surface font-code-sm whitespace-pre-wrap overflow-x-auto'; pivotResult.hidden = true;
-    panel.append(heading, status, controls, list, selected, target, optionsLabel, options, run, result, pivotButton, pivotResult);
-    Array.from(main.children).forEach(function (child) { child.hidden = true; });
-    main.appendChild(panel);
-    let modulePaths = [], selectedPath = '';
-    function renderModules() {
-      list.replaceChildren();
-      const q = search.value.toLowerCase();
-      const filtered = modulePaths.filter(function (path) { return path.toLowerCase().includes(q); });
-      if (!filtered.length) { list.textContent = 'No matching modules loaded.'; return; }
-      filtered.forEach(function (path) {
-        const button = document.createElement('button');
-        button.className = 'text-left px-space-sm py-1.5 rounded font-code-sm hover:bg-surface-container-high ' + (path === selectedPath ? 'bg-primary/15 text-primary' : 'text-on-surface');
-        button.textContent = path;
-        button.onclick = function () { selectedPath = path; selected.textContent = 'Selected module: ' + path; run.disabled = false; renderModules(); };
-        list.appendChild(button);
-      });
-    }
-    async function loadModules() {
-      load.disabled = true; status.textContent = 'Loading ' + type.value + ' modules…';
-      try {
-        const response = await requestJson('/api/msf/modules/' + encodeURIComponent(type.value));
-        modulePaths = (Array.isArray(response) ? response : (response.modules || [])).map(function (item) {
-          let path = typeof item === 'string' ? item : (item.fullname || item.name || item.path || '');
-          if (path.startsWith(type.value + '/')) path = path.slice(type.value.length + 1);
-          return path;
-        }).filter(Boolean);
-        selectedPath = ''; run.disabled = true; selected.textContent = 'No module selected.';
-        status.textContent = modulePaths.length + ' module(s) returned by Metasploit RPC.';
-        renderModules();
-      } catch (error) {
-        modulePaths = []; selectedPath = ''; run.disabled = true; list.textContent = 'Metasploit modules unavailable: ' + error.message;
-        status.textContent = 'Metasploit RPC is unavailable or returned an error.';
-      } finally { load.disabled = false; }
-    }
-    load.onclick = loadModules;
-    type.onchange = loadModules;
-    search.oninput = renderModules;
-    run.onclick = async function () {
-      if (!selectedPath) { result.textContent = 'Select a module first.'; return; }
-      if (!target.value.trim()) { result.textContent = 'Enter an in-scope target before execution.'; return; }
-      let parsedOptions;
-      try { parsedOptions = JSON.parse(options.value || '{}'); }
-      catch (_) { result.textContent = 'Module options must be valid JSON.'; return; }
-      if (!parsedOptions || typeof parsedOptions !== 'object' || Array.isArray(parsedOptions)) { result.textContent = 'Module options must be a JSON object.'; return; }
-      run.disabled = true; result.textContent = 'Checking scope…';
-      try {
-        const scope = await requestJson('/api/scope/check', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:target.value.trim()})});
-        if (!scope.allowed) { result.textContent = 'BLOCKED by scope guard: ' + (scope.reason || 'target is not allowed'); return; }
-        result.textContent = 'Submitting scoped Metasploit request…';
-        const response = await requestJson('/api/msf/run', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({module_type:type.value,module_path:selectedPath,target:target.value.trim(),options:parsedOptions})});
-        result.textContent = JSON.stringify(response, null, 2);
-      } catch (error) { result.textContent = 'Metasploit run rejected: ' + error.message; }
-      finally { run.disabled = false; }
-    };
-    pivotButton.onclick = async function () {
-      pivotButton.disabled = true;
-      try { pivotResult.textContent = JSON.stringify(await requestJson('/api/pivot/candidates'), null, 2); pivotResult.hidden = false; }
-      catch (error) { pivotResult.textContent = 'Pivot candidates unavailable: ' + error.message; pivotResult.hidden = false; }
-      finally { pivotButton.disabled = false; }
-    };
+    wireUnavailablePage();
   }
   function wireUnavailablePage() {
     const main = document.querySelector('main');
-    if (main) {
-      Array.from(main.children).forEach(function (child) { child.hidden = true; });
-      const notice = document.createElement('section');
-      notice.className = 'mx-margin my-space-lg p-space-lg rounded-lg border border-outline-variant/30 bg-surface-container-low';
-      notice.textContent = 'This feature has a design prototype, but WHAXON does not currently expose the backend operations required to make it functional. The prototype is preserved; its mock data and unsupported controls are hidden.';
-      main.appendChild(notice);
-    }
+    if (main) Array.from(main.children).forEach(function (child) { child.hidden = true; });
   }
   if (page === 'trust-layer-and-findings') wireFindings();
   if (page === 'trust-layer-findings') wireFindings();

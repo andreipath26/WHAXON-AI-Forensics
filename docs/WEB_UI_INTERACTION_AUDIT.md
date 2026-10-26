@@ -1,44 +1,47 @@
 # WHAXON Web UI Interaction Audit
 
-## Scope and status
+## Governing rule
 
-This audit covers the new designs in `web ui files and rendering/`, the existing Flask routes, and the existing legacy UI. The new UI serves the original design HTML directly; the source design files are not replaced with a newly invented UI. The legacy templates and static assets remain unchanged and are available at `/legacy-ui`.
+The roadmap at `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` is the source of truth for product scope. **The UI must never invent state or demonstrate an unimplemented feature with mock data.**
 
-- **WIRED** — connected to an existing backend route; not browser-tested.
-- **HIDDEN** — prototype-only actions or data are hidden because there is no suitable backend operation.
-- **NOT TESTED** — intentional: do not run tests or browser checks until all pages are wired.
+- Keep the canonical HTML files under `web ui files and rendering/` unchanged as the design source of truth.
+- For a feature that is not implemented or not yet correctly bound to real data/actions, hide its existing content in the served page. Do not replace it with a newly invented panel, sample data, or a pretend implementation.
+- Hidden markup is retained in the original design file so it can be revealed when its real backend/service implementation and native UI wiring are ready.
+- Show only values returned by the real backend. If a required endpoint fails, hide the affected page content rather than rewriting the design with fabricated fallback values.
+- Keep the legacy UI and its templates/assets unchanged.
+- Do not run tests, builds, browser checks, or runtime validation until all UI pages have been wired; status below is not a test pass.
 
-## Page wiring
+## Current implementation status
 
-| Page / route | Existing backend used | Current state |
+**No runtime testing has been performed.** These statuses describe code inspection only.
+
+| Page / route | Real backend surface | Current UI state |
 |---|---|---|
-| Dashboard — `/ui` | `GET /api/status`, `GET /api/history`, `GET /api/report?format=json` | WIRED: live summary counts and history rows; prototype-only workspace, upload, mock deployment, and archive actions hidden |
-| Scope & Targets — `/ui/scope-and-targets` | `GET /api/scope`, `POST /api/scope/check` | WIRED: live in-scope/excluded rules and scope-check action; add/import/commit controls hidden because no scope mutation/import endpoint exists |
-| Run & Orchestration — `/ui/run-and-orchestration` | `GET /api/tools`, `POST /api/run`, `GET /api/jobs/<id>/stream`, `POST /api/jobs/<id>/cancel` | WIRED: tool selection, target input, scope-guarded run, SSE output and cancellation. Arbitrary arguments, sub-tool injection, and mock pipeline controls hidden |
-| Trust Layer & Findings — `/ui/trust-layer-and-findings` | `GET /api/report?format=json`, `POST /api/validate/<job>/<seq>`, `POST /api/retest/<job>/<seq>` | WIRED: live findings, dynamic card list, live severity/state filters, detail metadata, validation for candidates and retest for verified findings. Mock proof claims, mark-fixed, issue-export, and finding-approval actions hidden |
-| Approvals queue — `/ui/trust-layer-approvals-queue-modal` | `GET /api/ai/pending`, `POST /api/ai/runs/<id>/answer` | WIRED to the existing AI-run approval mechanism only; it does not invent a finding-approval API |
-| PTES Coverage & Reports — `/ui/ptes-coverage-and-reports` | `GET /api/report?format=json|md|html|pdf` | WIRED: live report summary/findings, Markdown preview, Markdown/HTML/PDF/JSON downloads |
-| BAS & Detection Validation — `/ui/bas-and-detection-validation` | `GET /api/history`, `GET /api/coverage/<job>`, report formats | PARTIALLY WIRED: real findings and recorded coverage gaps are shown; unsupported blue-telemetry and SIEM deployment actions hidden |
-| Remediation Retest Studio — `/ui/remediation-retest-studio` | `GET /api/report?format=json`, `POST /api/retest/<job>/<seq>` | WIRED: live verified-finding retest queue |
-| Attack Surface & Continuous Monitoring — `/ui/attack-surface-and-continuous-monitoring` | `GET /api/pivot/graph` | WIRED as a live relationship/edge view; continuous recon, cloud-probe, ACL-remediation and certificate-renewal actions hidden because no matching endpoints exist |
-| Job Execution History — `/ui/job-execution-history` | `GET /api/history` | WIRED: live job rows and search; hard-coded counts, integrity claims, and unsupported export/verification controls hidden |
-| Evidence File Inspector — `/ui/evidence-file-inspector` | `GET /api/history`, `GET /api/jobs/<id>/evidence`, `GET /api/jobs/<id>/evidence/<seq>/download` | WIRED: choose a job, list its evidence, download recorded evidence; mock Merkle sync, TAR export, reparsing and issue-tracker actions hidden |
-| Correlated Attack Chains — `/ui/correlated-attack-chains` | `GET /api/report?format=json` (`chains`) | WIRED to recorded chain data; unsupported execution/replay actions hidden |
-| System Diagnostics & Health — `/ui/system-diagnostics-and-health` | `GET /api/health` | WIRED read-only health display; restart/diagnostic actions hidden because no matching endpoints exist |
-| Adapter & Plugin Manager — `/ui/adapter-and-plugin-manager` | `GET /api/tools` | WIRED to the live tool catalog and availability metadata; mock adapter registration, sync, resigning and configuration actions hidden |
-| Settings & API Explorer / Secrets Vault — `/ui/settings-and-api-explorer`, `/ui/settings-and-secrets-vault` | `GET /api/settings` | WIRED read-only settings view with secret-like keys redacted; secret/token management and writes hidden |
-| Threat Intel & Exploit Arsenal — `/ui/threat-intel-and-exploit-arsenal` | `GET /api/msf/modules/<type>`, `POST /api/msf/run`, `POST /api/scope/check`, `GET /api/pivot/candidates` | WIRED: live Metasploit module catalog, pivot candidates, and explicitly triggered module execution after a successful scope check; static CVE/EPSS claims hidden because no threat-feed endpoint exists |
-| Compliance & Framework Crosswalk — `/ui/compliance-and-framework-crosswalk` | No compliance-mapping endpoint found | HIDDEN |
-| Bug Bounty & Live Browser Studio — `/ui/bug-bounty-and-live-browser-studio` | No browser/issue-tracker integration endpoint found | HIDDEN |
-| PTaaS Client Portal — `/ui/ptaas-client-portal` | No client-portal backend found | HIDDEN |
-| Cryptographic Audit Log — `/ui/cryptographic-audit-log` | No corresponding cryptographic audit-log API found | HIDDEN |
+| Dashboard — `/ui` | `GET /api/status`, `GET /api/history`, `GET /api/report?format=json`, `GET /api/tools`, optional `GET /api/msf/sessions` | Partially wired to live summary/history data. Demo operator, engagement, and sample target labels are hidden. If the MSF session endpoint fails, the UI reports unavailable rather than zero. Further review of every static dashboard value is still required before testing. |
+| Scope & Targets — `/ui/scope-and-targets` | `GET /api/scope`, `POST /api/scope/check` | Live in-scope/excluded targets and scope-check action use the existing design. Columns for discovery mode, ports, rate limits, authorization, and replay authorization are hidden because the current scope response does not provide those per-target values. Mutation/import controls are hidden because there is no matching mutation/import route. |
+| Run & Orchestration — `/ui/run-and-orchestration` | `GET /api/tools`, `POST /api/run`, job stream and cancellation routes | Existing design controls are wired to the registered-tool/run flow. Unsupported pipeline, planner, and prototype actions are hidden. Not runtime-verified. |
+| Trust Layer & Findings — `/ui/trust-layer-and-findings` | `GET /api/report?format=json`, validation and retest routes | Existing finding-card design is populated from returned findings; search and severity/status filters use those rows. Prototype proof claims and unsupported mark-fixed/export/approval actions are hidden. Not runtime-verified. |
+| AI Approvals — `/ui/trust-layer-approvals-queue-modal` | `GET /api/ai/pending`, `POST /api/ai/runs/<id>/answer` | Uses the existing AI-run approval API only. It does not claim to implement finding approval. Not runtime-verified. |
+| PTES Coverage & Reports — `/ui/ptes-coverage-and-reports` | `GET /api/report?format=json|md|html|pdf` | Existing report design has partial live-data wiring and report export links. Static values and every report section still require a full content audit before this page can be called complete. |
+| Job Execution History — `/ui/job-execution-history` | `GET /api/history` | Existing table uses live job rows and filters. Hard-coded counts and cryptographic integrity claims are hidden. Unsupported export/verification controls are hidden. Not runtime-verified. |
+| Adapter & Plugin Manager — `/ui/adapter-and-plugin-manager` | `GET /api/tools` | Existing catalog design is populated from the live tool catalog. Category/status filters use returned tool data. Registration, configuration, sync, and signing actions without matching backend routes are hidden. Not runtime-verified. |
+| Remediation Retest Studio — `/ui/remediation-retest-studio` | Retest API exists, but the new design is not yet wired through its native controls | Existing page content is hidden until its original controls are correctly wired. No substitute panel is inserted. This is UI work still to do, not a claim that the backend retest capability is absent. |
+| Attack Surface & Continuous Monitoring — `/ui/attack-surface-and-continuous-monitoring` | Pivot graph/candidate APIs exist; continuous-monitoring operations are roadmap scope | Existing page content is hidden pending native design wiring and implementation of the roadmap's continuous-monitoring feature. No replacement panel or simulated asset graph is inserted. |
+| BAS & Detection Validation — `/ui/bas-and-detection-validation` | Coverage ledger APIs exist; blue-team telemetry/SIEM actions are not implemented | Existing page content is hidden until the original design is wired to real coverage data. Unsupported detection/telemetry content is not shown as live. |
+| Evidence File Inspector — `/ui/evidence-file-inspector` | Evidence list/download APIs exist, but the design's native controls are not yet wired | Existing page content is hidden until native wiring is complete. Merkle sync, integrity verification, TAR export, reparsing, and issue-tracker actions are not represented as working. |
+| Correlated Attack Chains — `/ui/correlated-attack-chains` | Report correlation data exists; native design wiring is incomplete | Existing page content is hidden until the original design is wired to recorded correlation data. Execution/replay claims are not shown. |
+| System Diagnostics & Health — `/ui/system-diagnostics-and-health` | `GET /api/health` | Existing page content is hidden pending native design wiring. No replacement diagnostics panel is generated. |
+| Settings / API Explorer / Secrets Vault — `/ui/settings-and-api-explorer`, `/ui/settings-and-secrets-vault` | `GET /api/settings` | Existing page content is hidden pending native design wiring. Secret/token management actions without real routes are not shown as working. |
+| Threat Intel & Exploit Arsenal — `/ui/threat-intel-and-exploit-arsenal` | Some Metasploit and pivot APIs exist; the roadmap's threat-feed integration is queued | Existing page content is hidden. A Metasploit module runner is not a substitute for the planned CVE/ExploitDB/ATT&CK/threat-feed integration. No static CVE/EPSS examples are presented as live intelligence. |
+| Compliance & Framework Crosswalk — `/ui/compliance-and-framework-crosswalk` | No completed framework-mapping service/API identified | Existing page content is hidden; the roadmap's compliance mapping is not mocked. |
+| Bug Bounty & Live Browser Studio — `/ui/bug-bounty-and-live-browser-studio` | No completed browser/issue-tracker integration identified | Existing page content is hidden; no simulated browser or issue activity is shown. |
+| PTaaS Client Portal — `/ui/ptaas-client-portal` | Client portal is queued in roadmap §20.1 | Existing page content is hidden; no simulated client/workspace data is shown. |
+| Cryptographic Audit Log — `/ui/cryptographic-audit-log` | No corresponding cryptographic audit-log API identified | Existing page content is hidden; no fabricated integrity state is shown. |
 
-## Cross-cutting implementation
+## Design and legacy preservation
 
-- `/` redirects to the new design-based UI at `/ui`.
-- The previous UI remains available at `/legacy-ui`; `templates/base.html`, `templates/index.html`, and the legacy static assets are not replaced.
-- Page navigation uses the existing `data-path` values in the source HTML and allowlisted routes; unknown page links are hidden.
-- The 21 canonical design HTML files are included in wheel/sdist packaging, and the existing design directory is copied into the Docker image. The server can resolve design files from a source checkout or the packaged `whaxon/ui_source` fallback.
-- Mock global controls (workspace switcher, terminal-log shortcut, emergency-halt button, demo engagement/operator identifiers) are hidden or neutralized where no matching backend exists.
-- API failures hide stale prototype data rather than silently presenting mock values as live results.
-- No test, build, browser, or runtime validation has been run, per instruction. All states above are **WIRED, not PASS** until the complete wiring pass is finished and testing is authorized.
+- The canonical source designs under `web ui files and rendering/` remain the source of truth.
+- The current branch's packaging changes include the existing design folder for source and packaged installs; no replacement UI design is generated.
+- The legacy UI remains at `/legacy-ui`; its templates and static assets are not replaced.
+- Unsupported-page handling only hides children of the existing page's `main` element. It does not remove original design files or insert a replacement content panel.
+- The UI wiring pass is **incomplete and untested**. Do not treat any row as runtime-verified. Continue page-by-page against the roadmap, using the existing HTML and revealing only elements that are bound to real backend state/actions.
