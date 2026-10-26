@@ -1992,6 +1992,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (container && !container.contains(previewButton) && !(modal && modal.contains(container))) setHidden(container, true);
       else if (!container) setHidden(element, true);
     });
+    // The proof card wraps its sample title and explanatory claims outside the
+    // code block. Hide the complete native card so no prototype proof is shown
+    // beside a live report export.
+    const sampleProofTitle = Array.from(document.querySelectorAll('main span')).find(function (element) {
+      return /Sample Deterministic Proof: FINDING-SQLI-001/i.test(element.textContent || '');
+    });
+    if (sampleProofTitle) {
+      const proofCard = sampleProofTitle.closest('.p-space-md.bg-surface-container.rounded-lg');
+      setHidden(proofCard || sampleProofTitle, true);
+    }
+    // Strip fixed report-page HUD figures from the supplied prototype.
+    const prototypeMetrics = /^(?:6 curl-verified|84\\.5%|41 Scans|17 Findings|6 Confirmed|3 Artifacts|TEMPLATE V4\\.2|Target Phase 3|0x7F41\\.\\.\\.B289 \\[VALID\\]|Evidence Integrity Guaranteed|PTES Certified Evidence Locker|SHA256 Manifest Lock)$/i;
+    document.querySelectorAll('main span, main strong, main code, main p').forEach(function (element) {
+      if (prototypeMetrics.test((element.textContent || '').trim())) setHidden(element, true);
+    });
     // Keep the original report synthesis/export section; the phase tracker,
     // evidence locker, and gap-matrix sections are static mock engagement data.
     const previewSection = previewButton && previewButton.closest('section');
