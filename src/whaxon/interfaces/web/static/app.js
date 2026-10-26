@@ -1240,59 +1240,56 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   if (!tbody) return;
   const countEl = document.getElementById('coverage-count');
   const summaryEl = document.getElementById('coverage-summary');
-
+  const KIND_PILL = { scope_blocked:'pill-warning', binary_missing:'pill-neutral', timeout:'pill-medium', auth_required:'pill-accent', waf_blocked:'pill-critical' };
   function render(gaps) {
-    if (!gaps || gaps.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="padding:16px; color:var(--text-dim);">No coverage gaps recorded for this engagement.</td></tr>';
+    tbody.replaceChildren();
+    const items = Array.isArray(gaps) ? gaps : [];
+    if (!items.length) {
+      const tr = document.createElement('tr'), td = document.createElement('td');
+      td.colSpan = 4; td.className = 'coverage-empty'; td.textContent = 'No coverage gaps recorded for this engagement.';
+      tr.appendChild(td); tbody.appendChild(tr);
       if (countEl) countEl.textContent = '0';
-      if (summaryEl) summaryEl.textContent = 'Every step either ran or was not attempted.';
+      if (summaryEl) summaryEl.textContent = 'No skipped steps are recorded in the current report data.';
       const badge = document.getElementById('coverage-badge');
       if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
       return;
     }
-    const KIND_PILL = {
-      scope_blocked: 'pill-warning',
-      binary_missing: 'pill-neutral',
-      timeout: 'pill-medium',
-      auth_required: 'pill-accent',
-      waf_blocked: 'pill-critical',
-    };
-    tbody.innerHTML = '';
-    gaps.forEach(g => {
+    items.forEach(g => {
       const tr = document.createElement('tr');
-      const cls = KIND_PILL[g.kind] || 'pill-info';
-      tr.innerHTML =
-        '<td><span class="pill ' + cls + '">' + g.kind + '</span></td>' +
-        '<td><span class="mono"></span></td>' +
-        '<td><span class="target"></span></td>' +
-        '<td><span class="title"></span></td>';
-      tr.querySelector('.mono').textContent = g.tool_id;
-      tr.querySelector('.target').textContent = g.target;
-      tr.querySelector('.title').textContent = g.detail;
-      tbody.appendChild(tr);
+      const kind = String(g.kind || 'unknown');
+      const reason = document.createElement('td'), pill = document.createElement('span');
+      pill.className = 'pill ' + (KIND_PILL[kind] || 'pill-info'); pill.textContent = kind; reason.appendChild(pill);
+      const tool = document.createElement('td'); tool.className = 'mono'; tool.textContent = String(g.tool_id || '—');
+      const target = document.createElement('td'); target.className = 'target'; target.textContent = String(g.target || '—');
+      const detail = document.createElement('td'); detail.className = 'title'; detail.textContent = String(g.detail || '—');
+      tr.append(reason, tool, target, detail); tbody.appendChild(tr);
     });
-    if (countEl) countEl.textContent = String(gaps.length);
-    if (summaryEl) summaryEl.textContent = gaps.length + ' skipped step(s) across the engagement.';
+    if (countEl) countEl.textContent = String(items.length);
+    if (summaryEl) summaryEl.textContent = items.length + ' skipped step(s) across the engagement.';
     const badge = document.getElementById('coverage-badge');
-    if (badge) { badge.textContent = String(gaps.length); badge.style.display = gaps.length ? '' : 'none'; }
+    if (badge) { badge.textContent = String(items.length); badge.style.display = ''; }
   }
-
-  function loadCoverage() {
-    fetch('/api/report?format=json')
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        const jobs = data.jobs || [];
-        const all = [];
-        jobs.forEach(entry => {
-          (entry.coverage || []).forEach(c => all.push(c));
-        });
-        render(all);
-      })
-      .catch(err => {
-        whaxonRenderMessageRow(tbody, 4, 'Failed to load coverage: ' + err);
+  async function loadCoverage() {
+    if (summaryEl) summaryEl.textContent = 'Loading coverage data…';
+    try {
+      const response = await fetch('/api/report?format=json');
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json(), all = [];
+      (Array.isArray(data.jobs) ? data.jobs : []).forEach(entry => {
+        (Array.isArray(entry.coverage) ? entry.coverage : []).forEach(item => all.push(item));
       });
+      render(all);
+    } catch (err) {
+      tbody.replaceChildren();
+      const tr = document.createElement('tr'), td = document.createElement('td');
+      td.colSpan = 4; td.className = 'coverage-empty'; td.setAttribute('role', 'alert');
+      td.textContent = 'Could not load coverage data: ' + String(err && err.message || err);
+      tr.appendChild(td); tbody.appendChild(tr);
+      if (countEl) countEl.textContent = '—';
+      if (summaryEl) summaryEl.textContent = 'Coverage data unavailable.';
+    }
   }
-
+  document.querySelectorAll('.sb-item[data-page="monitoring"]').forEach(el => el.addEventListener('click', loadCoverage));
   document.addEventListener('DOMContentLoaded', loadCoverage);
   if (document.readyState !== 'loading') loadCoverage();
 })();
