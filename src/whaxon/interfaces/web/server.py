@@ -3082,7 +3082,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   }
   async function wireCoverage() {
     const gapButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
-      return /^Gap Report$/i.test((button.textContent || '').trim());
+      return /Gap Report/i.test((button.textContent || '').trim());
     });
     const unsupportedButtons = [
       'Detonate Sequence', 'Query Blue Telemetry', 'Configure Vector Filters',
