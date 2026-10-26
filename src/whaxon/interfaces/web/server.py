@@ -3071,7 +3071,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
      'inspect msf options','execute curl replay test','view nuclei heuristics',
      'arm & queue for hitl approval gate','terminal log','emergency halt scan'].forEach(hideButtonByText);
     const allButton = Array.from(panel.querySelectorAll('button')).find(function (button) {
-      return /^All \\(/i.test((button.textContent || '').trim());
+      return /^All \(/i.test((button.textContent || '').trim());
     });
     if (allButton) allButton.textContent = 'All (' + list.children.length + ')';
     ['CISA KEV','Weaponized PoC','Remote Code Execution','PrivEsc'].forEach(hideButtonByText);
