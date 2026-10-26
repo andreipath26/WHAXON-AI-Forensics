@@ -20,6 +20,8 @@ from __future__ import annotations
 import hashlib
 import json
 
+import pytest
+
 from whaxon.core import Core
 from whaxon.interfaces.web.server import (
     AsyncRunner,
@@ -331,7 +333,7 @@ def test_root_redirects_to_ui(tmp_path, monkeypatch):
 def test_scope_page_has_wiring_hooks(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
-    r = client.get("/ui")
+    r = client.get("/legacy-ui")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert 'id="scope-rules"' in body
@@ -347,7 +349,7 @@ def test_scope_page_has_wiring_hooks(tmp_path, monkeypatch):
 def test_findings_page_has_wiring_hooks(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
-    r = client.get("/ui")
+    r = client.get("/legacy-ui")
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert 'id="findings-tbody"' in body
@@ -697,3 +699,47 @@ def test_network_auth_requires_non_default_bcrypt_credentials(monkeypatch):
         b"password", web_server._bcrypt.gensalt(rounds=11)
     ).decode("utf-8")
     assert not web_server._remote_auth_ready("admin", "", weak_hash)
+
+# ---------------------------------------------------------------- canonical UI routes
+
+NEW_UI_ROUTES = [
+    "/ui",
+    "/ui/scope-and-targets",
+    "/ui/run-and-orchestration",
+    "/ui/trust-layer-and-findings",
+    "/ui/trust-layer-approvals-queue-modal",
+    "/ui/ptes-coverage-and-reports",
+    "/ui/bas-and-detection-validation",
+    "/ui/compliance-and-framework-crosswalk",
+    "/ui/threat-intel-and-exploit-arsenal",
+    "/ui/ai-strategy-gate",
+    "/ui/remediation-retest-studio",
+    "/ui/attack-surface-and-continuous-monitoring",
+    "/ui/correlated-attack-chains",
+    "/ui/bug-bounty-and-live-browser-studio",
+    "/ui/ptaas-client-portal",
+    "/ui/job-execution-history",
+    "/ui/evidence-file-inspector",
+    "/ui/cryptographic-audit-log",
+    "/ui/system-diagnostics-and-health",
+    "/ui/adapter-and-plugin-manager",
+    "/ui/settings-and-api-explorer",
+]
+
+
+@pytest.mark.parametrize("route", NEW_UI_ROUTES)
+def test_canonical_ui_route_serves_design_and_wiring(tmp_path, monkeypatch, route):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get(route)
+    assert response.status_code == 200, route
+    body = response.get_data(as_text=True)
+    assert "<html" in body.lower(), route
+    assert "WHAXON" in body, route
+    assert "requestJson" in body, route
+
+
+def test_legacy_ui_remains_available(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/legacy-ui")
+    assert response.status_code == 200
+    assert 'id="app"' in response.get_data(as_text=True)
