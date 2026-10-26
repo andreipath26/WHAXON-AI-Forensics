@@ -979,305 +979,188 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
 (function () {
   const catalogEl = document.getElementById('run-catalog');
   if (!catalogEl) return;
-
   const countEl = document.getElementById('run-catalog-count');
   const targetEl = document.getElementById('run-target');
-  const extraEl = document.getElementById('run-extra');
   const runBtn = document.getElementById('run-btn');
   const cancelBtn = document.getElementById('run-cancel-btn');
   const scopePill = document.getElementById('run-scope-pill');
   const outputEl = document.getElementById('run-output');
   const jobIdEl = document.getElementById('run-job-id');
   const recentEl = document.getElementById('run-recent-jobs');
+  const recentSummary = document.getElementById('run-recent-summary');
+  const statusEl = document.getElementById('run-status');
+  let selectedTool = null, currentJob = null, eventSource = null, runPending = false;
 
-  let selectedTool = null;
-  let currentJob = null;
-  let eventSource = null;
-
-  function showScopePill(kind, text) {
+  function setStatus(message, kind) {
+    if (!statusEl) return;
+    statusEl.textContent = message; statusEl.dataset.state = kind || 'info';
+  }
+  function showScopePill(text) {
     if (!scopePill) return;
-    scopePill.className = 'pill ' + (kind === 'ok' ? 'pill-success' : 'pill-danger');
-    scopePill.replaceChildren();
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    scopePill.appendChild(dot);
-    scopePill.appendChild(document.createTextNode(text));
-    scopePill.style.display = '';
+    scopePill.className = 'pill pill-danger'; scopePill.replaceChildren();
+    const dot = document.createElement('span'); dot.className = 'dot';
+    scopePill.append(dot, document.createTextNode(text)); scopePill.style.display = '';
   }
-
-  function hideScopePill() {
-    if (scopePill) scopePill.style.display = 'none';
-  }
-
+  function hideScopePill() { if (scopePill) scopePill.style.display = 'none'; }
   function appendLine(stream, text) {
     if (!outputEl) return;
     const span = document.createElement('span');
     span.className = 'ln' + (stream === 'stderr' ? ' err' : '');
-    span.textContent = text;
-    outputEl.appendChild(span);
-    outputEl.scrollTop = outputEl.scrollHeight;
+    span.textContent = String(text == null ? '' : text);
+    outputEl.appendChild(span); outputEl.scrollTop = outputEl.scrollHeight;
   }
-
-  function clearOutput() {
-    if (outputEl) outputEl.innerHTML = '';
+  function clearOutput() { if (outputEl) outputEl.replaceChildren(); }
+  function setRunning(running) {
+    runPending = running;
+    if (runBtn) runBtn.disabled = running || !selectedTool;
+    if (cancelBtn) cancelBtn.disabled = !running || !currentJob;
   }
-
-  function renderCatalog(tools) {
-    window._whaxonTools = Array.isArray(tools) ? tools : [];
-    catalogEl.innerHTML = '';
-    (tools || []).forEach(tool => {
-      const item = document.createElement('div');
-      item.className = 'tool-item';
-      item.dataset.toolId = tool.id;
-      const icon = document.createElement('span');
-      icon.className = 'ticon';
-      icon.textContent = (tool.name || tool.id || '?').charAt(0).toLowerCase();
-      const name = document.createTextNode(tool.name || tool.id);
-      const tid = document.createElement('span');
-      tid.className = 'tid';
-      tid.textContent = tool.id;
-      item.appendChild(icon);
-      item.appendChild(name);
-      item.appendChild(tid);
-      item.addEventListener('click', () => {
-        catalogEl.querySelectorAll('.tool-item').forEach(i => i.classList.remove('on'));
-        item.classList.add('on');
-        selectedTool = tool.id;
-        runBtn.textContent = '▶ Run ' + (tool.name || tool.id);
-      });
-      catalogEl.appendChild(item);
+  function selectTool(tool, item) {
+    selectedTool = tool.id;
+    catalogEl.querySelectorAll('.tool-item').forEach(el => {
+      const active = el === item; el.classList.toggle('on', active); el.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
-    if (countEl) countEl.textContent = (tools || []).length + ' tools';
+    if (runBtn) { runBtn.textContent = '▶ Run ' + (tool.name || tool.id); runBtn.disabled = runPending; }
+    setStatus((tool.name || tool.id) + ' selected. Enter a target authorized in the active scope.', 'info');
   }
-
+  function renderCatalog(tools) {
+    const safeTools = Array.isArray(tools) ? tools : [];
+    window._whaxonTools = safeTools; catalogEl.replaceChildren(); selectedTool = null;
+    if (runBtn) runBtn.disabled = true;
+    safeTools.forEach(tool => {
+      if (!tool || typeof tool.id !== 'string' || !tool.id) return;
+      const item = document.createElement('button'); item.type = 'button'; item.className = 'tool-item'; item.dataset.toolId = tool.id; item.setAttribute('aria-pressed', 'false');
+      const icon = document.createElement('span'); icon.className = 'ticon'; icon.textContent = String(tool.name || tool.id).charAt(0).toLowerCase();
+      const name = document.createElement('span'); name.className = 'run-tool-name'; name.textContent = String(tool.name || tool.id);
+      const tid = document.createElement('span'); tid.className = 'tid'; tid.textContent = tool.id;
+      item.append(icon, name, tid); item.addEventListener('click', () => selectTool(tool, item)); catalogEl.appendChild(item);
+    });
+    if (countEl) countEl.textContent = catalogEl.querySelectorAll('.tool-item').length + ' tools';
+    if (!catalogEl.children.length) {
+      const empty = document.createElement('div'); empty.className = 'run-empty'; empty.textContent = 'No tools are available in the catalog.'; catalogEl.appendChild(empty);
+      setStatus('No tools available. Check the server and tool catalog.', 'error');
+    } else setStatus('Select a tool to begin. The server enforces the active scope before execution.', 'info');
+  }
   function renderRecent(jobs) {
     if (!recentEl) return;
-    recentEl.innerHTML = '';
-    (jobs || []).slice(0, 8).forEach(job => {
-      const tr = document.createElement('tr');
-      const tool = document.createElement('td');
-      tool.innerHTML = '<span class="mono"></span>';
-      tool.querySelector('.mono').textContent = job.tool || '—';
-      const target = document.createElement('td');
-      target.textContent = job.target || '—';
-      const status = document.createElement('td');
-      const statusCls = job.status === 'finished' ? 'pill-success' :
-                        job.status === 'failed' ? 'pill-danger' :
-                        job.status === 'running' ? 'pill-accent' : 'pill-neutral';
-      status.innerHTML = '<span class="pill ' + statusCls + '"></span>';
-      status.querySelector('.pill').textContent = job.status || '—';
-      const findings = document.createElement('td');
-      findings.style.textAlign = 'right';
-      findings.innerHTML = '<span class="mono"></span>';
-      findings.querySelector('.mono').textContent = (job.findings_count || 0) + ' findings';
-      tr.appendChild(tool); tr.appendChild(target); tr.appendChild(status); tr.appendChild(findings);
-      recentEl.appendChild(tr);
+    recentEl.replaceChildren();
+    const safeJobs = Array.isArray(jobs) ? jobs.slice(0, 8) : [];
+    if (recentSummary) recentSummary.textContent = safeJobs.length + ' recent job' + (safeJobs.length === 1 ? '' : 's');
+    if (!safeJobs.length) {
+      const row = document.createElement('tr'), cell = document.createElement('td');
+      cell.colSpan = 4; cell.className = 'run-empty'; cell.textContent = 'No recent jobs for this engagement.';
+      row.appendChild(cell); recentEl.appendChild(row); return;
+    }
+    safeJobs.forEach(job => {
+      const tr = document.createElement('tr'), tool = document.createElement('td');
+      const toolText = document.createElement('span'); toolText.className = 'mono'; toolText.textContent = String(job.tool || '—'); tool.appendChild(toolText);
+      const target = document.createElement('td'); target.textContent = String(job.target || '—');
+      const status = document.createElement('td'), pill = document.createElement('span');
+      const value = String(job.status || 'unknown').toLowerCase();
+      pill.className = 'pill ' + (value === 'finished' ? 'pill-success' : value === 'failed' ? 'pill-danger' : value === 'running' ? 'pill-accent' : 'pill-neutral');
+      pill.textContent = value; status.appendChild(pill);
+      const findings = document.createElement('td'); findings.style.textAlign = 'right';
+      const count = document.createElement('span'); count.className = 'mono'; count.textContent = String(Number(job.findings_count) || 0) + ' findings'; findings.appendChild(count);
+      tr.append(tool, target, status, findings); recentEl.appendChild(tr);
     });
   }
-
-  function loadCatalog() {
-    fetch('/api/tools')
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        const tools = Array.isArray(data) ? data : (data.tools || []);
-        renderCatalog(tools);
-      })
-      .catch(err => { if (countEl) countEl.textContent = 'load failed'; });
-  }
-
-  function loadRecent() {
-    fetch('/api/history')
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => {
-        const jobs = Array.isArray(data) ? data : (data.jobs || []);
-        renderRecent(jobs);
-      })
-      .catch(() => {});
-  }
-
-  function closeStream() {
-    if (eventSource) { eventSource.close(); eventSource = null; }
-  }
-
-  function setRunning(running) {
-    if (runBtn) runBtn.disabled = running;
-    if (cancelBtn) cancelBtn.disabled = !running;
-  }
-
-  function openStream(jobId) {
-    closeStream();
-    const es = new EventSource('/api/jobs/' + jobId + '/stream');
-    eventSource = es;
-    es.onmessage = (ev) => {
-      let msg;
-      try { msg = JSON.parse(ev.data); } catch (_) { return; }
-      if (msg.type === 'line') {
-        appendLine(msg.stream, msg.text);
-      } else if (msg.type === 'finished') {
-        appendLine('stdout', '[finished, exit ' + msg.exit_code + ']');
-        setRunning(false);
-        closeStream();
-        loadRecent();
-      } else if (msg.type === 'failed') {
-        appendLine('stderr', '[failed: ' + (msg.error || 'unknown') + ']');
-        setRunning(false);
-        closeStream();
-        loadRecent();
-      }
-    };
-    es.onerror = () => {
-      closeStream();
-      setRunning(false);
-    };
-  }
-
-  function runJob() {
-    const target = (targetEl.value || '').trim();
-    if (!selectedTool) { alert('Pick a tool first.'); return; }
-    if (!target) { alert('Enter a target.'); return; }
-    clearOutput();
-    hideScopePill();
-    setRunning(true);
-    fetch('/api/run', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tool_id: selectedTool,
-        target: target,
-        extra_args: (extraEl.value || '').trim(),
-      }),
-    })
-      .then(r => r.json().then(body => ({ ok: r.ok, status: r.status, body })))
-      .then(({ ok, status, body }) => {
-        if (!ok) {
-          setRunning(false);
-          if (status === 403) {
-            showScopePill('denied', 'Out of scope');
-            const modal = document.getElementById('scope-modal');
-            const targetLabel = modal && modal.querySelector('[data-scope-target]');
-            const reasonLabel = modal && modal.querySelector('[data-scope-reason]');
-            if (targetLabel) targetLabel.textContent = target;
-            if (reasonLabel) reasonLabel.textContent = body.error || 'Target is not in the active scope.';
-            if (modal) modal.classList.add('open');
-          }
-          appendLine('stderr', body.error || ('error ' + status));
-          return;
-        }
-        currentJob = body.job_id;
-        if (jobIdEl) jobIdEl.textContent = 'Job ' + currentJob;
-        openStream(currentJob);
-      })
-      .catch(err => {
-        setRunning(false);
-        appendLine('stderr', 'Request failed: ' + err);
-      });
-  }
-
-  function cancelJob() {
-    if (!currentJob) return;
-    fetch('/api/jobs/' + currentJob + '/cancel', { method: 'POST' })
-      .then(() => { setRunning(false); closeStream(); })
-      .catch(() => {});
-  }
-
-  if (runBtn) runBtn.addEventListener('click', runJob);
-  if (cancelBtn) cancelBtn.addEventListener('click', cancelJob);
-
-  // ---- Approvals (§4.4) ----
-  const approvalsList = document.getElementById('approvals-list');
-  const approvalsOwner = document.getElementById('approvals-owner');
-  const approvalsSummary = document.getElementById('approvals-summary');
-  const approvalsBadge = document.getElementById('approvals-badge');
-
-  async function loadApprovals() {
-    if (!approvalsList) return;
-    const owner = (approvalsOwner && approvalsOwner.value || '').trim();
-    const qs = owner ? ('?owner=' + encodeURIComponent(owner)) : '';
+  async function loadCatalog() {
+    if (countEl) countEl.textContent = 'Loading…';
     try {
-      const rows = await (await fetch('/api/ai/pending' + qs)).json();
-      if (approvalsBadge) {
-        approvalsBadge.textContent = String(rows.length);
-        approvalsBadge.style.display = rows.length ? '' : 'none';
-      }
-      if (approvalsSummary) {
-        approvalsSummary.textContent = rows.length + ' run' + (rows.length === 1 ? '' : 's') + ' awaiting a decision';
-      }
-      if (!rows.length) {
-        approvalsList.innerHTML = '<div class="card-sub" style="padding:24px;">No pending approvals.</div>';
-        return;
-      }
-      approvalsList.replaceChildren();
-      rows.forEach(r => {
-        const q = r.pending_question || {};
-        const rationale = q.rationale || '(no rationale)';
-        const confidence = (typeof q.confidence === 'number') ? q.confidence.toFixed(2) : '—';
-        const phase = q.proposed_phase || '';
-        const ownerLabel = r.owner || 'local';
-
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.dataset.run = String(r.id || '');
-        card.style.marginBottom = '12px';
-
-        const title = document.createElement('div');
-        title.className = 'card-title';
-        title.textContent = String(rationale);
-        const sub = document.createElement('div');
-        sub.className = 'card-sub';
-        sub.appendChild(document.createTextNode('run ' + String(r.id || '') + ' · owner ' + String(ownerLabel) + ' · confidence ' + confidence));
-        if (phase) {
-          sub.appendChild(document.createTextNode(' · proposed phase '));
-          const phaseText = document.createElement('b');
-          phaseText.textContent = String(phase);
-          sub.appendChild(phaseText);
-        }
-
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex;gap:8px;margin-top:12px;align-items:center;';
-        const input = document.createElement('input');
-        input.className = 'form-input';
-        input.dataset.answerInput = '';
-        input.placeholder = 'answer (e.g. y, no, notes)';
-        input.style.flex = '1';
-        const button = document.createElement('button');
-        button.className = 'btn btn-primary btn-sm';
-        button.dataset.answerBtn = '';
-        button.textContent = 'Answer';
-        actions.append(input, button);
-        card.append(title, sub, actions);
-        approvalsList.appendChild(card);
-      });
-      approvalsList.querySelectorAll('.card[data-run]').forEach(card => {
-        const btn = card.querySelector('[data-answer-btn]');
-        const input = card.querySelector('[data-answer-input]');
-        btn.addEventListener('click', async () => {
-          const runId = card.dataset.run;
-          const answer = (input.value || '').trim();
-          if (!answer) { input.focus(); return; }
-          btn.disabled = true;
-          try {
-            const r = await fetch('/api/ai/runs/' + encodeURIComponent(runId) + '/answer', {
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({answer: answer, user: owner || 'web'})
-            });
-            if (r.ok || r.status === 409) { await loadApprovals(); }
-            else { btn.disabled = false; }
-          } catch (_e) { btn.disabled = false; }
-        });
-      });
-    } catch (_e) {
-      if (approvalsSummary) approvalsSummary.textContent = 'Failed to load approvals';
+      const response = await fetch('/api/tools'); if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json(); renderCatalog(Array.isArray(data) ? data : (data && Array.isArray(data.tools) ? data.tools : []));
+    } catch (err) {
+      catalogEl.replaceChildren();
+      const row = document.createElement('div'); row.className = 'run-empty'; row.setAttribute('role', 'alert'); row.textContent = 'Could not load tools. Check the server connection and reload.'; catalogEl.appendChild(row);
+      if (countEl) countEl.textContent = 'Load failed'; setStatus('Tool catalog request failed: ' + String(err && err.message || err), 'error');
     }
   }
-
-  const approvalsRefresh = document.getElementById('approvals-refresh');
-  if (approvalsRefresh) approvalsRefresh.addEventListener('click', loadApprovals);
-  if (approvalsOwner) approvalsOwner.addEventListener('keydown', e => { if (e.key === 'Enter') loadApprovals(); });
-  document.querySelectorAll('.sb-item[data-page="approvals"]').forEach(el => {
-    el.addEventListener('click', loadApprovals);
-  });
-
+  async function loadRecent() {
+    try {
+      const response = await fetch('/api/history'); if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json(); renderRecent(Array.isArray(data) ? data : (data && Array.isArray(data.jobs) ? data.jobs : []));
+    } catch (err) {
+      if (recentEl) {
+        recentEl.replaceChildren();
+        const row = document.createElement('tr'), cell = document.createElement('td');
+        cell.colSpan = 4; cell.className = 'run-empty'; cell.setAttribute('role', 'alert'); cell.textContent = 'Could not load recent jobs: ' + String(err && err.message || err);
+        row.appendChild(cell); recentEl.appendChild(row);
+      }
+      if (recentSummary) recentSummary.textContent = 'History unavailable';
+    }
+  }
+  function closeStream() { if (eventSource) { eventSource.close(); eventSource = null; } }
+  function finishJob(message, kind) {
+    appendLine(kind === 'error' ? 'stderr' : 'stdout', message); closeStream(); setRunning(false); setStatus(message, kind || 'info'); loadRecent();
+  }
+  function openStream(jobId) {
+    closeStream();
+    const es = new EventSource('/api/jobs/' + encodeURIComponent(jobId) + '/stream'); eventSource = es;
+    es.onmessage = ev => {
+      let msg; try { msg = JSON.parse(ev.data); } catch (_) { return; }
+      if (msg.type === 'status') {
+        if (msg.status === 'running') setStatus('Job is running…', 'running');
+        else if (msg.status === 'queued') setStatus('Job queued…', 'running');
+        else if (msg.status === 'cancelled') finishJob('Job cancelled.', 'info');
+      } else if (msg.type === 'line') appendLine(msg.stream, msg.text);
+      else if (msg.type === 'finished') finishJob('Finished (exit ' + msg.exit_code + ').', msg.exit_code === 0 ? 'success' : 'error');
+      else if (msg.type === 'failed') finishJob('Job failed: ' + String(msg.error || 'unknown error'), 'error');
+    };
+    es.onerror = () => {
+      if (!eventSource) return;
+      closeStream(); setRunning(false); setStatus('Live output connection ended. Check Recent jobs for final status.', 'error'); loadRecent();
+    };
+  }
+  async function runJob() {
+    const target = (targetEl && targetEl.value || '').trim();
+    if (runPending) return;
+    if (!selectedTool) { setStatus('Select a tool first.', 'error'); return; }
+    if (!target) { setStatus('Enter a target.', 'error'); if (targetEl) targetEl.focus(); return; }
+    clearOutput(); hideScopePill(); currentJob = null; setRunning(true);
+    if (jobIdEl) jobIdEl.textContent = 'Starting job…'; setStatus('Checking scope and starting job…', 'running');
+    try {
+      const response = await fetch('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tool_id: selectedTool, target: target, extra_args: '' }) });
+      let body = {}; try { body = await response.json(); } catch (_) {}
+      if (!response.ok) {
+        setRunning(false); const message = body.error || ('Request failed (HTTP ' + response.status + ').');
+        if (response.status === 403) {
+          showScopePill('Out of scope');
+          const modal = document.getElementById('scope-modal');
+          const targetLabel = modal && modal.querySelector('[data-scope-target]');
+          const reasonLabel = modal && modal.querySelector('[data-scope-reason]');
+          if (targetLabel) targetLabel.textContent = target;
+          if (reasonLabel) reasonLabel.textContent = message;
+          if (modal) modal.classList.add('open');
+          setStatus('Blocked: target is not confirmed in the active scope. No job was started.', 'error');
+        } else setStatus(message, 'error');
+        appendLine('stderr', message); if (jobIdEl) jobIdEl.textContent = 'No job running'; return;
+      }
+      if (!body.job_id || typeof body.job_id !== 'string') throw new Error('Server response did not include a job ID.');
+      currentJob = body.job_id; if (jobIdEl) jobIdEl.textContent = 'Job ' + currentJob;
+      setStatus('Job accepted; connecting to live output…', 'running'); if (cancelBtn) cancelBtn.disabled = false;
+      openStream(currentJob); loadRecent();
+    } catch (err) {
+      setRunning(false); if (jobIdEl) jobIdEl.textContent = 'No job running';
+      const message = 'Could not start job: ' + String(err && err.message || err); appendLine('stderr', message); setStatus(message, 'error');
+    }
+  }
+  async function cancelJob() {
+    if (!currentJob || !cancelBtn || cancelBtn.disabled) return;
+    cancelBtn.disabled = true; setStatus('Sending cancellation request…', 'running');
+    try {
+      const response = await fetch('/api/jobs/' + encodeURIComponent(currentJob) + '/cancel', { method: 'POST' });
+      let body = {}; try { body = await response.json(); } catch (_) {}
+      if (!response.ok) throw new Error(body.error || ('HTTP ' + response.status));
+      if (body.ok) finishJob('Cancellation requested.', 'info');
+      else { setStatus('The job could not be cancelled (it may already have finished).', 'error'); loadRecent(); }
+    } catch (err) {
+      cancelBtn.disabled = false; const message = 'Cancel failed: ' + String(err && err.message || err); setStatus(message, 'error'); appendLine('stderr', message);
+    }
+  }
+  if (runBtn) runBtn.addEventListener('click', runJob);
+  if (cancelBtn) cancelBtn.addEventListener('click', cancelJob);
+  if (targetEl) targetEl.addEventListener('keydown', e => { if (e.key === 'Enter' && runBtn && !runBtn.disabled) runJob(); });
+  document.querySelectorAll('.sb-item[data-page="run"]').forEach(el => el.addEventListener('click', () => { loadCatalog(); loadRecent(); }));
   document.addEventListener('DOMContentLoaded', () => { loadCatalog(); loadRecent(); });
   if (document.readyState !== 'loading') { loadCatalog(); loadRecent(); }
 })();
