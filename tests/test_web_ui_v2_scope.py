@@ -39,9 +39,9 @@ def test_scope_v2_denies_out_of_scope_target(page, live_server):
     assert "google.com" in page.locator("#scope-check-result").text_content()
 
 
-def test_scope_v2_hides_unimplemented_navigation(page, live_server):
+def test_scope_v2_shows_wired_navigation_and_hides_unfinished(page, live_server):
     _open_scope_v2(page, live_server)
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
-    assert not page.locator('a[data-path="run-and-orchestration"]').is_visible()
+    assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
     assert not page.locator('a[data-path="ptes-coverage-and-reports"]').is_visible()
