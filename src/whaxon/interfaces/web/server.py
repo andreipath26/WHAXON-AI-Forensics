@@ -2242,7 +2242,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const coverageLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'PTES Coverage'; });
       if (coverageLabel) { const card = coverageLabel.closest('.rounded-lg'); if (card) setHidden(card, true); }
       const sessionBufferLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return (el.textContent || '').trim() === 'Active Session Buffer'; });
-      if (sessionBufferLabel) { const bar = sessionBufferLabel.closest('.rounded-lg'); if (bar) setHidden(bar, true); }
+      if (sessionBufferLabel) { const column = sessionBufferLabel.closest('.flex.flex-col'); if (column) setHidden(column, true); }
       const falsePositiveLabel = Array.from(document.querySelectorAll('span')).find(function (el) { return /FALSE POSITIVES/.test(el.textContent || ''); });
       if (falsePositiveLabel) {
         setHidden(falsePositiveLabel, true);
