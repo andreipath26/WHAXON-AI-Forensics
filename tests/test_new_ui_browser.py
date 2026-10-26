@@ -202,7 +202,16 @@ def test_evidence_page_never_shows_static_sample_artifacts(page, live_server):
     page.wait_for_timeout(250)
     visible_text = page.locator("body").inner_text()
     assert "raw_nmap_syn_scan.xml" not in visible_text
+
+
+def test_evidence_page_shows_empty_state_when_no_jobs(page, live_server):
+    page.route("**/api/history", lambda route: route.fulfill(
+        status=200, content_type="application/json", body="[]"))
+    page.goto(f"{live_server}/ui/evidence-file-inspector", wait_until="domcontentloaded")
+    page.wait_for_timeout(250)
+    visible_text = page.locator("body").inner_text()
     assert "No recorded evidence yet." in visible_text
+    assert "raw_nmap_syn_scan.xml" not in visible_text
 
 
 def test_coverage_page_uses_recorded_gap_ledger_not_demo_claims(page, live_server):
