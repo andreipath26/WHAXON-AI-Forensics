@@ -701,3 +701,9 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
   --sp-6: 18px;
   --sp-8: 24px;
 }
+
+
+/* Findings page empty/error states and keyboard affordances */
+#findings-table .findings-empty { padding: 24px 16px; color: var(--text-dim); text-align: center; white-space: normal; }
+#findings-table tbody tr[data-job-id], #findings-table thead th[data-sort] { cursor: pointer; }
+#findings-table tbody tr[data-job-id]:focus-visible, #findings-table thead th[data-sort]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

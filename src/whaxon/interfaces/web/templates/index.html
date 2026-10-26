@@ -1,12 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="ai-banner" id="ai-banner" style="display:none;">
-        <div class="ai-icon">AI</div>
-        <div class="ai-body"><b>Proposal:</b> run <code>sqlmap</code> against <code>127.0.0.1:80/vulnerabilities/sqli/</code> — 3 parameters discovered, high confidence.</div>
-        <div class="ai-actions"><button class="btn btn-sm btn-ghost">Dismiss</button><button class="btn btn-sm btn-primary">Approve</button></div>
-      </div>
-
-      <!-- FINDINGS -->
+<!-- FINDINGS -->
       <section class="page active" id="page-findings">
         <div class="page-head">
           <div class="ph-main"><h1 class="page-title">Findings</h1><p class="page-sub" id="findings-summary">Loading…</p></div>
@@ -65,12 +59,12 @@
           <table class="tbl" id="findings-table">
             <thead>
               <tr>
-                <th class="checkbox-col"><input type="checkbox" class="cb" id="select-all"></th>
-                <th style="width:90px;" data-sort="severity" class="sorted">Severity <span class="sort">▾</span></th>
-                <th data-sort="title">Title <span class="sort">·</span></th>
-                <th style="width:160px;" data-sort="target">Target <span class="sort">·</span></th>
-                <th style="width:100px;" data-sort="source">Source <span class="sort">·</span></th>
-                <th style="width:100px;" data-sort="status">Status <span class="sort">·</span></th>
+                <th class="checkbox-col"><input type="checkbox" class="cb" id="select-all" aria-label="Select all visible findings" title="Select all visible findings"></th>
+                <th style="width:90px;" data-sort="severity" class="sorted" tabindex="0" role="button" aria-sort="ascending">Severity <span class="sort">▾</span></th>
+                <th data-sort="title" tabindex="0" role="button" aria-sort="none">Title <span class="sort">·</span></th>
+                <th style="width:160px;" data-sort="target" tabindex="0" role="button" aria-sort="none">Target <span class="sort">·</span></th>
+                <th style="width:100px;" data-sort="source" tabindex="0" role="button" aria-sort="none">Source <span class="sort">·</span></th>
+                <th style="width:100px;" data-sort="status" tabindex="0" role="button" aria-sort="none">Status <span class="sort">·</span></th>
               </tr>
             </thead>
             <tbody id="findings-tbody"></tbody>

@@ -61,13 +61,18 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
 
   // bulk selection
   function updateBulk() {
-    const checked = document.querySelectorAll('#findings-table .row-cb:checked').length;
+    const allBoxes = Array.from(document.querySelectorAll('#findings-table .row-cb'));
+    const checked = allBoxes.filter(cb => cb.checked).length;
     if (bulkCount) bulkCount.textContent = checked;
     if (bulkBar) bulkBar.hidden = checked === 0;
     if (selectAll) {
-      const boxes = Array.from(document.querySelectorAll('#findings-table .row-cb'));
-      selectAll.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
-      selectAll.indeterminate = checked > 0 && !selectAll.checked;
+      const visibleBoxes = Array.from(document.querySelectorAll('#findings-table tbody tr[data-job-id]'))
+        .filter(row => row.style.display !== 'none')
+        .map(row => row.querySelector('.row-cb')).filter(Boolean);
+      const visibleChecked = visibleBoxes.filter(cb => cb.checked).length;
+      selectAll.checked = visibleBoxes.length > 0 && visibleChecked === visibleBoxes.length;
+      selectAll.indeterminate = visibleChecked > 0 && visibleChecked < visibleBoxes.length;
+      selectAll.disabled = visibleBoxes.length === 0;
     }
   }
   const findingsTable = document.getElementById('findings-table');
@@ -75,7 +80,12 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     if (event.target && event.target.matches('.row-cb')) updateBulk();
   });
   if (selectAll) selectAll.addEventListener('change', () => {
-    document.querySelectorAll('#findings-table .row-cb').forEach(cb => cb.checked = selectAll.checked);
+    document.querySelectorAll('#findings-table tbody tr[data-job-id]').forEach(row => {
+      if (row.style.display !== 'none') {
+        const cb = row.querySelector('.row-cb');
+        if (cb) cb.checked = selectAll.checked;
+      }
+    });
     updateBulk();
   });
   const bulkClear = document.getElementById('bulk-clear-btn');
@@ -466,15 +476,30 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   }));
 
   function applyFilter() {
-    tbody.querySelectorAll('tr').forEach(tr => {
+    const oldEmpty = tbody.querySelector('tr[data-filter-empty]');
+    if (oldEmpty) oldEmpty.remove();
+    const rows = Array.from(tbody.querySelectorAll('tr[data-job-id]'));
+    rows.forEach(tr => {
       const severity = tr.dataset.severity || 'info';
       const status = tr.dataset.status || 'candidate';
       const matches = activeFilter === 'all'
-        || severity === activeFilter
-        || (activeFilter === 'low' && severity === 'info')
-        || status === activeFilter;
+        || (activeFilter === 'low' && (severity === 'low' || severity === 'info'))
+        || (['critical', 'high', 'medium'].includes(activeFilter) && severity === activeFilter)
+        || (['verified', 'candidate'].includes(activeFilter) && status === activeFilter);
       tr.style.display = matches ? '' : 'none';
     });
+    if (rows.length && !rows.some(row => row.style.display !== 'none')) {
+      const row = document.createElement('tr');
+      row.dataset.filterEmpty = 'true';
+      const cell = document.createElement('td');
+      cell.colSpan = 6;
+      cell.className = 'findings-empty';
+      cell.setAttribute('role', 'status');
+      cell.textContent = 'No findings match this filter.';
+      row.appendChild(cell);
+      tbody.appendChild(row);
+    }
+    updateSelection();
   }
 
   function updateFilterCounts(rows) {
@@ -493,16 +518,24 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     });
   }
 
-  document.querySelectorAll('.tbl thead th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
+  document.querySelectorAll('#findings-table thead th[data-sort]').forEach(th => {
+    th.tabIndex = 0;
+    th.setAttribute('role', 'button');
+    th.setAttribute('aria-sort', th.dataset.sort === sortKey ? 'ascending' : 'none');
+    const sort = () => {
       const key = th.dataset.sort;
       if (key === sortKey) sortAsc = !sortAsc;
       else { sortKey = key; sortAsc = true; }
-      document.querySelectorAll('.tbl thead th').forEach(x => { x.classList.remove('sorted'); const s = x.querySelector('.sort'); if (s) s.textContent = '·'; });
-      th.classList.add('sorted');
-      const s = th.querySelector('.sort'); if (s) s.textContent = sortAsc ? '▴' : '▾';
+      document.querySelectorAll('#findings-table thead th[data-sort]').forEach(x => {
+        x.classList.toggle('sorted', x === th);
+        x.setAttribute('aria-sort', x === th ? (sortAsc ? 'ascending' : 'descending') : 'none');
+        const icon = x.querySelector('.sort');
+        if (icon) icon.textContent = x === th ? (sortAsc ? '▴' : '▾') : '·';
+      });
       document.dispatchEvent(new CustomEvent('whaxon:findings-resort'));
-    });
+    };
+    th.addEventListener('click', sort);
+    th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sort(); } });
   });
   const summaryEl = document.getElementById('findings-summary');
   const donutSummary = document.getElementById('donut-summary');
@@ -596,10 +629,14 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     if (count) count.textContent = String(selected.length);
     if (bar) bar.hidden = selected.length === 0;
     const selectAll = document.getElementById('select-all');
-    const boxes = Array.from(tbody.querySelectorAll('.row-cb'));
+    const visibleBoxes = Array.from(tbody.querySelectorAll('tr[data-job-id]'))
+      .filter(row => row.style.display !== 'none')
+      .map(row => row.querySelector('.row-cb')).filter(Boolean);
+    const visibleSelected = visibleBoxes.filter(box => box.checked).length;
     if (selectAll) {
-      selectAll.checked = boxes.length > 0 && boxes.every(box => box.checked);
-      selectAll.indeterminate = boxes.some(box => box.checked) && !selectAll.checked;
+      selectAll.checked = visibleBoxes.length > 0 && visibleSelected === visibleBoxes.length;
+      selectAll.indeterminate = visibleSelected > 0 && visibleSelected < visibleBoxes.length;
+      selectAll.disabled = visibleBoxes.length === 0;
     }
   }
 
@@ -663,11 +700,23 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
   function renderTable(findings) {
     tbody.innerHTML = '';
+    if (!findings.length) {
+      const row = document.createElement('tr');
+      const cell = document.createElement('td');
+      cell.colSpan = 6;
+      cell.className = 'findings-empty';
+      cell.setAttribute('role', 'status');
+      cell.textContent = activeFilter === 'all' ? 'No findings yet. Run an authorized tool to populate this view.' : 'No findings match this filter.';
+      row.appendChild(cell);
+      tbody.appendChild(row);
+      updateSelection();
+      return;
+    }
     findings.forEach(f => {
       const tr = document.createElement('tr');
       const pillCls = SEV_PILL[f.severity] || 'pill-info';
@@ -680,16 +729,41 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         still_vulnerable: ['pill-critical', 'Still Vulnerable']
       };
       const [statusCls, statusLabel] = STATUS_META[f.status] || ['pill-accent', f.status || 'Candidate'];
-      tr.innerHTML =
-        '<td class="checkbox-col"><input type="checkbox" class="cb row-cb"></td>' +
-        '<td><span class="pill ' + pillCls + '"><span class="dot"></span>' + sevLabel + '</span></td>' +
-        '<td><span class="title"></span></td>' +
-        '<td><span class="target"></span></td>' +
-        '<td><span class="mono"></span></td>' +
-        '<td><span class="pill ' + statusCls + '">' + statusLabel + '</span></td>';
-      tr.querySelector('.title').textContent = f.title;
-      tr.querySelector('.target').textContent = f.target;
-      tr.querySelector('.mono').textContent = f.source;
+      const checkCell = document.createElement('td');
+      checkCell.className = 'checkbox-col';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'cb row-cb';
+      checkbox.setAttribute('aria-label', 'Select finding: ' + f.title);
+      checkCell.appendChild(checkbox);
+      const severityCell = document.createElement('td');
+      const severityPill = document.createElement('span');
+      severityPill.className = 'pill ' + pillCls;
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      severityPill.append(dot, document.createTextNode(sevLabel));
+      severityCell.appendChild(severityPill);
+      const titleCell = document.createElement('td');
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'title'; titleSpan.textContent = String(f.title);
+      titleCell.appendChild(titleSpan);
+      const targetCell = document.createElement('td');
+      const targetSpan = document.createElement('span');
+      targetSpan.className = 'target'; targetSpan.textContent = String(f.target || '—');
+      targetCell.appendChild(targetSpan);
+      const sourceCell = document.createElement('td');
+      const sourceSpan = document.createElement('span');
+      sourceSpan.className = 'mono'; sourceSpan.textContent = String(f.source || '—');
+      sourceCell.appendChild(sourceSpan);
+      const statusCell = document.createElement('td');
+      const statusPill = document.createElement('span');
+      statusPill.className = 'pill ' + statusCls;
+      statusPill.textContent = String(statusLabel);
+      statusCell.appendChild(statusPill);
+      tr.append(checkCell, severityCell, titleCell, targetCell, sourceCell, statusCell);
+      tr.tabIndex = 0;
+      tr.setAttribute('role', 'button');
+      tr.setAttribute('aria-label', 'Open finding: ' + f.title);
       tr.dataset.severity = f.severity;
       tr.dataset.title = f.title;
       tr.dataset.target = f.target;
@@ -705,10 +779,18 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       const rowCheckbox = tr.querySelector('.row-cb');
       if (rowCheckbox) rowCheckbox.addEventListener('change', updateSelection);
       tr.addEventListener('click', e => {
-        if (e.target.closest('.checkbox-col') || e.target.closest('.copy-btn')) return;
+        if (e.target.closest('input, button, a, label, .checkbox-col, .copy-btn')) return;
         tbody.querySelectorAll('tr.selected').forEach(row => row.classList.remove('selected'));
         tr.classList.add('selected');
         openSlideover(tr);
+      });
+      tr.addEventListener('keydown', e => {
+        if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('input, button, a, label')) {
+          e.preventDefault();
+          tbody.querySelectorAll('tr.selected').forEach(row => row.classList.remove('selected'));
+          tr.classList.add('selected');
+          openSlideover(tr);
+        }
       });
       tbody.appendChild(tr);
     });
@@ -849,7 +931,25 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
         applyFilter();
       })
       .catch(err => {
-        whaxonRenderMessageRow(tbody, 6, 'Failed to load findings: ' + err);
+        window._whaxonFindings = [];
+        renderKpis({});
+        renderDonut({});
+        updateFilterCounts([]);
+        renderSurface([]);
+        if (summaryEl) summaryEl.textContent = 'Findings could not be loaded.';
+        if (donutSummary) donutSummary.textContent = 'Data unavailable';
+        const badge = document.getElementById('findings-badge');
+        if (badge) badge.textContent = '—';
+        tbody.replaceChildren();
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 6;
+        cell.className = 'findings-empty';
+        cell.setAttribute('role', 'alert');
+        cell.textContent = 'Could not load findings. Check the server connection and reload this page. Details: ' + String(err && err.message || err);
+        row.appendChild(cell);
+        tbody.appendChild(row);
+        updateSelection();
       });
   }
 
