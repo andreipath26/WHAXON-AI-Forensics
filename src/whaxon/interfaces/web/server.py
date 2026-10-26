@@ -2062,6 +2062,28 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     document.querySelectorAll('main span, main strong, main code, main p').forEach(function (element) {
       if (prototypeMetrics.test((element.textContent || '').trim())) setHidden(element, true);
     });
+    // The report hero and compliance badges are prototype claims, not report API output.
+    const evidenceHero = Array.from(document.querySelectorAll('main h1, main h2, main h3')).find(function (el) {
+      return (el.textContent || '').trim() === 'PTES Certified Evidence Locker';
+    });
+    const evidenceHeroCard = evidenceHero && evidenceHero.closest('.rounded-xl');
+    if (evidenceHeroCard) setHidden(evidenceHeroCard, true);
+    const standardsLabel = Array.from(document.querySelectorAll('main span')).find(function (el) {
+      return /Correlate Standards & Compliance Matrix/i.test(el.textContent || '');
+    });
+    if (standardsLabel && standardsLabel.parentElement) setHidden(standardsLabel.parentElement, true);
+    const synthesisTitle = Array.from(document.querySelectorAll('main h2, main h3')).find(function (el) {
+      return (el.textContent || '').trim() === 'Report Synthesis & Compliance Profiler';
+    });
+    if (synthesisTitle) synthesisTitle.textContent = 'Report Synthesis';
+    const synthesisDescription = synthesisTitle && synthesisTitle.parentElement.querySelector('span, p');
+    if (synthesisDescription) synthesisDescription.textContent = 'Preview and export reports from recorded WHAXON jobs.';
+    document.querySelectorAll('main span').forEach(function (el) {
+      const value = (el.textContent || '').trim();
+      if (value === '.pdf (Audit Sign)') el.textContent = '.pdf';
+      else if (value === '.md (Raw Git)') el.textContent = '.md';
+      else if (value === '.html (Standalone)') el.textContent = '.html';
+    });
     // Keep the original report synthesis/export section; the phase tracker,
     // evidence locker, and gap-matrix sections are static mock engagement data.
     const previewSection = previewButton && previewButton.closest('section');
