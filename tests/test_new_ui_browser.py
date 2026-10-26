@@ -66,7 +66,8 @@ def test_findings_page_renders_real_findings(page, live_server):
     page.wait_for_timeout(500)
     card = page.locator("#finding-card-1")
     assert card.is_visible()
-    assert "SQL injection on /login" in card.inner_text()
+    assert "web_issue" in card.inner_text()
+    assert "127.0.0.1:80" in card.inner_text()
 
 
 def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
