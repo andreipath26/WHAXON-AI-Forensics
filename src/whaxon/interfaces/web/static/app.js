@@ -1204,13 +1204,13 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       list.replaceChildren();
       rows.forEach(run => {
         const question = run.pending_question || {};
-        const card = document.createElement('div'); card.className = 'card approvals-item'; card.style.marginBottom = '12px';
+        const card = document.createElement('div'); card.className = 'card approvals-item'; card.dataset.run = String(run.id || ''); card.style.marginBottom = '12px';
         const title = document.createElement('div'); title.className = 'card-title'; title.textContent = String(question.rationale || '(No rationale supplied)');
         const detail = document.createElement('div'); detail.className = 'card-sub';
         detail.textContent = 'Run ' + String(run.id || '—') + ' · owner ' + String(run.owner || 'local') + ' · confidence ' + (typeof question.confidence === 'number' ? question.confidence.toFixed(2) : '—') + (question.proposed_phase ? ' · proposed phase ' + String(question.proposed_phase) : '');
         const actions = document.createElement('div'); actions.className = 'approvals-actions';
-        const answer = document.createElement('input'); answer.className = 'form-input'; answer.placeholder = 'Answer or decision'; answer.setAttribute('aria-label','Answer for run '+String(run.id||''));
-        const button = document.createElement('button'); button.type='button'; button.className='btn btn-primary btn-sm'; button.textContent='Submit answer';
+        const answer = document.createElement('input'); answer.className = 'form-input'; answer.dataset.answerInput = ''; answer.placeholder = 'Answer or decision'; answer.setAttribute('aria-label','Answer for run '+String(run.id||''));
+        const button = document.createElement('button'); button.type='button'; button.className='btn btn-primary btn-sm'; button.dataset.answerBtn = ''; button.textContent='Submit answer';
         button.addEventListener('click', async () => {
           const value = answer.value.trim();
           if (!value) { answer.focus(); if(summary)summary.textContent='Enter an answer before submitting.'; return; }
