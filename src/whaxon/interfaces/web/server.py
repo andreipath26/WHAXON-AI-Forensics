@@ -3012,7 +3012,76 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     wireUnavailablePage();
   }
   async function wireThreatIntel() {
-    wireUnavailablePage();
+    let status, modules;
+    try {
+      status = await requestJson('/api/msf/status');
+      if (!status.up) { wireUnavailablePage(); return; }
+      modules = await requestJson('/api/msf/modules/exploit');
+    } catch (_) { wireUnavailablePage(); return; }
+    if (!Array.isArray(modules) || !modules.length) { wireUnavailablePage(); return; }
+
+    const template = document.querySelector('.cve-row-item');
+    if (!template || !template.parentElement) { wireUnavailablePage(); return; }
+    const list = template.parentElement;
+    const panel = template.closest('.lg\\:col-span-7');
+    const workbench = panel && panel.parentElement;
+    const workspace = (function () {
+      let node = workbench;
+      while (node && !(node.classList.contains('p-margin') && node.classList.contains('gap-space-2xl'))) node = node.parentElement;
+      return node;
+    })();
+    const cardTemplate = template.cloneNode(true);
+    list.replaceChildren();
+    modules.slice(0, 50).forEach(function (moduleName) {
+      if (typeof moduleName !== 'string' || !moduleName.trim()) return;
+      const card = cardTemplate.cloneNode(true);
+      card.removeAttribute('onclick');
+      card.dataset.tags = 'msf';
+      const moduleLabel = card.querySelector('.font-code-md.text-code-md.text-primary.font-bold');
+      const moduleTitle = card.querySelector('.font-headline-sm.text-headline-sm.text-on-surface.font-semibold');
+      if (moduleLabel) moduleLabel.textContent = 'MSF MODULE';
+      if (moduleTitle) moduleTitle.textContent = moduleName;
+      card.querySelectorAll('span').forEach(function (span) {
+        if (/CVSS|EPSS|CISA KEV|SHADOW API|PUBLIC READ DRIFT|CRITICAL EXPOSURE/i.test(span.textContent || '')) setHidden(span, true);
+      });
+      const description = card.querySelector('p');
+      if (description) setHidden(description, true);
+      const sampleDetails = Array.from(card.querySelectorAll('div')).find(function (element) {
+        return /In Scope:/.test(element.textContent || '') && /MSF:/.test(element.textContent || '');
+      });
+      if (sampleDetails) setHidden(sampleDetails, true);
+      card.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
+      list.appendChild(card);
+    });
+    if (!list.children.length) { wireUnavailablePage(); return; }
+
+    // Only the live Metasploit module catalog is supported on this page today.
+    // Hide static CVE scores, threat-feed claims, and the unimplemented runner.
+    if (workspace) Array.from(workspace.children).forEach(function (child) {
+      if (!child.contains(workbench)) setHidden(child, true);
+    });
+    const inspector = document.getElementById('inspector-cve-id');
+    if (inspector) {
+      let column = inspector;
+      while (column && !column.classList.contains('lg:col-span-5')) column = column.parentElement;
+      setHidden(column, true);
+    }
+    ['sync upstream feeds','rebuild sqlite vector db','searchsploit terminal',
+     'inspect exploit code','queue safe probe','simulate dry-run','metasploit harness',
+     'inspect msf options','execute curl replay test','view nuclei heuristics',
+     'arm & queue for hitl approval gate','terminal log','emergency halt scan'].forEach(hideButtonByText);
+    const allButton = Array.from(panel.querySelectorAll('button')).find(function (button) {
+      return /^All \\(/i.test((button.textContent || '').trim());
+    });
+    if (allButton) allButton.textContent = 'All (' + list.children.length + ')';
+    ['CISA KEV','Weaponized PoC','Remote Code Execution','PrivEsc'].forEach(hideButtonByText);
+    const search = panel.querySelector('input[placeholder*="Filter by CVE-ID"]');
+    if (search) search.oninput = function () {
+      const query = search.value.toLowerCase().trim();
+      list.querySelectorAll('.cve-row-item').forEach(function (card) {
+        setHidden(card, !card.textContent.toLowerCase().includes(query));
+      });
+    };
   }
   function wireUnavailablePage() {
     const main = document.querySelector('main');
