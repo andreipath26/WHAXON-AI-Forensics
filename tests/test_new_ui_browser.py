@@ -149,7 +149,7 @@ def test_unavailable_workflow_hides_its_navigation_entry(page, live_server):
     page.goto(f"{live_server}/ui/bas-and-detection-validation", wait_until="domcontentloaded")
     page.wait_for_timeout(250)
     assert page.locator('[data-path="bas-and-detection-validation"]').is_hidden()
-    assert "Detection Rule Coverage" not in page.locator("body").inner_text()
+    assert page.locator("main").inner_text().strip() == ""
 
 
 def test_unwired_approval_page_hides_demo_modal_outside_main(page, live_server):
