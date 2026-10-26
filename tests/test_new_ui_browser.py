@@ -138,6 +138,10 @@ def test_catalog_page_renders_live_tools(page, live_server):
     matrix = page.locator("#adapter-matrix")
     assert matrix.is_visible()
     assert matrix.locator(".adapter-card").count() >= 1
+    visible_text = page.locator("main").inner_text()
+    assert "100% Ed25519 Valid" not in visible_text
+    assert "Nuclei Configuration" not in visible_text
+    assert "LIVE ENTRY POINT SIGNATURE PIPELINE" not in visible_text
 
 
 
@@ -186,13 +190,19 @@ def test_health_page_shows_real_health_payload_and_hides_fake_controls(page, liv
     stream = page.locator("#diagnostic-stream")
     assert stream.is_visible()
     assert "readiness" in stream.inner_text()
+    visible_text = page.locator("main").inner_text()
+    assert "ALL SUBSYSTEMS HEALTHY" not in visible_text
+    assert "Cryptographic Roots" not in visible_text
+    assert "STREAM ACTIVE: 60 FPS" not in visible_text
     assert page.locator("#btn-restart-daemons").is_hidden()
 
 
 def test_evidence_page_never_shows_static_sample_artifacts(page, live_server):
     page.goto(f"{live_server}/ui/evidence-file-inspector", wait_until="domcontentloaded")
     page.wait_for_timeout(250)
-    assert "raw_nmap_syn_scan.xml" not in page.locator("body").inner_text()
+    visible_text = page.locator("body").inner_text()
+    assert "raw_nmap_syn_scan.xml" not in visible_text
+    assert "No recorded evidence yet." in visible_text
 
 
 def test_coverage_page_uses_recorded_gap_ledger_not_demo_claims(page, live_server):
