@@ -2619,7 +2619,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     });
     document.querySelectorAll('main span, main p, main strong').forEach(function (element) {
       const value = (element.textContent || '').trim();
-      if (/DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|142 of 142 Assets Active|Critical Root Risk Path Active|SYN-ACK received|0 new hosts found|assets-backup-archive\\.s3\\.amazonaws\\.com|api\\.staging\\.internal|54\\.210\\.42\\.19/i.test(value)) {
+      if (/DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|142 of 142 Assets Active|Critical Root Risk Path Active|SYN-ACK received|0 new hosts found|assets-backup-archive\.s3\.amazonaws\.com|api\.staging\.internal|54\.210\.42\.19/i.test(value)) {
         setHidden(element, true);
       }
     });
