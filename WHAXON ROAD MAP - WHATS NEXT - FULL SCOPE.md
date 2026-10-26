@@ -1888,3 +1888,149 @@ The following items are deferred until v1.0 is fully deployed. They represent th
 
 ---
 
+
+
+---
+
+# 39. TOOLING PORTFOLIO REVIEW — ADDITIONS, SUBSTITUTIONS AND ACCEPTANCE GATES
+
+**Status:** Proposed roadmap amendment, based on a portfolio review of §7 and the candidate inventory. This section refines priorities; it does not mean the tools below have already been integrated or tested. Existing §7 remains the historical inventory until §39.8 reconciles it.
+
+## 39.1 Decision
+
+Keep the strategic objective of broad tool coverage, but optimise for **distinct capability, maintainability, structured evidence and verified end-to-end behaviour**, not raw adapter count. Do not add a tool solely to reach 120.
+
+A tool integration is not production-ready merely because its adapter is registered or its parser passes fixture tests. Track these states separately:
+
+1. `planned`
+2. `implemented`
+3. `installed`
+4. `smoke-tested`
+5. `validated-on-lab`
+6. `end-to-end-verified`
+
+Only the final state counts as production-ready coverage. Every integration must have a named supported version/platform, input contract, scope policy, timeout/cancellation behaviour, structured output, error semantics, evidence provenance, test fixtures and at least one end-to-end lab proof.
+
+## 39.2 Priority additions and promotions
+
+These are candidates or capability priorities, not claims of current integration.
+
+### Promote or make first-class
+
+- **Nuclei:** already in the current catalog; make its template-based checks a first-class pipeline stage. Pin/review template sources, preserve template ID and version, enforce scope, capture raw evidence and send candidates through WHAXON validation. Template output alone must not imply `verified`.
+- **Naabu:** evaluate for fast port discovery complementary to Nmap. Use as an asset-discovery stage, not an Nmap replacement.
+- **Gowitness:** promote from Tier 2 to the asset triage/reporting workflow for screenshots, with headless-browser isolation and resource limits.
+- **gau:** retain as a complementary historical URL source to waybackurls where source coverage differs; deduplicate results.
+
+### Add as evaluation candidates
+
+- **OWASP ZAP:** evaluate for active web/API scanning and automation API integration, comparing coverage, output quality and operating cost against existing Burp and scanner workflows.
+- **Interactsh:** evaluate for controlled out-of-band evidence for blind vulnerabilities. Prefer a controlled instance where practical; correlate every callback to a unique test, enforce scope, document external data flows and never let a callback alone bypass the Trust Layer.
+- **Syft + Grype:** evaluate as a paired SBOM-generation and component-vulnerability workflow. Preserve SBOM provenance and component/package identifiers.
+- **Kubescape:** benchmark against Trivy, kube-bench and kubeaudit before adoption; add only for demonstrated coverage gaps.
+- **TruffleHog:** benchmark against Gitleaks before adoption; keep both only if measured source/secret coverage justifies the maintenance burden.
+- **RESTler or another schema-aware API fuzzer:** evaluate only after OpenAPI/Swagger ingestion, authentication/session handling, per-operation scope enforcement and deterministic validation are available.
+- **SharpHound:** evaluate as an alternative/addition to bloodhound-python only if Windows collection materially expands supported environments.
+- **enum4linux-ng:** prefer for new SMB/Windows enumeration work over the older enum4linux, subject to compatibility tests.
+- **ssh-audit:** evaluate as a clearly identified SSH configuration-audit capability; first confirm the exact project and supported output contract.
+
+## 39.3 Recommended substitutions and de-duplication
+
+Apply these as review decisions, not blind deletions. Confirm the exact upstream project, current maintenance, license, supported platforms and test results before changing the active inventory.
+
+- **enum4linux → enum4linux-ng** for the preferred modern SMB enumeration path; retain the original only if a real compatibility requirement exists.
+- **wfuzz vs ffuf:** keep ffuf as the default directory/content fuzzing integration. Retain wfuzz only for a demonstrated distinct workflow.
+- **XSStrike vs Dalfox:** benchmark both against a controlled XSS corpus. Keep both only if the measured coverage or workflow difference justifies maintaining both.
+- **testssl vs SSLyze vs sslscan:** choose a primary TLS assessment path and preserve a second tool only where it adds distinct checks or independent corroboration. Normalise overlapping findings.
+- **Droopescan vs Drupwn:** favour one maintained CMS coverage path; do not maintain duplicate Drupal enumeration without evidence of a gap.
+- **WhatWeb vs CMSeeK vs other CMS/fingerprint checks:** share deduplication and technology-identification logic; retain tools only for distinct supported technologies or measurable coverage.
+- **Medusa vs Ncrack vs Patator vs Hydra:** select a primary authorised authentication-audit integration based on protocol coverage, reliability and rate-limit controls. Do not integrate all four merely for breadth.
+- **Hashcat vs John the Ripper:** keep Hashcat as the existing baseline; evaluate John only for demonstrated format or workflow coverage not already met.
+- **Subfinder vs Sublist3r vs Assetfinder vs Amass:** keep the tools that contribute distinct passive sources or discovery modes; deduplicate assets and record provenance.
+- **Scoutsuite vs Prowler:** benchmark cloud-service and rule coverage. Keep Scoutsuite only if it fills an evidenced gap.
+- **Skipfish, Dmitry, Red-Hawk, Infoga, Recon-ng, Ghost-Eye, Cero and similar lower-priority candidates:** defer until project identity, maintenance, licensing, output quality and distinct capability are verified.
+- **Sn1per:** do not prioritise as a normal scanner dependency because it is itself an orchestration product and risks duplicating WHAXON's core role.
+- **SQLNinja:** defer unless it adds a tested SQL Server-specific workflow not covered by SQLMap and WHAXON's validation layer.
+- **Crunch and other wordlist generators:** treat as supporting utilities, not vulnerability scanners; adopt only if a concrete workflow needs them.
+
+## 39.4 Reconnaissance pipeline
+
+Target flow:
+
+`passive sources → DNS resolution → HTTP probing → port/service discovery → crawling and historical URLs → vulnerability checks`
+
+Candidate sequence:
+
+- Passive asset sources: Subfinder, Amass, certificate-transparency/DNS sources, gau/waybackurls.
+- DNS resolution: dnsx and the existing resolver path.
+- HTTP metadata: httpx.
+- Port discovery: evaluate Naabu alongside existing Nmap.
+- URL discovery: Katana plus historical URL sources.
+- Visual triage: Gowitness.
+- Vulnerability checks: existing catalog scanners and Nuclei, subject to template and scope controls.
+
+Every discovered hostname/IP/URL must retain provenance, be deduplicated, and pass scope evaluation before active requests. Related infrastructure discovered through certificates or third-party providers is a proposal for operator review, never an automatic scope expansion.
+
+## 39.5 Cloud, code, containers and software supply chain
+
+Keep Prowler, Trivy, Checkov, Semgrep and Gitleaks as foundational candidates. Design separate contracts for each data plane:
+
+- **Cloud posture:** cloud account/tenant identity, least-privilege permissions, region/service coverage, API-call audit and explicit cloud scope.
+- **Infrastructure as code:** repository/path input, policy/rule identifiers, file/line evidence and SARIF-compatible output where supported.
+- **Containers and dependencies:** image/repository/filesystem input, package identity, fixed-version information, SBOM linkage and provenance.
+- **Kubernetes:** cluster/context identity, permissions, namespace/resource scope, read-only default and explicit approval for any active action.
+- **Secrets:** secret type and location evidence, with secret values redacted from normal logs and reports.
+
+Evaluate Syft/Grype, Kubescape and TruffleHog as in §39.2. Avoid adding multiple tools with substantially duplicate rules unless measured results justify the extra install and maintenance burden.
+
+## 39.6 API security capability
+
+Add a capability workstream, not just a tool name:
+
+- Import OpenAPI/Swagger specifications and enumerate operations.
+- Retain authentication/session context safely, including refresh/expiry handling.
+- Enforce scope at the operation, host and redirect levels.
+- Support schema-aware input mutation and rate limits.
+- Distinguish discovery from validation; preserve request/response evidence with secrets redacted.
+- Evaluate ZAP and RESTler only after these foundations have acceptance tests.
+
+## 39.7 Tier 3 session and high-impact tool policy
+
+Do not treat Windows-native utilities, credential-access tools, network poisoning tools and command-and-control frameworks as equivalent scanner adapters.
+
+Before admitting any Tier 3 tool, define: supported session type, OS/version, privilege requirement, permitted operation classes, human-approval boundary, output contract, timeout/recovery, cleanup, audit trail and lab verification. Default to read-only collection. Credential-access, permission-changing, network-poisoning and C2 capabilities require separate explicit policy and must not run as ordinary unattended scan steps. Covenant and Empire should be deferred from the normal tool catalog unless a separate, justified adversary-emulation product boundary is approved.
+
+## 39.8 Inventory and estimate reconciliation — blocking bookkeeping task
+
+Before the next tool-adoption batch:
+
+1. Reconcile the stated target of 120, current count of 25, and claim of 95 additions against the actual unique tool IDs in the catalog and Tier lists.
+2. Resolve Tier totals (44 + 42 + 14 = 100) and category/list discrepancies, including the Tier 2 knockmail note.
+3. Distinguish tools, adapters, commands, providers, data sources and capabilities; do not count aliases or multiple wrappers for one executable as separate tools without a documented reason.
+4. For every candidate, record upstream URL, license, maintenance/activity check date, install method, supported OS, required privileges, output format, unique capability, overlap, scope risk, test plan and decision.
+5. Re-estimate integration effort after a representative pilot from each execution class: CLI scanner, cloud SDK/API, source-code scanner, GUI-driven integration and session-scoped Windows tool. The existing ~171h figure is a planning hypothesis, not a validated delivery commitment.
+
+## 39.9 Acceptance gates for every adapter
+
+- Scope is checked before every target-bearing action, including redirects, discovered hosts, callbacks and child processes.
+- No automatic scope expansion; proposed new assets require operator approval.
+- Tool output is structured and normalised without losing raw evidence or source attribution.
+- Exit code, timeout, partial output and tool-level errors are represented distinctly; exit code 0 is not proof of success.
+- Repeated findings are deduplicated while preserving all source references.
+- Findings enter the deterministic Trust Layer; the LLM may summarise evidence but never sets verification status.
+- Tests cover malformed output, missing executable, unsupported version, timeout, cancellation, out-of-scope input, partial output and false-positive/false-negative lab cases.
+- Documentation states prerequisites, permissions, side effects, rate limits, supported targets and safe-use constraints.
+
+## 39.10 Recommended execution order
+
+1. Reconcile the inventory and add per-tool decision records.
+2. Finish and regression-test the v1.0 Trust Layer, request-context replay, retest and coverage disclosure.
+3. Make Nuclei first-class and strengthen the existing recon → scan → validate → report pipeline.
+4. Pilot Naabu and Gowitness; retain only if end-to-end results justify the adapters.
+5. Design cloud/code/SBOM contracts, then pilot Syft/Grype and one cloud workflow.
+6. Evaluate ZAP and Interactsh in controlled labs.
+7. Add API-spec-driven testing after authentication, operation scope and validation are proven.
+8. Reassess Tier 2 based on measured unique coverage.
+9. Implement Tier 3 only after the session contract and explicit high-impact policy pass tests.
+
+**Success metric:** verified, reproducible coverage across supported asset and finding classes, with documented gaps and low false-positive rates—not the number of tool names in the catalog.
