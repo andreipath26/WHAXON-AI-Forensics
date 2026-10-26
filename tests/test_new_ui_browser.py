@@ -58,7 +58,7 @@ def test_scope_page_renders_real_scope_rules(page, live_server):
     body = page.locator("#targetTableBody")
     assert body.is_visible()
     assert body.locator("tr").count() >= 1
-    assert "127.0.0.1" in body.inner_text()
+    assert "127.0.0.0/8" in body.inner_text()
 
 
 def test_findings_page_renders_real_findings(page, live_server):
