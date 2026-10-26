@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+from pathlib import Path
 
 UI_ROUTES = [
     "/ui",
@@ -211,3 +212,36 @@ def test_approval_modal_uses_selected_real_finding_and_hides_fake_signing(page, 
     assert "CND-9402" not in modal.inner_text()
     assert page.get_by_role("button", name="Refute / False Positive").is_visible()
     assert page.get_by_role("button", name="Approve as Verified (Sign Proof)").is_hidden()
+
+
+def test_capture_ui_review_screenshots(page, live_server):
+    output = Path("artifacts/ui-review")
+    output.mkdir(parents=True, exist_ok=True)
+    routes = [
+        "/ui",
+        "/ui/scope-and-targets",
+        "/ui/run-and-orchestration",
+        "/ui/trust-layer-and-findings",
+        "/ui/ptes-coverage-and-reports",
+        "/ui/attack-surface-and-continuous-monitoring",
+        "/ui/job-execution-history",
+        "/ui/evidence-file-inspector",
+        "/ui/system-diagnostics-and-health",
+        "/ui/adapter-and-plugin-manager",
+        "/ui/correlated-attack-chains",
+        "/ui/threat-intel-and-exploit-arsenal",
+    ]
+    page.route("**/api/msf/status", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"up":true,"config":{}}'))
+    page.route("**/api/msf/modules/exploit", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='["exploit/linux/ssh/review_module","exploit/multi/http/review_module"]'))
+    for route in routes:
+        response = page.goto(f"{live_server}{route}", wait_until="domcontentloaded")
+        assert response is not None and response.status == 200, route
+        if route.endswith("threat-intel-and-exploit-arsenal"):
+            page.wait_for_function("document.querySelectorAll('.cve-row-item').length === 2")
+        else:
+            page.wait_for_timeout(350)
+        filename = route.removeprefix("/ui/").replace("/", "_") or "dashboard"
+        page.screenshot(path=str(output / f"{filename}.png"), full_page=True, animations="disabled")
