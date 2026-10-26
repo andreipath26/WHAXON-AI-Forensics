@@ -2799,9 +2799,25 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         setHidden(element, true);
       }
     });
+    // The right-hand topology, cadence and timeline are fixed demo data, not
+    // a graph/feed returned by the current backend. Hide those original panels.
+    ['Perimeter Topology','Recon Cadence & Rules','Delta Timeline'].forEach(function (titleText) {
+      const heading = Array.from(document.querySelectorAll('main h2, main h3, main span')).find(function (element) {
+        return (element.textContent || '').trim() === titleText;
+      });
+      const panel = heading && heading.closest('.bg-surface-container-low.rounded-lg');
+      if (panel) setHidden(panel, true);
+    });
     ['configure cloud & dns probes','trigger delta recon now','enforce scope lock','launch nuclei probe',
      'auto-remediate acl','audit objects','trigger acme renew','harden ciphers','session shell',
-     'expand canvas','stream full cryptographic audit logs','terminal log','emergency halt scan'].forEach(hideButtonByText);
+     'expand canvas','stream full cryptographic audit logs','terminal log','emergency halt scan',
+     'all infra','aws (','gcp (','cf (','prev','next','severity desc'].forEach(hideButtonByText);
+    document.querySelectorAll('main span, main p').forEach(function (element) {
+      const value = (element.textContent || '').trim();
+      if (/^PAGE \\d+ OF \\d+$/i.test(value) || /^Buffer:/.test(value)) {
+        setHidden(element.closest('.flex.items-center.justify-between') || element, true);
+      }
+    });
     document.querySelectorAll('main .status-tab').forEach(function (button) {
       if (button.dataset.status !== 'all') setHidden(button, true);
       else button.textContent = 'ALL (' + targets.length + ')';
