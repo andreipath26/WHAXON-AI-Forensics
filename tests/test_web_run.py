@@ -11,7 +11,7 @@ from __future__ import annotations
 
 
 def _open_run(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="run"]')
     page.wait_for_selector("#run-catalog", timeout=5000)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 
 def _open_findings(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="findings"]')
     # Wait for the table to populate.
     page.wait_for_function(
@@ -146,7 +146,7 @@ def test_bulk_clear_unselects_dynamic_finding_rows(page, live_server):
     assert not page.locator("#bulk-bar").evaluate("el => el.classList.contains('on')")
 
 def test_command_palette_search_navigates_to_catalog(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click("#palette-trigger")
     page.fill("#palette-input", "catalog")
     result = page.locator(".palette-item[role='button']").first

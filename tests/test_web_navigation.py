@@ -18,7 +18,7 @@ ALL_PAGES = [
 
 @pytest.mark.parametrize("slug,section_id", ALL_PAGES)
 def test_sidebar_activates_correct_section(page, live_server, slug, section_id):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click(f'.sb-item[data-page="{slug}"]')
     page.wait_for_timeout(200)
     assert page.locator(f"#{section_id}").evaluate("el => el.classList.contains('active')")
@@ -28,7 +28,7 @@ def test_sidebar_activates_correct_section(page, live_server, slug, section_id):
 
 
 def test_breadcrumb_updates_on_navigation(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="scope"]')
     page.wait_for_timeout(200)
     assert page.locator("#crumb-here").text_content().strip().lower() == "scope"
@@ -38,14 +38,14 @@ def test_breadcrumb_updates_on_navigation(page, live_server):
 
 
 def test_ctrl_k_opens_command_palette(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.keyboard.press("Control+k")
     page.wait_for_timeout(200)
     assert page.locator("#palette").evaluate("el => el.classList.contains('open')")
 
 
 def test_escape_closes_palette(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.keyboard.press("Control+k")
     page.wait_for_timeout(200)
     page.keyboard.press("Escape")
@@ -54,14 +54,14 @@ def test_escape_closes_palette(page, live_server):
 
 
 def test_question_mark_opens_shortcut_legend(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.keyboard.press("?")
     page.wait_for_timeout(200)
     assert page.locator("#kbd-legend").evaluate("el => el.classList.contains('open')")
 
 
 def test_sidebar_collapse_toggle(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click("#collapse-btn")
     page.wait_for_timeout(200)
     assert page.locator("#app").evaluate("el => el.classList.contains('collapsed')")

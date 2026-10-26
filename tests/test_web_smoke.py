@@ -14,13 +14,13 @@ def test_server_is_reachable(page, live_server):
 
 
 def test_ui_renders(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     # The sidebar brand is present on every page.
     assert page.locator(".sb-brand .label-text").text_content() == "WHAXON"
 
 
 def test_scope_page_loads(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="scope"]')
     # The scope rules container should be populated (or at least exist).
     page.wait_for_selector("#scope-rules", timeout=5000)
@@ -28,7 +28,7 @@ def test_scope_page_loads(page, live_server):
 
 
 def test_findings_page_loads(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="findings"]')
     page.wait_for_selector("#findings-tbody", timeout=5000)
     # The seeded store has 3 findings, so the tbody should have rows.

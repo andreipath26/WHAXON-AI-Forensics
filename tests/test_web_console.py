@@ -33,7 +33,7 @@ def _attach_listeners(page):
 
 def test_every_page_loads_without_console_errors(page, live_server):
     errors = _attach_listeners(page)
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.wait_for_load_state("networkidle")
 
     visited = []
@@ -51,7 +51,7 @@ def test_every_page_loads_without_console_errors(page, live_server):
 
 def test_initial_load_is_clean(page, live_server):
     errors = _attach_listeners(page)
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(1000)
     assert errors == [], "errors on initial load:\n" + "\n".join(errors)
@@ -59,7 +59,7 @@ def test_initial_load_is_clean(page, live_server):
 
 def test_scope_page_is_clean(page, live_server):
     errors = _attach_listeners(page)
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="scope"]')
     page.wait_for_timeout(800)
     assert errors == [], "errors on scope page:\n" + "\n".join(errors)
@@ -67,7 +67,7 @@ def test_scope_page_is_clean(page, live_server):
 
 def test_findings_page_is_clean(page, live_server):
     errors = _attach_listeners(page)
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="findings"]')
     page.wait_for_timeout(800)
     assert errors == [], "errors on findings page:\n" + "\n".join(errors)

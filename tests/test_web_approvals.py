@@ -8,7 +8,7 @@ from __future__ import annotations
 
 
 def _open_approvals(page, live_server):
-    page.goto(f"{live_server}/ui")
+    page.goto(f"{live_server}/legacy-ui")
     page.click('.sb-item[data-page="approvals"]')
     page.wait_for_function(
         "() => document.querySelectorAll('#approvals-list .card[data-run]').length > 0",
