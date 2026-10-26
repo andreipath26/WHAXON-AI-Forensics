@@ -54,35 +54,10 @@
 <div class="lg:col-span-7 flex flex-col gap-space-md" id="whaxon-detail"><div class="bg-surface-container-low p-space-lg rounded-lg"><div class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-space-sm">Evidence Inspector</div><p class="font-body-sm text-body-sm text-on-surface-variant">Select a live finding to inspect evidence and available validation actions.</p></div></div>
 </div>
 <div id="whaxon-action-message" class="hidden mt-space-md p-space-md rounded-lg border border-outline-variant text-code-sm text-on-surface-variant" role="status" aria-live="polite"></div>
-<!-- Architectural Documentation & Dogfooding Proof Matrix Footer -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter mt-space-md">
-<div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs">
-<div class="flex items-center gap-space-xs text-primary font-code-sm text-code-sm font-semibold">
-<span class="material-symbols-outlined text-base">security</span>
-<span>Explicit Target Scope Enforcement</span>
-</div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">
-          Strict default deny architecture. Boundary validation prevents out-of-scope packet transmission during multi-stage adapter execution.
-        </p>
-</div>
-<div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs">
-<div class="flex items-center gap-space-xs text-secondary font-code-sm text-code-sm font-semibold">
-<span class="material-symbols-outlined text-base">dataset</span>
-<span>Zero AI Hallucination Guarantee</span>
-</div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">
-          Findings without replayable cryptographic or socket evidence remain locked in Candidate Queue until physical verification.
-        </p>
-</div>
-<div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs">
-<div class="flex items-center gap-space-xs text-tertiary font-code-sm text-code-sm font-semibold">
-<span class="material-symbols-outlined text-base">rule</span>
-<span>PTES Coverage Traceability</span>
-</div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">
-          Every skipped step and adapter test vector is audited across Recon, Enumeration, and Vulnerability methodology steps.
-        </p>
-</div>
+<!-- Evidence provenance note: no sample findings or unsupported guarantees are presented. -->
+<div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs mt-space-md">
+<div class="flex items-center gap-space-xs text-primary font-code-sm text-code-sm font-semibold"><span class="material-symbols-outlined text-base">dataset</span><span>Evidence provenance</span></div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Findings, targets, statuses, and recorded evidence on this page are loaded from the WHAXON report API. Validation and retest actions use the existing backend endpoints; unavailable actions are not presented as completed.</p>
 </div>
 </div>
 <script>
