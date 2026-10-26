@@ -1,8 +1,9 @@
 """Browser smoke tests for the canonical roadmap UI served at /ui."""
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 UI_ROUTES = [
     "/ui",
