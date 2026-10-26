@@ -206,9 +206,9 @@
       <section class="page" id="page-graph">
         <div class="page-head"><div class="ph-main"><h1 class="page-title">Attack Surface</h1><p class="page-sub">Relationship visualization for hosts, services, and findings.</p></div></div>
         <div class="card card-pad-lg">
-          <div class="card-title">Live graph unavailable</div>
-          <p class="card-sub">The graph visualization is not yet connected to the engagement data. The previous illustration used hardcoded sample hosts and findings, so it has been removed rather than presented as live assessment evidence.</p>
-          <p>Use the Scope, Findings, and Coverage pages for current data.</p>
+          <div style="display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;"><div><div class="card-title">Pivot relationships</div><div class="card-sub" id="graph-summary" role="status" aria-live="polite">Loading stored exploit, session, and forwarding relationships…</div></div><button class="btn btn-ghost btn-sm" id="graph-refresh" type="button">Refresh</button></div>
+          <div class="card card-pad-none" style="margin-top:16px;overflow:auto;"><table class="tbl"><thead><tr><th>Parent</th><th>Relationship</th><th>Child</th><th>Evidence</th><th>Recorded</th></tr></thead><tbody id="graph-tbody"><tr><td colspan="5" style="padding:16px;color:var(--text-dim);">Loading relationships…</td></tr></tbody></table></div>
+          <p class="form-hint" style="margin-top:12px;">This view shows relationships recorded by WHAXON. It does not infer hosts or services that have not been recorded.</p>
         </div>
       </section>
 
