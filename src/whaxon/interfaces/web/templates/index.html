@@ -154,9 +154,9 @@
         <div class="page-head"><div class="ph-main"><h1 class="page-title">Retest</h1><p class="page-sub">Findings the engine verified. Click Retest to replay the payload against the current target.</p></div></div>
         <div class="card card-pad-lg">
           <div class="card-title">Retest queue <span class="badge" id="retest-count">0</span></div>
-          <div class="card-sub" id="retest-summary">Loading…</div>
-          <table class="tbl">
-            <thead><tr><th>Finding</th><th>Severity</th><th>Target</th><th>Source</th><th>Status</th><th></th></tr></thead>
+          <div class="card-sub" id="retest-summary" role="status" aria-live="polite">Loading verified findings…</div>
+          <table class="tbl" aria-label="Verified findings available for retest">
+            <thead><tr><th>Finding</th><th>Severity</th><th>Target</th><th>Source</th><th>Status</th><th>Action</th></tr></thead>
             <tbody id="retest-tbody">
               <tr><td colspan="6" style="padding:16px; color:var(--text-dim);">Loading…</td></tr>
             </tbody>

@@ -1388,67 +1388,84 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   if (!tbody) return;
   const countEl = document.getElementById('retest-count');
   const summaryEl = document.getElementById('retest-summary');
-
+  let loading = false;
+  function message(text, role) {
+    tbody.replaceChildren();
+    const row = document.createElement('tr'), cell = document.createElement('td');
+    cell.colSpan = 6; cell.className = 'retest-empty'; cell.textContent = text;
+    if (role) cell.setAttribute('role', role);
+    row.appendChild(cell); tbody.appendChild(row);
+  }
   async function load() {
+    if (loading) return;
+    loading = true;
+    if (summaryEl) summaryEl.textContent = 'Loading verified findings…';
     try {
-      const data = await (await fetch('/api/report?format=json')).json();
+      const response = await fetch('/api/report?format=json');
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
       const rows = [];
-      (data.jobs || []).forEach(entry => {
+      (Array.isArray(data.jobs) ? data.jobs : []).forEach(entry => {
         const job = entry.job || {};
-        (entry.findings || []).forEach(f => {
-          if (f.verification_status === 'verified') {
-            rows.push({ job, f });
-          }
+        (Array.isArray(entry.findings) ? entry.findings : []).forEach(f => {
+          if (f.verification_status === 'verified' && job.id && Number.isInteger(Number(f.seq))) rows.push({ job, f });
         });
       });
       if (countEl) countEl.textContent = String(rows.length);
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="padding:16px; color:var(--text-dim);">No verified findings yet. Validate a finding first.</td></tr>';
+        message('No verified findings yet. Validate a finding first.');
         if (summaryEl) summaryEl.textContent = 'Nothing to retest.';
         return;
       }
       if (summaryEl) summaryEl.textContent = rows.length + ' verified finding(s) available for retest.';
-      tbody.innerHTML = '';
+      tbody.replaceChildren();
       rows.forEach(({ job, f }) => {
         const tr = document.createElement('tr');
-        const rawSeverity = String(f.severity || 'info').toLowerCase();
-        const severity = ['critical', 'high', 'medium', 'low', 'info'].includes(rawSeverity) ? rawSeverity : 'info';
-        tr.innerHTML =
-          '<td><span class="title"></span></td>' +
-          '<td><span class="pill pill-' + severity + ' no-border"><span class="dot"></span><span class="severity-label"></span></span></td>' +
-          '<td><span class="target"></span></td>' +
-          '<td><span class="mono"></span></td>' +
-          '<td><span class="pill pill-success">Verified</span></td>' +
-          '<td><button class="btn btn-sm btn-primary">Retest</button></td>';
-        tr.querySelector('.severity-label').textContent = severity;
-        tr.querySelector('.title').textContent = f.title || f.kind || '(finding)';
-        tr.querySelector('.target').textContent = job.target || '';
-        tr.querySelector('.mono').textContent = f.source || job.tool || '';
-        const btn = tr.querySelector('button');
-        btn.addEventListener('click', async () => {
-          btn.disabled = true;
-          btn.textContent = 'Retesting…';
+        const titleCell = document.createElement('td'), title = document.createElement('span');
+        title.className = 'title'; title.textContent = String(f.title || f.kind || '(finding)'); titleCell.appendChild(title);
+        const severityCell = document.createElement('td'), severityPill = document.createElement('span');
+        const raw = String(f.severity || 'info').toLowerCase();
+        const severity = ['critical','high','medium','low','info'].includes(raw) ? raw : 'info';
+        severityPill.className = 'pill pill-' + severity + ' no-border';
+        const dot = document.createElement('span'); dot.className = 'dot';
+        const label = document.createElement('span'); label.textContent = severity;
+        severityPill.append(dot, label); severityCell.appendChild(severityPill);
+        const targetCell = document.createElement('td'); targetCell.textContent = String(job.target || '—');
+        const sourceCell = document.createElement('td'); sourceCell.className = 'mono'; sourceCell.textContent = String(f.source || job.tool || '—');
+        const statusCell = document.createElement('td'), status = document.createElement('span');
+        status.className = 'pill pill-success'; status.textContent = 'Verified'; statusCell.appendChild(status);
+        const actionCell = document.createElement('td'), button = document.createElement('button');
+        button.type = 'button'; button.className = 'btn btn-sm btn-primary'; button.textContent = 'Retest';
+        button.setAttribute('aria-label', 'Retest ' + String(f.title || f.kind || 'finding'));
+        button.addEventListener('click', async () => {
+          if (button.disabled) return;
+          button.disabled = true; button.textContent = 'Retesting…';
+          if (summaryEl) summaryEl.textContent = 'Retesting finding against the current target…';
           try {
-            const r = await fetch('/api/retest/' + encodeURIComponent(job.id) + '/' + f.seq, { method: 'POST' });
-            const body = await r.json();
-            if (!r.ok) { alert('Retest failed: ' + (body.error || r.status)); }
-            else { alert('Retest: ' + body.status + '\n' + body.reason); }
+            const result = await fetch('/api/retest/' + encodeURIComponent(job.id) + '/' + encodeURIComponent(String(f.seq)), { method: 'POST' });
+            let body = {}; try { body = await result.json(); } catch (_) {}
+            if (!result.ok) throw new Error(body.error || ('HTTP ' + result.status));
+            const resultStatus = String(body.status || 'completed');
+            const reason = body.reason ? ': ' + String(body.reason) : '';
+            if (summaryEl) summaryEl.textContent = 'Retest result: ' + resultStatus + reason;
             await load();
-          } catch (e) { alert('Retest failed: ' + e); }
-          finally { btn.disabled = false; btn.textContent = 'Retest'; }
+          } catch (err) {
+            if (summaryEl) summaryEl.textContent = 'Retest failed: ' + String(err && err.message || err);
+            button.disabled = false; button.textContent = 'Retest';
+          }
         });
-        tbody.appendChild(tr);
+        actionCell.appendChild(button); tr.append(titleCell, severityCell, targetCell, sourceCell, statusCell, actionCell); tbody.appendChild(tr);
       });
-    } catch (e) {
-      whaxonRenderMessageRow(tbody, 6, 'Failed to load retest queue: ' + e);
-    }
+    } catch (err) {
+      message('Could not load retest queue: ' + String(err && err.message || err), 'alert');
+      if (summaryEl) summaryEl.textContent = 'Retest queue unavailable.';
+      if (countEl) countEl.textContent = '—';
+    } finally { loading = false; }
   }
-
   document.querySelectorAll('.sb-item[data-page="retest"]').forEach(el => el.addEventListener('click', load));
   document.addEventListener('DOMContentLoaded', load);
   if (document.readyState !== 'loading') load();
 })();
-
 // ---- Sessions page wiring ----
 (function () {
   const tbody = document.getElementById('sessions-tbody');
