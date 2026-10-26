@@ -423,23 +423,30 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       return;
     }
     btnEl.disabled = true;
+    btnEl.textContent = 'Checking…';
+    showResult('Checking target against the active scope…', 'warn');
     fetch('/api/scope/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ target: target })
     })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(async r => {
+        let data = {};
+        try { data = await r.json(); } catch (_) {}
+        if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+        return data;
+      })
       .then(data => {
-        if (data.allowed || data.in_scope) {
+        if (data.allowed === true || data.in_scope === true) {
           const reason = data.reason || data.matched_rule || 'matched in-scope rule';
-          showResult('✓ ' + target + ' is in scope (' + reason + ')', 'ok');
+          showResult('✓ ' + target + ' is in scope (' + reason + '). This check does not start a scan.', 'ok');
         } else {
           const reason = data.reason || 'no matching in-scope rule';
-          showResult('✗ ' + target + ' is not in scope (' + reason + ')', 'denied');
+          showResult('✗ ' + target + ' is not confirmed in scope (' + reason + '). WHAXON will block the run.', 'denied');
         }
       })
-      .catch(err => showResult('Check failed: ' + err, 'warn'))
-      .finally(() => { btnEl.disabled = false; });
+      .catch(err => showResult('Scope check failed closed: ' + String(err && err.message || err) + '. Do not run this target until scope can be confirmed.', 'warn'))
+      .finally(() => { btnEl.disabled = false; btnEl.textContent = 'Check scope'; });
   }
 
   if (btnEl) btnEl.addEventListener('click', checkScope);

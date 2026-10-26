@@ -723,3 +723,8 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 #page-run #run-status[data-state="error"] { color: var(--danger, #e56b6f); }
 #page-run #run-status[data-state="success"] { color: var(--success, #48b884); }
 #page-run #run-output .ln { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+
+/* Scope checker result states */
+#page-scope #scope-check-result > div { overflow-wrap: anywhere; }
+#page-scope #scope-check-input:focus-visible, #page-scope #scope-check-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -122,9 +122,9 @@
           </div>
           <div class="card card-pad-lg">
             <div class="card-title">Check a target</div><div class="card-sub">Before running anything</div>
-            <div class="form-row"><label class="form-label">Target</label><input class="form-input" id="scope-check-input" placeholder="host, IP, URL, or CIDR"></div>
+            <div class="form-row"><label class="form-label" for="scope-check-input">Target</label><input class="form-input" id="scope-check-input" placeholder="host, IP, URL, or CIDR" maxlength="2048" aria-describedby="scope-check-help"></div><div class="form-hint" id="scope-check-help">Checks the active scope only; it does not launch a scan or add a rule.</div>
             <button class="btn btn-primary" id="scope-check-btn">Check scope</button>
-            <div id="scope-check-result"></div>
+            <div id="scope-check-result" role="status" aria-live="polite"></div>
           </div>
         </div>
       </section>
