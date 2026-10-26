@@ -147,11 +147,28 @@ def test_evidence_page_never_shows_static_sample_artifacts(page, live_server):
     assert "raw_nmap_syn_scan.xml" not in page.locator("body").inner_text()
 
 
-def test_unavailable_workflow_hides_its_navigation_entry(page, live_server):
+def test_coverage_page_uses_recorded_gap_ledger_not_demo_claims(page, live_server):
+    page.route("**/api/history", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='[{"id":"coverage-job-1","target":"https://example.test","status":"completed","tool":"nmap"}]'))
+    page.route("**/api/coverage/coverage-job-1", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='{"job_id":"coverage-job-1","count":2,"gaps":['
+             '{"seq":1,"tool_id":"nmap","target":"https://example.test","kind":"unsupported_check","detail":"TLS checks skipped","phase":"recon"},'
+             '{"seq":2,"tool_id":"httpx","target":"https://example.test","kind":"not_configured","detail":"HTTP probing unavailable","phase":"discovery"}]}'))
     page.goto(f"{live_server}/ui/bas-and-detection-validation", wait_until="domcontentloaded")
-    page.wait_for_timeout(250)
-    assert page.locator('[data-path="bas-and-detection-validation"]').is_hidden()
-    assert page.locator("main").inner_text().strip() == ""
+    page.wait_for_function("document.body.innerText.includes('RECORDED COVERAGE GAPS')")
+    assert page.locator('[data-path="bas-detection-validation"]').is_visible()
+    assert page.locator("main .font-headline-xl").first.inner_text() == "2"
+    visible_text = page.locator("main").inner_text()
+    assert "coverage-job-1" in visible_text
+    assert "57.2%" not in visible_text
+    assert "SEC-AZ-992" not in visible_text
+    assert page.get_by_role("button", name="Gap Report").is_visible()
+    messages = []
+    page.on("dialog", lambda dialog: (messages.append(dialog.message), dialog.accept()))
+    page.get_by_role("button", name="Gap Report").click()
+    assert messages and "TLS checks skipped" in messages[0]
 
 
 def test_unwired_approval_page_hides_demo_modal_outside_main(page, live_server):

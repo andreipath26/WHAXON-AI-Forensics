@@ -3009,7 +3009,112 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     wireUnavailablePage();
   }
   async function wireCoverage() {
-    wireUnavailablePage();
+    const gapButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /^Gap Report$/i.test((button.textContent || '').trim());
+    });
+    const unsupportedButtons = [
+      'Detonate Sequence', 'Query Blue Telemetry', 'Configure Vector Filters',
+      'Push Rule to SIEM', 'Deploy to Sentinel', 'Deploy to Splunk',
+      'Emergency Halt Scan', 'Export Validation Matrix'
+    ];
+    unsupportedButtons.forEach(hideButtonByText);
+
+    // This backend records skipped/omitted checks per job. It does not execute
+    // BAS simulations or query SIEM telemetry, so expose only those recorded
+    // coverage gaps and suppress the static detection claims in the prototype.
+    const main = document.querySelector('main');
+    const workspace = main && Array.from(main.querySelectorAll('div')).find(function (element) {
+      return element.classList.contains('p-margin') &&
+        element.classList.contains('flex') &&
+        element.classList.contains('flex-col') &&
+        element.classList.contains('gap-gutter') &&
+        Array.from(element.children).some(function (child) { return child.classList.contains('grid'); });
+    });
+    let jobs = [];
+    try {
+      const history = await requestJson('/api/history');
+      jobs = Array.isArray(history) ? history : (history.jobs || history.history || []);
+    } catch (error) {
+      wireUnavailablePage();
+      return;
+    }
+    const candidates = jobs.slice(0, 20).filter(function (job) {
+      return job && (job.id || job.job_id);
+    });
+    let selectedJob = candidates[0] || null;
+    let gaps = [];
+    for (const job of candidates) {
+      const id = String(job.id || job.job_id);
+      try {
+        const data = await requestJson('/api/coverage/' + encodeURIComponent(id));
+        if (job === candidates[0]) { selectedJob = job; gaps = Array.isArray(data.gaps) ? data.gaps : []; }
+        if (Array.isArray(data.gaps) && data.gaps.length) {
+          selectedJob = job;
+          gaps = data.gaps;
+          break;
+        }
+      } catch (_) {
+        // A missing coverage record for one job should not hide other recorded jobs.
+      }
+    }
+
+    const kpiGrid = main && Array.from(main.querySelectorAll('.grid')).find(function (grid) {
+      return /DETECTION VALIDATION RATIO/.test(grid.textContent || '') &&
+        /CAUGHT/.test(grid.textContent || '');
+    });
+    if (kpiGrid) {
+      const cards = Array.from(kpiGrid.children).filter(function (child) {
+        return child.classList.contains('bg-surface-container-low') ||
+          child.classList.contains('bg-surface-container');
+      });
+      cards.forEach(function (card, index) { if (index > 0) setHidden(card, true); });
+      const card = cards[0];
+      if (card) {
+        const labels = Array.from(card.querySelectorAll('span'));
+        const title = labels.find(function (span) { return /DETECTION VALIDATION RATIO/.test(span.textContent || ''); });
+        if (title) title.textContent = 'RECORDED COVERAGE GAPS';
+        const value = card.querySelector('.font-headline-xl');
+        if (value) value.textContent = String(gaps.length);
+        const caught = labels.find(function (span) { return (span.textContent || '').trim() === 'CAUGHT'; });
+        if (caught) caught.textContent = 'RECORDED';
+        const detail = card.querySelector('.mt-space-md');
+        if (detail) {
+          detail.replaceChildren();
+          const line = document.createElement('span');
+          line.className = 'font-code-sm text-code-sm text-on-surface-variant';
+          line.textContent = selectedJob
+            ? 'Job ' + String(selectedJob.id || selectedJob.job_id) + ' · ' + String(selectedJob.target || 'target not recorded')
+            : 'No jobs recorded yet';
+          detail.appendChild(line);
+        }
+        const progress = card.querySelector('.w-full.bg-surface-container-highest');
+        if (progress) setHidden(progress, true);
+      }
+    }
+    if (workspace) {
+      Array.from(workspace.children).forEach(function (child) {
+        if (child !== kpiGrid) setHidden(child, true);
+      });
+    }
+    // Remove fixed demo figures and target labels outside the primary workspace.
+    document.querySelectorAll('main span, main p, main strong, main h2, main h3').forEach(function (element) {
+      if (/api\.internal\.corp|57\.2%|4 of 7 executed techniques|SEC-AZ-992|SIGMA-WIN-04769|BOLA State Manipulation|MITRE ATT&CK Coverage Heatmap|Automated rule generation available/i.test(element.textContent || '')) {
+        const card = element.closest('.bg-surface-container-low.rounded-lg, .bg-surface-container.rounded-lg');
+        if (card && !card.contains(kpiGrid)) setHidden(card, true);
+        else if (!card) setHidden(element, true);
+      }
+    });
+    if (gapButton) gapButton.onclick = function () {
+      const jobLabel = selectedJob ? String(selectedJob.id || selectedJob.job_id) : 'none';
+      const lines = gaps.map(function (gap) {
+        return '[' + String(gap.kind || 'gap') + '] ' +
+          String(gap.tool_id || 'unknown tool') + ' · ' +
+          String(gap.target || 'target not recorded') + ' · ' +
+          String(gap.detail || 'No detail recorded');
+      });
+      window.alert('Recorded coverage gaps for job ' + jobLabel + ' (' + gaps.length + '):\n' +
+        (lines.length ? lines.join('\n') : 'No coverage gaps are recorded for the available job.'));
+    };
   }
   async function wireThreatIntel() {
     let status, modules;
