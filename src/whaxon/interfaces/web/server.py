@@ -3042,7 +3042,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (moduleLabel) moduleLabel.textContent = 'MSF MODULE';
       if (moduleTitle) moduleTitle.textContent = moduleName;
       card.querySelectorAll('span').forEach(function (span) {
-        if (/CVSS|EPSS|CISA KEV|SHADOW API|PUBLIC READ DRIFT|CRITICAL EXPOSURE/i.test(span.textContent || '')) setHidden(span, true);
+        if (/CVSS|EPSS|CISA KEV|SHADOW API|PUBLIC READ DRIFT|CRITICAL EXPOSURE|Async Python PoC Ready/i.test(span.textContent || '')) setHidden(span, true);
       });
       const description = card.querySelector('p');
       if (description) setHidden(description, true);
