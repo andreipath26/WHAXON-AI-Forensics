@@ -12,7 +12,7 @@ Most automated scanners stop at "this looks vulnerable." WHAXON adds conservativ
 
 No LLM decides a finding's verdict. Deterministic checks attach repeatable evidence for supported cases, but their coverage is limited and the evidence still requires analyst review.
 
-> **UI image note:** the UI v4 images in [docs/assets](docs/assets/) are design references, not live screenshots or evidence from a current engagement. The browser UI is scheduled for replacement in a separate workstream; this release-readiness pass covers the core engine, runner, scope controls, validation, persistence, and packaging—not UI implementation.
+> **UI image note:** the UI v4 images in [docs/assets](docs/assets/) are design references, not live screenshots or evidence from a current engagement. On branch `ui/full-wiring-2026-10-26`, the canonical roadmap designs are served at `/ui`; the previous interface remains available at `/legacy-ui`. This UI workstream is still incomplete: unsupported pages are deliberately hidden rather than filled with mock data.
 
 [![CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml/badge.svg)](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/whaxon.svg)](https://pypi.org/project/whaxon/)
@@ -64,6 +64,24 @@ whaxon scope --show
 
 Read [docs/scope.md](docs/scope.md) before running any scan. Confirm the target is yours or that you have explicit written authorization. Do not disable scope enforcement on systems you do not control.
 
+### Testing the roadmap UI from this branch
+
+To test the new browser UI, use this repository branch rather than the published PyPI package:
+
+```bash
+git clone https://github.com/andreipath26/WHAXON-AI-Forensics.git
+cd WHAXON-AI-Forensics
+git switch --track origin/ui/full-wiring-2026-10-26
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[web,dev]"
+whaxon init
+whaxon web
+```
+
+Open **http://127.0.0.1:5001/ui** on the same computer. The older interface is at **http://127.0.0.1:5001/legacy-ui**. Keep the listener on loopback for local testing; do not bind to a public or shared network without configuring and reviewing remote authentication.
+
+The dashboard, scope, run, findings, history, and catalog pages have browser smoke coverage. Other roadmap pages remain intentionally hidden until their original controls are connected to real backend capabilities. No simulated scan results or placeholder evidence should be interpreted as live functionality.
 ### 3. Explore the interfaces
 
 ```bash

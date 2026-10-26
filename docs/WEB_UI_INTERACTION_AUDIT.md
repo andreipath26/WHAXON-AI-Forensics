@@ -9,11 +9,11 @@ The roadmap at `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` is the source of t
 - Hidden markup is retained in the original design file so it can be revealed when its real backend/service implementation and native UI wiring are ready.
 - Show only values returned by the real backend. If a required endpoint fails, hide the affected page content rather than rewriting the design with fabricated fallback values.
 - Keep the legacy UI and its templates/assets unchanged.
-- Do not run tests, builds, browser checks, or runtime validation until all UI pages have been wired; status below is not a test pass.
+- The user explicitly requested runtime testing before every roadmap page was wired. Run checks to catch defects, but do not mistake a passing smoke test for completion of hidden roadmap features.
 
 ## Current implementation status
 
-**No runtime testing has been performed.** These statuses describe code inspection only.
+**Runtime validation has been performed on the implemented pages.** The UI workstream remains incomplete: route smoke tests do not mean that intentionally hidden roadmap pages are implemented.
 
 | Page / route | Real backend surface | Current UI state |
 |---|---|---|
@@ -46,3 +46,14 @@ The roadmap at `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` is the source of t
 - Unsupported-page handling only hides children of the existing page's `main` element. It does not remove original design files or insert a replacement content panel.
 - The scope and report handlers no longer inject replacement panels; the AI approvals handler also hides the existing design until its native controls are wired.
 - The UI wiring pass is **incomplete and untested**. Do not treat any row as runtime-verified. Continue page-by-page against the roadmap, using the existing HTML and revealing only elements that are bound to real backend state/actions.
+## Validation record
+
+CI run: https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/40345993040
+
+- **Python 3.12:** 947 passed, 13 skipped in the existing suite; 28 browser tests passed; Ruff, Mypy, distribution metadata checks, and the clean-wheel smoke test passed.
+- **Python 3.13:** the existing suite, 28 browser tests, Ruff, Mypy, and distribution metadata checks passed. The wheel smoke step is intentionally limited to Python 3.12 by the workflow.
+- **Python 3.11:** the job remained in the system-dependency installation step and had not reached the test steps at the time of this record; it is not counted as a pass.
+- Browser coverage checks all 21 canonical routes for HTTP 200 and uncaught page errors, checks that `/legacy-ui` remains reachable, and verifies live data on the dashboard, scope, findings, run, history, and catalog pages.
+- The findings-page test exposed and led to removal of a duplicate `const proof` declaration that had prevented the injected script from parsing. The scope test uses the real default CIDR `127.0.0.0/8`.
+
+These results establish that the tested routes can be opened in a browser on Python 3.12 and 3.13. They do **not** establish completion of the pages listed above as intentionally hidden.
