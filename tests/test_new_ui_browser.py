@@ -107,17 +107,14 @@ def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
     assert "Process Group & Descendant Monitor" not in run_text
     assert "Network Packets" not in run_text
     passive = page.get_by_role("button", name="Dispatch Passive Recon")
-    assert passive.is_hidden()
+    assert passive.is_visible()
     assert page.get_by_role("button", name="Run Active Pipeline").is_hidden()
-    rerun = page.locator("main button").filter(has_text="Re-run")
-    assert rerun.count() >= 1
-    assert rerun.first.is_visible()
     target.fill("127.0.0.1")
     with page.expect_request("**/api/run") as request_info:
-        rerun.first.click()
+        passive.click()
     payload = request_info.value.post_data_json
     assert payload["target"] == "127.0.0.1"
-    assert payload["tool_id"]
+    assert payload["tool_id"] == "nmap"
 
 
 def test_history_page_renders_live_job_rows(page, live_server):

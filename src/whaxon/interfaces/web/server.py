@@ -2266,6 +2266,54 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         }
       };
     });
+    // Use the supplied passive-recon button to launch the registered Nmap tool.
+    // Scope enforcement remains in the /api/run backend.
+    const passiveButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /dispatch passive recon/i.test(button.textContent || '');
+    });
+    const passiveTool = usable.find(function (tool) { return norm(tool.id) === 'nmap' || norm(tool.name) === 'nmap'; });
+    if (passiveButton && passiveTool && targetInput) {
+      passiveButton.onclick = async function () {
+        const target = targetInput.value.trim();
+        if (!target) { window.alert('Enter a target that is included in the configured scope.'); return; }
+        passiveButton.disabled = true;
+        if (output) output.textContent = 'Submitting ' + passiveTool.id + ' against ' + target + '…';
+        try {
+          const result = await requestJson('/api/run', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({tool_id:passiveTool.id, target:target})
+          });
+          selectedJob = result.job_id || result.id;
+          if (!selectedJob) throw new Error('Run API did not return a job ID.');
+          const jobLabel = document.getElementById('job-id');
+          if (jobLabel) jobLabel.textContent = selectedJob;
+          if (stream) stream.close();
+          stream = new EventSource('/api/jobs/' + encodeURIComponent(selectedJob) + '/stream');
+          stream.onmessage = function (event) {
+            let message;
+            try { message = JSON.parse(event.data); } catch (_) { return; }
+            if (!output) return;
+            if (message.type === 'line') {
+              const line = document.createElement('div');
+              line.className = 'whitespace-pre-wrap break-words';
+              line.textContent = (message.stream ? '[' + message.stream + '] ' : '') + (message.text || message.line || '');
+              output.appendChild(line); output.scrollTop = output.scrollHeight;
+            } else if (message.type === 'status') {
+              const line = document.createElement('div');
+              line.textContent = 'Status: ' + (message.status || 'unknown'); output.appendChild(line);
+            } else if (message.type === 'finished' || message.type === 'failed') {
+              const line = document.createElement('div');
+              line.textContent = message.type === 'finished' ? 'Finished (exit ' + message.exit_code + ')' : 'Failed: ' + (message.error || 'unknown error');
+              output.appendChild(line); stream.close(); stream = null; passiveButton.disabled = false;
+            }
+          };
+          stream.onerror = function () { if (stream) { stream.close(); stream = null; } passiveButton.disabled = false; };
+        } catch (error) {
+          if (output) output.textContent = 'Run rejected: ' + error.message;
+          passiveButton.disabled = false;
+        }
+      };
+    } else if (passiveButton) { setHidden(passiveButton, true); }
     // Hide static tool cards and progress telemetry that are not backed by
     // an active WHAXON job. Only native per-tool Re-run cards with a matching
     // registered tool remain available.
@@ -2292,7 +2340,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     const staticCli = Array.from(document.querySelectorAll('main span')).find(function (el) { return /CLI: whaxon recon <target>/i.test(el.textContent || ''); });
     if (staticCli) setHidden(staticCli, true);
     // Use only controls that exist in the supplied design; do not inject a tool selector.
-    ['run active pipeline','dispatch passive recon','inject payload','spawn sub-tool','emergency abort','engage replay','explore whatweb','gobuster','wpscan','execute','pause pipeline','pause','abort'].forEach(hideButtonByText);
+    ['run active pipeline','inject payload','spawn sub-tool','emergency abort','engage replay','explore whatweb','gobuster','wpscan','execute','pause pipeline','pause','abort'].forEach(hideButtonByText);
     ['ai-planner-toggle','toggle-planner-gate'].forEach(function (id) {
       const control = document.getElementById(id);
       if (control) { const label = control.closest('label') || control.closest('div'); if (label) setHidden(label, true); else setHidden(control, true); }
