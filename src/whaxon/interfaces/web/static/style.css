@@ -752,3 +752,7 @@ code { font-family: var(--font-mono); font-size: 0.94em; color: var(--accent-hov
 
 /* Coverage table states */
 #page-monitoring .coverage-empty { padding: 16px; color: var(--text-dim); white-space: normal; }
+
+
+/* Audit page stays unavailable until the backend exposes a real audit-event API. */
+#page-audit { display: none !important; }
