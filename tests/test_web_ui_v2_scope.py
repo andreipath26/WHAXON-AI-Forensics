@@ -13,7 +13,7 @@ def _open_scope_v2(page, live_server):
 def test_scope_v2_renders_live_rules_and_counts(page, live_server):
     _open_scope_v2(page, live_server)
     assert page.locator("#scope-kpi-in").text_content().strip() == "7"
-    assert page.locator("#scope-in-table tr").count() == 7
+    assert page.locator("#targetTableBody tr").count() == 7
     assert "default" in page.locator("#scope-engagement-label").text_content()
 
 
