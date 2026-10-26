@@ -1973,7 +1973,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const scopePreflight = preflightLabel && preflightLabel.closest('.bg-surface-container-lowest.rounded');
       if (scopePreflight) setHidden(scopePreflight, true);
       const listedBadge = Array.from(document.querySelectorAll('main span')).find(function (el) { return /\d+ of \d+ Listed/i.test(el.textContent || ''); });
-      if (listedBadge) listedBadge.textContent = rows.length + ' Listed';
+      if (listedBadge) listedBadge.textContent = ((data.in_scope || []).length + (data.out_of_scope || []).length) + ' Listed';
       const rootCount = Array.from(document.querySelectorAll('main span')).find(function (el) { return /SHOWING \d+ OF \d+ REGISTERED ROOTS/i.test(el.textContent || ''); });
       if (rootCount) setHidden(rootCount, true);
       ['quick import','add in-scope target','next','view certificate san chain',
