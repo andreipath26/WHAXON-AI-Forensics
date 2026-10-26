@@ -3047,7 +3047,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       const description = card.querySelector('p');
       if (description) setHidden(description, true);
       const sampleDetails = Array.from(card.querySelectorAll('div')).find(function (element) {
-        return /In Scope:/.test(element.textContent || '') && /MSF:/.test(element.textContent || '');
+        return element.classList.contains('flex-wrap') && element.classList.contains('justify-between') &&
+          element.classList.contains('pt-space-xs') &&
+          /In Scope:/.test(element.textContent || '') && /MSF:/.test(element.textContent || '');
       });
       if (sampleDetails) setHidden(sampleDetails, true);
       card.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
