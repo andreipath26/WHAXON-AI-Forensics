@@ -1333,44 +1333,55 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
 
 // ---- Report page wiring (§34.4 step 1) ----
 (function () {
-  const MD = document.getElementById('report-md');
-  const HTML = document.getElementById('report-html');
-  const PDF = document.getElementById('report-pdf');
-  if (!MD && !HTML && !PDF) return;
-
-  async function download(fmt, btn) {
-    const original = btn.textContent;
-    btn.disabled = true;
+  const buttons = [
+    { element: document.getElementById('report-md'), format: 'md', label: 'Markdown' },
+    { element: document.getElementById('report-html'), format: 'html', label: 'HTML' },
+    { element: document.getElementById('report-pdf'), format: 'pdf', label: 'PDF' }
+  ].filter(item => item.element);
+  if (!buttons.length) return;
+  const statusEl = document.getElementById('report-status');
+  let active = false;
+  function status(message, kind) {
+    if (!statusEl) return;
+    statusEl.textContent = message; statusEl.dataset.state = kind || 'info';
+  }
+  async function download(item) {
+    if (active) return;
+    active = true;
+    const btn = item.element, original = btn.textContent;
+    buttons.forEach(entry => { entry.element.disabled = true; });
     btn.textContent = 'Generating…';
+    status('Generating ' + item.label + ' report from current engagement data…', 'busy');
     try {
-      const r = await fetch('/api/report?format=' + fmt + '&engagement=default');
-      if (!r.ok) {
-        const err = await r.text();
-        alert('Report failed: ' + (err || r.status));
-        return;
+      const response = await fetch('/api/report?format=' + encodeURIComponent(item.format) + '&engagement=default');
+      if (!response.ok) {
+        let message = 'HTTP ' + response.status;
+        try {
+          const body = await response.json();
+          if (body && body.error) message = body.error;
+        } catch (_) {
+          try { const text = await response.text(); if (text) message = text; } catch (_e) {}
+        }
+        throw new Error(message);
       }
-      const blob = await r.blob();
+      const blob = await response.blob();
+      if (!blob.size) throw new Error('The server returned an empty report.');
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'whaxon-report.' + fmt;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (e) {
-      alert('Report failed: ' + e);
+      const link = document.createElement('a');
+      link.href = url; link.download = 'whaxon-report.' + item.format; link.hidden = true;
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      status(item.label + ' report generated. Your download should begin shortly.', 'success');
+    } catch (err) {
+      status('Report generation failed: ' + String(err && err.message || err), 'error');
     } finally {
-      btn.disabled = false;
+      active = false;
+      buttons.forEach(entry => { entry.element.disabled = false; });
       btn.textContent = original;
     }
   }
-
-  if (MD) MD.addEventListener('click', () => download('md', MD));
-  if (HTML) HTML.addEventListener('click', () => download('html', HTML));
-  if (PDF) PDF.addEventListener('click', () => download('pdf', PDF));
+  buttons.forEach(item => item.element.addEventListener('click', () => download(item)));
 })();
-
 // ---- Retest page wiring (live queue) ----
 (function () {
   const tbody = document.getElementById('retest-tbody');
