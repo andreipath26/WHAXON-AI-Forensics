@@ -457,7 +457,11 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
   const filterChips = Array.from(document.querySelectorAll('#page-findings .toolbar .chip[data-filter]'));
   filterChips.forEach(chip => chip.addEventListener('click', () => {
     activeFilter = chip.dataset.filter || 'all';
-    filterChips.forEach(item => item.classList.toggle('on', item === chip));
+    filterChips.forEach(item => {
+      const active = item === chip;
+      item.classList.toggle('on', active);
+      item.setAttribute('aria-pressed', String(active));
+    });
     applyFilter();
   }));
 
@@ -668,8 +672,14 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
       const tr = document.createElement('tr');
       const pillCls = SEV_PILL[f.severity] || 'pill-info';
       const sevLabel = SEV_LABEL[f.severity] || 'Info';
-      const statusCls = f.status === 'verified' ? 'pill-success' : 'pill-accent';
-      const statusLabel = f.status === 'verified' ? 'Verified' : 'Candidate';
+      const STATUS_META = {
+        verified: ['pill-success', 'Verified'],
+        candidate: ['pill-accent', 'Candidate'],
+        refuted: ['pill-neutral', 'Refuted'],
+        fixed: ['pill-low', 'Fixed'],
+        still_vulnerable: ['pill-critical', 'Still Vulnerable']
+      };
+      const [statusCls, statusLabel] = STATUS_META[f.status] || ['pill-accent', f.status || 'Candidate'];
       tr.innerHTML =
         '<td class="checkbox-col"><input type="checkbox" class="cb row-cb"></td>' +
         '<td><span class="pill ' + pillCls + '"><span class="dot"></span>' + sevLabel + '</span></td>' +
