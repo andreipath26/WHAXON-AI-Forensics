@@ -144,3 +144,9 @@ def test_ai_strategy_gate_does_not_show_demo_proposal_without_pending_run(page, 
     page.wait_for_timeout(200)
     assert page.locator("#btn-authorize").is_hidden()
     assert page.locator("#btn-reject").is_hidden()
+
+
+def test_attack_chain_page_hides_static_chain_when_no_recorded_edges(page, live_server):
+    page.goto(f"{live_server}/ui/correlated-attack-chains", wait_until="domcontentloaded")
+    page.wait_for_timeout(200)
+    assert "Postgres Remote Code Execution via dblink/COPY" not in page.locator("body").inner_text()

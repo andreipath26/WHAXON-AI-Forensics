@@ -2736,7 +2736,70 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     });
   }
   async function wireChains() {
-    wireUnavailablePage();
+    let graph;
+    try { graph = await requestJson('/api/pivot/graph'); }
+    catch (_) { wireUnavailablePage(); return; }
+    const edges = Array.isArray(graph.edges) ? graph.edges : [];
+    if (!edges.length) { wireUnavailablePage(); return; }
+    const cards = Array.from(document.querySelectorAll('main .bg-surface-container.rounded-xl.p-space-md.shadow-sm'));
+    const template = cards.find(function (card) {
+      return /SQL Injection|Postgres Remote Code Execution|Tenant IDOR/i.test(card.textContent || '');
+    });
+    if (!template || !template.parentElement) { wireUnavailablePage(); return; }
+    const container = template.parentElement;
+    const cardSelector = function (element) {
+      return element.classList.contains('bg-surface-container') &&
+        element.classList.contains('rounded-xl') && element.classList.contains('p-space-md') &&
+        element.classList.contains('shadow-sm');
+    };
+    const directCards = Array.from(container.children).filter(cardSelector);
+    const insertBefore = directCards[0] || null;
+    directCards.forEach(function (card) { card.remove(); });
+    function describe(node) { return String((node && node.kind) || 'node') + ':' + String((node && node.id) || 'unknown'); }
+    edges.forEach(function (edge, index) {
+      const card = template.cloneNode(true);
+      setHidden(card, false);
+      const badge = card.querySelector('.w-6.h-6');
+      if (badge) badge.textContent = String(index + 1);
+      const heading = Array.from(card.querySelectorAll('span')).find(function (span) {
+        return span.classList.contains('font-code-md') && !/^\d+$/.test((span.textContent || '').trim());
+      });
+      if (heading) heading.textContent = describe(edge.parent) + ' → ' + describe(edge.child);
+      const statusBadge = Array.from(card.querySelectorAll('span')).find(function (span) {
+        return /LETHAL COMPROMISE|LATERAL MOVEMENT|INITIAL ACCESS|PRIVILEGE ESCALATION|PIVOT/i.test(span.textContent || '');
+      });
+      if (statusBadge) statusBadge.textContent = String(edge.relation || 'linked').replace(/_/g, ' ').toUpperCase();
+      const paragraph = card.querySelector('p');
+      if (paragraph) paragraph.textContent = edge.evidence ? String(edge.evidence) : 'No evidence note is recorded for this relationship.';
+      const code = card.querySelector('.font-code-sm');
+      if (code) code.textContent = describe(edge.parent) + ' → ' + describe(edge.child);
+      card.querySelectorAll('button').forEach(function (button) { setHidden(button, true); });
+      if (insertBefore && insertBefore.parentElement === container) container.insertBefore(card, insertBefore);
+      else container.appendChild(card);
+    });
+    ['Add Custom Mitigation Rule','Generate Red Team Retest Script','Trace Proof'].forEach(hideButtonByText);
+    const recompute = document.getElementById('btn-recompute');
+    if (recompute) recompute.onclick = async function () {
+      recompute.disabled = true;
+      try {
+        const updated = await requestJson('/api/pivot/graph');
+        if (!Array.isArray(updated.edges) || !updated.edges.length) { wireUnavailablePage(); return; }
+        window.location.reload();
+      } catch (error) { window.alert('Could not refresh recorded attack relationships: ' + error.message); }
+      finally { recompute.disabled = false; }
+    };
+    const exportButton = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /Export.*Graph.*JSON/i.test(button.textContent || '');
+    });
+    if (exportButton) exportButton.onclick = async function () {
+      try {
+        const data = await requestJson('/api/pivot/graph');
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); link.href = url; link.download = 'whaxon-pivot-graph.json';
+        document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+      } catch (error) { window.alert('Graph export failed: ' + error.message); }
+    };
   }
   async function wireSettings() {
     wireUnavailablePage();
