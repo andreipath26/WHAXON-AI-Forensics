@@ -1817,6 +1817,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         const kpiGrid = kpiLabel.closest('.grid');
         if (kpiGrid) setHidden(kpiGrid, true);
       }
+      // The supplied KPI counters and footer guarantees are static demo claims;
+      // only the finding cards, filters, and evidence returned by the API are live.
+      const prototypeKpis = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+        const value = grid.textContent || '';
+        return /Verified Findings/.test(value) && /Candidate Queue/.test(value) && /Refuted Findings/.test(value);
+      });
+      if (prototypeKpis) setHidden(prototypeKpis, true);
+      const prototypeFooter = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+        const value = grid.textContent || '';
+        return /Explicit Target Scope Enforcement/.test(value) && /Zero AI Hallucination Guarantee/.test(value) && /PTES Coverage Traceability/.test(value);
+      });
+      if (prototypeFooter) setHidden(prototypeFooter, true);
+      hideButtonByText('retest verified scope');
+      hideButtonByText('policy: strict cryptographic proof');
       const replay = document.getElementById('replay-btn');
       if (replay) {
         replay.disabled = !first || !first.dataset.jobId || !first.dataset.seq || !['candidate','verified'].includes(first.dataset.status);
@@ -1933,6 +1947,35 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
           });
         };
       }
+      // Only the registered scope list is backed by the current scope API.
+      // Hide prototype metrics, example exclusions/hosts, import claims, and the
+      // pre-flight transcript rather than presenting them as current policy.
+      const scopeMetric = Array.from(document.querySelectorAll('main span')).find(function (el) {
+        return (el.textContent || '').trim() === 'Total In-Scope Assets';
+      });
+      const scopeMetricGrid = scopeMetric && scopeMetric.closest('.grid');
+      if (scopeMetricGrid) setHidden(scopeMetricGrid, true);
+      const scopeWarning = Array.from(document.querySelectorAll('main span')).find(function (el) {
+        return /Global Scope CIDR Warning Guard & Replay Authorization/i.test(el.textContent || '');
+      });
+      const scopeWarningCard = scopeWarning && scopeWarning.closest('.p-space-md.rounded.bg-surface-container-low');
+      if (scopeWarningCard) setHidden(scopeWarningCard, true);
+      const denyHeading = Array.from(document.querySelectorAll('main h3')).find(function (el) { return (el.textContent || '').trim() === 'Strict Deny Rules'; });
+      const denyCard = denyHeading && denyHeading.closest('.bg-surface-container-low.rounded');
+      if (denyCard) setHidden(denyCard, true);
+      const discoveredHeading = Array.from(document.querySelectorAll('main h2')).find(function (el) { return /Discovered Hosts & SSL SAN Intake Queue/i.test(el.textContent || ''); });
+      const discoveredCard = discoveredHeading && discoveredHeading.closest('.bg-surface-container-low.rounded');
+      if (discoveredCard) setHidden(discoveredCard, true);
+      const ingestionHeading = Array.from(document.querySelectorAll('main h3')).find(function (el) { return (el.textContent || '').trim() === 'Supported Ingestion Formats'; });
+      const ingestionCard = ingestionHeading && ingestionHeading.closest('.bg-surface-container-low.rounded');
+      if (ingestionCard) setHidden(ingestionCard, true);
+      const preflightLabel = Array.from(document.querySelectorAll('main span')).find(function (el) { return (el.textContent || '').trim() === 'Scope Pre-Flight Check Execution'; });
+      const scopePreflight = preflightLabel && preflightLabel.closest('.bg-surface-container-lowest.rounded');
+      if (scopePreflight) setHidden(scopePreflight, true);
+      const listedBadge = Array.from(document.querySelectorAll('main span')).find(function (el) { return /\d+ of \d+ Listed/i.test(el.textContent || ''); });
+      if (listedBadge) listedBadge.textContent = rows.length + ' Listed';
+      const rootCount = Array.from(document.querySelectorAll('main span')).find(function (el) { return /SHOWING \d+ OF \d+ REGISTERED ROOTS/i.test(el.textContent || ''); });
+      if (rootCount) setHidden(rootCount, true);
       ['quick import','add in-scope target','next','view certificate san chain',
        'mark out-of-scope exclusion','promote to scope','add boundary exclusion',
        'commit to scope','import & parse rules','terminal log','emergency halt scan'].forEach(hideButtonByText);
