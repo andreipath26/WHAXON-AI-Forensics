@@ -111,6 +111,22 @@ def test_reports_page_wires_native_preview_to_live_report(page, live_server):
     assert "ENG-2026-X892" not in preview.inner_text()
 
 
+def test_threat_intel_page_uses_live_metasploit_module_names(page, live_server):
+    page.route("**/api/msf/status", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"up":true,"config":{}}'))
+    page.route("**/api/msf/modules/exploit", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='["exploit/linux/ssh/test_module","exploit/multi/http/test_module"]'))
+    page.goto(f"{live_server}/ui/threat-intel-and-exploit-arsenal", wait_until="domcontentloaded")
+    page.wait_for_function("document.querySelectorAll('.cve-row-item').length === 2")
+    visible_text = page.locator("body").inner_text()
+    assert "exploit/linux/ssh/test_module" in visible_text
+    assert "exploit/multi/http/test_module" in visible_text
+    assert "CVE-2024-6387" not in visible_text
+    assert "CVE-2024-38077" not in visible_text
+    assert "CISA KEV" not in visible_text
+
+
 def test_health_page_shows_real_health_payload_and_hides_fake_controls(page, live_server):
     page.goto(f"{live_server}/ui/system-diagnostics-and-health", wait_until="domcontentloaded")
     stream = page.locator("#diagnostic-stream")
