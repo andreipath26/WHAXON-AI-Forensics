@@ -15,6 +15,8 @@ NAVIGABLE = [
     ("sessions", "page-sessions"),
     ("graph", "page-graph"),
     ("catalog", "page-catalog"),
+    ("intel", "page-intel"),
+    ("settings", "page-settings"),
 ]
 
 
@@ -30,7 +32,7 @@ def test_page_navigation_activates_section(page, live_server, slug, section_id):
     assert section.evaluate("el => el.classList.contains('active')"), f"{section_id} not active after click"
 
 
-HIDDEN = ["audit", "intel", "compliance", "settings"]
+HIDDEN = ["audit", "compliance"]
 
 
 @pytest.mark.parametrize("slug", HIDDEN)
