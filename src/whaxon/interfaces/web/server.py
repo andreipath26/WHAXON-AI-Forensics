@@ -1999,9 +1999,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       return /Sample Deterministic Proof: FINDING-SQLI-001/i.test(element.textContent || '');
     });
     if (sampleProofTitle) {
-      const proofCard = sampleProofTitle.closest('.p-space-md.bg-surface-container.rounded-lg');
-      setHidden(proofCard || sampleProofTitle, true);
+      const proofHeading = sampleProofTitle.closest('div.flex.items-center.justify-between.text-outline.pb-1');
+      setHidden(proofHeading || sampleProofTitle, true);
     }
+    document.querySelectorAll('main p, main span').forEach(function (element) {
+      if (/Verified deterministically without LLM ambiguity|HTTP\\/2 200 OK|PostgreSQL 15\\.4/i.test((element.textContent || '').trim())) {
+        setHidden(element, true);
+      }
+    });
     // Strip fixed report-page HUD figures from the supplied prototype.
     const prototypeMetrics = /^(?:6 curl-verified|84\.5%|41 Scans|17 Findings|6 Confirmed|3 Artifacts|TEMPLATE V4\.2|Target Phase 3|0x7F41\.\.\.B289 \[VALID\]|Evidence Integrity Guaranteed|PTES Certified Evidence Locker|SHA256 Manifest Lock)$/i;
     document.querySelectorAll('main span, main strong, main code, main p').forEach(function (element) {
