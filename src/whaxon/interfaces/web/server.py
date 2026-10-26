@@ -2093,6 +2093,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         }
       };
     });
+    // Hide static tool cards and progress telemetry that are not backed by
+    // an active WHAXON job. Only native per-tool Re-run cards with a matching
+    // registered tool remain available.
+    document.querySelectorAll('main section').forEach(function (section) {
+      if (/Session Token/.test(section.textContent || '') && /SSE Socket/.test(section.textContent || '')) setHidden(section, true);
+    });
+    document.querySelectorAll('main .bg-surface-container-low.rounded-lg').forEach(function (card) {
+      if (/Nuclei v|Nikto 2\.|sqlmap 1\.|Quick Trigger Utility Bar|whaxon:\/\/cli-pipeline/i.test(card.textContent || '')) {
+        const hasNativeRun = Array.from(card.querySelectorAll('button')).some(function (button) {
+          return (button.textContent || '').trim().toLowerCase() === 're-run';
+        });
+        if (!hasNativeRun) setHidden(card, true);
+      }
+    });
     // Use only controls that exist in the supplied design; do not inject a tool selector.
     ['run active pipeline','dispatch passive recon','inject payload','spawn sub-tool','emergency abort','engage replay','explore whatweb','gobuster','wpscan','execute','pause pipeline','pause','abort'].forEach(hideButtonByText);
     ['ai-planner-toggle','toggle-planner-gate'].forEach(function (id) {
