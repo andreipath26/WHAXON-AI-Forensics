@@ -2619,6 +2619,18 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         setHidden(section, true);
       }
     });
+    const daemonStatus = Array.from(document.querySelectorAll('main span')).find(function (element) {
+      return /DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE/i.test(element.textContent || '');
+    });
+    if (daemonStatus) {
+      const daemonPill = daemonStatus.closest('div.flex.items-center.gap-space-xs.bg-surface-container-high');
+      setHidden(daemonPill || daemonStatus, true);
+    }
+    const timingStatus = Array.from(document.querySelectorAll('main div')).find(function (element) {
+      return element.classList.contains('bg-surface-container-low') &&
+        /LAST RUN:/.test(element.textContent || '') && /NEXT SYNC:/.test(element.textContent || '');
+    });
+    if (timingStatus) setHidden(timingStatus, true);
     document.querySelectorAll('main span, main p, main strong').forEach(function (element) {
       const value = (element.textContent || '').trim();
       if (/DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|LAST RUN:|NEXT SYNC:|^14m ago$|^46m$|142 of 142 Assets Active|Critical Root Risk Path Active|SYN-ACK received|0 new hosts found|assets-backup-archive\.s3\.amazonaws\.com|api\.staging\.internal|54\.210\.42\.19/i.test(value)) {
