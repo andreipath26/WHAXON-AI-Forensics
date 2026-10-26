@@ -49,7 +49,7 @@
 | X.02 | Interact button | Open session | No handler | none | MOCKUP |
 
 ## Attack Surface page
-| A.01 | Graph render | Fetch /api/pivot/graph | Hardcoded SVG | GET /api/pivot/graph | MOCKUP |
+| A.01 | Graph render | Fetch /api/pivot/graph and show recorded relationships | Live relationship table with loading/empty/error states and refresh | GET /api/pivot/graph | WIRED (browser test added; execution pending) |
 
 ## Catalog page
 | C.01 | Tool list | Fetch /api/tools | Live list | GET /api/tools | WIRED |
@@ -86,8 +86,8 @@
 - F.07, F.08 → hide bulk bar buttons (no backend)
 - B.03 → strip palette mock actions, keep search
 
-## Pass 2 targets (next session)
-- A.01 → wire to /api/pivot/graph
+## Pass 2 targets
+- ~~A.01 → wire to /api/pivot/graph~~ **Implemented in PR #14; Playwright regression test added. Awaiting CI/browser execution.**
 - I.01, I.02 → add CVE/lookup web routes, wire search
 
 ## Pass 3 targets
