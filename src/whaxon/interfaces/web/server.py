@@ -2563,7 +2563,84 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     });
   }
   async function wireAttackSurface() {
-    wireUnavailablePage();
+    let tree;
+    try { tree = await requestJson('/api/tree?limit=50'); }
+    catch (_) { wireUnavailablePage(); return; }
+    const targets = Array.isArray(tree.targets) ? tree.targets : [];
+    const container = document.getElementById('asset-ledger-container');
+    const original = container && container.querySelector('article.asset-card');
+    if (!container || !original || !targets.length) { wireUnavailablePage(); return; }
+
+    const template = original.cloneNode(true);
+    container.replaceChildren();
+    const rank = {critical:5, high:4, medium:3, low:2, info:1};
+    targets.forEach(function (record) {
+      const card = template.cloneNode(true);
+      setHidden(card, false);
+      const findings = Array.isArray(record.findings) ? record.findings : [];
+      const highest = findings.reduce(function (current, finding) {
+        const value = String(finding.severity || 'info').toLowerCase();
+        return (rank[value] || 0) > (rank[current] || 0) ? value : current;
+      }, 'info');
+      card.dataset.status = highest;
+      card.dataset.provider = 'recorded';
+      const title = card.querySelector('.font-code-lg.text-code-lg.font-bold');
+      if (title) title.textContent = String(record.target || 'Target not recorded');
+      const header = card.querySelector('.flex.items-center.gap-space-sm.flex-wrap');
+      if (header) {
+        const badge = Array.from(header.querySelectorAll('span')).find(function (span) {
+          return /SEV:|CRITICAL EXPOSURE|SHADOW API DETECTED/i.test(span.textContent || '');
+        });
+        if (badge && findings.length) badge.textContent = 'SEVERITY: ' + highest.toUpperCase();
+        else if (badge) setHidden(badge, true);
+        Array.from(header.querySelectorAll('span')).forEach(function (span) {
+          if (span === title || span === badge || span.classList.contains('material-symbols-outlined')) return;
+          setHidden(span, true);
+        });
+      }
+      const metadata = card.querySelector('.mt-space-xs.font-body-sm');
+      if (metadata) metadata.textContent = String(record.job_count || (record.jobs || []).length || 0) +
+        ' recorded jobs · ' + String(record.finding_count || findings.length || 0) + ' recorded findings';
+      const actions = card.querySelectorAll('button');
+      actions.forEach(function (button) { setHidden(button, true); });
+      const drawer = card.querySelector('.bg-surface-container-lowest.p-space-sm.rounded');
+      if (drawer) {
+        drawer.textContent = 'Recorded target · ' + String(record.job_count || (record.jobs || []).length || 0) +
+          ' jobs · ' + String(record.finding_count || findings.length || 0) + ' findings';
+      }
+      container.appendChild(card);
+    });
+
+    // This backend records targets seen in jobs; it does not run a continuous
+    // asset monitor. Keep the original ledger, but suppress the demo telemetry
+    // and actions that imply cloud discovery, drift detection, or remediation.
+    document.querySelectorAll('main section').forEach(function (section) {
+      if (!section.contains(container)) setHidden(section, true);
+    });
+    document.querySelectorAll('main span, main p, main strong').forEach(function (element) {
+      const value = (element.textContent || '').trim();
+      if (/DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|142 of 142 Assets Active|Critical Root Risk Path Active|SYN-ACK received|0 new hosts found|assets-backup-archive\\.s3\\.amazonaws\\.com|api\\.staging\\.internal|54\\.210\\.42\\.19/i.test(value)) {
+        setHidden(element, true);
+      }
+    });
+    ['configure cloud & dns probes','trigger delta recon now','enforce scope lock','launch nuclei probe',
+     'auto-remediate acl','audit objects','trigger acme renew','harden ciphers','session shell',
+     'expand canvas','stream full cryptographic audit logs','terminal log','emergency halt scan'].forEach(hideButtonByText);
+    document.querySelectorAll('main .status-tab').forEach(function (button) {
+      if (button.dataset.status !== 'all') setHidden(button, true);
+      else button.textContent = 'ALL (' + targets.length + ')';
+    });
+    const search = document.getElementById('asset-search-input');
+    if (search) search.oninput = function () {
+      const query = search.value.toLowerCase().trim();
+      container.querySelectorAll('article.asset-card').forEach(function (card) {
+        setHidden(card, !card.textContent.toLowerCase().includes(query));
+      });
+    };
+    const sort = Array.from(document.querySelectorAll('main button')).find(function (button) {
+      return /SEVERITY DESC/i.test(button.textContent || '');
+    });
+    if (sort) setHidden(sort, true);
   }
   async function wireAiApprovals() {
     const modal = document.getElementById('approvals-modal');
