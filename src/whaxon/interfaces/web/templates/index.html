@@ -260,24 +260,10 @@
       <section class="page" id="page-intel">
         <div class="page-head"><div class="ph-main"><h1 class="page-title">Threat Intel</h1><p class="page-sub">Search NVD for CVEs, or searchsploit for exploits - same data the CLI returns.</p></div></div>
         <div class="card card-pad-lg" style="margin-bottom:20px;">
-          <div class="form-row" style="margin-bottom:var(--sp-3);"><label class="form-label">Search <span class="hint">CVE ID, keyword, or service version</span></label><div class="form-inline"><input class="form-input" style="flex:1;" placeholder="CVE-2021-44228  .  apache 2.4  .  werkzeug 3.1.8"><button class="btn btn-primary">Search</button></div></div>
-          <div class="toolbar" style="margin-bottom:0;"><span class="chip on">CVEs (NVD)</span><span class="chip">Exploits (searchsploit)</span><span class="spacer"></span><span class="form-hint" style="margin:0;">Cache: 1 entry - TTL 7d</span></div>
+          <div class="form-row" style="margin-bottom:var(--sp-3);"><label class="form-label" for="intel-query">Search <span class="hint">CVE ID, keyword, or service version</span></label><div class="form-inline"><input id="intel-query" class="form-input" style="flex:1;" placeholder="CVE-2021-44228 or apache 2.4" autocomplete="off"><button id="intel-search" class="btn btn-primary" type="button">Search</button></div><div id="intel-status" class="form-hint" role="status" aria-live="polite" style="margin-top:8px;">Search NVD or Exploit-DB. Results open on the source site.</div></div>
+          <div class="toolbar" style="margin-bottom:0;"><button type="button" class="chip on" data-intel-source="nvd" aria-pressed="true">CVEs (NVD)</button><button type="button" class="chip" data-intel-source="exploit" aria-pressed="false">Exploits (Exploit-DB)</button><span class="spacer"></span><span class="form-hint" style="margin:0;">Live source search · opens in a new tab</span></div>
         </div>
-        <div class="card card-pad-none" style="overflow:hidden;">
-          <div class="card-title" style="padding:var(--sp-4) var(--sp-5); margin:0; border-bottom:1px solid var(--border);">CVE-2021-44228</div>
-          <div style="padding:var(--sp-5);">
-            <div class="grid-4" style="margin-bottom:var(--sp-4);">
-              <div class="kpi"><div class="k-label">CVSS</div><div class="k-value c" style="font-size:var(--t-xl);">10.0</div></div>
-              <div class="kpi"><div class="k-label">Severity</div><div class="k-value c" style="font-size:var(--t-xl);">CRITICAL</div></div>
-              <div class="kpi"><div class="k-label">Status</div><div class="k-value dim" style="font-size:var(--t-xl);">Analyzed</div></div>
-              <div class="kpi"><div class="k-label">Published</div><div class="k-value dim" style="font-size:var(--t-xl);">2021-12-10</div></div>
-            </div>
-            <div class="kv"><span class="k">Vector</span><span class="v">CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H</span></div>
-            <div class="kv"><span class="k">CWE</span><span class="v"><span class="fw-chip cwe">CWE-20</span> <span class="fw-chip cwe">CWE-400</span> <span class="fw-chip cwe">CWE-502</span> <span class="fw-chip cwe">CWE-917</span></span></div>
-            <div class="kv" style="align-items:flex-start;"><span class="k">Description</span><span class="v" style="font-family:var(--font-sans); font-size:var(--t-sm); color:var(--text-dim); line-height:1.6;">Apache Log4j2 2.0-beta9 through 2.15.0 JNDI features do not protect against attacker controlled LDAP endpoints. An attacker who can control log messages can execute arbitrary code loaded from LDAP servers.</span></div>
-            <div class="kv" style="align-items:flex-start;"><span class="k">References</span><span class="v" style="font-family:var(--font-mono); font-size:var(--t-xs);"><a href="#">packetstormsecurity.com/files/165225</a><br><a href="#">packetstormsecurity.com/files/165260</a><br><a href="#">packetstormsecurity.com/files/165270</a></span></div>
-          </div>
-        </div>
+        <div id="intel-results" class="card card-pad-lg" style="margin-top:16px;"><div class="card-title">Search results</div><p class="card-sub">Enter a CVE identifier, product name, or version, then select Search. WHAXON will send you to the live source results; no sample finding is presented as current data.</p></div>
       </section>
 
       <!-- COMPLIANCE -->
@@ -297,7 +283,7 @@
         <div class="grid-2">
           <div class="card card-pad-lg">
             <div class="card-title">Appearance</div><div class="card-sub">Theme and density</div>
-            <div class="form-row"><label class="form-label">Theme</label><select class="tb-select" style="width:100%;"><option>Dark (default)</option><option>Light</option><option>System</option></select></div>
+            <div class="form-row"><label class="form-label">Theme</label><select id="settings-theme" class="tb-select" style="width:100%;"><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></div>
             <div class="form-row"><label class="form-label">Density</label><div class="density-toggle"><button class="on" data-density="comfortable">Comfortable</button><button data-density="compact">Compact</button></div></div>
           </div>
           <div class="card card-pad-lg">
