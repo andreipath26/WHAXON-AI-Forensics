@@ -51,6 +51,8 @@ def test_dashboard_renders_live_job_rows_and_routes_new_engagement(page, live_se
     page.wait_for_timeout(500)
     assert page.locator("main").is_visible()
     assert page.locator("main table tbody tr").count() >= 1
+    for slug in ["compliance-and-framework-crosswalk", "bug-bounty-and-live-browser-studio", "ptaas-client-portal", "cryptographic-audit-log", "settings-and-secrets-vault"]:
+        assert page.locator(f'[data-path="{slug}"]').is_hidden()
     assert "seed-job-1" in page.locator("main").inner_text()
     visible_text = page.locator("main").inner_text()
     assert "Quickstart Target Scope Wizard" not in visible_text
@@ -71,6 +73,9 @@ def test_scope_page_renders_real_scope_rules_and_hides_inert_controls(page, live
     assert body.is_visible()
     assert body.locator("tr").count() >= 1
     assert "127.0.0.0/8" in body.inner_text()
+    scope_text = page.locator('main').inner_text()
+    assert "Strict Deny Rules" not in scope_text
+    assert "staging-api.internal.corp" not in scope_text
     assert page.locator(".toggle-scope-status:visible").count() == 0
     assert page.get_by_role("button", name="Emergency Halt Scan").is_hidden()
     assert page.get_by_role("button", name="Quick Import").is_hidden()
@@ -96,8 +101,11 @@ def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
     target = page.locator('input[placeholder*="Target host"]')
     assert target.is_visible()
     assert page.locator('select[aria-label="Tool to run"]').count() == 0
-    assert "VULN_CANDIDATE" not in page.locator("main").inner_text()
-    assert "staging-api.corp.net" not in page.locator("main").inner_text()
+    run_text = page.locator("main").inner_text()
+    assert "VULN_CANDIDATE" not in run_text
+    assert "staging-api.corp.net" not in run_text
+    assert "Process Group & Descendant Monitor" not in run_text
+    assert "Network Packets" not in run_text
     passive = page.get_by_role("button", name="Dispatch Passive Recon")
     assert passive.is_hidden()
     assert page.get_by_role("button", name="Run Active Pipeline").is_hidden()
@@ -115,7 +123,11 @@ def test_run_page_exposes_live_tool_and_target_controls(page, live_server):
 def test_history_page_renders_live_job_rows(page, live_server):
     page.goto(f"{live_server}/ui/job-execution-history", wait_until="domcontentloaded")
     page.wait_for_timeout(400)
-    assert "seed-job-1" in page.locator("body").inner_text()
+    visible_text = page.locator("body").inner_text()
+    assert "seed-job-1" in visible_text
+    assert "42 JOBS" not in visible_text
+    assert "staging-api.corp.net" not in visible_text
+    assert "Ledger Cryptographic Attestation" not in visible_text
 
 
 def test_catalog_page_renders_live_tools(page, live_server):
@@ -252,6 +264,9 @@ def test_attack_surface_renders_recorded_targets_not_cloud_demo(page, live_serve
     assert "DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE" not in visible_text
     assert "14m ago" not in visible_text
     assert "46m" not in visible_text
+    assert "Perimeter Topology" not in visible_text
+    assert "Recon Cadence & Rules" not in visible_text
+    assert "api.staging" not in visible_text
     assert "Perimeter Topology" not in visible_text
     assert "Recon Cadence & Rules" not in visible_text
     assert "Delta Timeline" not in visible_text

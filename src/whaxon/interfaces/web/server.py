@@ -1626,9 +1626,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
   'use strict';
   const page = """ + page_json + r""";
   const pages = """ + _json.dumps(_NEW_UI_PAGES) + r""";
+  const unsupportedNavigation = new Set([
+    'compliance-and-framework-crosswalk', 'bug-bounty-and-live-browser-studio',
+    'bug-bounty-live-browser', 'ptaas-client-portal', 'cryptographic-audit-log',
+    'settings-and-api-explorer', 'settings-and-secrets-vault', 'settings-secrets-vault'
+  ]);
   document.querySelectorAll('[data-path]').forEach(function (link) {
     const slug = link.getAttribute('data-path');
-    if (pages[slug]) link.setAttribute('href', '/ui/' + slug);
+    if (unsupportedNavigation.has(slug)) {
+      link.style.display = 'none';
+      link.setAttribute('aria-hidden', 'true');
+    } else if (pages[slug]) link.setAttribute('href', '/ui/' + slug);
     else link.style.display = 'none';
   });
   async function requestJson(url, options) {
@@ -2265,13 +2273,24 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (/Session Token/.test(section.textContent || '') && /SSE Socket/.test(section.textContent || '')) setHidden(section, true);
     });
     document.querySelectorAll('main .bg-surface-container-low.rounded-lg').forEach(function (card) {
-      if (/Nuclei v|Nikto 2\.|sqlmap 1\.|Quick Trigger Utility Bar|whaxon:\/\/cli-pipeline/i.test(card.textContent || '')) {
+      if (/Nuclei v|Nikto 2\.|sqlmap 1\.|Quick Trigger Utility Bar|Process Group & Descendant Monitor|AI Strategy Planner \(Local\)|WMI \/ SMB Execution Module|Deterministic Boundary Enforced|whaxon:\/\/cli-pipeline/i.test(card.textContent || '')) {
         const hasNativeRun = Array.from(card.querySelectorAll('button')).some(function (button) {
           return (button.textContent || '').trim().toLowerCase() === 're-run';
         });
         if (!hasNativeRun) setHidden(card, true);
       }
     });
+    // Remove static worker telemetry and fixed metrics that do not belong to a live job.
+    const packetMetric = Array.from(document.querySelectorAll('main span')).find(function (el) { return (el.textContent || '').trim() === 'Network Packets'; });
+    const packetCard = packetMetric && packetMetric.closest('.bg-surface-container-low.rounded-lg');
+    if (packetCard) setHidden(packetCard, true);
+    const threadMetric = Array.from(document.querySelectorAll('main span')).find(function (el) { return (el.textContent || '').trim() === 'ThreadPoolExecutor'; });
+    const threadStrip = threadMetric && threadMetric.closest('.bg-surface-container-lowest.rounded');
+    if (threadStrip) setHidden(threadStrip, true);
+    const passivePipeline = Array.from(document.querySelectorAll('main span')).find(function (el) { return /Passive Check Pipeline \(All 10 Parallel\)/i.test(el.textContent || ''); });
+    if (passivePipeline && passivePipeline.parentElement) setHidden(passivePipeline.parentElement, true);
+    const staticCli = Array.from(document.querySelectorAll('main span')).find(function (el) { return /CLI: whaxon recon <target>/i.test(el.textContent || ''); });
+    if (staticCli) setHidden(staticCli, true);
     // Use only controls that exist in the supplied design; do not inject a tool selector.
     ['run active pipeline','dispatch passive recon','inject payload','spawn sub-tool','emergency abort','engage replay','explore whatweb','gobuster','wpscan','execute','pause pipeline','pause','abort'].forEach(hideButtonByText);
     ['ai-planner-toggle','toggle-planner-gate'].forEach(function (id) {
@@ -2523,6 +2542,28 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       if (toolFilter) toolFilter.onchange = applyFilters;
       if (timeFilter) timeFilter.onchange = applyFilters;
       applyFilters();
+      // Keep the real job ledger and filters; hide the sample KPIs, inspector,
+      // pagination, and cryptographic attestations from the design prototype.
+      const historyKpis = Array.from(document.querySelectorAll('main .grid')).find(function (grid) {
+        const value = grid.textContent || '';
+        return /TOTAL RUNS/.test(value) && /SUCCESS RUNS/.test(value) && /ERRORS \/ HALTS/.test(value);
+      });
+      if (historyKpis) setHidden(historyKpis, true);
+      const inspectorLabel = Array.from(document.querySelectorAll('main span')).find(function (el) { return /DEEP INSPECTOR: #JOB-8841/i.test(el.textContent || ''); });
+      const inspectorCard = inspectorLabel && inspectorLabel.closest('.bg-surface-container-low.rounded-xl');
+      if (inspectorCard) setHidden(inspectorCard, true);
+      const attestationLabel = Array.from(document.querySelectorAll('main span')).find(function (el) { return (el.textContent || '').trim() === 'Ledger Cryptographic Attestation'; });
+      const attestationCard = attestationLabel && attestationLabel.closest('.rounded-xl');
+      if (attestationCard) setHidden(attestationCard, true);
+      const immutabilityBadge = Array.from(document.querySelectorAll('main span')).find(function (el) { return /ENFORCING ED25519 IMMUTABILITY/i.test(el.textContent || ''); });
+      if (immutabilityBadge) setHidden(immutabilityBadge, true);
+      const pageLabel = Array.from(document.querySelectorAll('main span')).find(function (el) { return /Page 1 of 3 \(Total 42 records\)/i.test(el.textContent || ''); });
+      const pagination = pageLabel && pageLabel.closest('.px-space-md.py-2.bg-surface-container');
+      if (pagination) setHidden(pagination, true);
+      const fixedSort = Array.from(document.querySelectorAll('main span')).find(function (el) { return /SORT: TIMESTAMP \(DESC\)/i.test(el.textContent || ''); });
+      if (fixedSort && fixedSort.parentElement) setHidden(fixedSort.parentElement, true);
+      const historyIntro = Array.from(document.querySelectorAll('main span, main p')).find(function (el) { return /KERNEL-EBPF ENFORCED|cryptographic SHA-256 execution digests/i.test(el.textContent || ''); });
+      if (historyIntro) setHidden(historyIntro, true);
       hideButtonByText('verify integrity');
       hideButtonByText('export ledger');
       hideButtonByText('all (42)');
@@ -2833,6 +2874,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
       return /SEVERITY DESC/i.test(button.textContent || '');
     });
     if (sort) setHidden(sort, true);
+    // The right-hand topology, cadence and delta widgets are static prototype data;
+    // the current API supports only the recorded-target ledger on the left.
+    const rightPane = document.querySelector('main aside');
+    if (rightPane) setHidden(rightPane, true);
+    const telemetryFooterLabel = Array.from(document.querySelectorAll('main span')).find(function (el) { return /142 of 142 Assets Active/i.test(el.textContent || ''); });
+    const telemetryFooter = telemetryFooterLabel && telemetryFooterLabel.closest('.bg-surface-container-lowest.p-space-sm.rounded');
+    if (telemetryFooter) setHidden(telemetryFooter, true);
+    document.querySelectorAll('main button').forEach(function (button) {
+      if (/^(AWS|GCP|CF) \(\d+\)$/i.test((button.textContent || '').trim())) setHidden(button, true);
+    });
   }
   async function wireAiApprovals() {
     const modal = document.getElementById('approvals-modal');
