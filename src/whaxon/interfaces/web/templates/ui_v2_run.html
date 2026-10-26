@@ -61,7 +61,7 @@
 <!-- Two-Column Operational Workbench -->
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter p-margin">
 <!-- LEFT COLUMN: Security Tool Catalog & Runners (5 cols on lg) -->
-<div id="run-tool-list" style="visibility:hidden" class="lg:col-span-5 flex flex-col gap-space-lg">
+<div class="lg:col-span-5 flex flex-col gap-space-lg">
 <!-- Catalog Header & Batch Action -->
 <!-- Phase 0: Passive Reconnaissance Stage (10-Check Parallel Dispatcher) -->
 <div class="bg-surface-container-low rounded-lg p-space-md flex flex-col gap-space-sm shadow-sm border border-secondary/20 relative overflow-hidden">
@@ -146,20 +146,20 @@
 <!-- Dispatch Controls & Target Input -->
 <div class="flex flex-col gap-1.5 pt-1 border-t border-outline-variant/30">
 <div class="flex items-center gap-space-xs">
-<input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-secondary font-mono" id="run-target-shadow" placeholder="Target is entered in the terminal input below" type="text" value="" disabled/>
-<button style="display:none" class="flex items-center gap-1 px-space-sm py-1 bg-secondary hover:bg-secondary-container text-on-secondary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
+<input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-secondary font-mono" id="run-target" placeholder="Enter authorized target (host, IP, or URL)" type="text"/>
+<button id="run-check-scope" class="flex items-center gap-1 px-space-sm py-1 bg-secondary hover:bg-secondary-container text-on-secondary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
 <span class="material-symbols-outlined text-sm">bolt</span>
-<span>Dispatch Passive Recon</span>
+<span>Check Scope</span>
 </button>
-<button style="display:none" class="flex items-center gap-1 px-space-sm py-1 bg-primary-container hover:bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
+<button id="run-submit" class="flex items-center gap-1 px-space-sm py-1 bg-primary-container hover:bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
 <span class="material-symbols-outlined text-sm">play_arrow</span>
-<span>Run Active Pipeline</span>
+<span>Run Selected Tool</span>
 </button>
 </div>
 <div class="flex items-center justify-between text-code-sm text-on-surface-variant font-mono bg-surface-container-lowest px-space-sm py-1 rounded">
-<span class="text-outline text-xs">Recent Job:</span>
-<span class="text-secondary text-xs truncate">Loading recent job…</span>
-<span class="text-primary text-xs flex items-center gap-0.5">
+<span class="text-outline text-xs">Recent Job:</span><span id="run-job-label" class="text-secondary text-xs">No job running</span>
+<span id="run-recent-job" class="text-secondary text-xs truncate">No jobs recorded</span>
+<span id="run-message" class="text-primary text-xs flex items-center gap-0.5">
 <span class="material-symbols-outlined text-xs">check</span> Awaiting live status
       </span>
 </div>
@@ -173,6 +173,7 @@
           Live tool catalog loading
         </span>
 </div>
+<div id="run-tool-list" class="flex flex-col gap-space-md" style="visibility:hidden">
 <!-- AI Strategy Planner & Guardrail Card -->
 <div class="bg-surface-container-low rounded-lg p-space-md relative overflow-hidden shadow-sm">
 <div class="flex items-start justify-between gap-space-md">
@@ -203,7 +204,7 @@
 <span class="font-label-sm text-label-sm text-on-surface-variant">GATE: ENFORCED</span>
 </div>
 </div>
-<!-- Tool card template; populated from live catalog -->
+<!-- Existing canonical tool-card component; populated from live catalog -->
 <div id="run-tool-card-template" data-live-tool-card class="bg-surface-container-low rounded-lg p-space-md flex flex-col gap-space-sm shadow-sm transition-all hover:bg-surface-container/70">
 <div class="flex items-center justify-between gap-space-sm">
 <div class="flex items-center gap-space-sm min-w-0">
@@ -492,15 +493,7 @@
 </div>
 </div>
 <!-- Terminal Command Injection Line -->
-<div class="mt-space-md pt-space-sm border-t border-outline-variant/30 flex items-center gap-space-sm">
-<span class="font-code-sm text-code-sm text-primary font-bold">Target &gt;</span>
-<input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface placeholder:text-outline/50 px-space-sm py-1 rounded focus:outline-none focus:ring-1 focus:ring-secondary transition-all" id="run-target" placeholder="Enter an authorized target (host, IP, or URL)" type="text"/>
-<button class="px-space-md py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface font-code-sm text-code-sm rounded transition-colors" id="run-submit" type="button">
-            Execute
-          </button>
-</div>
-</div>
-<!-- Bottom Interactive Pipeline Controls -->
+<div class="mt-space-md pt-space-sm border-t border-outline-variant/30" style="display:none"></div></div><!-- Bottom Interactive Pipeline Controls -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-space-sm">
 <!-- Pause Pipeline -->
 <button style="display:none" class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" id="btn-pause" style="display:none" type="button">
@@ -550,24 +543,24 @@
 <script>
 (function(){
 "use strict";
-const grid=document.getElementById("run-tool-list"),target=document.getElementById("run-target"),submit=document.getElementById("run-submit"),cancel=document.getElementById("run-cancel"),output=document.getElementById("terminal-stdout");
+const grid=document.getElementById("run-tool-list"),target=document.getElementById("run-target"),submit=document.getElementById("run-submit"),cancel=document.getElementById("run-cancel"),output=document.getElementById("terminal-stdout"),status=document.getElementById("run-message"),jobLabel=document.getElementById("run-job-label"),recent=document.getElementById("run-recent-job");
 let tools=[],selected=null,jobId=null,stream=null;
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
 function append(text,kind){const row=el("div","flex items-start gap-space-sm "+(kind==="error"?"text-error":kind==="status"?"text-primary":"text-on-surface"));row.appendChild(el("span","text-outline/60 select-none","["+new Date().toLocaleTimeString()+"]"));row.appendChild(el("span","text-secondary","[whaxon]"));row.appendChild(el("span","",text));output.appendChild(row);output.scrollTop=output.scrollHeight;}
-function setMessage(text,error){const el=document.getElementById("run-message");if(el){el.textContent=text;el.className=error?"text-error text-xs":"text-primary text-xs";}}
-function cardTemplate(){return document.getElementById("run-tool-card-template")?.cloneNode(true);}
-function renderTools(){const template=cardTemplate();if(!template)return;grid.replaceChildren();if(!tools.length){grid.style.visibility="visible";grid.appendChild(el("div","p-space-md text-on-surface-variant","No tools are available in the live catalog."));return;}tools.forEach(t=>{const c=template.cloneNode(true);c.removeAttribute("id");c.dataset.toolId=t.id;c.style.cursor=t.available?"pointer":"not-allowed";c.classList.toggle("opacity-50",!t.available);const name=c.querySelector(".font-code-md.text-code-md.font-semibold.text-on-surface");if(name)name.textContent=t.name||t.id;const category=c.querySelector("span.font-label-sm.text-label-sm.text-outline");if(category)category.textContent=t.category||"Catalog tool";const adapter=c.querySelector("span.text-primary");if(adapter)adapter.textContent=t.adapter_available?"Adapter registered":"No adapter registered";const spans=[...c.querySelectorAll("span")];const status=spans.find(s=>/COMPLETED|RUNNING|QUEUED|FAILED|AVAILABLE/.test(s.textContent));if(status)status.textContent=t.available?"AVAILABLE":"UNAVAILABLE";const row=c.querySelector("div.flex.items-center.justify-between.bg-surface-container-lowest");if(row){const texts=row.querySelectorAll("span");if(texts.length>1)texts[texts.length-1].textContent=t.description||"No description supplied by catalog.";}const flag=c.querySelector("div.flex.items-center.justify-between.text-body-sm");if(flag)flag.textContent="Tool ID: "+t.id;c.querySelectorAll("button").forEach(b=>b.style.display="none");c.addEventListener("click",()=>{if(!t.available)return;selected=t;grid.querySelectorAll("[data-tool-id]").forEach(x=>x.classList.toggle("ring-1",x.dataset.toolId===t.id));grid.querySelectorAll("[data-tool-id]").forEach(x=>x.classList.toggle("ring-primary/50",x.dataset.toolId===t.id));submit.disabled=false;append("Selected tool "+(t.name||t.id),"status");});grid.appendChild(c);});grid.style.visibility="visible";}
-async function loadTools(){try{const r=await fetch("/api/tools");if(!r.ok)throw new Error("HTTP "+r.status);tools=await r.json();const count=tools.filter(t=>t.available).length;const badge=[...document.querySelectorAll("span")].find(s=>s.textContent.includes("Live tool catalog loading"));if(badge)badge.textContent=count+" TOOLS AVAILABLE";renderTools();}catch(e){grid.style.visibility="visible";grid.replaceChildren(el("div","p-space-md text-error","Could not load catalog: "+e.message));}}
-async function loadHistory(){try{const r=await fetch("/api/history");if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json(),jobs=Array.isArray(d)?d:(d.jobs||[]),last=jobs[0];const label=[...document.querySelectorAll("span")].find(s=>s.textContent.includes("Loading recent job"));if(label)label.textContent=last?String(last.tool||last.id)+" : "+String(last.target||"")+" : "+String(last.status||""):"No jobs recorded";const status=[...document.querySelectorAll("span")].find(s=>s.textContent.includes("Awaiting live status"));if(status)status.textContent=last?String(last.status||"recorded"):"No job status";const packets=[...document.querySelectorAll("span")].find(s=>s.textContent==="Not reported");if(packets)packets.textContent="Not reported";}catch(_){}}
-async function runSelected(){const t=target.value.trim();if(!selected){setMessage("Select an available tool from the catalog first.",true);return;}if(!t){setMessage("Enter a target first.",true);return;}submit.disabled=true;cancel.disabled=true;output.replaceChildren();output.style.visibility="visible";append("Checking scope for "+t+"…","status");try{const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:t})}),sc=await check.json();if(!check.ok||!sc.allowed)throw new Error(sc.reason||sc.error||"Target is not authorized by the current scope.");const r=await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tool_id:selected.id,target:t})}),d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));jobId=d.job_id;append("Started job "+jobId+" with "+selected.id,"status");setMessage("Job "+jobId+" running.",false);cancel.style.display="";cancel.disabled=false;const label=[...document.querySelectorAll("span")].find(s=>s.textContent.includes("Loading recent job"));if(label)label.textContent=selected.id+" : "+t+" : running";stream=new EventSource("/api/jobs/"+encodeURIComponent(jobId)+"/stream");stream.onmessage=e=>{try{const ev=JSON.parse(e.data);if(ev.type==="line")append(ev.text||"",ev.stream==="stderr"?"error":"");else if(ev.type==="status")append("Status: "+String(ev.status||"running"),"status");else if(ev.type==="finished"){append("Finished with exit code "+String(ev.exit_code),"status");closeStream();finishRun("finished");}else if(ev.type==="failed"){append("Failed: "+String(ev.error||"unknown error"),"error");closeStream();finishRun("failed");}}catch(_){append("Unrecognized job stream event.","error");}};stream.onerror=()=>{if(stream&&stream.readyState===EventSource.CLOSED){append("Job stream closed.","error");closeStream();finishRun("stream closed");}};}catch(e){append("Run blocked: "+e.message,"error");setMessage(e.message,true);submit.disabled=false;cancel.disabled=true;}}
+function say(text,error){status.textContent=text;status.className=(error?"text-error":"text-primary")+" text-xs flex items-center gap-0.5";}
+function templateCard(){return document.getElementById("run-tool-card-template")?.cloneNode(true);}
+function renderTools(){const tpl=templateCard();grid.replaceChildren();if(!tpl){grid.style.visibility="visible";grid.appendChild(el("p","text-error","Canonical tool-card template missing."));return;}if(!tools.length){grid.style.visibility="visible";grid.appendChild(el("p","text-on-surface-variant","No tools are available in the live catalog."));return;}tools.forEach(t=>{const c=tpl.cloneNode(true);c.removeAttribute("id");c.dataset.toolId=t.id;c.style.cursor=t.available?"pointer":"not-allowed";c.classList.toggle("opacity-50",!t.available);const name=c.querySelector(".font-code-md.text-code-md.font-semibold.text-on-surface");if(name)name.textContent=t.name||t.id;const category=c.querySelector("span.font-label-sm.text-label-sm.text-outline");if(category)category.textContent=t.category||"Catalog tool";const adapter=c.querySelector("span.text-primary");if(adapter)adapter.textContent=t.adapter_available?"Adapter registered":"No adapter registered";const statusSpan=[...c.querySelectorAll("span")].find(s=>/COMPLETED|RUNNING|QUEUED|FAILED/.test(s.textContent));if(statusSpan)statusSpan.textContent=t.available?"AVAILABLE":"UNAVAILABLE";const outputRow=c.querySelector("div.flex.items-center.justify-between.bg-surface-container-lowest");if(outputRow){const spans=outputRow.querySelectorAll("span");if(spans.length>1)spans[spans.length-1].textContent=t.description||"No description supplied by catalog.";}const flags=c.querySelector("div.flex.items-center.justify-between.text-body-sm");if(flags)flags.textContent="Tool ID: "+t.id;c.querySelectorAll("button").forEach(b=>b.style.display="none");c.addEventListener("click",()=>{if(!t.available)return;selected=t;grid.querySelectorAll("[data-tool-id]").forEach(x=>{const active=x.dataset.toolId===t.id;x.classList.toggle("ring-1",active);x.classList.toggle("ring-primary/50",active);});submit.disabled=false;say("Selected "+(t.name||t.id)+".",false);});grid.appendChild(c);});grid.style.visibility="visible";}
+async function loadTools(){try{const r=await fetch("/api/tools");if(!r.ok)throw new Error("HTTP "+r.status);tools=await r.json();const count=tools.filter(t=>t.available).length;const badge=[...document.querySelectorAll("span")].find(s=>s.textContent.includes("Live tool catalog loading"));if(badge)badge.textContent=count+" TOOLS AVAILABLE";renderTools();}catch(e){grid.style.visibility="visible";grid.replaceChildren(el("p","text-error","Could not load tool catalog: "+e.message));}}
+async function loadHistory(){try{const r=await fetch("/api/history");if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json(),jobs=Array.isArray(d)?d:(d.jobs||[]),last=jobs[0];recent.textContent=last?String(last.tool||last.id)+" : "+String(last.target||"")+" : "+String(last.status||""):"No jobs recorded";}catch(_){recent.textContent="Job history unavailable";}}
+async function runSelected(){const t=target.value.trim();if(!selected){say("Select an available tool from the catalog first.",true);return;}if(!t){say("Enter a target first.",true);return;}submit.disabled=true;cancel.disabled=true;output.replaceChildren();output.style.visibility="visible";append("Checking scope for "+t+"…","status");try{const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:t})}),sc=await check.json();if(!check.ok||!sc.allowed)throw new Error(sc.reason||sc.error||"Target is not authorized by current scope.");const r=await fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tool_id:selected.id,target:t})}),d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));jobId=d.job_id;jobLabel.textContent="Job "+jobId+" · running";say("Job "+jobId+" running.",false);cancel.style.display="";cancel.disabled=false;append("Started job "+jobId+" with "+selected.id,"status");stream=new EventSource("/api/jobs/"+encodeURIComponent(jobId)+"/stream");stream.onmessage=e=>{try{const ev=JSON.parse(e.data);if(ev.type==="line")append(ev.text||"",ev.stream==="stderr"?"error":"");else if(ev.type==="status")append("Status: "+String(ev.status||"running"),"status");else if(ev.type==="finished"){append("Finished with exit code "+String(ev.exit_code),"status");closeStream();finishRun("finished");}else if(ev.type==="failed"){append("Failed: "+String(ev.error||"unknown error"),"error");closeStream();finishRun("failed");}}catch(_){append("Unrecognized job stream event.","error");}};stream.onerror=()=>{if(stream&&stream.readyState===EventSource.CLOSED){append("Job stream closed.","error");closeStream();finishRun("stream closed");}};}catch(e){append("Run blocked: "+e.message,"error");say(e.message,true);submit.disabled=false;cancel.disabled=true;}}
 function closeStream(){if(stream){stream.close();stream=null;}}
-function finishRun(status){cancel.disabled=true;submit.disabled=!selected;setMessage("Job "+jobId+" "+status+".",status==="failed");loadHistory();}
-async function cancelRun(){if(!jobId)return;cancel.disabled=true;try{const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/cancel",{method:"POST"}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||"Cancellation was not confirmed.");append("Cancellation requested for "+jobId,"status");setMessage("Cancellation requested.",false);}catch(e){setMessage("Cancel failed: "+e.message,true);cancel.disabled=false;}}
+function finishRun(state){jobLabel.textContent="Job "+jobId+" · "+state;cancel.disabled=true;submit.disabled=!selected;say("Job "+jobId+" "+state+".",state==="failed");loadHistory();}
+async function cancelRun(){if(!jobId)return;cancel.disabled=true;try{const r=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/cancel",{method:"POST"}),d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||"Cancellation was not confirmed.");append("Cancellation requested for "+jobId,"status");say("Cancellation requested.",false);}catch(e){say("Cancel failed: "+e.message,true);cancel.disabled=false;}}
 submit.addEventListener("click",runSelected);cancel.addEventListener("click",cancelRun);
-document.querySelectorAll("button").forEach(b=>{const text=b.textContent.trim().toLowerCase();if(["whatweb","gobuster","wpscan"].some(n=>text.includes(n))){b.addEventListener("click",()=>{const term=text.split(/\s+/).pop();const t=tools.find(x=>(x.id+" "+x.name).toLowerCase().includes(term));if(t&&t.available){selected=t;submit.disabled=false;append("Selected "+t.id,"status");}else setMessage("That tool is not available in the live catalog.",true);});}});
-document.getElementById("run-cancel").textContent="Cancel Active Job";cancel.style.display="none";cancel.disabled=true;
-document.getElementById("cli-input")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();runSelected();}});
+document.querySelectorAll("button").forEach(b=>{const text=b.textContent.trim().toLowerCase();if(["whatweb","gobuster","wpscan"].some(n=>text.includes(n))){b.addEventListener("click",()=>{const term=text.split(/\s+/).pop();const t=tools.find(x=>(x.id+" "+x.name).toLowerCase().includes(term));if(t&&t.available){selected=t;submit.disabled=false;say("Selected "+t.id+".",false);}else{say("That tool is not available in the live catalog.",true);}});}});
+const checkScope=document.getElementById("run-check-scope");if(checkScope)checkScope.addEventListener("click",async()=>{const t=target.value.trim();if(!t){say("Enter a target first.",true);return;}try{const r=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:t})}),d=await r.json();say((d.allowed?"ALLOWED: ":"DENIED: ")+String(d.reason||t),!d.allowed);}catch(e){say("Scope check failed: "+e.message,true);}});
+cancel.textContent="Cancel Active Job";cancel.style.display="none";cancel.disabled=true;
 document.querySelectorAll("a[data-path]").forEach(a=>{const u={"scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/reports"};if(u[a.dataset.path]){a.style.display="";a.href=u[a.dataset.path];if(a.dataset.path==="run-and-orchestration"){a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary");a.setAttribute("aria-current","page");}}else{a.style.display="none";a.setAttribute("aria-hidden","true");a.setAttribute("tabindex","-1");}});
-output.replaceChildren();output.style.visibility="visible";append("No active job. Select a tool, enter a target, and execute.","status");cancel.style.display="none";loadTools();loadHistory();
+output.replaceChildren();output.style.visibility="visible";append("No active job. Select a tool, enter a target, and run it.","status");jobLabel.textContent="No job running";loadTools();loadHistory();
 })();
 </script></main></div></body></html>
