@@ -586,12 +586,13 @@
     });
     else if(label==="Export Findings (.json)") b.addEventListener("click",()=>{window.location.href="/api/report?format=json";});
     else if(label==="Download Full Report (.pdf)") b.addEventListener("click",()=>{window.location.href="/api/report?format=pdf";});
-    else if(label==="close") b.addEventListener("click",()=>{const m=document.getElementById("previewModal");m?.classList.add("hidden");m?.setAttribute("aria-hidden","true");});
+    else if(b.id==="closePreviewBtn") { /* wired below */ }
+    else if(label==="close") b.addEventListener("click",()=>{const m=document.getElementById("previewModal");m?.classList.add("hidden");m?.classList.remove("flex");m?.setAttribute("aria-hidden","true");});
     else hideButton(b);
   });
   const preview=document.getElementById("previewBtn");
   const close=document.getElementById("closePreviewBtn");
-  if(close)close.addEventListener("click",()=>{const m=document.getElementById("previewModal");m?.classList.add("hidden");m?.setAttribute("aria-hidden","true");});
+  if(close)close.addEventListener("click",()=>{const m=document.getElementById("previewModal");m?.classList.add("hidden");m?.classList.remove("flex");m?.setAttribute("aria-hidden","true");});
   async function load(){
     const [rr,sr]=await Promise.allSettled([
       fetch("/api/report?format=json").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();}),
