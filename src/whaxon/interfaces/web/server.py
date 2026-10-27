@@ -1646,6 +1646,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         from flask import render_template as _rt
         return _rt("settings.html")
 
+    @app.get("/ui-v2/scope")
+    def ui_v2_scope():
+        """Canonical scope and targets page backed by the live ScopeManager."""
+        return render_template("ui_v2_scope.html")
+
     @app.get("/ui-v2/run")
     def ui_v2_run():
         """Canonical run and orchestration page backed by the live job API."""
