@@ -13,3 +13,13 @@ def test_dashboard_loads_and_routes_only_to_wired_core_pages(page, live_server):
     assert "CVE-2023-38606" not in visible
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
     assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
+
+def test_browser_navigation_headers_do_not_block_get_routes(page, live_server):
+    response = page.request.get(
+        f"{live_server}/ui-v2",
+        headers={
+            "Sec-Fetch-Site": "cross-site",
+            "Origin": "https://untrusted.example",
+        },
+    )
+    assert response.status == 200
