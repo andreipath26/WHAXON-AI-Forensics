@@ -580,6 +580,7 @@
   const closeBtn=document.getElementById("closePreviewBtn");
   let liveMarkdown="";
   const livePreviewButton=document.getElementById("live-report-preview");
+  closeBtn?.addEventListener("click",()=>{modal?.classList.add("hidden");modal?.classList.remove("flex");});
   livePreviewButton?.addEventListener("click",()=>{
     if(preview)preview.textContent=liveMarkdown || "Live report is loading. If no report data is recorded, this preview will remain empty.";
     if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}
@@ -619,7 +620,6 @@
       document.getElementById("live-report-md")?.addEventListener("click",()=>download("whaxon-report.md",markdown,"text/markdown;charset=utf-8"));
       if(preview)preview.textContent=markdown;
       if(previewBtn)previewBtn.addEventListener("click",()=>{if(modal){modal.classList.remove("hidden");modal.classList.add("flex");}if(preview)preview.textContent=markdown;});
-      closeBtn?.addEventListener("click",()=>{modal?.classList.add("hidden");modal?.classList.remove("flex");});
       // Never display example evidence, hashes, hosts, or invented coverage as live data.
       document.querySelectorAll("main *").forEach(node=>{
         if(node.children.length)return;
