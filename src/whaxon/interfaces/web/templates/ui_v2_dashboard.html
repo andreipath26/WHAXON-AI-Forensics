@@ -646,11 +646,14 @@
 <script>
 /* Keep the supplied dashboard design, but do not expose controls without a live backend action. */
 (function () {
-  // No dashboard button has a live action yet; keep navigation on wired links only.
+  const inertLabels = /Add New|Terminal Log|Emergency Halt Scan|CLI Help|Update Credentials Now|Switch Target Session|Start New Engagement|Launch Wizard|Upload Artifact|Deploy Mock|Configure Filters|Export Archive|Continue Setup|Load Workspace|Inspect Ledger|Audit Pack/i;
   document.querySelectorAll("button").forEach((button) => {
-    button.hidden = true;
-    button.disabled = true;
-    button.setAttribute("aria-hidden", "true");
+    const label = (button.innerText || button.textContent || "").replace(/\\s+/g, " ").trim();
+    if (inertLabels.test(label)) {
+      button.disabled = true;
+      button.setAttribute("aria-hidden", "true");
+      button.style.setProperty("display", "none", "important");
+    }
   });
   document.querySelectorAll("main *").forEach((node) => {
     if (node.children.length) return;
