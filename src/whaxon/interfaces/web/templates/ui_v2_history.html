@@ -755,13 +755,12 @@
     document.body.querySelectorAll("*").forEach(node => {
       if (node.children.length) return;
       const value = (node.textContent || "").trim();
-      if (/staging-api\\.corp\\.net|api\\.internal\\.corp|ENG-2026-X892|JOB-8841|JOB-8840|7f99b1|128\\.4 MB|HITL Authorized|CVE-2023-38606/i.test(value)) {
+      if (/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|JOB-8841|JOB-8840|7f99b1|128\.4 MB|HITL Authorized|CVE-2023-38606/i.test(value)) {
         const card = node.closest("section, .rounded-xl, .bg-surface-container-low, .bg-surface-container-lowest");
         if (card && !card.contains(table)) card.hidden = true;
         else node.textContent = "Live data unavailable";
       }
     });
-  }
   }
   if (exportButton) exportButton.addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(jobs, null, 2)], {type:"application/json"});
