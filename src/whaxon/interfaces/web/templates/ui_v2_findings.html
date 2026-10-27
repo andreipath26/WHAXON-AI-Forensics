@@ -475,7 +475,7 @@ document.querySelectorAll('button[onclick="exportProofAction()"],button[onclick=
 const targetHeader=[...document.querySelectorAll("header span,header div")].find(n=>n.textContent.includes("Live engagement data"));if(targetHeader)targetHeader.textContent="Live engagement data";
 const search=document.getElementById("whaxon-finding-filter");if(search)search.addEventListener("input",renderList);
 wireFilters();
-document.querySelectorAll("a[data-path]").forEach(a=>{const p=a.dataset.path,urls={"scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/reports"};if(p==="trust-layer-and-findings"){a.style.display="";a.href=urls[p];a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary");a.setAttribute("aria-current","page");}else{a.style.display="none";a.setAttribute("aria-hidden","true");a.setAttribute("tabindex","-1");}});
+document.querySelectorAll("a[data-path]").forEach(a=>{const p=a.dataset.path;if(p==="trust-layer-and-findings"){a.style.display="";a.href="/ui-v2/findings";a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary");a.setAttribute("aria-current","page");}else{a.style.display="none";a.setAttribute("aria-hidden","true");a.setAttribute("tabindex","-1");}});
 load();
 })();
 </script>
