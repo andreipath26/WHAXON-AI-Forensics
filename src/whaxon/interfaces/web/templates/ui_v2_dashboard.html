@@ -645,7 +645,7 @@
 <script>
 /* Keep the supplied dashboard design, but do not expose controls without a live backend action. */
 (function () {
-  const inertLabels = /^(?:Add New|Terminal Log|Emergency Halt Scan|CLI Help|Update Credentials Now|Switch Target Session|Start New Engagement|Launch Wizard|Upload Artifact|Deploy Mock|Configure Filters|Export Archive|Continue Setup|Load Workspace|Inspect Ledger|Audit Pack)$/i;
+  const inertLabels = /Add New|Terminal Log|Emergency Halt Scan|CLI Help|Update Credentials Now|Switch Target Session|Start New Engagement|Launch Wizard|Upload Artifact|Deploy Mock|Configure Filters|Export Archive|Continue Setup|Load Workspace|Inspect Ledger|Audit Pack/i;
   document.querySelectorAll("button").forEach((button) => {
     const label = (button.innerText || button.textContent || "").replace(/\s+/g, " ").trim();
     if (inertLabels.test(label)) {
