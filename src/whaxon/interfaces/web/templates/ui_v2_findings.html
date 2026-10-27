@@ -476,7 +476,7 @@ const targetHeader=[...document.querySelectorAll("header span,header div")].find
 const search=document.getElementById("whaxon-finding-filter");if(search)search.addEventListener("input",renderList);
 wireFilters();
 document.querySelectorAll("a[data-path]").forEach(a=>{
-    const routes={"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings"};
+    const routes={"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/report"};
     const path=a.dataset.path, href=routes[path];
     a.classList.remove("bg-surface-container-high","text-primary","border-l-2","border-primary");
     if(href){a.style.display="";a.href=href;a.removeAttribute("aria-hidden");a.removeAttribute("tabindex");if(path==="trust-layer-and-findings"){a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary");a.setAttribute("aria-current","page");}else{a.removeAttribute("aria-current");}}
