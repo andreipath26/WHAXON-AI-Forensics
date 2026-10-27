@@ -677,8 +677,7 @@
       }
     });
     document.querySelectorAll("span").forEach(s => {
-      if (textOf(s) === "128.4 MB across 3 replay vaults") s.textContent = jobs.length + " recorded jobs";
-      if (textOf(s).includes("MERKLE_ROOT_VERIFIED")) s.textContent = "Integrity status unavailable";
+      if (textOf(s) === "— across recorded jobs") s.textContent = jobs.length + " recorded jobs";
     });
   }
   load().catch(() => {
