@@ -753,7 +753,7 @@
       const value = (node.textContent || "").trim();
       if (/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|JOB-8841|JOB-8840|7f99b1|128\.4 MB|HITL Authorized|CVE-2023-38606/i.test(value)) {
         const card = node.closest("section, .rounded-xl, .bg-surface-container-low, .bg-surface-container-lowest");
-        if (card && card !== table?.parentElement) card.hidden = true;
+        if (card && !card.contains(table)) card.hidden = true;
         else node.textContent = "Live data unavailable";
       }
     });
