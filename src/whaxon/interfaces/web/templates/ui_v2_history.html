@@ -263,7 +263,9 @@
     "correlated-attack-chains": "/ui-v2/chains",
     "adapter-and-plugin-manager": "/ui-v2/adapters",
     "settings-and-api-explorer": "/ui-v2/settings",
-    "cryptographic-audit-log": "/ui-v2/audit",};
+    "cryptographic-audit-log": "/ui-v2/audit",
+ "attack-surface-continuous-monitoring": "/ui-v2/monitoring"
+};
   document.querySelectorAll("a[data-path]").forEach(a => {
     const route = routes[a.dataset.path];
     if (!route) { a.hidden = true; a.setAttribute("aria-hidden", "true"); return; }
