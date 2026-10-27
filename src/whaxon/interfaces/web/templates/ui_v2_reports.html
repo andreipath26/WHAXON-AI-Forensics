@@ -643,6 +643,21 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
         }
       });
       document.querySelectorAll('a[href="#"]').forEach(a=>{if(/Raw/.test(a.textContent)){a.style.display="none";a.setAttribute("aria-hidden","true");}});
+      // Gap filters and the proof accordion are static mock controls, not live filters/evidence.
+      document.querySelectorAll("button").forEach(button => {
+        if (/^(?:All Gaps|Policy|Safety)\\b/i.test((button.textContent || "").trim())) {
+          button.style.display = "none";
+          button.disabled = true;
+          button.setAttribute("aria-hidden", "true");
+        }
+      });
+      document.querySelectorAll("main *").forEach(node => {
+        if (node.children.length) return;
+        if (/Sample Deterministic Proof|FINDING-SQLI-001|raw_nmap_syn_scan|sqlmap_session_dump|burp_traffic_proxy/i.test((node.textContent || "").trim())) {
+          const sample = node.closest(".bg-surface-container-lowest");
+          if (sample && !sample.closest("#whaxon-live-report")) sample.style.display = "none";
+        }
+      });
       const downloadButtons=[...document.querySelectorAll("button")].filter(b=>(b.textContent||"").includes("Download Full Report (.pdf)"));
       downloadButtons.forEach(b=>{b.querySelector("span:last-child").textContent="Download Report (.md)";b.addEventListener("click",()=>download("whaxon-report.md",markdown,"text/markdown;charset=utf-8"));});
       const jsonButtons=[...document.querySelectorAll("button")].filter(b=>(b.textContent||"").includes("Export Findings (.json)"));
