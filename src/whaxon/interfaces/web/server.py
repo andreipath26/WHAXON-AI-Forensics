@@ -474,6 +474,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/api/tools")
     def list_tools():
         import shutil
+
         from whaxon.adapters import get_adapter
 
         result = []
