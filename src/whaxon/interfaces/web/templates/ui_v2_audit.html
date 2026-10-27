@@ -698,7 +698,22 @@
  "compliance-framework-crosswalk": "/ui-v2/compliance",
  "ptaas-client-portal": "/ui-v2/ptaas",
  "threat-intel-exploit-arsenal": "/ui-v2/threat-intel",
- "trust-layer-approvals-queue": "/ui-v2/approvals"
+ "trust-layer-approvals-queue": "/ui-v2/approvals",
+ "attack-surface-and-continuous-monitoring": "/ui-v2/monitoring",
+ "bug-bounty-and-live-browser-studio": "/ui-v2/bug-bounty",
+ "bug-bounty-live-browser": "/ui-v2/bug-bounty",
+ "threat-intel-and-exploit-arsenal": "/ui-v2/threat-intel",
+ "bas-and-detection-validation": "/ui-v2/bas",
+ "compliance-and-framework-crosswalk": "/ui-v2/compliance",
+ "scope-targets": "/ui-v2/scope",
+ "run-orchestration": "/ui-v2/run",
+ "trust-layer-findings": "/ui-v2/findings",
+ "ptes-coverage-reports": "/ui-v2/reports",
+ "system-diagnostics-health": "/ui-v2/diagnostics",
+ "adapter-plugin-manager": "/ui-v2/adapters",
+ "settings-secrets-vault": "/ui-v2/settings",
+ "settings-and-secrets-vault": "/ui-v2/settings",
+ "trust-layer-approvals-queue-modal": "/ui-v2/approvals"
  };document.querySelectorAll("a[data-path]").forEach(a=>{const p=routes[a.dataset.path];if(p){a.href=p;a.style.display="";}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});const main=document.querySelector("main");if(!main)return;const panel=document.createElement("section");panel.id="whaxon-live-audit";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Recorded execution ledger</h2><p class="mt-1 text-on-surface-variant">This view shows fields actually returned by WHAXON. It does not claim cryptographic signing or tamper-proof attestation when no such record exists.</p><p id="audit-status" class="mt-3 text-on-surface-variant">Loading recorded jobs…</p><div id="audit-list" class="mt-3 grid gap-2"></div>';main.prepend(panel);const status=panel.querySelector("#audit-status"),list=panel.querySelector("#audit-list");const add=(p,v,cls)=>{const n=document.createElement("div");n.textContent=v==null||v===""?"Not recorded":String(v);if(cls)n.className=cls;p.append(n);};async function load(){try{const r=await fetch("/api/history");const jobs=await r.json();if(!r.ok)throw new Error("HTTP "+r.status);list.replaceChildren();status.textContent=(Array.isArray(jobs)?jobs.length:0)+" execution record(s) available from WHAXON history.";for(const job of Array.isArray(jobs)?jobs:[]){const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";add(card,"Job "+(job.id||"ID unavailable"),"font-code-sm text-primary");add(card,"Tool: "+(job.tool||"not recorded")+" · status: "+(job.status||"not recorded"),"mt-1 font-semibold");add(card,"Target: "+(job.target||"not recorded"),"mt-1 text-on-surface-variant");add(card,"Exit code: "+(job.exit_code??"not recorded")+" · duration: "+(job.duration_s??"not recorded"),"mt-1 font-code-sm");add(card,"Integrity digest: "+(job.sha256||job.digest||"not recorded")+" · cryptographic attestation: "+(job.attestation||"not recorded"),"mt-1 text-outline");list.append(card);}}catch(e){status.textContent="Execution ledger could not be loaded: "+e.message;}}load();})();
 </script>
 </body></html>
