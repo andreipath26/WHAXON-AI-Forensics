@@ -702,20 +702,7 @@
         a.style.display="none"; a.setAttribute("aria-hidden","true"); a.setAttribute("tabindex","-1");
       }
     });
-    // Hide template-only demo cards instead of presenting invented jobs or evidence as live.
-    const main = document.querySelector("main");
-    const demoMarkers = ["WX-8492", "CVE-2023-38606", "184,209", "31 Validated", "PTES Coverage", "10/10 Enabled", "12 services found", "Nmap 7.94", "/api/v1/stream/", "whaxon://cli-pipeline", "ENUM_ACTIVE", "Manual Approval Required Before Tool Execution", "04 Active Replayers", "Phase 0: Passive Reconnaissance Stage", "Deterministic Replay Mode (Strict Evidence Check)", "Deterministic Boundary Enforced", "Coverage Recon: 100%", "Scope: OK"];
-    if (main) main.querySelectorAll("div, section, article").forEach(node => {
-      const content = node.textContent || "";
-      if (!demoMarkers.some(marker => content.toLowerCase().includes(marker.toLowerCase()))) return;
-      let card = node;
-      while (card.parentElement && card.parentElement !== main &&
-        !/(^|\\s)bg-surface-container-(low|lowest|high|highest)(\\s|$)/.test(card.className || "")) {
-        card = card.parentElement;
-      }
-      if (card !== main) card.style.display = "none";
-    });
-    // Remove all template-supplied illustrative evidence and host-specific claims.
+    // Do not hide parent layout containers; individual static cards are handled below.
     document.querySelectorAll("main h2, main h3").forEach(heading => {
       const text = heading.textContent.toLowerCase();
       if (text.includes("live vulnerability candidate") || text.includes("replay queue") ||
