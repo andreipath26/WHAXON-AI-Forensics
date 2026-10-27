@@ -594,6 +594,12 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
   const preview=modal?.querySelector("pre");
   const previewBtn=document.getElementById("previewBtn");
   const closeBtn=document.getElementById("closePreviewBtn");
+  let liveMarkdown="";
+  document.getElementById("live-report-preview")?.addEventListener("click",()=>{
+    if(!liveMarkdown)return;
+    if(preview)preview.textContent=liveMarkdown;
+    if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}
+  });
   const findButton=(text)=>[...document.querySelectorAll("button")].find(b=>(b.textContent||"").includes(text));
   const download=(name,content,type)=>{
     const blob=new Blob([content],{type});
@@ -615,7 +621,7 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
       const [jsonResponse,mdResponse]=await Promise.all([fetch("/api/report?format=json"),fetch("/api/report?format=md")]);
       if(!jsonResponse.ok)throw new Error("Report API returned HTTP "+jsonResponse.status);
       if(!mdResponse.ok)throw new Error("Markdown report returned HTTP "+mdResponse.status);
-      const data=await jsonResponse.json();const markdown=await mdResponse.text();
+      const data=await jsonResponse.json();const markdown=await mdResponse.text();liveMarkdown=markdown;
       const entries=Array.isArray(data.jobs)?data.jobs:[];
       const findings=entries.flatMap(e=>(e.findings||[]).map(f=>({...f,job:e.job||{}})));
       const verified=findings.filter(f=>["verified","still_vulnerable"].includes(String(f.verification_status||f.status||"").toLowerCase())).length;
@@ -625,8 +631,6 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
       document.getElementById("live-report-verified").textContent=String(verified);
       document.getElementById("live-report-severe").textContent=String(severe);
       summary.textContent="Generated from the current WHAXON report API. Counts reflect recorded data; absent phase coverage and evidence-file metadata are not inferred.";
-      const livePreview=document.getElementById("live-report-preview");
-      livePreview?.addEventListener("click",()=>{if(preview)preview.textContent=markdown;if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}});
       document.getElementById("live-report-json")?.addEventListener("click",()=>download("whaxon-report.json",JSON.stringify(data,null,2),"application/json"));
       document.getElementById("live-report-md")?.addEventListener("click",()=>download("whaxon-report.md",markdown,"text/markdown;charset=utf-8"));
       if(preview)preview.textContent=markdown;
