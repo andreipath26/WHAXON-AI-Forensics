@@ -489,10 +489,24 @@
     if (footer) footer.textContent = "LIVE CONFIGURATION · " + ruleList("in_scope").length + " in-scope · " + ruleList("out_of_scope").length + " excluded";
     // Remove unsupported navigation and all demo-only panels that claim invented hosts or metrics.
     document.querySelectorAll("a[data-path]").forEach(a => {
-      if (a.dataset.path === "scope-and-targets") {
-        a.style.display = ""; a.href = "/ui-v2/scope"; a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary");
+      const routes = {
+        "dashboard-zero-state": "/ui-v2",
+        "scope-and-targets": "/ui-v2/scope",
+        "run-and-orchestration": "/ui-v2/run",
+        "trust-layer-and-findings": "/ui-v2/findings"
+      };
+      const path = a.dataset.path;
+      if (!routes[path]) {
+        a.style.display = "none"; a.setAttribute("aria-hidden","true"); a.setAttribute("tabindex","-1");
+        return;
+      }
+      a.style.display = ""; a.href = routes[path];
+      a.classList.remove("bg-surface-container-high","text-primary","border-l-2","border-primary");
+      a.removeAttribute("aria-current");
+      if (path === "scope-and-targets") {
+        a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary");
         a.setAttribute("aria-current","page");
-      } else { a.style.display = "none"; a.setAttribute("aria-hidden","true"); a.setAttribute("tabindex","-1"); }
+      }
     });
     document.querySelectorAll("main h2, main h3").forEach(heading => {
       const text = heading.textContent.toLowerCase();
