@@ -602,6 +602,43 @@
       if (fake.includes(text) && !node.hasAttribute("data-live-value")) node.textContent = "—";
     });
   }
+  async function populateLiveMetrics() {
+    try {
+      const [reportResponse, toolsResponse] = await Promise.all([
+        fetch("/api/report?format=json"),
+        fetch("/api/tools")
+      ]);
+      if (!reportResponse.ok || !toolsResponse.ok) throw new Error("live metrics unavailable");
+      const report = await reportResponse.json();
+      const tools = await toolsResponse.json();
+      const jobs = Array.isArray(report.jobs) ? report.jobs : [];
+      const findings = jobs.flatMap(entry => (entry.findings || []).map(f => ({...f, job: entry.job || {}})));
+      const activeJobs = jobs.filter(entry => ["running","queued","cancelling"].includes(String(entry.job?.status || "").toLowerCase())).length;
+      const verified = findings.filter(f => ["verified","still_vulnerable"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
+      const adapters = Array.isArray(tools) ? tools.filter(t => t.adapter_available && t.binary_available && t.transport !== "msf_session").length : 0;
+      const setMetric = (label, value) => {
+        const labelNode = [...document.querySelectorAll("main span")].find(n => n.textContent.trim() === label);
+        const card = labelNode?.closest(".rounded-lg");
+        const number = card?.querySelector("span.font-headline-lg");
+        if (number) number.textContent = String(value);
+      };
+      setMetric("Active Scans", activeJobs);
+      setMetric("Verified Findings", verified);
+      setMetric("Active Adapters", adapters);
+      setMetric("PTES Coverage", "—");
+      const state = [...document.querySelectorAll("main span")].find(n => n.textContent.includes("Awaiting Target Commit"));
+      if (state) state.textContent = "(Live WHAXON state)";
+    } catch (_) {
+      const status = document.querySelector("main");
+      if (status && !status.textContent.includes("Dashboard data unavailable")) {
+        const note = document.createElement("p");
+        note.className = "font-code-sm text-outline";
+        note.textContent = "Dashboard data unavailable; use the live pages to inspect current state.";
+        status.prepend(note);
+      }
+    }
+  }
+  populateLiveMetrics();
 })();
 </script>
 </body></html>
