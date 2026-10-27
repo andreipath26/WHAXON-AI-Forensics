@@ -1670,6 +1670,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Canonical findings design, wired to live report and validation APIs."""
         return render_template("ui_v2_findings.html")
 
+    @app.get("/ui-v2/history")
+    def ui_v2_history():
+        """Canonical job history page backed by recorded WHAXON jobs."""
+        return render_template("ui_v2_history.html")
+
     @app.get("/ui-v2")
     def ui_v2_dashboard():
         """Canonical engagement dashboard with live core-page navigation."""
