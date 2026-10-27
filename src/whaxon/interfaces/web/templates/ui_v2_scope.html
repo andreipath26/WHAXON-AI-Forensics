@@ -410,8 +410,7 @@
       remove.textContent = "Remove";
       remove.addEventListener("click", async () => {
         if (!window.confirm("Remove scope rule " + entry.rule + "?")) return;
-        const key = entry.type === "EXCLUDED" ? "out_scope" : "in_scope";
-        const field = key === "out_scope" ? "out_scope" : "in_scope";
+        const field = entry.type === "EXCLUDED" ? "out_of_scope" : "in_scope";
         const next = ruleList(field).filter(item => item !== entry.rule);
         try { await save({[field]: next}); }
         catch (error) { say(error.message, false); }
@@ -501,6 +500,14 @@
     catch (error) { say(error.message, false); }
   });
   $("openImportDrawerBtn")?.addEventListener("click", () => drawer?.classList.remove("hidden"));
+  // Only scope.json is currently supported by the live import endpoint; do not advertise inert parsers.
+  drawer?.querySelectorAll("button").forEach(button => {
+    const label = button.textContent.trim();
+    if (label === "Burp XML/JSON" || label === "CIDR List") button.style.display = "none";
+  });
+  drawer?.querySelectorAll("textarea").forEach(area => {
+    area.placeholder = '{ "engagement": "Authorized assessment", "enabled": true, "in_scope": ["example.com"], "out_of_scope": [], "notes": "" }';
+  });
   // The static template includes illustrative targets; never leave them visible before the live API responds.
   tbody?.replaceChildren();
   document.querySelectorAll("button").forEach(button => {
