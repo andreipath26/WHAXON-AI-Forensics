@@ -107,7 +107,6 @@ def test_scope_rules_remain_editable_after_enforcement_is_disabled(page, live_se
         before,
     )
     assert disabled["status"] == 200
-    edited_rules = [*disabled["body"]["in_scope"], "scope-edit.example.com"]
     saved = page.evaluate(
         """async (scope) => {
           const response = await fetch('/api/scope', {
