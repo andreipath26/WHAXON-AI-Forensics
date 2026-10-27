@@ -601,7 +601,7 @@
   }
   async function loadTools() {
     const tools = await api("/api/tools");
-    const usable = tools.filter(t => t.available && t.adapter_available);
+    const usable = tools.filter(t => t.binary_available || t.available);
     toolSelect.replaceChildren();
     if (!usable.length) {
       toolSelect.add(new Option("No available adapters", ""));
@@ -609,7 +609,7 @@
       return;
     }
     for (const tool of usable) {
-      const option = new Option(tool.name + " · " + tool.id, tool.id);
+      const option = new Option(tool.name + " · " + tool.id + (tool.adapter_available ? "" : " · generic runner"), tool.id);
       option.dataset.description = tool.description || "";
       toolSelect.add(option);
     }
