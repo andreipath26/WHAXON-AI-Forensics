@@ -41,7 +41,7 @@
 <span class="font-label-sm text-label-sm uppercase text-outline">SSE Socket</span>
 <div class="flex items-center gap-space-xs">
 <span class="h-1.5 w-1.5 rounded-full bg-primary animate-ping"></span>
-<span class="font-label-sm text-label-sm text-primary">Not connected</span>
+<span id="run-sse-state" class="font-label-sm text-label-sm text-primary">Not connected</span>
 </div>
 </div>
 </div>
@@ -650,7 +650,7 @@
     if (source) source.close();
     source = new EventSource("/api/jobs/" + encodeURIComponent(jobId) + "/stream");
     source.onopen = () => {
-      const socket = [...document.querySelectorAll("span")].find(el => el.textContent.trim() === "Not connected");
+      const socket = $("run-sse-state");
       if (socket) { socket.textContent = "Connected"; socket.className = "font-label-sm text-label-sm text-primary"; }
     };
     source.onmessage = event => {
@@ -684,9 +684,10 @@
   function clearLog() { stdout?.replaceChildren(); }
   function disableFakeControls() {
     // These template controls imply unsupported multi-tool orchestration or payload injection.
+    document.querySelectorAll("[onclick]").forEach(element => element.removeAttribute("onclick"));
     document.querySelectorAll("button").forEach(button => {
       const label = button.textContent.trim();
-      if (/Emergency Halt Scan|Emergency Abort|Inject Payload|Spawn Sub-Tool|Engage Replay|Re-run|Pause$|Terminal Log/.test(label)) {
+      if (/terminal log|emergency halt scan|emergency abort|inject payload|spawn sub.tool|engage replay|re.run|^pause$|^abort$|view stdout|execute/i.test(label) && !["run-passive-btn","run-active-btn","btn-pause"].includes(button.id)) {
         button.style.display = "none";
         button.setAttribute("aria-hidden","true");
         button.disabled = true;
