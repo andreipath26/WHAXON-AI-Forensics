@@ -1685,6 +1685,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Canonical evidence inspector backed by recorded job evidence."""
         return render_template("ui_v2_evidence.html")
 
+    @app.get("/ui-v2/ai")
+    def ui_v2_ai():
+        """Canonical AI strategy gate backed by live AI run and scope APIs."""
+        return render_template("ui_v2_ai.html")
+
     @app.get("/ui-v2")
     def ui_v2_dashboard():
         """Canonical engagement dashboard with live core-page navigation."""
