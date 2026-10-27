@@ -246,7 +246,7 @@
 </div>
 <section id="history-live-details" class="p-margin rounded-xl bg-surface-container-low text-on-surface-variant">Select a recorded job to inspect its actual invocation, output, artifacts, and integrity metadata. Fields not stored by WHAXON are not fabricated.</section>
 </div></div></main></div>
-<script><script>
+<script>
 (function () {
   const routes = {
     "dashboard-zero-state": "/ui-v2",
@@ -254,7 +254,8 @@
     "run-and-orchestration": "/ui-v2/run",
     "trust-layer-and-findings": "/ui-v2/findings",
     "ptes-coverage-and-reports": "/ui-v2/reports",
-    "job-execution-history": "/ui-v2/history"
+    "job-execution-history": "/ui-v2/history",
+    "system-diagnostics-and-health": "/ui-v2/diagnostics"
   };
   document.querySelectorAll("a[data-path]").forEach(a => {
     const route = routes[a.dataset.path];
