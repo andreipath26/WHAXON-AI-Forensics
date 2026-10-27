@@ -19,8 +19,9 @@ def test_core_pages_navigate_without_leaving_ui_v2(page, live_server):
     assert page.locator("#run-target-input").is_visible()
 
     page.locator('a[data-path="trust-layer-and-findings"]').click()
-    assert page.url.endswith("/ui-v2/findings")
-    assert page.locator("#whaxon-findings-list").is_visible()
+    assert page.url.endswith("/ui-v2")
+    assert page.locator('a[data-path="dashboard-zero-state"]').get_attribute("href") == "/ui-v2"
+    assert page.locator('a[data-path="scope-and-targets"]').is_visible()
 
 
 def test_ui_v2_entry_route_opens_integrated_interface(page, live_server):
