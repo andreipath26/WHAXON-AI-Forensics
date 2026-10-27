@@ -10,6 +10,17 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
         timeout=8000,
     )
     assert page.locator("#run-target-input").count() == 1
+    assert page.locator("#run-target-input").is_visible()
+    assert page.locator("#run-active-btn").is_visible()
+    assert page.locator("#run-passive-btn").is_visible()
+    assert page.get_by_role("button", name="Spawn Sub-tool").is_hidden()
+    assert page.get_by_role("button", name="Inject Payload").is_hidden()
+    assert page.get_by_role("button", name="Emergency Abort").is_hidden()
+    assert page.get_by_role("button", name="Execute").is_hidden()
+    visible_text = page.locator("main").inner_text()
+    assert "CVE-2023-38606" not in visible_text
+    assert "184,209" not in visible_text
+    assert "PTES Coverage" not in visible_text
     assert page.locator("#run-job-id").text_content() == "No job started"
     assert "staging-api.corp.net" not in response.text()
     assert "api.internal.corp" not in response.text()
