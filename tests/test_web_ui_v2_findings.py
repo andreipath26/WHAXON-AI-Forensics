@@ -40,8 +40,9 @@ def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, l
     assert page.locator('a[data-path="ptes-coverage-and-reports"]').is_hidden()
 
 def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
-    page.goto(f"{live_server}/ui-v2/findings")
-    html = page.content()
+    response = page.goto(f"{live_server}/ui-v2/findings")
+    assert response is not None
+    html = response.text()
     assert "staging-api.corp.net" not in html
     assert "redacted_token_sess_089" not in html
     assert "5055ms" not in html
