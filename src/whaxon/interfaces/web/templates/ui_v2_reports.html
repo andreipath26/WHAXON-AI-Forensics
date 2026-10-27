@@ -637,6 +637,8 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
         if(node.children.length)return;
         const value=(node.textContent||"").trim();
         if(/api\.internal\.corp|ENG-2026-X892|FINDING-SQLI-001|raw_nmap_syn_scan|sqlmap_session_dump|burp_traffic_proxy|deterministic_proof_log|sha256:|7f83b165|PostgreSQL 15\.4|8 Subdomains|43 Ports Map|41 Scans|17 Findings|6 Confirmed|100%|92%|85%|70%/.test(value)){
+          const previewModal=node.closest("#previewModal");
+          if(previewModal){node.textContent="Live data is loaded when the preview opens";return;}
           const card=node.closest(".bg-surface-container")||node.closest(".bg-surface-container-low")||node.closest(".rounded-xl");
           if(card&&card.id!=="whaxon-live-report")card.style.display="none";
           else node.textContent="Live evidence not recorded";
