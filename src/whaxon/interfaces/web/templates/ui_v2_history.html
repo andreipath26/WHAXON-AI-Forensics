@@ -691,7 +691,7 @@
       targetCell.append(text("div", "Scope enforcement applies to execution", "font-label-sm text-label-sm text-outline mt-1"));
       const durationCell = document.createElement("td");
       durationCell.className = "py-3 px-space-md align-top whitespace-nowrap";
-      durationCell.append(text("div", Number.isFinite(Number(job.duration_s)) ? Number(job.duration_s).toFixed(2) + " s" : "Not recorded", "text-on-surface"));
+      durationCell.append(text("div", job.duration_s != null && Number.isFinite(Number(job.duration_s)) ? Number(job.duration_s).toFixed(2) + " s" : "Not recorded", "text-on-surface"));
       durationCell.append(text("div", "Timestamp not recorded by history API", "font-label-sm text-label-sm text-outline mt-1"));
       const operatorCell = document.createElement("td");
       operatorCell.className = "py-3 px-space-md align-top";
