@@ -497,6 +497,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             )
             result.append({
                 "binary_available": binary_available,
+                "transport": tool.transport,
                 "id": tool.id,
                 "name": tool.name,
                 "category": tool.category,
