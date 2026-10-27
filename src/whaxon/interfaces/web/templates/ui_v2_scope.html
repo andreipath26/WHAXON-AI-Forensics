@@ -20,7 +20,7 @@
 <h1 class="font-headline-md text-headline-md text-on-surface tracking-tight font-bold">Scope &amp; Target Definition</h1>
 <span class="px-space-xs py-0.5 rounded bg-primary/10 text-primary border border-primary/30 font-label-sm text-label-sm uppercase tracking-wider">AGPL-3.0 Engine</span>
 </div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Deterministic authorization boundary layer. Zero unauthorized egress enforced by local kernel daemon.</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">WHAXON checks configured scope before runner actions. Use host firewall or network egress controls as an additional boundary.</p>
 </div>
 </div>
 <!-- Quick Action Triggers -->
@@ -45,12 +45,12 @@
 <span class="material-symbols-outlined text-primary text-lg">domain</span>
 </div>
 <div class="my-space-sm flex items-baseline gap-space-sm">
-<span class="font-headline-xl text-headline-xl text-primary font-bold">14</span>
+<span class="font-headline-xl text-headline-xl text-primary font-bold">—</span>
 <span class="font-code-sm text-code-sm text-on-surface-variant font-medium">Explicit Targets</span>
 </div>
 <div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant border-t border-outline-variant/20 pt-space-xs">
-<span>Active DNS: 9</span>
-<span class="text-primary font-medium">100% Authorized</span>
+<span>DNS resolution: checked on demand</span>
+<span class="text-primary font-medium">No authorization percentage</span>
 </div>
 </div>
 <!-- Card 2: Active Subnets -->
@@ -60,12 +60,12 @@
 <span class="material-symbols-outlined text-secondary text-lg">lan</span>
 </div>
 <div class="my-space-sm flex items-baseline gap-space-sm">
-<span class="font-headline-xl text-headline-xl text-secondary font-bold">3</span>
+<span class="font-headline-xl text-headline-xl text-secondary font-bold">—</span>
 <span class="font-code-sm text-code-sm text-on-surface-variant font-medium">Target CIDRs</span>
 </div>
 <div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant border-t border-outline-variant/20 pt-space-xs">
-<span>Total IPs: 768</span>
-<span class="text-secondary font-medium">BGP Route Match</span>
+<span>Address count not inferred</span>
+<span class="text-secondary font-medium">No BGP claim</span>
 </div>
 </div>
 <!-- Card 3: Exclusions / Dropped -->
@@ -75,12 +75,12 @@
 <span class="material-symbols-outlined text-tertiary text-lg">block</span>
 </div>
 <div class="my-space-sm flex items-baseline gap-space-sm">
-<span class="font-headline-xl text-headline-xl text-tertiary font-bold">8</span>
+<span class="font-headline-xl text-headline-xl text-tertiary font-bold">—</span>
 <span class="font-code-sm text-code-sm text-on-surface-variant font-medium">Drop Rules</span>
 </div>
 <div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant border-t border-outline-variant/20 pt-space-xs">
-<span>Production Gateways: 2</span>
-<span class="text-tertiary font-medium">Strict Drop Active</span>
+<span>No production count</span>
+<span class="text-tertiary font-medium">Backend scope checks</span>
 </div>
 </div>
 <!-- Card 4: Scope Enforcement Status -->
@@ -93,12 +93,12 @@
 </span>
 </div>
 <div class="my-space-xs flex flex-col">
-<span class="font-code-md text-code-md text-on-surface font-semibold truncate">AGPL3 LOCAL DAEMON</span>
-<span class="font-label-sm text-label-sm text-primary tracking-wide uppercase font-semibold">Strict Boundary Enforced</span>
+<span class="font-code-md text-code-md text-on-surface font-semibold truncate">WHAXON SCOPE MANAGER</span>
+<span class="font-label-sm text-label-sm text-primary tracking-wide uppercase font-semibold">Scope status loaded from backend</span>
 </div>
 <div class="flex items-center justify-between font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
-<span>whaxon-proxy: 127.0.0.1</span>
-<span class="text-primary font-mono">LATENCY &lt;1ms</span>
+<span>Scope API</span>
+<span class="text-primary font-mono">No latency claim</span>
 </div>
 </div>
 </div>
