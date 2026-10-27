@@ -1,5 +1,5 @@
 """Browser coverage for the live adapter manager."""
-from __future__
+from __future__ import annotations
 
 
 def test_adapter_manager_uses_live_tool_catalog(page, live_server):
