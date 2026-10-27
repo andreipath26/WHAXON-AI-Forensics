@@ -17,7 +17,10 @@ def test_scope_page_loads_live_configuration(page, live_server):
     assert "staging-api.corp.net" not in response.text()
     assert "api.internal.corp" not in response.text()
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
-    assert page.locator('a[data-path="run-and-orchestration"]').is_hidden()
+    assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
+    assert page.locator('a[data-path="run-and-orchestration"]').get_attribute("href") == "/ui-v2/run"
+    assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
+    assert page.locator('a[data-path="trust-layer-and-findings"]').get_attribute("href") == "/ui-v2/findings"
 
 
 def test_scope_api_rejects_malformed_rules_without_changing_config(page, live_server):
