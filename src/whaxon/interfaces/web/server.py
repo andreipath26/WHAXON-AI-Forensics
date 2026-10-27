@@ -1710,6 +1710,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Read-only settings and API explorer with secret redaction."""
         return render_template("ui_v2_settings.html")
 
+    @app.get("/ui-v2/audit")
+    def ui_v2_audit():
+        """Show recorded execution metadata without inventing cryptographic claims."""
+        return render_template("ui_v2_audit.html")
+
     @app.get("/ui-v2")
     def ui_v2_dashboard():
         """Canonical engagement dashboard with live core-page navigation."""
