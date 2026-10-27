@@ -645,7 +645,7 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
           const previewModal=node.closest("#previewModal");
           if(previewModal){node.textContent="Live data is loaded when the preview opens";return;}
           const card=node.closest(".bg-surface-container")||node.closest(".bg-surface-container-low")||node.closest(".rounded-xl");
-          if(card&&card.id!=="whaxon-live-report")card.style.display="none";
+          if(card&&card.id!=="whaxon-live-report"&&!card.querySelector("#previewModal"))card.style.display="none";
           else node.textContent="Live evidence not recorded";
         }
       });
