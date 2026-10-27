@@ -34,7 +34,7 @@ def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, l
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
         timeout=5000,
     )
-    assert page.locator('a[data-path="scope-and-targets"]').is_visible()
-    assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
-    assert page.locator('a[data-path="ptes-coverage-and-reports"]').is_visible()
+    assert page.locator('a[data-path="scope-and-targets"]').is_hidden()
+    assert page.locator('a[data-path="run-and-orchestration"]').is_hidden()
+    assert page.locator('a[data-path="ptes-coverage-and-reports"]').is_hidden()
