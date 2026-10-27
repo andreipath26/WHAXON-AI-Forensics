@@ -595,7 +595,9 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
   const previewBtn=document.getElementById("previewBtn");
   const closeBtn=document.getElementById("closePreviewBtn");
   let liveMarkdown="";
-  document.getElementById("live-report-preview")?.addEventListener("click",()=>{
+  const livePreviewButton=document.getElementById("live-report-preview");
+  if(livePreviewButton)livePreviewButton.disabled=true;
+  livePreviewButton?.addEventListener("click",()=>{
     if(!liveMarkdown)return;
     if(preview)preview.textContent=liveMarkdown;
     if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}
@@ -621,7 +623,7 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
       const [jsonResponse,mdResponse]=await Promise.all([fetch("/api/report?format=json"),fetch("/api/report?format=md")]);
       if(!jsonResponse.ok)throw new Error("Report API returned HTTP "+jsonResponse.status);
       if(!mdResponse.ok)throw new Error("Markdown report returned HTTP "+mdResponse.status);
-      const data=await jsonResponse.json();const markdown=await mdResponse.text();liveMarkdown=markdown;
+      const data=await jsonResponse.json();const markdown=await mdResponse.text();liveMarkdown=markdown;if(livePreviewButton)livePreviewButton.disabled=false;
       const entries=Array.isArray(data.jobs)?data.jobs:[];
       const findings=entries.flatMap(e=>(e.findings||[]).map(f=>({...f,job:e.job||{}})));
       const verified=findings.filter(f=>["verified","still_vulnerable"].includes(String(f.verification_status||f.status||"").toLowerCase())).length;
