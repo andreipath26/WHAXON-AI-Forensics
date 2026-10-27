@@ -1700,6 +1700,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Canonical attack-chain page backed by stored pivot graph data."""
         return render_template("ui_v2_chains.html")
 
+    @app.get("/ui-v2/adapters")
+    def ui_v2_adapters():
+        """Canonical adapter manager backed by the live tool catalog."""
+        return render_template("ui_v2_adapters.html")
+
+    @app.get("/ui-v2/settings")
+    def ui_v2_settings():
+        """Read-only settings and API explorer with secret redaction."""
+        return render_template("ui_v2_settings.html")
+
     @app.get("/ui-v2")
     def ui_v2_dashboard():
         """Canonical engagement dashboard with live core-page navigation."""
