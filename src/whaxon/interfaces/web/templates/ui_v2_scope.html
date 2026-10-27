@@ -374,8 +374,12 @@
     const payload = { engagement: scope.engagement || "", enabled: scope.enabled !== false,
       in_scope: ruleList("in_scope"), out_of_scope: ruleList("out_of_scope"), notes: scope.notes || "" };
     Object.assign(payload, next || {});
-    if (payload.enabled === false) {
-      if (!confirmation || !window.confirm("Disable scope enforcement? This allows targets that are not in the configured scope.")) return false;
+    if (payload.enabled === false && scope.enabled !== false) {
+      if (!window.confirm("Disable scope enforcement? This allows targets that are not in the configured scope.")) return false;
+      payload.confirm_disable = true;
+    } else if (payload.enabled === false) {
+      // The API accepts edits while enforcement remains disabled; this is not
+      // a new disable transition and must not prompt again for every edit.
       payload.confirm_disable = true;
     }
     scope = await api("/api/scope", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
