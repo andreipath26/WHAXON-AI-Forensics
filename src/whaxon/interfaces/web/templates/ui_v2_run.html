@@ -704,7 +704,7 @@
     });
     // Hide template-only demo cards instead of presenting invented jobs or evidence as live.
     const main = document.querySelector("main");
-    const demoMarkers = ["WX-8492", "CVE-2023-38606", "184,209", "31 Validated", "PTES Coverage", "10/10 Enabled", "12 services found", "Nmap 7.94", "/api/v1/stream/", "whaxon://cli-pipeline", "ENUM_ACTIVE"];
+    const demoMarkers = ["WX-8492", "CVE-2023-38606", "184,209", "31 Validated", "PTES Coverage", "10/10 Enabled", "12 services found", "Nmap 7.94", "/api/v1/stream/", "whaxon://cli-pipeline", "ENUM_ACTIVE", "Manual Approval Required Before Tool Execution", "04 Active Replayers", "Phase 0: Passive Reconnaissance Stage", "Deterministic Replay Mode (Strict Evidence Check)", "Deterministic Boundary Enforced", "Coverage Recon: 100%", "Scope: OK"];
     if (main) main.querySelectorAll("div, section, article").forEach(node => {
       const content = node.textContent || "";
       if (!demoMarkers.some(marker => content.toLowerCase().includes(marker.toLowerCase()))) return;
