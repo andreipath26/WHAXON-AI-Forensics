@@ -629,12 +629,25 @@ def test_msf_run_rejects_path_traversal_module_path(tmp_path, monkeypatch):
     assert response.status_code == 400
     assert "module path" in response.get_json()["error"]
 
-def test_loopback_listener_rejects_cross_site_get_requests(tmp_path, monkeypatch):
+def test_loopback_listener_allows_cross_site_metadata_on_safe_get(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
     app, _ = _make_app(tmp_path, monkeypatch)
     response = app.test_client().get(
         "/api/pivot/candidates",
-        headers={"Sec-Fetch-Site": "cross-site"},
+        headers={"Sec-Fetch-Site": "cross-site", "Origin": "https://untrusted.example"},
+        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    # Safe GETs must remain navigable; browser metadata checks protect writes.
+    assert response.status_code == 200
+
+
+def test_loopback_listener_rejects_cross_site_state_changing_requests(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/scope",
+        json={"enabled": True, "in_scope": ["127.0.0.1"], "out_of_scope": []},
+        headers={"Sec-Fetch-Site": "cross-site", "Origin": "https://untrusted.example"},
         environ_base={"REMOTE_ADDR": "127.0.0.1"},
     )
     assert response.status_code == 403
