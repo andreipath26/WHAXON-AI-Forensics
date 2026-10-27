@@ -579,12 +579,8 @@
   const previewBtn=document.getElementById("previewBtn");
   const closeBtn=document.getElementById("closePreviewBtn");
   let liveMarkdown="";
-  const livePreviewButton=document.getElementById("live-report-preview");
+  let livePreviewButton=null;
   closeBtn?.addEventListener("click",()=>{modal?.classList.add("hidden");modal?.classList.remove("flex");});
-  livePreviewButton?.addEventListener("click",()=>{
-    if(preview)preview.textContent=liveMarkdown || "Live report is loading. If no report data is recorded, this preview will remain empty.";
-    if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}
-  });
   const findButton=(text)=>[...document.querySelectorAll("button")].find(b=>(b.textContent||"").includes(text));
   const download=(name,content,type)=>{
     const blob=new Blob([content],{type});
@@ -600,6 +596,8 @@
     main.prepend(card);
   };
   addLiveCard();
+  livePreviewButton=document.getElementById("live-report-preview");
+  livePreviewButton?.addEventListener("click",()=>{if(preview)preview.textContent=liveMarkdown || "Live report is loading. If no report data is recorded, this preview will remain empty.";if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}});
   async function loadReport(){
     const summary=document.getElementById("live-report-summary");
     try{
