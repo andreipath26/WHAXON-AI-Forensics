@@ -44,7 +44,7 @@ def test_reports_preview_opens_and_closes(page, live_server):
     assert response is not None and response.status == 200
     modal = page.locator("#previewModal")
     assert not modal.is_visible()
-    page.locator("#previewBtn").click()
+    page.locator("#live-report-preview").click()
     assert modal.is_visible()
     page.locator("#closePreviewBtn").click()
     assert not modal.is_visible()
