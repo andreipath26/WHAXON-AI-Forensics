@@ -10,6 +10,10 @@ def test_scope_page_loads_live_configuration(page, live_server):
         timeout=5000,
     )
     assert page.locator("#targetTableBody tr").count() >= 1
+    assert page.get_by_text("Allowed Ports Range").is_hidden()
+    assert page.get_by_text("Rate Limit Threshold").is_hidden()
+    assert page.get_by_text("Written Authorization Reference / Contract ID").is_hidden()
+    assert "10.0.12.0/24 (Prod DBs)" not in page.locator("main").inner_text()
     assert "staging-api.corp.net" not in response.text()
     assert "api.internal.corp" not in response.text()
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
