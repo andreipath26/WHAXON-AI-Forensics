@@ -162,7 +162,7 @@
 <span class="font-label-sm text-label-sm uppercase text-outline">Option 01</span>
 <h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Quickstart Target Scope Wizard</h2>
 <p class="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-              Establish legally bounded attack boundaries. Automatically verify CIDRs and inject hardware throttle locks.
+              Establish legally bounded attack boundaries. Validate target rules against WHAXON’s configured scope before launching a run.
             </p>
 </div>
 <!-- Step Progression Timeline Mini -->
@@ -532,6 +532,13 @@
         button.style.display = "none";
         button.setAttribute("aria-hidden", "true");
         button.disabled = true;
+      }
+    });
+    document.querySelectorAll("h2").forEach(h => {
+      const title = textOf(h);
+      if (title === "Import Existing Assessment Profile" || title === "Explore Lab Environments") {
+        const card = h.closest(".rounded-lg.bg-surface-container-low") || h.parentElement?.parentElement?.parentElement;
+        if (card) card.style.display = "none";
       }
     });
     // Hide static pre-flight claims; scope state is shown from the live API instead.
