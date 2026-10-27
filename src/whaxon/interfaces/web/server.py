@@ -1048,6 +1048,56 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def get_scope():
         return jsonify(registry.core.scope.summary())
 
+    @app.post("/api/scope")
+    def save_scope():
+        """Validate and persist an operator-edited scope definition."""
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "JSON object required"}, 400
+        enabled = data.get("enabled", True)
+        if type(enabled) is not bool:
+            return {"error": "'enabled' must be a JSON boolean"}, 400
+        current_scope = registry.core.scope.summary()
+        if (
+            enabled is False
+            and current_scope.get("enabled", True) is not False
+            and data.get("confirm_disable") is not True
+        ):
+            return {"error": "confirm_disable=true is required to disable scope enforcement"}, 400
+        engagement = data.get("engagement", "")
+        notes = data.get("notes", "")
+        if not isinstance(engagement, str) or len(engagement) > 200:
+            return {"error": "engagement must be a string of at most 200 characters"}, 400
+        if not isinstance(notes, str) or len(notes) > 5000:
+            return {"error": "notes must be a string of at most 5000 characters"}, 400
+        from whaxon.core.scope import _validate_scope_rule
+        rules = {}
+        for key in ("in_scope", "out_of_scope"):
+            value = data.get(key, [])
+            if not isinstance(value, list) or len(value) > 500:
+                return {"error": f"'{key}' must be a list with at most 500 rules"}, 400
+            normalized = []
+            for item in value:
+                if not isinstance(item, str) or not item.strip() or len(item.strip()) > 253:
+                    return {"error": f"invalid rule in '{key}'"}, 400
+                rule = item.strip()
+                if not _validate_scope_rule(rule):
+                    return {"error": f"invalid scope rule: {rule}"}, 400
+                if rule not in normalized:
+                    normalized.append(rule)
+            rules[key] = normalized
+        try:
+            registry.core.scope.save({
+                "engagement": engagement.strip(),
+                "enabled": enabled,
+                "in_scope": rules["in_scope"],
+                "out_of_scope": rules["out_of_scope"],
+                "notes": notes.strip(),
+            })
+        except (OSError, RuntimeError, ValueError) as exc:
+            return {"error": f"scope was not saved: {exc}"}, 400
+        return jsonify(registry.core.scope.summary())
+
     @app.post("/api/scope/check")
     def check_scope():
         data = request.get_json(silent=True) or {}
