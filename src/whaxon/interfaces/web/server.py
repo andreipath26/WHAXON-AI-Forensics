@@ -473,6 +473,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/tools")
     def list_tools():
+        import shutil
         from whaxon.adapters import get_adapter
 
         result = []
@@ -482,7 +483,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             except Exception:
                 app.logger.exception("Adapter lookup failed for catalog tool %s", tool.id)
                 adapter_available = False
+            binary_available = bool(
+                tool.binary
+                and (
+                    shutil.which(tool.binary)
+                    or (
+                        os.path.isabs(tool.binary)
+                        and os.path.isfile(tool.binary)
+                        and os.access(tool.binary, os.X_OK)
+                    )
+                )
+            )
             result.append({
+                "binary_available": binary_available,
                 "id": tool.id,
                 "name": tool.name,
                 "category": tool.category,
