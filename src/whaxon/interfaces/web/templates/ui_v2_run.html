@@ -695,7 +695,7 @@
       if (/View stdout/.test(label)) button.style.display = "none";
     });
     document.querySelectorAll("a[data-path]").forEach(a => {
-      const routes = {"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings"};
+      const routes = {"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/report"};
       const path = a.dataset.path, href = routes[path];
       a.classList.remove("bg-surface-container-high","text-primary","border-l-2","border-primary");
       if (href) {
