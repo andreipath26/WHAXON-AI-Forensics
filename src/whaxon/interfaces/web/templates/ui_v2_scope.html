@@ -417,6 +417,32 @@
       tr.append(target, type, ports, rate, auth, action);
       tbody.append(tr);
     }
+    const metricCards = [...document.querySelectorAll("main .grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4 > div")];
+    const cidrs = ruleList("in_scope").filter(rule => rule.includes("/")).length;
+    const setMetric = (cardIndex, value, secondary, footerLeft, footerRight) => {
+      const card = metricCards[cardIndex];
+      if (!card) return;
+      const mainValue = card.querySelector(".font-headline-xl");
+      if (mainValue) mainValue.textContent = value;
+      const labels = card.querySelectorAll(".my-space-sm .font-code-sm, .my-space-xs .font-code-md, .my-space-xs .font-label-sm");
+      if (labels[0] && secondary) labels[0].textContent = secondary;
+      const footer = card.querySelectorAll(".border-t.pt-space-xs span");
+      if (footer[0] && footerLeft) footer[0].textContent = footerLeft;
+      if (footer[1] && footerRight) footer[1].textContent = footerRight;
+    };
+    setMetric(0, String(ruleList("in_scope").length), "Configured rules", "Engagement: " + (scope.engagement || "Unnamed"), "From scope.json");
+    setMetric(1, String(cidrs), "CIDR rules", "Host rules: " + (ruleList("in_scope").length - cidrs), "No route claims");
+    setMetric(2, String(ruleList("out_of_scope").length), "Explicit deny rules", "Out-of-scope rules", "Evaluated first");
+    const engineCard = metricCards[3];
+    if (engineCard) {
+      const values = engineCard.querySelectorAll(".my-space-xs span, .border-t.pt-space-xs span");
+      if (values[0]) values[0].textContent = "WHAXON SCOPE MANAGER";
+      if (values[1]) values[1].textContent = scope.enabled ? "Enforcement enabled" : "Enforcement disabled";
+      if (values[2]) values[2].textContent = "Backend scope checks";
+      if (values[3]) values[3].textContent = "No latency claim";
+    }
+    const intro = [...document.querySelectorAll("main p")].find(p => p.textContent.includes("Zero unauthorized egress"));
+    if (intro) intro.textContent = "WHAXON checks configured scope before runner actions. Use host firewall or network egress controls as an additional boundary.";
     const badge = [...document.querySelectorAll("h2")].find(el => el.textContent.includes("In-Scope Target Registry"))?.parentElement?.querySelector("span");
     if (badge) badge.textContent = rows.length + " rules loaded";
     const headerTarget = [...document.querySelectorAll("header span")].find(el => /Target:|Live scope/.test(el.textContent));
