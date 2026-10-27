@@ -651,7 +651,7 @@
       }
     }
     document.querySelectorAll("button").forEach(button => {
-      const label = textOf(button).replace(/\s+/g, " ");
+      const clone = button.cloneNode(true); clone.querySelectorAll(".material-symbols-outlined").forEach(icon => icon.remove()); const label = textOf(clone).replace(/\s+/g, " ");
       if (/^(Launch Wizard|Continue Setup)$/.test(label)) {
         button.addEventListener("click", () => { window.location.href = "/ui-v2/scope"; });
       } else if (/^(Start New Engagement|Terminal Log|Inspect Ledger)$/.test(label)) {
