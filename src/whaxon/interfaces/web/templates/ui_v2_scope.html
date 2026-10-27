@@ -341,6 +341,14 @@
   const tbody = $("targetTableBody");
   const modal = $("targetModal");
   const drawer = $("importDrawer");
+  // Hide canonical-template inputs not persisted or enforced by the current backend.
+  document.querySelectorAll("label").forEach(label => {
+    const text = label.textContent.trim().toLowerCase();
+    if (text === "allowed ports range" || text === "rate limit threshold" ||
+        text === "written authorization reference / contract id") {
+      label.parentElement.style.display = "none";
+    }
+  });
   const notice = document.createElement("div");
   notice.id = "scope-ui-notice";
   notice.className = "mx-margin mt-space-md p-space-sm rounded font-code-sm text-code-sm";
