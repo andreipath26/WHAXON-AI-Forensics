@@ -416,19 +416,23 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             if request_hostname.lower().rstrip(".") not in allowed_hosts:
                 return {"error": "invalid Host for local request"}, 403
 
-        fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
-        if fetch_site in {"cross-site", "same-site"}:
-            return {"error": "cross-origin browser request rejected"}, 403
-        origin = request.headers.get("Origin")
-        if origin:
-            supplied = _urlsplit(origin)
-            current = _urlsplit(request.host_url)
-            if (
-                supplied.scheme.lower() != current.scheme.lower()
-                or (supplied.hostname or "").lower() != (current.hostname or "").lower()
-                or supplied.port != current.port
-            ):
+        # Fetch Metadata and Origin are CSRF defenses for state-changing requests.
+        # Applying them to GET blocks ordinary browser navigation (including /ui and
+        # favicon requests) when the browser sends same-site/cross-site metadata.
+        if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            fetch_site = request.headers.get("Sec-Fetch-Site", "").lower()
+            if fetch_site in {"cross-site", "same-site"}:
                 return {"error": "cross-origin browser request rejected"}, 403
+            origin = request.headers.get("Origin")
+            if origin:
+                supplied = _urlsplit(origin)
+                current = _urlsplit(request.host_url)
+                if (
+                    supplied.scheme.lower() != current.scheme.lower()
+                    or (supplied.hostname or "").lower() != (current.hostname or "").lower()
+                    or supplied.port != current.port
+                ):
+                    return {"error": "cross-origin browser request rejected"}, 403
 
         if request.remote_addr in ("127.0.0.1", "::1"):
             return None
