@@ -13,6 +13,8 @@ def test_reports_page_uses_live_report_endpoints_and_hides_sample_evidence(page,
     assert page.locator("#whaxon-live-report").is_visible()
     assert page.locator("#live-report-json").is_visible()
     assert page.locator("#live-report-md").is_visible()
+    for label in ("All Gaps", "Policy", "Safety"):
+        assert page.get_by_role("button", name=label, exact=False).count() == 0
 
     visible = page.locator("body").inner_text()
     for marker in (
