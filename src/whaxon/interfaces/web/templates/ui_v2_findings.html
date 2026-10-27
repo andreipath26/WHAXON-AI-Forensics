@@ -419,28 +419,28 @@
 <div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs">
 <div class="flex items-center gap-space-xs text-primary font-code-sm text-code-sm font-semibold">
 <span class="material-symbols-outlined text-base">security</span>
-<span>Explicit Target Scope Enforcement</span>
+<span>Scope checks on validation actions</span>
 </div>
 <p class="font-body-sm text-body-sm text-on-surface-variant">
-          Strict default deny architecture. Boundary validation prevents out-of-scope packet transmission during multi-stage adapter execution.
+          Validation and retest endpoints check the recorded job target against configured scope before replay.
         </p>
 </div>
 <div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs">
 <div class="flex items-center gap-space-xs text-secondary font-code-sm text-code-sm font-semibold">
 <span class="material-symbols-outlined text-base">dataset</span>
-<span>Zero AI Hallucination Guarantee</span>
+<span>Recorded evidence, not AI claims</span>
 </div>
 <p class="font-body-sm text-body-sm text-on-surface-variant">
-          Findings without replayable cryptographic or socket evidence remain locked in Candidate Queue until physical verification.
+          This page displays evidence and verification status stored by WHAXON; it does not infer verification from a finding description.
         </p>
 </div>
 <div class="bg-surface-container-low p-space-md rounded-lg flex flex-col gap-space-xs">
 <div class="flex items-center gap-space-xs text-tertiary font-code-sm text-code-sm font-semibold">
 <span class="material-symbols-outlined text-base">rule</span>
-<span>PTES Coverage Traceability</span>
+<span>Recorded methodology metadata</span>
 </div>
 <p class="font-body-sm text-body-sm text-on-surface-variant">
-          Every skipped step and adapter test vector is audited across Recon, Enumeration, and Vulnerability methodology steps.
+          A methodology phase is shown only when phase metadata is present in the finding record.
         </p>
 </div>
 </div>
@@ -471,7 +471,7 @@ document.getElementById("copy-btn")?.addEventListener("click",async e=>{e.preven
 document.getElementById("replay-btn")?.addEventListener("click",e=>{e.preventDefault();if(selected)act(selected.status==="verified"?"retest":"validate",e.currentTarget);});
 ["fixed-btn"].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display="none";});
 document.querySelectorAll('button[onclick="exportProofAction()"],button[onclick="sendToApprovalsAction()"]').forEach(b=>b.style.display="none");
-const footer=document.getElementById("unsupported-claims-footer");if(footer)footer.style.display="none";
+
 const targetHeader=[...document.querySelectorAll("header span,header div")].find(n=>n.textContent.includes("Live engagement data"));if(targetHeader)targetHeader.textContent="Live engagement data";
 const search=document.getElementById("whaxon-finding-filter");if(search)search.addEventListener("input",renderList);
 wireFilters();
