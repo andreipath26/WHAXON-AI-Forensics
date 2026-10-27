@@ -1042,7 +1042,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         enabled = data.get("enabled", True)
         if type(enabled) is not bool:
             return {"error": "'enabled' must be a JSON boolean"}, 400
-        if enabled is False and data.get("confirm_disable") is not True:
+        current_scope = registry.core.scope.summary()
+        # Confirmation is required only for the transition from enforced to
+        # disabled. Once enforcement is already disabled, operators must still
+        # be able to edit the scope rules without repeatedly confirming the same
+        # state transition.
+        if enabled is False and current_scope.get("enabled", True) is not False and data.get("confirm_disable") is not True:
             return {"error": "confirm_disable=true is required to disable scope enforcement"}, 400
         engagement = data.get("engagement", "")
         notes = data.get("notes", "")
