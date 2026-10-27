@@ -339,7 +339,7 @@
 <script>
 (function(){
 "use strict";
-const body=document.getElementById("targetTableBody"),filter=document.getElementById("targetFilterInput"),form=document.getElementById("scope-check-form"),input=document.getElementById("scope-check-target"),result=document.getElementById("scope-check-result"),template=document.getElementById("scope-exclusion-template");
+const engagementLabel=document.createElement("span");engagementLabel.id="scope-engagement-label";engagementLabel.className="font-code-sm text-code-sm text-on-surface-variant";engagementLabel.textContent="default engagement";const body=document.getElementById("targetTableBody");body.closest("section")?.appendChild(engagementLabel);const filter=document.getElementById("targetFilterInput"),form=document.getElementById("scope-check-form"),input=document.getElementById("scope-check-target"),result=document.getElementById("scope-check-result"),template=document.getElementById("scope-exclusion-template");
 let inRules=[],outRules=[],enabled=true;
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
 const ruleText=r=>typeof r==="string"?r:(r&&typeof r==="object"?String(r.target||r.rule||r.value||JSON.stringify(r)):"");
