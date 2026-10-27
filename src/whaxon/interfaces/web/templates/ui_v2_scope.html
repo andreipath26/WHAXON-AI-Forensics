@@ -568,6 +568,10 @@
     catch (error) { say(error.message, false); }
   });
   $("openImportDrawerBtn")?.addEventListener("click", () => drawer?.classList.remove("hidden"));
+  // Only scope.json is currently supported; hide the nonfunctional source picker entirely.
+  drawer?.querySelectorAll("label").forEach(label => {
+    if (label.textContent.includes("Select Scope Source")) label.parentElement.style.display = "none";
+  });
   // Only scope.json is currently supported by the live import endpoint; do not advertise inert parsers.
   drawer?.querySelectorAll("button").forEach(button => {
     const label = button.textContent.trim();
