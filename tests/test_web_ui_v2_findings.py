@@ -47,3 +47,31 @@ def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
     assert "5055ms" not in html
     assert "Baseline: 34ms" not in html
 
+def test_replay_button_posts_to_live_validation_route(page, live_server):
+    calls = []
+
+    def respond(route):
+        calls.append((route.request.method, route.request.url))
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"status":"verified","reason":"browser test response"}',
+        )
+
+    page.route("**/api/validate/**", respond)
+    page.route("**/api/retest/**", respond)
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
+        timeout=5000,
+    )
+    page.locator("#whaxon-findings-list [data-finding-index]").first.click()
+    with page.expect_response(
+        lambda response: response.request.method == "POST"
+        and ("/api/validate/" in response.url or "/api/retest/" in response.url)
+    ) as response_info:
+        page.locator("#replay-btn").click()
+    assert response_info.value.ok
+    assert calls and calls[0][0] == "POST"
+    assert "/api/validate/" in calls[0][1] or "/api/retest/" in calls[0][1]
+
