@@ -25,7 +25,8 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
     assert "staging-api.corp.net" not in response.text()
     assert "api.internal.corp" not in response.text()
     assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
-    assert page.locator('a[data-path="scope-and-targets"]').is_hidden()
+    assert page.locator('a[data-path="scope-and-targets"]').is_visible()
+    assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
 
 
 def test_run_page_echo_job_streams_real_output(page, live_server):
