@@ -601,7 +601,7 @@
   }
   async function loadTools() {
     const tools = await api("/api/tools");
-    const usable = tools.filter(t => t.binary_available || t.available);
+    const usable = tools.filter(t => t.transport !== "msf_session" && (t.binary_available || t.available));
     toolSelect.replaceChildren();
     if (!usable.length) {
       toolSelect.add(new Option("No available adapters", ""));
