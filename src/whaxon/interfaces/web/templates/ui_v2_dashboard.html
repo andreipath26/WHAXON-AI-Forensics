@@ -642,4 +642,27 @@
   populateLiveMetrics();
 })();
 </script>
+<script>
+/* Keep the supplied dashboard design, but do not expose controls without a live backend action. */
+(function () {
+  const inertLabels = /^(?:Add New|Terminal Log|Emergency Halt Scan|CLI Help|Update Credentials Now|Switch Target Session|Start New Engagement|Launch Wizard|Upload Artifact|Deploy Mock|Configure Filters|Export Archive|Continue Setup|Load Workspace|Inspect Ledger|Audit Pack)$/i;
+  document.querySelectorAll("button").forEach((button) => {
+    const label = (button.innerText || button.textContent || "").replace(/\s+/g, " ").trim();
+    if (inertLabels.test(label)) {
+      button.hidden = true;
+      button.disabled = true;
+      button.setAttribute("aria-hidden", "true");
+    }
+  });
+  document.querySelectorAll("main *").forEach((node) => {
+    if (node.children.length) return;
+    const text = (node.textContent || "").trim();
+    if (/api\.internal\.corp|ENG-2026-X892|FINDING-SQLI-001|sha256:|7f83b165|Deploy Mock|MOCK DEPLOY/i.test(text)) {
+      const card = node.closest(".bg-surface-container, .bg-surface-container-low, .rounded-xl");
+      if (card) card.hidden = true;
+      else node.textContent = "Live data unavailable";
+    }
+  });
+})();
+</script>
 </body></html>
