@@ -704,7 +704,7 @@
     });
     // Do not hide parent layout containers; individual static cards are handled below.
     const main = document.querySelector("main");
-    const placeholders = [["WX-8492", "No job started"], ["184,209", "—"], ["31 Validated", "—"], ["PTES Coverage", "Live coverage unavailable"], ["10/10 Enabled", "—"], ["12 services found", "—"], ["Nmap 7.94", "No completed tool run"], ["/api/v1/stream/WX-8492", "Not connected"], ["whaxon://cli-pipeline", "No command available"], ["ENUM_ACTIVE", "Idle"]];
+    const placeholders = [["WX-8492", "No job started"], ["CVE-2023-38606", "No live finding"], ["184,209", "—"], ["31 Validated", "—"], ["PTES Coverage", "Live coverage unavailable"], ["10/10 Enabled", "—"], ["12 services found", "—"], ["Nmap 7.94", "No completed tool run"], ["/api/v1/stream/WX-8492", "Not connected"], ["whaxon://cli-pipeline", "No command available"], ["ENUM_ACTIVE", "Idle"]];
     if (main) main.querySelectorAll("*").forEach(node => {
       if (node.children.length !== 0) return;
       const value = node.textContent || "";
