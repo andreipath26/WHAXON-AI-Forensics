@@ -157,17 +157,15 @@
 </div>
 </div>
 <div class="bg-background rounded p-space-md font-code-sm text-code-sm text-on-surface-variant flex flex-col gap-1 border border-outline-variant/20 overflow-x-auto">
-<div class="text-outline flex items-center justify-between">
-<span>$ whaxon scope --check --target example.invalid --verbose</span>
-<button class="text-[11px] text-secondary hover:underline cursor-pointer flex items-center gap-0.5" id="copyCliBtn">
-<span class="material-symbols-outlined text-xs">content_copy</span> copy
-              </button>
+<div class="flex flex-col gap-space-sm">
+<label for="scopeCheckTarget" class="font-label-sm text-label-sm uppercase text-outline">Check a target against the active scope</label>
+<div class="flex gap-space-xs">
+<input id="scopeCheckTarget" class="min-w-0 flex-1 px-2 py-1 bg-surface-container-lowest border border-outline-variant/40 rounded text-on-surface font-code-sm" placeholder="hostname, IP, or URL" type="text"/>
+<button id="runScopeCheckBtn" type="button" class="px-3 py-1 rounded bg-secondary-container text-on-secondary font-code-sm font-semibold">Check</button>
+<button id="copyCliBtn" type="button" class="px-2 py-1 text-secondary border border-outline-variant/30 rounded text-[11px]">Copy CLI</button>
 </div>
-<div class="text-primary-fixed mt-1">[✓] In-scope verification hash: sha256:7f99b1a0e9...</div>
-<div class="text-on-surface">[+] Resolved IPv4: 198.51.100.42 (Authoritative ASN: AS13335)</div>
-<div class="text-on-surface">[+] Allowed rate: 150 pkts/s (Kernel throttle filter loaded)</div>
-<div class="text-on-surface">[+] Port scan envelope: [80, 443, 8443] - Strict drop for all out-of-range SYN</div>
-<div class="text-primary font-semibold">[READY] Deterministic replay pipeline synchronized with runner agent.</div>
+<div id="scopeCheckResult" class="text-on-surface-variant" role="status">No scope check has been run in this session.</div>
+</div>
 </div>
 </div>
 </div>
@@ -423,6 +421,30 @@
     if (badge) badge.textContent = rows.length + " rules loaded";
     const headerTarget = [...document.querySelectorAll("header span")].find(el => /Target:|Live scope/.test(el.textContent));
     if (headerTarget) headerTarget.textContent = "Live scope: " + (scope.engagement || "Unnamed engagement");
+    const denyHeading = [...document.querySelectorAll("h3")].find(el => el.textContent.includes("Strict Deny Rules"));
+    const denyCard = denyHeading?.closest(".bg-surface-container-low");
+    if (denyCard) {
+      const list = denyCard.querySelector("div.flex.flex-col.gap-space-xs.font-code-sm");
+      if (list) {
+        list.replaceChildren();
+        ruleList("out_of_scope").forEach(rule => {
+          const row = document.createElement("div");
+          row.className = "p-2 rounded bg-surface-container flex items-center justify-between border border-outline-variant/30";
+          const name = document.createElement("span");
+          name.className = "text-error font-semibold truncate";
+          name.textContent = rule;
+          const badge = document.createElement("span");
+          badge.className = "px-1.5 py-0.5 rounded bg-error-container/40 text-error text-[10px] uppercase font-bold";
+          badge.textContent = "DENY";
+          row.append(name, badge);
+          list.append(row);
+        });
+      }
+      const count = denyHeading.parentElement?.querySelector("span.px-1\\.5");
+      if (count) count.textContent = "Active (" + ruleList("out_of_scope").length + " rules)";
+      const warning = denyCard.querySelector("p");
+      if (warning) warning.textContent = "Explicit exclusions take precedence over in-scope rules. WHAXON checks them before runner actions; network-level egress controls remain recommended.";
+    }
     const status = document.querySelector("header span.text-on-surface-variant");
     if (status && status.textContent.includes("STRICT BOUNDARY")) status.textContent = scope.enabled ? "STRICT BOUNDARY ENFORCED" : "SCOPE ENFORCEMENT DISABLED";
     const footer = document.querySelector("#targetTableBody")?.closest(".overflow-x-auto")?.parentElement?.querySelector(".p-space-md.bg-surface-container-lowest");
@@ -437,7 +459,7 @@
     document.querySelectorAll("main h2, main h3").forEach(heading => {
       const text = heading.textContent.toLowerCase();
       if (text.includes("discovered hosts") || text.includes("ssl san intake") || text.includes("terminal preview") ||
-          text.includes("simulated") || text.includes("active exclusion rules")) {
+          text.includes("simulated") || text.includes("supported ingestion formats") || text.includes("active exclusion rules")) {
         const card = heading.closest(".bg-surface-container-low") || heading.closest(".bg-surface-container-lowest");
         if (card) card.style.display = "none";
       }
@@ -475,6 +497,26 @@
     const rules = ruleList("out_of_scope");
     if (!rules.includes(rule.trim())) rules.push(rule.trim());
     try { await save({out_of_scope: rules}); } catch (error) { say(error.message, false); }
+  });
+  $("runScopeCheckBtn")?.addEventListener("click", async () => {
+    const target = $("scopeCheckTarget")?.value.trim();
+    const result = $("scopeCheckResult");
+    if (!target) { if (result) result.textContent = "Enter a target to check."; return; }
+    if (result) result.textContent = "Checking target against live scope…";
+    try {
+      const verdict = await api("/api/scope/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({target})});
+      if (result) {
+        result.textContent = (verdict.allowed ? "ALLOWED — " : "BLOCKED — ") +
+          (verdict.reason || "No reason recorded") +
+          (verdict.matched_rule ? " · Rule: " + verdict.matched_rule : "");
+        result.className = verdict.allowed ? "text-primary font-semibold" : "text-error font-semibold";
+      }
+    } catch (error) {
+      if (result) { result.textContent = "Scope check failed: " + error.message; result.className = "text-error"; }
+    }
+  });
+  $("scopeCheckTarget")?.addEventListener("keydown", event => {
+    if (event.key === "Enter") $("runScopeCheckBtn")?.click();
   });
   $("copyCliBtn")?.addEventListener("click", async () => {
     const target = ruleList("in_scope")[0];
