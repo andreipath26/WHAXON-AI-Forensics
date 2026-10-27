@@ -556,24 +556,7 @@
 <span class="material-symbols-outlined text-sm">close</span>
 </button>
 </div>
-<pre class="bg-surface-container-lowest p-margin rounded font-code-sm text-code-sm text-on-surface-variant overflow-x-auto leading-relaxed max-h-80 select-all"># WHAXON Security Assessment Report: api.internal.corp
-**Assessment Reference:** ENG-2026-X892
-**Methodology:** PTES (Penetration Testing Execution Standard)
-**Verification Mode:** Deterministic Replay (Strict Non-LLM Validation)
-**Integrity Hash:** `7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069`
-
-## Executive Summary
-During the authorized evaluation of `api.internal.corp`, WHAXON executed 41 automated vulnerability templates and correlated 17 findings. A total of **6 vulnerabilities were deterministically verified** with replayed HTTP payload evidence.
-
-## PTES Coverage Gap Statement
-Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
-- **Phase 4:** Aggressive DoS/ReDoS scanning was omitted to preserve cluster integrity.
-- **Phase 6:** Post-exploitation lateral movement was halted by boundary lock.
-
-## Verified Findings with Curl Proofs
-### [HIGH] SQL Injection in Auth Endpoint (`/v1/auth/token`)
-- **CVSS 3.1 Score:** 8.6 (`CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N`)
-- **Deterministic Proof:**</pre></div></div></div></main></div>
+<pre class="bg-surface-container-lowest p-margin rounded font-code-sm text-code-sm text-on-surface-variant overflow-x-auto leading-relaxed max-h-80 select-all">Live report is loading. The current report API response will appear here.</pre></div></div></div></main></div>
 <script>
 (function(){
   const routes = {
@@ -597,9 +580,8 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
   const closeBtn=document.getElementById("closePreviewBtn");
   let liveMarkdown="";
   const livePreviewButton=document.getElementById("live-report-preview");
-  if(livePreviewButton)livePreviewButton.disabled=true;
   livePreviewButton?.addEventListener("click",()=>{
-    if(preview)preview.textContent=liveMarkdown || "No report data has been recorded yet.";
+    if(preview)preview.textContent=liveMarkdown || "Live report is loading. If no report data is recorded, this preview will remain empty.";
     if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}
   });
   const findButton=(text)=>[...document.querySelectorAll("button")].find(b=>(b.textContent||"").includes(text));
