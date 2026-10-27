@@ -598,8 +598,7 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
   const livePreviewButton=document.getElementById("live-report-preview");
   if(livePreviewButton)livePreviewButton.disabled=true;
   livePreviewButton?.addEventListener("click",()=>{
-    if(!liveMarkdown)return;
-    if(preview)preview.textContent=liveMarkdown;
+    if(preview)preview.textContent=liveMarkdown || "No report data has been recorded yet.";
     if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}
   });
   const findButton=(text)=>[...document.querySelectorAll("button")].find(b=>(b.textContent||"").includes(text));
