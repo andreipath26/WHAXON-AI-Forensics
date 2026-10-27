@@ -1719,6 +1719,30 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def ui_v2_monitoring():
         return render_template("ui_v2_monitoring.html")
 
+    @app.get("/ui-v2/bas")
+    def ui_v2_bas():
+        return render_template("ui_v2_bas.html")
+
+    @app.get("/ui-v2/bug-bounty")
+    def ui_v2_bug_bounty():
+        return render_template("ui_v2_bug_bounty.html")
+
+    @app.get("/ui-v2/compliance")
+    def ui_v2_compliance():
+        return render_template("ui_v2_compliance.html")
+
+    @app.get("/ui-v2/ptaas")
+    def ui_v2_ptaas():
+        return render_template("ui_v2_ptaas.html")
+
+    @app.get("/ui-v2/threat-intel")
+    def ui_v2_threat_intel():
+        return render_template("ui_v2_threat_intel.html")
+
+    @app.get("/ui-v2/approvals")
+    def ui_v2_approvals():
+        return render_template("ui_v2_approvals.html")
+
     @app.get("/ui-v2")
     def ui_v2_dashboard():
         """Canonical engagement dashboard with live core-page navigation."""
