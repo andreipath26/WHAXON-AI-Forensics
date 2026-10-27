@@ -91,3 +91,34 @@ def test_scope_check_button_calls_live_scope_api(page, live_server):
         "() => document.querySelector('#scopeCheckResult')?.textContent.includes('ALLOWED')",
         timeout=5000,
     )
+
+def test_scope_rules_remain_editable_after_enforcement_is_disabled(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    before = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
+    disabled = page.evaluate(
+        """async (scope) => {
+          const response = await fetch('/api/scope', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({...scope, enabled: false, confirm_disable: true})
+          });
+          return {status: response.status, body: await response.json()};
+        }""",
+        before,
+    )
+    assert disabled["status"] == 200
+    edited_rules = [*disabled["body"]["in_scope"], "scope-edit.example.com"]
+    saved = page.evaluate(
+        """async (scope) => {
+          const response = await fetch('/api/scope', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({...scope, in_scope: [...scope.in_scope, 'scope-edit.example.com']})
+          });
+          return {status: response.status, body: await response.json()};
+        }""",
+        disabled["body"],
+    )
+    assert saved["status"] == 200
+    assert "scope-edit.example.com" in saved["body"]["in_scope"]
+    assert saved["body"]["enabled"] is False
