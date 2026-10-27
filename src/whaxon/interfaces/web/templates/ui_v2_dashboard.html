@@ -57,8 +57,8 @@
 <span class="font-label-sm text-label-sm uppercase text-outline">State</span>
 <div class="flex items-center gap-space-xs">
 <span class="h-2 w-2 rounded-full bg-tertiary animate-pulse"></span>
-<span class="font-code-sm text-code-sm text-tertiary font-medium">INITIALIZING_SCOPE</span>
-<span class="font-label-sm text-label-sm text-outline">(Awaiting Target Commit)</span>
+<span class="font-code-sm text-code-sm text-tertiary font-medium">Idle</span>
+<span class="font-label-sm text-label-sm text-outline">(No job running)</span>
 </div>
 </div>
 <div class="h-8 w-px bg-surface-container-highest"></div>
@@ -537,7 +537,7 @@
     // Hide static pre-flight claims; scope state is shown from the live API instead.
     document.querySelectorAll("h3").forEach(h => {
       if (textOf(h).includes("Pre-Flight Boundary Checklist")) {
-        const panel = h.closest(".rounded-xl") || h.parentElement?.parentElement?.parentElement;
+        const panel = h.closest(".px-gutter-lg.pt-space-lg") || h.parentElement?.parentElement?.parentElement;
         if (panel) panel.style.display = "none";
       }
       if (textOf(h).includes("Recent Engagements & Workspaces")) {
