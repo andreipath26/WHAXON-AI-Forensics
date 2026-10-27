@@ -57,6 +57,7 @@ def test_dashboard_hides_inert_controls_and_illustrative_claims(page, live_serve
         assert page.get_by_role("button", name=label).count() == 0, (
             f"Inert dashboard control should not be visible: {label}"
         )
+    assert page.locator("button:visible").count() == 0
     visible = page.locator("body").inner_text()
     assert "api.internal.corp" not in visible
     assert "ENG-2026-X892" not in visible
