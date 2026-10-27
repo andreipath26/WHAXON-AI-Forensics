@@ -23,3 +23,22 @@ def test_browser_navigation_headers_do_not_block_get_routes(page, live_server):
         },
     )
     assert response.status == 200
+
+def test_every_visible_dashboard_navigation_link_resolves_to_a_live_page(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+
+    links = page.locator('a[data-path]:visible').evaluate_all(
+        "(anchors) => anchors.map(a => ({label: a.innerText.trim(), href: a.getAttribute('href')}))"
+    )
+    assert links, "The dashboard should expose its wired navigation links."
+
+    for link in links:
+        href = link["href"]
+        assert href and href != "#", f"Visible navigation item is not wired: {link['label']}"
+        page_response = page.request.get(f"{live_server}{href}")
+        assert page_response.status == 200, (
+            f"Navigation item {link['label']!r} points to {href!r}, "
+            f"which returned HTTP {page_response.status}"
+        )
+
