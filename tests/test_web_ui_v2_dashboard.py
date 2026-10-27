@@ -42,3 +42,23 @@ def test_every_visible_dashboard_navigation_link_resolves_to_a_live_page(page, l
             f"which returned HTTP {page_response.status}"
         )
 
+def test_dashboard_hides_inert_controls_and_illustrative_claims(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+    for label in (
+        "Deploy Mock",
+        "Update Credentials Now",
+        "Switch Target Session",
+        "Upload Artifact",
+        "Export Archive",
+        "Inspect Ledger",
+        "Audit Pack",
+    ):
+        assert page.get_by_role("button", name=label).count() == 0, (
+            f"Inert dashboard control should not be visible: {label}"
+        )
+    visible = page.locator("body").inner_text()
+    assert "api.internal.corp" not in visible
+    assert "ENG-2026-X892" not in visible
+    assert "FINDING-SQLI-001" not in visible
+
