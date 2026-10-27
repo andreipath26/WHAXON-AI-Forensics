@@ -202,6 +202,9 @@ Each project is intended to stand alone. Integration between them should not be 
 
 Use WHAXON only for systems you own or have explicit authorization to assess. You are responsible for obtaining permission, defining scope, complying with applicable law, and reviewing the impact of each tool and action.
 
+
+
+The only pentest platform that is fast enough for a bug bounty hunter's terminal, but trustworthy enough for an enterprise client's audit
 ## License
 
 WHAXON is licensed under [AGPL-3.0-or-later](LICENSE). Review the repository's licensing documents and obtain independent legal advice if you need to determine whether your intended use requires a separate commercial agreement.
