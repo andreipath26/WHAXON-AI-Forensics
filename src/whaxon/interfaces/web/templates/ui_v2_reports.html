@@ -645,7 +645,7 @@ Pursuant to client Rules of Engagement §3.1 &amp; §4.2:
       document.querySelectorAll('a[href="#"]').forEach(a=>{if(/Raw/.test(a.textContent)){a.style.display="none";a.setAttribute("aria-hidden","true");}});
       // Gap filters and the proof accordion are static mock controls, not live filters/evidence.
       document.querySelectorAll("button").forEach(button => {
-        if (/^(?:All Gaps|Policy|Safety)\\b/i.test((button.textContent || "").trim())) {
+        if (/^(?:All Gaps|Policy|Safety)\b/i.test((button.textContent || "").trim())) {
           button.style.display = "none";
           button.disabled = true;
           button.setAttribute("aria-hidden", "true");
