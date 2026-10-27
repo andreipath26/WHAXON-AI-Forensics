@@ -695,12 +695,14 @@
       if (/View stdout/.test(label)) button.style.display = "none";
     });
     document.querySelectorAll("a[data-path]").forEach(a => {
-      if (a.dataset.path === "run-and-orchestration") {
-        a.style.display = ""; a.href="/ui-v2/run"; a.classList.add("bg-surface-container-high","text-primary");
-        a.setAttribute("aria-current","page");
-      } else {
-        a.style.display="none"; a.setAttribute("aria-hidden","true"); a.setAttribute("tabindex","-1");
-      }
+      const routes = {"scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings"};
+      const path = a.dataset.path, href = routes[path];
+      a.classList.remove("bg-surface-container-high","text-primary","border-l-2","border-primary");
+      if (href) {
+        a.style.display = ""; a.href = href; a.removeAttribute("aria-hidden"); a.removeAttribute("tabindex");
+        if (path === "run-and-orchestration") { a.classList.add("bg-surface-container-high","text-primary","border-l-2","border-primary"); a.setAttribute("aria-current","page"); }
+        else a.removeAttribute("aria-current");
+      } else { a.style.display = "none"; a.setAttribute("aria-hidden","true"); a.setAttribute("tabindex","-1"); }
     });
     // Do not hide parent layout containers; individual static cards are handled below.
     const main = document.querySelector("main");
