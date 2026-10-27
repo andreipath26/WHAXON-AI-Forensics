@@ -744,6 +744,8 @@
     if (/Approval Gate: Active/.test(button.textContent)) button.style.display="none";
   });
   disableFakeControls();
+  clearLog();
+  line("No job output yet. This panel will show events returned by the live WHAXON runner.", "whaxon.web");
   setStatus("idle");
   loadTools().catch(error => say("Unable to load tools: " + error.message, false));
 })();
