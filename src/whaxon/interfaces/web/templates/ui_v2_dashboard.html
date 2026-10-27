@@ -583,9 +583,18 @@
       button.setAttribute("aria-hidden","true");
     }
   });
+  document.querySelectorAll("body *").forEach(node => {
+    if (node.children.length) return;
+    const value = (node.textContent || "").trim();
+    if (/whaxon:whaxon|api\.internal\.corp|ENG-2026-X892|INITIALIZING_SCOPE|Deterministic Determinism v3\.1/i.test(value)) {
+      const section = node.closest(".px-gutter-lg");
+      if (section) section.style.display = "none";
+      else node.textContent = "Live data unavailable";
+    }
+  });
   const main = document.querySelector("main");
   if (main) {
-    const fake = ["0", "0%", "0.0", "99.9%", "100%", "12", "24", "48", "1,284", "184,209", "18", "52"];
+    const fake = ["0", "0%", "0.0", "99.9%", "100%", "12", "24", "48", "1,284", "184,209", "18", "52", "4"];
     main.querySelectorAll("*").forEach(node => {
       if (node.children.length || !node.textContent.trim()) return;
       if (node.matches("button,a,input,textarea,select")) return;
