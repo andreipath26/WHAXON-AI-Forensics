@@ -20,7 +20,7 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
     visible_text = page.locator("main").inner_text()
     assert "CVE-2023-38606" not in visible_text
     assert "184,209" not in visible_text
-    assert "PTES Coverage" not in visible_text
+    assert "Recon: 100%" not in visible_text
     assert page.locator("#run-job-id").text_content() == "No job started"
     assert "staging-api.corp.net" not in response.text()
     assert "api.internal.corp" not in response.text()
