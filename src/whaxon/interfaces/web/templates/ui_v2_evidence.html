@@ -677,8 +677,14 @@
     "adapter-and-plugin-manager": "/ui-v2/adapters",
     "settings-and-api-explorer": "/ui-v2/settings",
     "cryptographic-audit-log": "/ui-v2/audit",
- "attack-surface-continuous-monitoring": "/ui-v2/monitoring"
-};
+ "attack-surface-continuous-monitoring": "/ui-v2/monitoring",
+ "bas-detection-validation": "/ui-v2/bas",
+ "bug-bounty-live-browser-studio": "/ui-v2/bug-bounty",
+ "compliance-framework-crosswalk": "/ui-v2/compliance",
+ "ptaas-client-portal": "/ui-v2/ptaas",
+ "threat-intel-exploit-arsenal": "/ui-v2/threat-intel",
+ "trust-layer-approvals-queue": "/ui-v2/approvals"
+ };
  document.querySelectorAll("a[data-path]").forEach(a=>{const path=routes[a.dataset.path];if(path){a.href=path;a.style.display="";}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});
  const main=document.querySelector("main");if(!main)return;
  const panel=document.createElement("section");panel.id="whaxon-live-evidence";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
