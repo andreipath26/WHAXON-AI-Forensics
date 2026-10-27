@@ -1715,6 +1715,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Show recorded execution metadata without inventing cryptographic claims."""
         return render_template("ui_v2_audit.html")
 
+    @app.get("/ui-v2/monitoring")
+    def ui_v2_monitoring():
+        return render_template("ui_v2_monitoring.html")
+
     @app.get("/ui-v2")
     def ui_v2_dashboard():
         """Canonical engagement dashboard with live core-page navigation."""
