@@ -740,7 +740,11 @@
   if (tbody) tbody.replaceChildren();
   if (integrityButton) integrityButton.hidden = true;
   document.querySelectorAll("button").forEach(button => {
-    if (/Terminal Log|Emergency Halt Scan|^New$/i.test((button.textContent || "").trim())) button.hidden = true;
+    if (button === exportButton || filters.includes(button)) return;
+    if (table && table.contains(button)) return;
+    button.hidden = true;
+    button.disabled = true;
+    button.setAttribute("aria-hidden", "true");
   });
   if (main) {
     const summary = document.createElement("p");
