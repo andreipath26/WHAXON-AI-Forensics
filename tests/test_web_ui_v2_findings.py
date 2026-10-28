@@ -39,7 +39,11 @@ def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, l
     assert page.locator('a[data-path="scope-and-targets"]').get_attribute("href") == "/ui-v2/scope"
     assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
     assert page.locator('a[data-path="run-and-orchestration"]').get_attribute("href") == "/ui-v2/run"
-    assert page.locator('a[data-path="ptes-coverage-and-reports"]').is_hidden()
+    # Reports are now part of the integrated UI, so navigation must lead to the real report route.
+    reports = page.locator('a[data-path="ptes-coverage-and-reports"]')
+    assert reports.is_visible()
+    assert reports.get_attribute("href") == "/ui-v2/report"
+
 
 def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
     response = page.goto(f"{live_server}/ui-v2/findings")
@@ -49,6 +53,7 @@ def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
     assert "redacted_token_sess_089" not in html
     assert "5055ms" not in html
     assert "Baseline: 34ms" not in html
+
 
 def test_replay_button_posts_to_live_validation_route(page, live_server):
     calls = []
@@ -77,4 +82,3 @@ def test_replay_button_posts_to_live_validation_route(page, live_server):
     assert response_info.value.ok
     assert calls and calls[0][0] == "POST"
     assert "/api/validate/" in calls[0][1] or "/api/retest/" in calls[0][1]
-
