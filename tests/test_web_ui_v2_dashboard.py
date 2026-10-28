@@ -97,8 +97,7 @@ def test_dashboard_artifact_card_supports_drop_and_rejects_unwired_formats(page,
         "() => document.querySelector('#dashboard-action-status') !== null",
         timeout=8000,
     )
-    card = page.locator("h2").filter(has_text="Import Existing Assessment Profile").locator("..").locator("..")
-    assert card.is_visible()
+    assert page.locator("h2").filter(has_text="Import Existing Assessment Profile").is_visible()
     page.evaluate(
         """() => {
           const heading = [...document.querySelectorAll('h2')].find(node =>
