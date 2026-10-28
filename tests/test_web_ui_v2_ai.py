@@ -118,4 +118,7 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert "Kiln/Ollama (Mistral-Offensive-7B)" not in visible_text
     assert "LOW RISK" not in visible_text
     assert "Nuclei basic tech-detect" not in visible_text
+    assert "Chain-of-Thought" not in visible_text
+    assert "AI Decision & Evidence Trail" in visible_text
+    assert "Recorded Proposal Details" in visible_text
     assert "Target: No target selected" in page.locator("header span").filter(has_text="Target:").first.text_content()
