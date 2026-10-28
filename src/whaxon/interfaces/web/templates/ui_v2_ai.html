@@ -107,7 +107,7 @@
 <div class="flex items-center justify-between pb-space-xs">
 <div class="flex items-center gap-space-sm">
 <span class="material-symbols-outlined text-primary text-lg">psychology</span>
-<span class="font-label-md text-label-md uppercase text-on-surface tracking-wider font-semibold">AI Reasoning Trail &amp; Chain-of-Thought</span>
+<span class="font-label-md text-label-md uppercase text-on-surface tracking-wider font-semibold">AI Decision &amp; Evidence Trail</span>
 </div>
 <span class="font-label-sm text-label-sm text-secondary bg-surface-container-highest px-space-xs py-0.5 rounded">TENSOR DOCK // 350ms</span>
 </div>
@@ -115,7 +115,7 @@
 <div class="bg-surface-container-low rounded p-space-md flex flex-col gap-space-xs">
 <div class="flex items-center gap-space-xs text-outline font-label-sm text-label-sm uppercase">
 <span class="material-symbols-outlined text-xs text-secondary">input</span>
-<span>Telemetry Ingestion Context:</span>
+<span>Recorded AI proposal context:</span>
 </div>
 <p class="font-code-sm text-code-sm text-on-surface leading-relaxed">
             Nmap 7.94 detected <span class="text-secondary font-semibold">Envoy 1.18.0</span> on port <span class="text-primary font-semibold">8080</span> and <span class="text-secondary font-semibold">HTTP nginx 1.18.0</span> on port <span class="text-primary font-semibold">443</span> with <span class="text-tertiary font-semibold">glibc header fingerprint</span>.
@@ -123,7 +123,7 @@
 </div>
 <!-- CoT Deduction Steps -->
 <div class="flex flex-col gap-space-sm pt-space-xs">
-<span class="font-label-sm text-label-sm uppercase text-outline">Deterministic Deduction Sequence:</span>
+<span class="font-label-sm text-label-sm uppercase text-outline">Recorded Decision Details:</span>
 <div class="flex items-start gap-space-md bg-surface-container-lowest p-space-md rounded">
 <div class="w-6 h-6 rounded bg-surface-container-highest flex items-center justify-center font-code-sm text-code-sm text-primary font-bold shrink-0">01</div>
 <div class="flex flex-col gap-0.5">
@@ -371,7 +371,7 @@
  const pyLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Py:");
  const modelLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="MODEL:");
  const thresholdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="THRESH:");
- const telemetryLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Telemetry Ingestion Context:");
+ const telemetryLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Recorded AI proposal context:");
  const telemetryCard=telemetryLabel?.closest("div.bg-surface-container-low.rounded.p-space-md");
  const telemetryDescription=telemetryCard?.querySelector("p");
  const traceLatency=[...document.querySelectorAll("span")].find(n=>textOf(n)==="TENSOR DOCK // 350ms");
@@ -380,6 +380,7 @@
  let aiApiAvailable=false;
  const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
  const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
+ if(commandHeading)commandHeading.textContent="Recorded Proposal Details";
  const commandCode=commandCard?.querySelector("code");
  const wireHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="HTTP Request Wire Preview");
  const wireCard=wireHeading?.closest("div.bg-surface-container.rounded-xl");
