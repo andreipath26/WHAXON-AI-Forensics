@@ -16,7 +16,6 @@ import time
 from types import SimpleNamespace
 
 from whaxon.ai.actions import Action, ActionResult
-
 from whaxon.core import Core
 from whaxon.interfaces.web.server import (
     AsyncRunner,
