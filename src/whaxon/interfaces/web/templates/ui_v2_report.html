@@ -624,7 +624,7 @@
     const sampleProof = [...document.querySelectorAll("main span")].find(n => textOf(n).startsWith("Sample Deterministic Proof:"));
     const samplePanel = sampleProof?.closest("div.bg-surface-container-lowest");
     if (samplePanel) samplePanel.style.display = "none";
-    document.querySelectorAll("h2").forEach(h=>{
+    document.querySelectorAll("main h1, main h2, main h3, main h4").forEach(h=>{
       const t=textOf(h);
       if(t.includes("PTES Phase Execution & Telemetry Tracker")||t.includes("Coverage Gap Matrix")||t.includes("Evidence Summary")||t.includes("Local Evidence Locker")){
         const panel=h.closest("section")||h.parentElement?.parentElement?.parentElement;
