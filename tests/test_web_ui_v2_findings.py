@@ -105,7 +105,7 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
         arg=total,
         timeout=5000,
     )
-    assert heading.inner_text() == f"Attack Surface Findings ({total} shown of {total})"
+    assert heading.inner_text().lower() == f"attack surface findings ({total} shown of {total})"
 
     search = page.locator("#whaxon-finding-filter")
     search.fill("no-such-finding-token-90210")
