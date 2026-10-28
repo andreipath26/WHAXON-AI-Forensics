@@ -379,8 +379,8 @@
      const response=await fetch("/api/ai/runs/"+encodeURIComponent(run.id)+"/answer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answer,user:"local",note:note||""})});
      const data=await response.json();
      if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
-     status.textContent="Operator response recorded for "+run.id+". Refreshing the AI run state.";
      await load();
+     status.textContent="Operator response recorded for "+run.id+".";
    }catch(error){status.textContent="Operator response was not recorded: "+error.message;}
    finally{answerInProgress=false;setDecisionButtons();renderPending();}
  }
