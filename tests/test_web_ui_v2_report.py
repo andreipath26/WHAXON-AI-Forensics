@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 
 
 def test_report_page_loads_and_uses_live_report_counts(page, live_server):
