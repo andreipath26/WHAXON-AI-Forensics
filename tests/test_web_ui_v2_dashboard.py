@@ -11,7 +11,7 @@ def test_dashboard_new_engagement_control_opens_scope(page, live_server):
         "() => document.querySelector('#dashboard-action-status') !== null",
         timeout=8000,
     )
-    page.get_by_role("button", name=re.compile(r"No active engagement")).click()
+    page.locator("#dashboard-engagement-selector").click()
     assert page.url.endswith("/ui-v2/scope")
 
 
