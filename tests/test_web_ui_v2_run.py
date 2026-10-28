@@ -76,6 +76,7 @@ def test_arbitrary_shell_input_is_disabled_and_execute_is_hidden(page, live_serv
     assert "Shell commands are disabled" in command_input.get_attribute("placeholder")
     assert page.get_by_role("button", name="Execute").is_hidden()
 
+
 def test_run_page_passive_button_starts_guarded_job(page, live_server):
     page.goto(f"{live_server}/ui-v2/run")
     page.wait_for_function(
@@ -109,7 +110,7 @@ def test_run_page_cancel_button_cancels_active_job(page, live_server):
         route.fulfill(
             status=200,
             headers={"content-type": "text/event-stream", "cache-control": "no-cache"},
-            body='retry: 60000\\ndata: {"type":"status","status":"running"}\\n\\n',
+            body='retry: 60000\ndata: {"type":"status","status":"running"}\n\n',
         )
 
     def fake_cancel(route):
