@@ -94,8 +94,8 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
     )
     total = page.locator("#whaxon-findings-list [data-finding-index]:visible").count()
     heading = page.locator("#whaxon-findings-heading")
-    assert "shown of" in heading.inner_text()
-    assert "4 in buffer" not in heading.inner_text()
+    assert "shown of" in heading.inner_text().lower()
+    assert "4 in buffer" not in heading.inner_text().lower()
 
     verified_filter = page.get_by_role("button", name=re.compile(r"VERIFIED"))
     verified_filter.click()
