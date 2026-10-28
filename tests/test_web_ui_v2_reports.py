@@ -1,0 +1,52 @@
+"""Browser coverage for the canonical WHAXON v2 live reports page."""
+from __future__ import annotations
+
+
+def test_reports_page_uses_live_report_endpoints_and_hides_sample_evidence(page, live_server):
+    json_response = page.request.get(f"{live_server}/api/report?format=json")
+    markdown_response = page.request.get(f"{live_server}/api/report?format=md")
+    assert json_response.status == 200
+    assert markdown_response.status == 200
+
+    response = page.goto(f"{live_server}/ui-v2/reports")
+    assert response is not None and response.status == 200
+    assert page.locator("#whaxon-live-report").is_visible()
+    assert page.locator("#live-report-json").is_visible()
+    assert page.locator("#live-report-md").is_visible()
+    for label in ("All Gaps", "Policy", "Safety"):
+        assert page.get_by_role("button", name=label, exact=False).count() == 0
+
+    visible = page.locator("body").inner_text()
+    for marker in (
+        "api.internal.corp",
+        "ENG-2026-X892",
+        "FINDING-SQLI-001",
+        "raw_nmap_syn_scan",
+        "sqlmap_session_dump",
+        "burp_traffic_proxy",
+    ):
+        assert marker not in visible, f"Illustrative evidence must not appear as live data: {marker}"
+
+
+def test_reports_json_and_markdown_export_buttons_download_live_reports(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/reports")
+    assert response is not None and response.status == 200
+
+    with page.expect_download() as json_download:
+        page.locator("#live-report-json").click()
+    assert json_download.value.suggested_filename == "whaxon-report.json"
+
+    with page.expect_download() as markdown_download:
+        page.locator("#live-report-md").click()
+    assert markdown_download.value.suggested_filename == "whaxon-report.md"
+
+
+def test_reports_preview_opens_and_closes(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/reports")
+    assert response is not None and response.status == 200
+    modal = page.locator("#previewModal")
+    assert not modal.is_visible()
+    page.locator("#live-report-preview").click()
+    assert modal.is_visible()
+    page.locator("#closePreviewBtn").click()
+    assert not modal.is_visible()
