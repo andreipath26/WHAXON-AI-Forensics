@@ -1,6 +1,8 @@
 """Browser coverage for the canonical findings UI (UI v2)."""
 from __future__ import annotations
 
+import re
+
 
 def test_canonical_findings_page_loads_live_report(page, live_server):
     page.goto(f"{live_server}/ui-v2/findings")
