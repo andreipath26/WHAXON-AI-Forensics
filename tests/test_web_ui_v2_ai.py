@@ -107,3 +107,13 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert page.locator("#btn-reject").is_disabled()
     assert page.get_by_text("HTTP Request Wire Preview").is_hidden()
     assert page.locator("#ai-pending-list").inner_text().find("No AI runs are currently waiting") >= 0
+    visible_text = page.locator("body").inner_text()
+    assert "CVE-2023-38606" not in visible_text
+    assert "staging-api.corp.net" not in visible_text
+    assert "Nmap 7.94 detected" not in visible_text
+    assert "89.4%" not in visible_text
+    assert "89% probability" not in visible_text
+    assert "Kiln/Ollama (Mistral-Offensive-7B)" not in visible_text
+    assert "LOW RISK" not in visible_text
+    assert "Nuclei basic tech-detect" not in visible_text
+    assert "Target: No target selected" in visible_text
