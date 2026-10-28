@@ -90,3 +90,27 @@ def test_dashboard_credential_notice_reflects_live_status_api(page, live_server)
         arg=status["default_creds"],
         timeout=8000,
     )
+
+def test_dashboard_artifact_card_supports_drop_and_rejects_unwired_formats(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    card = page.locator("h2").filter(has_text="Import Existing Assessment Profile").locator("..").locator("..")
+    assert card.is_visible()
+    page.evaluate(
+        """() => {
+          const heading = [...document.querySelectorAll('h2')].find(node =>
+            node.textContent.trim() === 'Import Existing Assessment Profile'
+          );
+          const card = heading.closest('.group.relative.flex.flex-col');
+          const transfer = new DataTransfer();
+          transfer.items.add(new File(['not an importable artifact'], 'unsupported.txt', {type: 'text/plain'}));
+          card.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: transfer}));
+        }"""
+    )
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Nmap and scope-profile imports are not wired yet')",
+        timeout=5000,
+    )
