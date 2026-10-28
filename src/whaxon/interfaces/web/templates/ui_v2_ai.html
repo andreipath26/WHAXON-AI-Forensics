@@ -361,7 +361,23 @@
  const actionIdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("ACTION_ID:"));
  const activeTargetLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Active Target Endpoint");
  const activePhaseLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Operational Phase");
+ const headerTarget=[...document.querySelectorAll("header span")].find(n=>textOf(n).startsWith("Target:"));
+ const headerScope=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="(IN SCOPE)");
+ const boundaryLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="STRICT BOUNDARY ENFORCED");
+ const engineLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Engine:");
+ const engineValue=engineLabel?.nextElementSibling;
+ const portLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Port:");
+ const hostLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Host:");
+ const pyLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Py:");
+ const modelLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="MODEL:");
+ const thresholdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="THRESH:");
+ const telemetryLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Telemetry Ingestion Context:");
+ const telemetryCard=telemetryLabel?.closest("div.bg-surface-container-low.rounded.p-space-md");
+ const telemetryDescription=telemetryCard?.querySelector("p");
+ const traceLatency=[...document.querySelectorAll("span")].find(n=>textOf(n)==="TENSOR DOCK // 350ms");
+ const progressBar=[...document.querySelectorAll("div")].find(n=>n.classList.contains("bg-primary")&&n.classList.contains("h-full")&&n.classList.contains("w-2/3"));
  const traceCards=["Fingerprint Correlation & Boundary Analysis","Timing Anomaly Detection","Orchestration Tool Selection"].map(label=>{const title=[...document.querySelectorAll("span")].find(n=>textOf(n)===label);const card=title?.closest("div.bg-surface-container-lowest.p-space-md.rounded");return {title,description:card?.querySelector("p")};});
+ let aiApiAvailable=false;
  const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
  const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
  const commandCode=commandCard?.querySelector("code");
@@ -457,6 +473,19 @@
    if(actionIdLabel)actionIdLabel.textContent="ACTION_ID: "+(run?.id||"—");
    if(activeTargetLabel?.nextElementSibling)activeTargetLabel.nextElementSibling.textContent=q?.target||"No active target selected";
    if(activePhaseLabel?.nextElementSibling)activePhaseLabel.nextElementSibling.textContent=q?.proposed_phase||run?.phase||recordedRuns[0]?.phase||"No active phase recorded";
+   if(headerTarget)headerTarget.textContent="Target: "+(q?.target||"No target selected");
+   if(headerScope)headerScope.textContent=!scopeData?"(STATUS UNAVAILABLE)":scopeData.enabled===false?"(ENFORCEMENT DISABLED)":q?.target?"(SCOPE CHECKED)":"(SCOPE ENFORCED)";
+   if(boundaryLabel)boundaryLabel.textContent=!scopeData?"SCOPE STATUS UNAVAILABLE":scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SERVER-SIDE SCOPE CHECK ENABLED";
+   if(engineLabel)engineLabel.textContent="AI API:";
+   if(engineValue)engineValue.textContent=aiApiAvailable?"Online":"Unavailable";
+   if(portLabel?.nextElementSibling)portLabel.nextElementSibling.textContent=window.location.port||"default";
+   if(hostLabel?.nextElementSibling)hostLabel.nextElementSibling.textContent=window.location.hostname||"unavailable";
+   if(pyLabel){pyLabel.textContent="Runtime:";if(pyLabel.nextElementSibling)pyLabel.nextElementSibling.textContent="version not exposed";}
+   if(modelLabel?.nextElementSibling)modelLabel.nextElementSibling.textContent="not exposed by API";
+   if(thresholdLabel?.nextElementSibling)thresholdLabel.nextElementSibling.textContent="not configured";
+   if(telemetryDescription)telemetryDescription.textContent=q?"No raw scanner telemetry is attached to this pending AI question. The recorded rationale and action fields are the available evidence.":"No raw scanner telemetry is attached to the current AI run. Recorded findings and evidence are available in the Findings and Reports pages.";
+   if(traceLatency)traceLatency.textContent="LIVE AI RUN STATE";
+   if(progressBar){progressBar.classList.remove("w-2/3");const score=Number(q?.confidence);progressBar.style.width=q&&Number.isFinite(score)?Math.max(0,Math.min(100,score<=1?score*100:score))+"%":"0%";}
    if(commandCode)commandCode.textContent=q?JSON.stringify(q,null,2):"No live proposal is awaiting operator input.";
    if(confidenceValue){
      const score=Number(q?.confidence);
@@ -486,6 +515,7 @@
    recordedRuns=rr.status==="fulfilled"&&Array.isArray(rr.value)?rr.value:[];
    pendingRuns=pr.status==="fulfilled"&&Array.isArray(pr.value)?pr.value:[];
    scopeData=sr.status==="fulfilled"?sr.value:null;
+   aiApiAvailable=rr.status==="fulfilled"&&pr.status==="fulfilled";
    if(rr.status!=="fulfilled"||pr.status!=="fulfilled"){
      status.textContent="AI run state unavailable: "+(rr.status!=="fulfilled"?(rr.reason?.message||"runs endpoint failed"):(pr.reason?.message||"pending endpoint failed"));
    }else{
@@ -526,18 +556,7 @@
  if(newButton){newButton.title="Configure a new engagement and its authorized scope";newButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
  const haltButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Emergency Halt Scan"));
  if(haltButton)haltButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
- /* Active-job cancellation is implemented on the Run page, which owns the live job list. */
- /* if(haltButton)haltButton.addEventListener("click",async()=>{
-   try{
-     const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
-     const jobs=await response.json(),active=(Array.isArray(jobs)?jobs:[]).filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
-     if(!active.length){status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
-     if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
-     let cancelled=0;
-     for(const job of active){const id=job.id||job.job_id;if(!id)continue;const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(result.ok){const body=await result.json();if(body.ok===true)cancelled++;}}
-     status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
-   }catch(error){status.textContent="Emergency halt failed: "+error.message;}
- }); */
+ /* Active-job cancellation is handled on the Run page, which owns the live job list. */
  window.addEventListener("keydown",e=>{
    if(e.target!==document.body||!pendingRuns.length||answerInProgress)return;
    if(e.key==="Enter"){e.preventDefault();answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate (keyboard shortcut)");}
