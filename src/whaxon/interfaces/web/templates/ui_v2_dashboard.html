@@ -528,6 +528,7 @@
       button.textContent.includes("No active engagement") || button.textContent.includes("Active scope")
     );
     if (engagementButton) {
+      engagementButton.dataset.dashboardAction = "scope";
       const spans = engagementButton.querySelectorAll("span");
       const engagement = liveStatus.engagement && liveStatus.engagement !== "default"
         ? liveStatus.engagement
@@ -733,7 +734,7 @@
       const label = buttonLabel(button);
       if (button.dataset.dashboardWired === "true") return;
       let handler = null;
-      if (/^(No active engagement \(No target selected\)|New|Switch Target Session|Start New Engagement|Launch Wizard|Continue Setup)$/.test(label)) {
+      if (button.dataset.dashboardAction === "scope" || label.startsWith("No active engagement") || /^(New|Switch Target Session|Start New Engagement|Launch Wizard|Continue Setup)$/.test(label)) {
         handler = () => route("/ui-v2/scope");
       } else if (label === "Terminal Log") {
         handler = () => route("/ui-v2/run");
