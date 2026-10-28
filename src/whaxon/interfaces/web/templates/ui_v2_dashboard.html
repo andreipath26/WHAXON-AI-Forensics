@@ -593,4 +593,33 @@
   });
 })();
 </script>
+<script>
+(function () {
+  "use strict";
+  const canonicalRoutes = {
+    "ai-strategy-gate": "/ui-v2/ai",
+    "remediation-retest-studio": "/ui-v2/retest",
+    "correlated-attack-chains": "/ui-v2/chains",
+    "job-execution-history": "/ui-v2/history",
+    "evidence-file-inspector": "/ui-v2/evidence",
+    "cryptographic-audit-log": "/ui-v2/audit",
+    "system-diagnostics-and-health": "/ui-v2/diagnostics",
+    "adapter-and-plugin-manager": "/ui-v2/adapters",
+    "settings-and-api-explorer": "/ui-v2/settings",
+    "settings-and-secrets-vault": "/ui-v2/settings",
+    "system-diagnostics-health": "/ui-v2/diagnostics",
+    "adapter-plugin-manager": "/ui-v2/adapters",
+    "ptaas-client-portal": "/ui-v2/ptaas"
+  };
+  document.querySelectorAll("a[data-path]").forEach(function (link) {
+    const route = canonicalRoutes[link.dataset.path];
+    if (!route) return;
+    link.href = route;
+    link.hidden = false;
+    link.style.display = "";
+    link.removeAttribute("aria-hidden");
+    link.removeAttribute("tabindex");
+  });
+})();
+</script>
 </body></html>
