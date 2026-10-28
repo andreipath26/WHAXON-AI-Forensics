@@ -626,7 +626,7 @@
     if (samplePanel) samplePanel.style.display = "none";
     document.querySelectorAll("h2").forEach(h=>{
       const t=textOf(h);
-      if(t.includes("PTES Phase Execution & Telemetry Tracker")||t.includes("Coverage Gap Matrix")||t.includes("Report Synthesis & Compliance Profiler")||t.includes("Evidence Summary")||t.includes("Local Evidence Locker")){
+      if(t.includes("PTES Phase Execution & Telemetry Tracker")||t.includes("Coverage Gap Matrix")||t.includes("Evidence Summary")||t.includes("Local Evidence Locker")){
         const panel=h.closest("section")||h.parentElement?.parentElement?.parentElement;
         if(panel)panel.style.display="none";
       }
@@ -638,8 +638,13 @@
       const item=[...document.querySelectorAll("main span")].find(n=>textOf(n)===label);
       if(item?.parentElement)item.parentElement.style.display="none";
     }
+    const moduleLabel=[...document.querySelectorAll("main span")].find(n=>textOf(n)==="Select Report Modules to Compile");
+    if(moduleLabel?.parentElement)moduleLabel.parentElement.style.display="none";
+    const standardsLabel=[...document.querySelectorAll("main span")].find(n=>textOf(n)==="Correlate Standards & Compliance Matrix");
+    if(standardsLabel?.parentElement)standardsLabel.parentElement.style.display="none";
+    document.documentElement.dataset.reportReady="true";
   }
-  load().catch(()=>{});
+  load().catch(()=>{document.documentElement.dataset.reportReady="true";});
 })();
 </script>
 </body></html>
