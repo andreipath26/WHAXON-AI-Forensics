@@ -458,7 +458,7 @@
     const badge = [...document.querySelectorAll("h2")].find(el => el.textContent.includes("In-Scope Target Registry"))?.parentElement?.querySelector("span");
     if (badge) badge.textContent = rows.length + " rules loaded";
     const headerTarget = [...document.querySelectorAll("header span")].find(el => /Target:|Live scope/.test(el.textContent));
-    if (headerTarget) headerTarget.textContent = "Live scope: " + (scope.engagement || "Unnamed engagement");
+    if (headerTarget) headerTarget.textContent = "Target: " + (ruleList("in_scope")[0] || "No target configured");
     const denyHeading = [...document.querySelectorAll("h3")].find(el => el.textContent.includes("Strict Deny Rules"));
     const denyCard = denyHeading?.closest(".bg-surface-container-low");
     if (denyCard) {
