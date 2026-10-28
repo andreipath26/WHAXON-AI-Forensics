@@ -382,7 +382,7 @@
      status.textContent="Operator response recorded for "+run.id+". Refreshing the AI run state.";
      await load();
    }catch(error){status.textContent="Operator response was not recorded: "+error.message;}
-   finally{answerInProgress=false;setDecisionButtons();}
+   finally{answerInProgress=false;setDecisionButtons();renderPending();}
  }
  if(authBtn)authBtn.addEventListener("click",()=>{if(pendingRuns[0])answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate");});
  if(rejectBtn)rejectBtn.addEventListener("click",()=>{if(!pendingRuns[0])return;const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason===null)return;answerPending(pendingRuns[0],"no: "+(reason.trim()||"rejected by operator"),reason.trim());});
@@ -481,7 +481,7 @@
        if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
      });
    }else{
-     document.querySelectorAll("header span,header div").forEach(n=>{if(textOf(n)==="(IN SCOPE)")n.textContent="(STATUS UNAVAILABLE";if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent="SCOPE STATUS UNAVAILABLE";});
+     document.querySelectorAll("header span,header div").forEach(n=>{if(textOf(n)==="(IN SCOPE)")n.textContent="(STATUS UNAVAILABLE)";if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent="SCOPE STATUS UNAVAILABLE";});
    }
    renderRuns();renderPending();renderLedger();renderProposal();
    document.documentElement.dataset.aiGateReady="true";
