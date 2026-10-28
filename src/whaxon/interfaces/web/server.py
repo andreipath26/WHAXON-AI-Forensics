@@ -616,7 +616,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 for approval in store.list_approvals(run_id):
                     if int(approval.get("seq", -1)) == answer_seq:
                         return str(approval.get("answer") or "")
-                await __import__("asyncio").sleep(0.25)
+                await asyncio.sleep(0.25)
             raise TimeoutError("operator approval timed out; AI run stopped")
 
         def _factory():
