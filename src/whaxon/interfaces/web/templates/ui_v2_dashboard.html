@@ -552,7 +552,7 @@
       }
     }
     const headerLabels = [...document.querySelectorAll("header span")];
-    const headerValue = label => headerLabels.find(node => textOf(node) === label)?.parentElement?.querySelectorAll("span")[1];
+    const headerValue = label => headerLabels.find(node => textOf(node).replace(/:$/, "") === label)?.parentElement?.querySelectorAll("span")[1];
     const engineValue = headerValue("Engine");
     if (engineValue) engineValue.textContent = health.ok ? "Connected" : "Unavailable";
     const portValue = headerValue("Port");
