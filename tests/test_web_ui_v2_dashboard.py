@@ -117,12 +117,22 @@ def test_dashboard_artifact_card_supports_drop_and_rejects_unwired_formats(page,
         timeout=5000,
     )
 
-def test_dashboard_imports_valid_burp_xml_and_opens_findings(page, live_server):
+def test_dashboard_posts_burp_xml_and_opens_findings(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     page.wait_for_function(
         "() => document.querySelector('#dashboard-action-status') !== null",
         timeout=8000,
     )
+    calls = []
+
+    def fulfill_import(route):
+        calls.append({
+            "method": route.request.method,
+            "content_type": route.request.headers.get("content-type", ""),
+        })
+        route.fulfill(status=200, content_type="application/json", body='{"count": 1}')
+
+    page.route("**/api/import/burp", fulfill_import)
     page.evaluate(
         """() => {
           const heading = [...document.querySelectorAll('h2')].find(node =>
@@ -136,5 +146,5 @@ def test_dashboard_imports_valid_burp_xml_and_opens_findings(page, live_server):
         }"""
     )
     page.wait_for_url("**/ui-v2/findings", timeout=10000)
-    payload = page.evaluate("() => fetch('/api/ui-v2/findings').then(response => response.text())")
-    assert "Dashboard import test" in payload
+    assert calls == [{"method": "POST", "content_type": calls[0]["content_type"]}]
+    assert "multipart/form-data" in calls[0]["content_type"]
