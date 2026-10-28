@@ -116,3 +116,25 @@ def test_dashboard_artifact_card_supports_drop_and_rejects_unwired_formats(page,
         "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Nmap and scope-profile imports are not wired yet')",
         timeout=5000,
     )
+
+def test_dashboard_imports_valid_burp_xml_and_opens_findings(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    page.evaluate(
+        """() => {
+          const heading = [...document.querySelectorAll('h2')].find(node =>
+            node.textContent.trim() === 'Import Existing Assessment Profile'
+          );
+          const card = heading.closest('.group.relative.flex.flex-col');
+          const xml = '<?xml version="1.0"?><issues><issue><name>Dashboard import test</name><host>http://127.0.0.1</host><path>/dashboard-test</path><severity>High</severity><confidence>Certain</confidence></issue></issues>';
+          const transfer = new DataTransfer();
+          transfer.items.add(new File([xml], 'dashboard-import.xml', {type: 'application/xml'}));
+          card.dispatchEvent(new DragEvent('drop', {bubbles: true, cancelable: true, dataTransfer: transfer}));
+        }"""
+    )
+    page.wait_for_url("**/ui-v2/findings", timeout=10000)
+    payload = page.evaluate("() => fetch('/api/ui-v2/findings').then(response => response.text())")
+    assert "Dashboard import test" in payload
