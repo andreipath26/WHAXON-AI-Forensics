@@ -581,7 +581,7 @@
         const md=await r.text();
         const pre=modal?.querySelector("pre,textarea,[data-report-preview]");
         if(pre)pre.textContent=md;
-        if(modal){modal.classList.remove("hidden");modal.setAttribute("aria-hidden","false");}
+        if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.setAttribute("aria-hidden","false");}
       }catch(e){alert("Report preview failed: "+e.message);}
     });
     else if(label==="Export Findings (.json)") b.addEventListener("click",()=>{window.location.href="/api/report?format=json";});
