@@ -1,0 +1,92 @@
+name: One-time stale branch cleanup
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  cleanup:
+    if: contains(github.event.head_commit.message, '[branch-cleanup-2026-10-28]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only audited, unchanged, obsolete branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          refs="$(gh api "repos/$repo/git/matching-refs/heads")"
+
+          # Each entry is an audited branch name plus its exact observed head SHA.
+          # Any moved branch is skipped. main and the experiment branch are never targets.
+          while read -r branch expected; do
+            [[ -z "${branch:-}" ]] && continue
+            [[ "$branch" == "main" || "$branch" == "publish/whaxon-experiment-2026-10-25" ]] && {
+              echo "PROTECTED: $branch"
+              continue
+            }
+            actual="$(jq -r --arg ref "refs/heads/$branch" '.[] | select(.ref == $ref) | .object.sha' <<< "$refs")"
+            if [[ -z "$actual" ]]; then
+              echo "ALREADY ABSENT: $branch"
+              continue
+            fi
+            if [[ "$actual" != "$expected" ]]; then
+              echo "SKIP MOVED BRANCH: $branch expected=$expected actual=$actual"
+              continue
+            fi
+            open_prs="$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq 'length')"
+            if [[ "$open_prs" != "0" ]]; then
+              echo "SKIP OPEN PR: $branch"
+              continue
+            fi
+            encoded="${branch//\//%2F}"
+            gh api --method DELETE "repos/$repo/git/refs/heads/$encoded"
+            echo "DELETED: $branch ($actual)"
+          done <<'BRANCHES'
+          Ui-upload 2d53fb86dfee63471f032511c750275be2ac0915
+          ci/python311-system-deps-retry 1ec1e4f8c9f5ba933bf02d46e2a4914acc9fe356
+          docs/reconcile-roadmap-2026-10-25 cc230dc002cb52a27feb6b493cff338afc13e51d
+          feat/new-default-obsidian-ui 3426d38b857a6fbb8f97c0cfc6d5248531cbe135
+          feat/obsidian-react-ui 3e7576a7776c0be5a6a6c72e84f8001a997f6343
+          fix/ui-remediation-findings 634333bbafe3bd8b62978998bae9ea24332a4150
+          fix/ui-v2-report-preview-modal a06e08fb9136e84c68b2ea896ac39310e7f239b3
+          fix/ui-v2-run-orchestration afa996f9a47e21f59f1cf34c929b02dbac847f9e
+          fix/ui-v2-scope-targets e7ecd5878f12f5cf2f900987d21647714f382356
+          hardening/argv-target-guard da3431f5f59d2603b2ed9524236845ed430d9f18
+          integration/ui-v2-core-pages 97d0568d3fa4e0eda2fbfa020c0f42a8fc7bb4a0
+          maintenance/reconcile-ci-prs-2026-10-28 9286a16fea90227f27524d3b71239743fd458628
+          maintenance/reconcile-roadmap-prs-2026-10-28 32ce3c9cca705dcae0933b31a99f4cc54fecaf70
+          release/v1.0-cli-context-roundtrip b480886987f76a707aaad64c9d002548fdeb73f6
+          release/v1.0-core-readiness 5e1becb53fc874552a3c4f83c014b9bd50682b4d
+          release/v1.0-readiness-ui-truthfulness 46237b98fbe2307a157e5cc20c0387809d4249e6
+          release/v1.0.0-metadata dd26fa95efc34ee8a751d8ba52909e65a62af5cd
+          roadmap/tooling-review-and-ui-followup c00dc0750862a540619f6a010fedcba477a6e513
+          ui/ci-wiring-check-2026-10-26 9c21ca90e93b4afc84b13da6ded49cf025fa8df9
+          ui/ci-wiring-check-2026-10-26b 574ff03e30b7af35b000995e89c2d224acde4c89
+          ui/ci-wiring-check-2026-10-26c c89195b270587773c743289f77625b2e142882ad
+          ui/ci-wiring-check-2026-10-26d 6a00076f50800483a21ab5e570761e718c2ff76b
+          ui/ci-wiring-check-2026-10-26e fa64d0c68e7ccc5bb253bf5a2413985a2b3dc7a7
+          ui/ci-wiring-check-2026-10-26f 0ebfb48d64dc0f6230849f528f6648c702f02e81
+          ui/ci-wiring-check-2026-10-26g 95f3058d4c47e5b3439d59897a96595d0e4990cc
+          ui/ci-wiring-check-2026-10-26h 9f7e38c439b63748f7dad6394ed367ef1463e762
+          ui/ci-wiring-check-2026-10-26i 870f073f415b087aa0aff33f1b7628a0fd492725
+          ui/ci-wiring-check-2026-10-26j ae30ffdda0c7808edea7ef7a9ed5856fa4076079
+          ui/ci-wiring-check-2026-10-26k 7ebb5e2c9eaa2ed58541a6aa0e9738a8bc641644
+          ui/ci-wiring-check-2026-10-26l 85bd735bb7096f86f58b054d06c4e914760a9b7f
+          ui/ci-wiring-check-2026-10-26m 095d53c3b3dbf256216e913ca0b7ddaa422d50a0
+          ui/ci-wiring-check-2026-10-26n 92c94495e27a3f9939b5168d7bb3f762dbca3a7d
+          ui/ci-wiring-check-2026-10-26o 92c94495e27a3f9939b5168d7bb3f762dbca3a7d
+          ui/full-wiring-2026-10-26 3a3b8975338a65a9c5dc66a8ed7a170b0908b6c8
+          ui/live-attack-surface-graph d003334252573830bcd12fa64f6f80d4bc0da079
+          ui/port-canonical-auxiliary-pages-2026-10-28 72b21c89f7aaa48d6f313c3ba06636d84c835df7
+          ui/v2-integrated-core-pages 7f79b3e20e218f9e8e10de370c7f7c6d56ad450a
+          ui/wire-settings-threat-intel bc60bfab3c98880f80a5d68bf1202589c6953bf9
+          ui/wiring-fixes-validation-2026-10-26 c205fac63fbb2c1efdf1388834395fff1ff1280d
+          ui-v2-auxiliary-pages-from-main 6661fc561dc3d42c31a541aa64aa712cc608f5e7
+          BRANCHES
