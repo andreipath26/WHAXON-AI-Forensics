@@ -370,6 +370,7 @@
  if(wireCard)wireCard.style.display="none";
  const confidenceValue=[...document.querySelectorAll("span")].find(n=>textOf(n)==="89.4%");
  const confidenceNote=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("Model Threshold:"));
+ const confidenceDonut=[...document.querySelectorAll("svg path")].find(p=>p.getAttribute("stroke-dasharray")==="89.4, 100");
  const authBtn=document.getElementById("btn-authorize"),rejectBtn=document.getElementById("btn-reject");
  const proposalDetails=()=>pendingRuns[0]?.pending_question||null;
  const activeProposalText=()=>{const q=proposalDetails();return q?(q.rationale||q.goal||JSON.stringify(q)):"No live proposal is awaiting operator input.";};
@@ -465,9 +466,8 @@
      const score=Number(q?.confidence);
      confidenceNote.textContent=q&&Number.isFinite(score)?"Recorded proposal confidence; not a proof of safety":"Confidence score unavailable until a live proposal is recorded.";
    }
-   const donut=[...document.querySelectorAll("svg path")].find(p=>p.getAttribute("stroke-dasharray")==="89.4, 100"||p.getAttribute("stroke-dasharray")==="0, 100");
    const score=Number(q?.confidence);
-   if(donut)donut.setAttribute("stroke-dasharray",q&&Number.isFinite(score)?String(Math.max(0,Math.min(100,score<=1?score*100:score)))+", 100":"0, 100");
+   if(confidenceDonut)confidenceDonut.setAttribute("stroke-dasharray",q&&Number.isFinite(score)?String(Math.max(0,Math.min(100,score<=1?score*100:score)))+", 100":"0, 100");
    const traceText=[
      q?.rationale||"No live AI rationale is recorded for the current page.",
      "Current scope is checked by the server before an AI run starts; the executor checks scope again before running tools.",
