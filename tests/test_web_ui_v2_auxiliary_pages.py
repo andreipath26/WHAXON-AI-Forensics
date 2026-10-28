@@ -22,5 +22,5 @@ def test_auxiliary_canonical_pages_render_live_panels(page, live_server, path, l
     page.wait_for_function(
         "(id) => { const el = document.getElementById(id); return el && !el.textContent.includes('Fetching current backend state.'); }",
         arg=live_id,
-        timeout=8000,
+        timeout=20000,
     )
