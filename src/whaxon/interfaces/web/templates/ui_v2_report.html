@@ -576,13 +576,16 @@
     if(label==="Terminal Log") b.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
     else if(label==="Preview Markdown") b.addEventListener("click",async()=>{
       const modal=document.getElementById("previewModal");
+      const pre=modal?.querySelector("pre,textarea,[data-report-preview]");
+      if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.setAttribute("aria-hidden","false");}
+      if(pre)pre.textContent="Loading the current report preview…";
       try{
         const r=await fetch("/api/report?format=md");if(!r.ok)throw new Error("HTTP "+r.status);
         const md=await r.text();
-        const pre=modal?.querySelector("pre,textarea,[data-report-preview]");
         if(pre)pre.textContent=md;
-        if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.setAttribute("aria-hidden","false");}
-      }catch(e){alert("Report preview failed: "+e.message);}
+      }catch(e){
+        if(pre)pre.textContent="Report preview unavailable: "+e.message;
+      }
     });
     else if(label==="Export Findings (.json)") b.addEventListener("click",()=>{window.location.href="/api/report?format=json";});
     else if(label==="Download Full Report (.pdf)") b.addEventListener("click",()=>{window.location.href="/api/report?format=pdf";});
