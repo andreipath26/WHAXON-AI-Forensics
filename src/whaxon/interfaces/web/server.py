@@ -473,6 +473,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/tools")
     def list_tools():
+        import shutil
+
         from whaxon.adapters import get_adapter
 
         result = []
@@ -482,7 +484,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             except Exception:
                 app.logger.exception("Adapter lookup failed for catalog tool %s", tool.id)
                 adapter_available = False
+            binary_available = bool(
+                tool.binary
+                and (
+                    shutil.which(tool.binary)
+                    or (
+                        os.path.isabs(tool.binary)
+                        and os.path.isfile(tool.binary)
+                        and os.access(tool.binary, os.X_OK)
+                    )
+                )
+            )
             result.append({
+                "binary_available": binary_available,
+                "transport": tool.transport,
                 "id": tool.id,
                 "name": tool.name,
                 "category": tool.category,
@@ -1033,6 +1048,56 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def get_scope():
         return jsonify(registry.core.scope.summary())
 
+    @app.post("/api/scope")
+    def save_scope():
+        """Validate and persist an operator-edited scope definition."""
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "JSON object required"}, 400
+        enabled = data.get("enabled", True)
+        if type(enabled) is not bool:
+            return {"error": "'enabled' must be a JSON boolean"}, 400
+        current_scope = registry.core.scope.summary()
+        if (
+            enabled is False
+            and current_scope.get("enabled", True) is not False
+            and data.get("confirm_disable") is not True
+        ):
+            return {"error": "confirm_disable=true is required to disable scope enforcement"}, 400
+        engagement = data.get("engagement", "")
+        notes = data.get("notes", "")
+        if not isinstance(engagement, str) or len(engagement) > 200:
+            return {"error": "engagement must be a string of at most 200 characters"}, 400
+        if not isinstance(notes, str) or len(notes) > 5000:
+            return {"error": "notes must be a string of at most 5000 characters"}, 400
+        from whaxon.core.scope import _validate_scope_rule
+        rules = {}
+        for key in ("in_scope", "out_of_scope"):
+            value = data.get(key, [])
+            if not isinstance(value, list) or len(value) > 500:
+                return {"error": f"'{key}' must be a list with at most 500 rules"}, 400
+            normalized = []
+            for item in value:
+                if not isinstance(item, str) or not item.strip() or len(item.strip()) > 253:
+                    return {"error": f"invalid rule in '{key}'"}, 400
+                rule = item.strip()
+                if not _validate_scope_rule(rule):
+                    return {"error": f"invalid scope rule: {rule}"}, 400
+                if rule not in normalized:
+                    normalized.append(rule)
+            rules[key] = normalized
+        try:
+            registry.core.scope.save({
+                "engagement": engagement.strip(),
+                "enabled": enabled,
+                "in_scope": rules["in_scope"],
+                "out_of_scope": rules["out_of_scope"],
+                "notes": notes.strip(),
+            })
+        except (OSError, RuntimeError, ValueError) as exc:
+            return {"error": f"scope was not saved: {exc}"}, 400
+        return jsonify(registry.core.scope.summary())
+
     @app.post("/api/scope/check")
     def check_scope():
         data = request.get_json(silent=True) or {}
@@ -1580,6 +1645,32 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def settings_page():
         from flask import render_template as _rt
         return _rt("settings.html")
+
+    @app.get("/ui-v2/run")
+    def ui_v2_run():
+        """Canonical run and orchestration page backed by the live job API."""
+        return render_template("ui_v2_run.html")
+
+    @app.get("/ui-v2")
+    @app.get("/ui-v2/dashboard")
+    def ui_v2_home():
+        """Canonical dashboard backed by live WHAXON state."""
+        return render_template("ui_v2_dashboard.html")
+
+    @app.get("/ui-v2/findings")
+    def ui_v2_findings():
+        """Canonical findings design, wired to live report and validation APIs."""
+        return render_template("ui_v2_findings.html")
+
+    @app.get("/ui-v2/scope")
+    def ui_v2_scope():
+        """Canonical scope and targets page backed by the live ScopeManager."""
+        return render_template("ui_v2_scope.html")
+
+    @app.get("/ui-v2/report")
+    def ui_v2_report():
+        """Canonical report and PTES page backed by live report APIs."""
+        return render_template("ui_v2_report.html")
 
     @app.get("/ui")
     def ui():
