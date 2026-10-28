@@ -146,5 +146,6 @@ def test_dashboard_posts_burp_xml_and_opens_findings(page, live_server):
         }"""
     )
     page.wait_for_url("**/ui-v2/findings", timeout=10000)
-    assert calls == [{"method": "POST", "content_type": calls[0]["content_type"]}]
+    assert len(calls) == 1
+    assert calls[0]["method"] == "POST"
     assert "multipart/form-data" in calls[0]["content_type"]
