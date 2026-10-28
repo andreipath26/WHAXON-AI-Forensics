@@ -76,3 +76,17 @@ def test_dashboard_does_not_claim_default_credentials_are_detected_without_check
     assert "Default Local Engine Credentials Detected" not in html
     assert "whaxon:whaxon" not in html
     assert "Credential Configuration Before Network Exposure" in html
+
+def test_dashboard_credential_notice_reflects_live_status_api(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    status = page.evaluate("() => fetch('/api/status').then(response => response.json())")
+    page.wait_for_function(
+        """(defaultCreds) => {
+          const labels = [...document.querySelectorAll('span')].map(node => node.textContent.trim());
+          return defaultCreds
+            ? labels.includes('Default Credentials Detected')
+            : labels.includes('Credential Configuration Status');
+        }""",
+        arg=status["default_creds"],
+        timeout=8000,
+    )
