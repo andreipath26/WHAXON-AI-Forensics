@@ -9,6 +9,42 @@
 - **URGENT** — do before other queued work
 - **OUT** — explicitly excluded, never built
 
+## Repository reality check — 2026-10-25 (reconciled against source tree)
+
+This section supersedes stale progress estimates and any older status statements below where they conflict. It is a repository inspection, not a claim that every capability has passed end-to-end acceptance testing.
+
+**Inspected repository:** `andreipath26/WHAXON-AI-Forensics`, `main` at `21db85a83fa2a8d643570434ec8ad1b75a903cfa` (merge of UI asset upload PR #9). The separate `WHAXON` repository is not the source of truth for this review. The experimental folder `whaxon-experiment-2026-10-25/` is intentionally excluded from this roadmap reconciliation and must remain untouched.
+
+### Framework work present in the repository
+
+| Area | Evidence in this repository | Roadmap status after reconciliation |
+|---|---|---|
+| Request-context validation | `core/validator.py`, adapter request-context support, `tests/test_request_context.py`, `tests/test_validator_request_context_contract.py` | Implemented; retain regression coverage. Do not describe as future work. |
+| Blind/time-based validation | `tests/test_validator_blind.py`; validator uses multiple baseline/injected samples and median comparison | Implemented, but timing evidence has inherent false-positive/target-variance risk; keep as a qualified evidence type, not a universal guarantee. |
+| Observation probes | `tests/test_validator_observation.py` and observation-validation code/tests | Present in code and tests; verify supported observation types and end-to-end CLI/web behavior before claiming full acceptance. |
+| Retest lifecycle | `interfaces/cli/retest_cmd.py`, `tests/test_validator_retest.py`, `tests/test_web_findings.py` | CLI/core and web route paths exist. Full finding-state lifecycle, scheduling, and client-facing workflow remain distinct from a working retest command. |
+| Scope and execution hardening | `tests/test_scope_failclosed.py`, `tests/test_runner.py`, `tests/test_executor_target_lock.py`, `tests/test_web_auth_fail_closed.py`; current changelog documents guarded web execution, cancellation, and listener credential checks | Implemented controls are present; still require release-level regression and deployment checks. DNS preflight is not connection-time DNS pinning; external egress restrictions remain required for beta deployments. |
+| Passive reconnaissance | `core/recon.py`, `core/recon_checks.py`, `interfaces/cli/recon_cmd.py`, `tests/test_recon.py` | Phase 1 and passive Phase 2 are implemented in the repository. Third-party data providers and active checks remain future work. |
+| Reporting and severity | `core/report.py`, `core/report.html`, `core/report_charts.py`, report and business-impact tests; standalone HTML/PDF/Markdown/JSON paths | Report generation, severity enrichment, deduplication, and business-impact work are present. Coverage disclosure and reproducible proof artifacts must be separately acceptance-tested against the v1.0 definition. |
+| CLI, web, TUI, GUI | `interfaces/cli/`, `interfaces/web/`, `interfaces/tui/`, `interfaces/gui/`; web, TUI, server, and route tests | Multiple interfaces exist. Their existence does not prove feature parity or a completed redesign. |
+| Quality and packaging | `pyproject.toml` declares package version `1.0.0`; CI/release workflows exist; changelog describes clean-wheel smoke tests and metadata checks | Release metadata/workflow work is present. Do not infer that a public v1.0 release, tag, publication, or green current CI run exists without checking those live states. |
+
+### UI architecture decision — new default UI; legacy UIs retained as references
+
+The checked-in design package under `web ui files and rendering/` (32 HTML screens, 32 PNG renderings, and `obsidian_kinetic/DESIGN.md`) defines the **new default WHAXON web UI**. This is a new UI implementation, not a refresh or continuation of the previous UI. The old web UI, its templates, CSS/JS, prior mockups, and prior screenshots are **deprecated reference material only**: preserve them unchanged for historical comparison, but do not use them as the design source, do not merge their visual language into the new UI, and do not treat their completion status as completion of the new UI.
+
+The new UI must become the default interface launched by WHAXON. Build/integrate it as the active frontend and connect it to the existing framework/services and safe backend routes. Use the checked-in screen HTML and PNG renderings as the source of truth for visual fidelity. The new UI is not complete just because the design assets are present: each screen intended for production must be mapped to a route/workflow, controls must be wired to real supported behavior, and browser/interaction/visual regression checks must pass. If a control has no safe implemented backend, hide or disable it in the live UI without deleting the supplied reference screen or redesigning it.
+
+The existing `docs/WEB_UI_INTERACTION_AUDIT.md` describes the deprecated UI, not the new default UI. Preserve it as a historical audit; create a separate interaction/acceptance audit for the new UI rather than rewriting history. The old Flask templates and assets remain untouched unless a later, explicitly scoped migration step requires changing how the app selects its default entry point. Do not delete or overwrite deprecated UI files.
+
+### Corrected v1.0 interpretation
+
+The framework has advanced substantially beyond the older `docs/STATE.md` snapshot (last updated 2026-10-21, version 0.11.12, 797 tests). The state file is historical until refreshed. The current roadmap must not treat the old ~71-hour / 8–10-session estimate as remaining work: key framework units in §34.2 are already represented in source/tests. The remaining path is primarily **evidence-led integration and release acceptance**: map the actual implemented framework to the v1.0 stopping condition, integrate the supplied UI without redesigning it, wire or hide unsupported controls in the live interface while preserving source assets, run browser/CLI end-to-end checks, resolve release blockers, then verify the actual release artifacts and CI state.
+
+**Status vocabulary for this reconciliation:** “Implemented in source” means code/tests exist; “verified” means the relevant automated or end-to-end check was actually observed passing; “released” means a release artifact/tag/publication was independently confirmed. These statuses are not interchangeable.
+
+---
+
 ---
 
 ## TABLE OF CONTENTS
@@ -31,7 +67,7 @@
 16. MCP / competitor reference
 17. Team-ready capabilities
 18. Company-grade platform
-19. UI redesign (URGENT)
+19. New default UI integration and acceptance (URGENT; legacy UI deprecated)
 20. Market coverage (20.1 URGENT)
 21. Report and UI quality issues
 22. Session log
@@ -45,7 +81,8 @@
 35. Portfolio R&D Pipeline
 36. Web-Check-Style Recon Stage
 37. Post-v1.0 Strategic Pivots
-38. v1.0 Release Blockers
+38. v1.0 Release Blockers and acceptance checklist
+39. Tooling portfolio review and integration gates
 
 ---
 
@@ -606,9 +643,15 @@ Near-term roadmap remains §§4–10 + §17 MCP/knowledge graph/verification/tea
 
 ---
 
-# 19. UI REDESIGN — ALL FOUR INTERFACES (URGENT)
+# 19. NEW DEFAULT UI INTEGRATION AND ACCEPTANCE (URGENT)
 
-**Status: URGENT. Not deferred. Do before other queued work.**
+**Status: NEW UI DESIGN ASSETS PRESENT; implementation and acceptance remain open. Legacy UIs are deprecated and reference-only.**
+
+The repository contains the new Obsidian Kinetic design system, 32 HTML screens, and 32 matching renderings under `web ui files and rendering/`. This is a **new default UI**, not a redesign of the previous UI. Preserve the old UI source and assets unchanged for reference. Do not modify the legacy design to imitate the new one, and do not reuse its old interaction audit as the new UI's acceptance record.
+
+**Acceptance rule:** make the new UI the default interface launched by WHAXON; map each intended production screen to its workflow and backend service; wire every visible action to supported, safe behavior; hide or disable unsupported live controls without deleting supplied design assets; and cover the new UI with browser interaction and visual regression tests. The supplied HTML and PNG renderings are the design/visual source of truth.
+
+**Do not count uploading the design assets as completing the UI.**
 
 **Problem:** Interfaces cluttered as features accumulated across sessions 1–54. No information hierarchy.
 
@@ -629,7 +672,7 @@ Near-term roadmap remains §§4–10 + §17 MCP/knowledge graph/verification/tea
 
 **Recommendation:** B for web, C for TUI, CLI output consistency pass.
 
-**Design artifact:** mockups/ui-v4.html on the founder's Desktop is the canonical design. It is a self-contained HTML file (no external CSS, no external JS, no CDN) that renders the full system: sidebar navigation, six-stage workflow, right slide-over, command palette, AI banner, notifications, findings with severity donut + attack-surface graph + KPIs, CVE/exploit sections in slide-over, Threat Intel interactive lookup, Report Known Vulnerabilities preview, workspace switcher, and a components gallery. It is the spec that implementation follows.
+**Design artifact (deprecated):** the old reference to `mockups/ui-v4.html` on the founder's Desktop and all previous UI implementations are reference-only. The new default UI's source of truth is the checked-in files under `web ui files and rendering/` and `obsidian_kinetic/DESIGN.md`. The supplied screens must be integrated as the default frontend rather than replaced with, or visually blended into, the old UI. The intended system includes: sidebar navigation, six-stage workflow, right slide-over, command palette, AI banner, notifications, findings with severity donut + attack-surface graph + KPIs, CVE/exploit sections in slide-over, Threat Intel interactive lookup, Report Known Vulnerabilities preview, workspace switcher, and a components gallery. It is the spec that implementation follows.
 
 ## 19.2 Testing
 
@@ -1705,27 +1748,30 @@ To beat Sn1per, HunterX, and the AI agents, we cannot out-tool them. We must out
 - **vs AI Agents (XBOW, Shannon):** They hallucinate. We win because our Validator uses urllib and deterministic baselines. No LLM decides if a bug is real.
 - **vs HunterX:** They have "proof contracts" but are heavy. We win by being a single, air-gapped, stdlib-only package.
 
-## 34.2 The Solo V1.0 Execution Path (Next 10-12 Sessions)
-*No new features until this list is done. No Enterprise, No MCP, No Clawbrowser.*
+## 34.2 The Solo V1.0 Execution Path — reconciled 2026-10-25
+
+*No unrelated feature expansion until the v1.0 acceptance checks below are complete. No Enterprise, no MCP expansion, no Clawbrowser expansion.*
+
+The old “Next 10–12 Sessions” title and ~31h remaining implication are stale. Steps 1–4 and the core Trust Layer have implementation evidence in the current repository. Their original DONE labels mean code was reported as landed, not that every v1.0 end-to-end acceptance criterion is closed. The UI step is **not complete** merely because a prior UI pass landed or the design assets were uploaded.
 
 1. **Adapter Request Context:** Finding model gains `request_context` (method, url, headers, body). Adapters populate it. Validator uses it to replay POST and authenticated endpoints. (~4h) — **DONE (session 73)**
 2. **Blind Validation:** Timing delta check in Validator. Payload > 3s longer than baseline = `verified (blind)`. (~3h) — **DONE (session 74)**
 3. **The Retest Loop (§32.5):** `whaxon retest <job_id> <seq>`. Flip status to `fixed` or `still_vulnerable`. (~2h) — **DONE (session 75)**
 4. **Coverage Ledger (§32.4):** Runner logs skipped items. Report renders them + a Confidence Score. (~4h) — **DONE (session 76)**
-5. **Three-Tab UI Redesign (§32.12):** ~14h (not 4h). Full unit: — **DONE (session 77)** — **DONE (session 77)**
+5. **New default UI / supplied design integration (§32.12):** **PARTIAL — design assets are in the repository; new frontend integration, default-entry-point switch, backend wiring and interaction acceptance remain open. Previous UIs are deprecated reference-only and must remain unchanged.**
    - Service layer + CLI/web route parity test.
    - **Discover** (Scope, Run, Findings, Attack Surface, Catalog).
    - **Operate** (Validate, Access, Retest queue, Coverage gaps) - WCAG 1.4.1, keyboard paths.
    - **Report** (report builder, business impact, coverage disclosure, export).
    - Sidebar restructure. Playwright tests updated in the same PR.
-6. **Layer 2 & 3 Trust Layer (§33.1):** Human exception gate + LLM triage for ambiguous candidates. — **DONE (session 77)** — **DONE (session 77)**
+6. **Layer 2 & 3 Trust Layer (§33.1):** Core/web approval and triage paths are present with tests. **PARTIAL acceptance:** verify ambiguous findings end to end; ensure no LLM path can promote a finding to verified.
 
-**Total: ~31h / 10-12 sessions.** The earlier "5 sessions" estimate shrank the UI unit and ignored the parity test.
+**Remaining effort:** do not use the old ~31h / 10–12 session estimate as current remaining work. Estimate only after the release checklist below is evidenced; prioritize integration/verification rather than rebuilding framework components that already exist.
 
-## 34.3 The Launch Sequence (Post-Solo V1.0)
+## 34.3 The Launch Sequence (after acceptance, not merely after implementation)
 
-1. **Dogfood:** Run on DVWA, Juice Shop, bWAPP. Verify blind SQLi and context retention.
-2. **Artifact:** Generate report with `verified` finding + `curl --reproduce` proof.
+1. **Dogfood:** run controlled lab targets (DVWA, Juice Shop, bWAPP as available) and preserve reproducible logs; distinguish tests actually run from historical notes.
+2. **Artifact:** generate reports with verification status/reasons and inspect whether each reported proof artifact is genuinely reproducible. Do not claim `curl --reproduce` support until a real artifact is emitted and tested.
 3. **Content:** Write "Why AI scanners have a trust problem".
 4. **Launch:** Post to HN (regular submission), then "Show HN", then r/SideProject and r/cybersecurity.
 
@@ -1737,7 +1783,7 @@ To beat Sn1per, HunterX, and the AI agents, we cannot out-tool them. We must out
 ## 34.5 Versioning Cadence (Supersedes §12)
 - **Patch (v0.11.x):** Bugfixes.
 - **Minor (v0.12.0):** New CLI verb (`retest`, `coverage`) or major feature.
-- **Major (v1.0.0):** §34.2 complete, ready for HN launch.
+- **Major (v1.0.0):** all release blockers in §38 closed, CI/release workflow verified, package/tag/publication state confirmed, and v1.0 acceptance evidence recorded. Version metadata alone does not constitute a release.
 
 ---
 
@@ -1888,3 +1934,166 @@ The following items are deferred until v1.0 is fully deployed. They represent th
 
 ---
 
+
+
+---
+
+# 38. V1.0 RELEASE BLOCKERS AND ACCEPTANCE CHECKLIST
+
+**Status: OPEN until each item has evidence recorded.** This section is the operational release gate and supersedes optimistic DONE labels elsewhere when acceptance evidence is missing.
+
+- [ ] **Framework-to-roadmap crosswalk:** map each v1.0 stopping-condition stage (recon, enumeration, vulnerability discovery, initial access where supported, deterministic validation, findings, coverage/non-testing disclosure, reporting, retest) to the actual source path and automated test(s). Mark unsupported scope explicitly; do not claim zero false positives as a universal property.
+- [ ] **Validation trust boundary:** test SQL/error-marker, reflected-XSS, timing/blind, observation-probe and request-context replay paths. Candidate/inconclusive results must not be reported as verified; the LLM must never set verification status. Record timing caveats.
+- [ ] **Retest semantics:** verify that retest accepts only eligible previously verified findings and produces the documented `fixed`, `still_vulnerable`, or `inconclusive` result with a reason. Align the older “flip status” language in §§32–34 with the current implementation.
+- [ ] **Coverage honesty:** prove that skipped/failed/unrequested work is not silently counted as tested. Confirm the report's coverage section and confidence claims are based on persisted evidence; if this is not implemented end to end, mark it as a blocker rather than DONE.
+- [ ] **New default UI:** implement the supplied design as WHAXON's default frontend, matching the checked-in HTML/PNG references and design system. Connect supported actions to the framework/services; hide/disable unsupported controls in the live UI; add/execute Playwright navigation, interaction and visual regression tests. Create a separate new-UI interaction audit. Preserve all previous UI templates, CSS/JS, mockups, screenshots and `docs/WEB_UI_INTERACTION_AUDIT.md` unchanged as deprecated reference material.
+- [ ] **Security regressions:** run the scope fail-closed, target-boundary, auth fail-closed, job cancellation/descendant termination and request-context regression tests. Document residual deployment constraints (including external egress enforcement and DNS rebinding/pinning limitations).
+- [ ] **Packaging:** build wheel and sdist; install the wheel in a clean environment; verify CLI help, packaged payload/catalog resources, scope initialization, and local observation-validation smoke test.
+- [ ] **CI and release workflow:** verify all required Python-version jobs are green on the candidate commit; resolve or explicitly disposition any open CI blocker. A workflow definition or a past green run is not proof of current green status.
+- [ ] **Release identity:** confirm the intended tag matches `pyproject.toml`, the release workflow succeeds, and the intended package index shows the expected version. Do not state “released” until checked.
+- [ ] **Docs synchronization:** refresh `docs/STATE.md` after the above checks; update the UI audit and this roadmap with observed results and commit/test references. Remove stale estimates only when the replacement evidence is recorded.
+
+**Release decision rule:** any unchecked item that affects correctness, safety, the user-visible UI, report honesty, or installability blocks calling the product release-ready. Deferred commercial/team features are not blockers unless required by the agreed solo v1.0 scope.
+
+# 39. TOOLING PORTFOLIO REVIEW — ADDITIONS, SUBSTITUTIONS AND ACCEPTANCE GATES
+
+**Status:** Proposed roadmap amendment, based on a portfolio review of §7 and the candidate inventory. This section refines priorities; it does not mean the tools below have already been integrated or tested. Existing §7 remains the historical inventory until §39.8 reconciles it.
+
+## 39.1 Decision
+
+Keep the strategic objective of broad tool coverage, but optimise for **distinct capability, maintainability, structured evidence and verified end-to-end behaviour**, not raw adapter count. Do not add a tool solely to reach 120.
+
+A tool integration is not production-ready merely because its adapter is registered or its parser passes fixture tests. Track these states separately:
+
+1. `planned`
+2. `implemented`
+3. `installed`
+4. `smoke-tested`
+5. `validated-on-lab`
+6. `end-to-end-verified`
+
+Only the final state counts as production-ready coverage. Every integration must have a named supported version/platform, input contract, scope policy, timeout/cancellation behaviour, structured output, error semantics, evidence provenance, test fixtures and at least one end-to-end lab proof.
+
+## 39.2 Priority additions and promotions
+
+These are candidates or capability priorities, not claims of current integration.
+
+### Promote or make first-class
+
+- **Nuclei:** already in the current catalog; make its template-based checks a first-class pipeline stage. Pin/review template sources, preserve template ID and version, enforce scope, capture raw evidence and send candidates through WHAXON validation. Template output alone must not imply `verified`.
+- **Naabu:** evaluate for fast port discovery complementary to Nmap. Use as an asset-discovery stage, not an Nmap replacement.
+- **Gowitness:** promote from Tier 2 to the asset triage/reporting workflow for screenshots, with headless-browser isolation and resource limits.
+- **gau:** retain as a complementary historical URL source to waybackurls where source coverage differs; deduplicate results.
+
+### Add as evaluation candidates
+
+- **OWASP ZAP:** evaluate for active web/API scanning and automation API integration, comparing coverage, output quality and operating cost against existing Burp and scanner workflows.
+- **Interactsh:** evaluate for controlled out-of-band evidence for blind vulnerabilities. Prefer a controlled instance where practical; correlate every callback to a unique test, enforce scope, document external data flows and never let a callback alone bypass the Trust Layer.
+- **Syft + Grype:** evaluate as a paired SBOM-generation and component-vulnerability workflow. Preserve SBOM provenance and component/package identifiers.
+- **Kubescape:** benchmark against Trivy, kube-bench and kubeaudit before adoption; add only for demonstrated coverage gaps.
+- **TruffleHog:** benchmark against Gitleaks before adoption; keep both only if measured source/secret coverage justifies the maintenance burden.
+- **RESTler or another schema-aware API fuzzer:** evaluate only after OpenAPI/Swagger ingestion, authentication/session handling, per-operation scope enforcement and deterministic validation are available.
+- **SharpHound:** evaluate as an alternative/addition to bloodhound-python only if Windows collection materially expands supported environments.
+- **enum4linux-ng:** prefer for new SMB/Windows enumeration work over the older enum4linux, subject to compatibility tests.
+- **ssh-audit:** evaluate as a clearly identified SSH configuration-audit capability; first confirm the exact project and supported output contract.
+
+## 39.3 Recommended substitutions and de-duplication
+
+Apply these as review decisions, not blind deletions. Confirm the exact upstream project, current maintenance, license, supported platforms and test results before changing the active inventory.
+
+- **enum4linux → enum4linux-ng** for the preferred modern SMB enumeration path; retain the original only if a real compatibility requirement exists.
+- **wfuzz vs ffuf:** keep ffuf as the default directory/content fuzzing integration. Retain wfuzz only for a demonstrated distinct workflow.
+- **XSStrike vs Dalfox:** benchmark both against a controlled XSS corpus. Keep both only if the measured coverage or workflow difference justifies maintaining both.
+- **testssl vs SSLyze vs sslscan:** choose a primary TLS assessment path and preserve a second tool only where it adds distinct checks or independent corroboration. Normalise overlapping findings.
+- **Droopescan vs Drupwn:** favour one maintained CMS coverage path; do not maintain duplicate Drupal enumeration without evidence of a gap.
+- **WhatWeb vs CMSeeK vs other CMS/fingerprint checks:** share deduplication and technology-identification logic; retain tools only for distinct supported technologies or measurable coverage.
+- **Medusa vs Ncrack vs Patator vs Hydra:** select a primary authorised authentication-audit integration based on protocol coverage, reliability and rate-limit controls. Do not integrate all four merely for breadth.
+- **Hashcat vs John the Ripper:** keep Hashcat as the existing baseline; evaluate John only for demonstrated format or workflow coverage not already met.
+- **Subfinder vs Sublist3r vs Assetfinder vs Amass:** keep the tools that contribute distinct passive sources or discovery modes; deduplicate assets and record provenance.
+- **Scoutsuite vs Prowler:** benchmark cloud-service and rule coverage. Keep Scoutsuite only if it fills an evidenced gap.
+- **Skipfish, Dmitry, Red-Hawk, Infoga, Recon-ng, Ghost-Eye, Cero and similar lower-priority candidates:** defer until project identity, maintenance, licensing, output quality and distinct capability are verified.
+- **Sn1per:** do not prioritise as a normal scanner dependency because it is itself an orchestration product and risks duplicating WHAXON's core role.
+- **SQLNinja:** defer unless it adds a tested SQL Server-specific workflow not covered by SQLMap and WHAXON's validation layer.
+- **Crunch and other wordlist generators:** treat as supporting utilities, not vulnerability scanners; adopt only if a concrete workflow needs them.
+
+## 39.4 Reconnaissance pipeline
+
+Target flow:
+
+`passive sources → DNS resolution → HTTP probing → port/service discovery → crawling and historical URLs → vulnerability checks`
+
+Candidate sequence:
+
+- Passive asset sources: Subfinder, Amass, certificate-transparency/DNS sources, gau/waybackurls.
+- DNS resolution: dnsx and the existing resolver path.
+- HTTP metadata: httpx.
+- Port discovery: evaluate Naabu alongside existing Nmap.
+- URL discovery: Katana plus historical URL sources.
+- Visual triage: Gowitness.
+- Vulnerability checks: existing catalog scanners and Nuclei, subject to template and scope controls.
+
+Every discovered hostname/IP/URL must retain provenance, be deduplicated, and pass scope evaluation before active requests. Related infrastructure discovered through certificates or third-party providers is a proposal for operator review, never an automatic scope expansion.
+
+## 39.5 Cloud, code, containers and software supply chain
+
+Keep Prowler, Trivy, Checkov, Semgrep and Gitleaks as foundational candidates. Design separate contracts for each data plane:
+
+- **Cloud posture:** cloud account/tenant identity, least-privilege permissions, region/service coverage, API-call audit and explicit cloud scope.
+- **Infrastructure as code:** repository/path input, policy/rule identifiers, file/line evidence and SARIF-compatible output where supported.
+- **Containers and dependencies:** image/repository/filesystem input, package identity, fixed-version information, SBOM linkage and provenance.
+- **Kubernetes:** cluster/context identity, permissions, namespace/resource scope, read-only default and explicit approval for any active action.
+- **Secrets:** secret type and location evidence, with secret values redacted from normal logs and reports.
+
+Evaluate Syft/Grype, Kubescape and TruffleHog as in §39.2. Avoid adding multiple tools with substantially duplicate rules unless measured results justify the extra install and maintenance burden.
+
+## 39.6 API security capability
+
+Add a capability workstream, not just a tool name:
+
+- Import OpenAPI/Swagger specifications and enumerate operations.
+- Retain authentication/session context safely, including refresh/expiry handling.
+- Enforce scope at the operation, host and redirect levels.
+- Support schema-aware input mutation and rate limits.
+- Distinguish discovery from validation; preserve request/response evidence with secrets redacted.
+- Evaluate ZAP and RESTler only after these foundations have acceptance tests.
+
+## 39.7 Tier 3 session and high-impact tool policy
+
+Do not treat Windows-native utilities, credential-access tools, network poisoning tools and command-and-control frameworks as equivalent scanner adapters.
+
+Before admitting any Tier 3 tool, define: supported session type, OS/version, privilege requirement, permitted operation classes, human-approval boundary, output contract, timeout/recovery, cleanup, audit trail and lab verification. Default to read-only collection. Credential-access, permission-changing, network-poisoning and C2 capabilities require separate explicit policy and must not run as ordinary unattended scan steps. Covenant and Empire should be deferred from the normal tool catalog unless a separate, justified adversary-emulation product boundary is approved.
+
+## 39.8 Inventory and estimate reconciliation — blocking bookkeeping task
+
+Before the next tool-adoption batch:
+
+1. Reconcile the stated target of 120, current count of 25, and claim of 95 additions against the actual unique tool IDs in the catalog and Tier lists.
+2. Resolve Tier totals (44 + 42 + 14 = 100) and category/list discrepancies, including the Tier 2 knockmail note.
+3. Distinguish tools, adapters, commands, providers, data sources and capabilities; do not count aliases or multiple wrappers for one executable as separate tools without a documented reason.
+4. For every candidate, record upstream URL, license, maintenance/activity check date, install method, supported OS, required privileges, output format, unique capability, overlap, scope risk, test plan and decision.
+5. Re-estimate integration effort after a representative pilot from each execution class: CLI scanner, cloud SDK/API, source-code scanner, GUI-driven integration and session-scoped Windows tool. The existing ~171h figure is a planning hypothesis, not a validated delivery commitment.
+
+## 39.9 Acceptance gates for every adapter
+
+- Scope is checked before every target-bearing action, including redirects, discovered hosts, callbacks and child processes.
+- No automatic scope expansion; proposed new assets require operator approval.
+- Tool output is structured and normalised without losing raw evidence or source attribution.
+- Exit code, timeout, partial output and tool-level errors are represented distinctly; exit code 0 is not proof of success.
+- Repeated findings are deduplicated while preserving all source references.
+- Findings enter the deterministic Trust Layer; the LLM may summarise evidence but never sets verification status.
+- Tests cover malformed output, missing executable, unsupported version, timeout, cancellation, out-of-scope input, partial output and false-positive/false-negative lab cases.
+- Documentation states prerequisites, permissions, side effects, rate limits, supported targets and safe-use constraints.
+
+## 39.10 Recommended execution order
+
+1. Reconcile the inventory and add per-tool decision records.
+2. Finish and regression-test the v1.0 Trust Layer, request-context replay, retest and coverage disclosure.
+3. Make Nuclei first-class and strengthen the existing recon → scan → validate → report pipeline.
+4. Pilot Naabu and Gowitness; retain only if end-to-end results justify the adapters.
+5. Design cloud/code/SBOM contracts, then pilot Syft/Grype and one cloud workflow.
+6. Evaluate ZAP and Interactsh in controlled labs.
+7. Add API-spec-driven testing after authentication, operation scope and validation are proven.
+8. Reassess Tier 2 based on measured unique coverage.
+9. Implement Tier 3 only after the session contract and explicit high-impact policy pass tests.
+
+**Success metric:** verified, reproducible coverage across supported asset and finding classes, with documented gaps and low false-positive rates—not the number of tool names in the catalog.
