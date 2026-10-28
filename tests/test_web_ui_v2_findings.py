@@ -82,3 +82,40 @@ def test_replay_button_posts_to_live_validation_route(page, live_server):
     assert response_info.value.ok
     assert calls and calls[0][0] == "POST"
     assert "/api/validate/" in calls[0][1] or "/api/retest/" in calls[0][1]
+
+
+def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, live_server):
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
+        timeout=8000,
+    )
+    total = page.locator("#whaxon-findings-list [data-finding-index]:visible").count()
+    heading = page.locator("#whaxon-findings-heading")
+    assert "shown of" in heading.inner_text()
+    assert "4 in buffer" not in heading.inner_text()
+
+    verified_filter = page.get_by_role("button", name=re.compile(r"VERIFIED"))
+    verified_filter.click()
+    verified_filter.click()
+    page.wait_for_function(
+        "(total) => document.querySelectorAll('#whaxon-findings-list [data-finding-index]:visible').length === total",
+        arg=total,
+        timeout=5000,
+    )
+    assert heading.inner_text() == f"Attack Surface Findings ({total} shown of {total})"
+
+    search = page.locator("#whaxon-finding-filter")
+    search.fill("no-such-finding-token-90210")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list #whaxon-findings-empty').length === 1",
+        timeout=5000,
+    )
+    assert page.locator("#whaxon-findings-list [data-finding-index]:visible").count() == 0
+    search.fill("")
+    page.wait_for_function(
+        "(total) => document.querySelectorAll('#whaxon-findings-list [data-finding-index]:visible').length === total",
+        arg=total,
+        timeout=5000,
+    )
+    assert page.locator("#whaxon-findings-list #whaxon-findings-empty").count() == 0
