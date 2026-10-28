@@ -528,6 +528,7 @@
       button.textContent.includes("No active engagement") || button.textContent.includes("Active scope")
     );
     if (engagementButton) {
+      engagementButton.id = "dashboard-engagement-selector";
       engagementButton.dataset.dashboardAction = "scope";
       const spans = engagementButton.querySelectorAll("span");
       const engagement = liveStatus.engagement && liveStatus.engagement !== "default"
