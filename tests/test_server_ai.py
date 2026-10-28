@@ -11,6 +11,8 @@ and the store's ai_runs table. We do not wait for the executor to finish.
 """
 from __future__ import annotations
 
+import json
+
 from whaxon.core import Core
 from whaxon.interfaces.web.server import (
     AsyncRunner,
@@ -68,6 +70,67 @@ def test_ai_run_accepts_goal(tmp_path, monkeypatch):
     stored = core.store.get_ai_run(data["run_id"])
     assert stored is not None
     assert stored["goal"] == "scan 127.0.0.1"
+
+def test_ai_run_requires_a_resolvable_target(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/ai/run",
+        json={"goal": "review the security posture"},
+    )
+    assert response.status_code == 400
+    assert "target required" in response.get_json()["error"]
+    assert core.store.list_ai_runs() == []
+
+
+def test_ai_run_rejects_out_of_scope_target_server_side(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/ai/run",
+        json={"target": "https://example.com", "goal": "assess this target"},
+    )
+    assert response.status_code == 403
+    assert "out of scope" in response.get_json()["error"]
+    assert core.store.list_ai_runs() == []
+
+
+def test_ai_run_fails_closed_when_scope_check_raises(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+
+    def broken_scope_check(_target):
+        raise RuntimeError("scope file unavailable")
+
+    monkeypatch.setattr(core.scope, "check", broken_scope_check)
+    response = app.test_client().post(
+        "/api/ai/run",
+        json={"target": "127.0.0.1", "goal": "assess the local target"},
+    )
+    assert response.status_code == 503
+    assert "scope evaluation failed" in response.get_json()["error"]
+    assert core.store.list_ai_runs() == []
+
+
+def test_ai_run_answer_records_operator_response(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    core.store.create_ai_run("ai-waiting", "review an authorized target")
+    core.store.set_ai_run_waiting(
+        "ai-waiting",
+        json.dumps({"rationale": "Confirm next phase", "proposed_phase": "enum"}),
+    )
+
+    response = app.test_client().post(
+        "/api/ai/runs/ai-waiting/answer",
+        json={"answer": "yes", "user": "operator", "note": "Approved in UI"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    run = core.store.get_ai_run("ai-waiting")
+    assert run["status"] == "running"
+    assert run["pending_question"] in ("", None)
+    approvals = core.store.list_approvals("ai-waiting")
+    assert len(approvals) == 1
+    assert approvals[0]["answer"] == "yes"
+    assert approvals[0]["user"] == "operator"
+
 
 
 def test_ai_runs_list_empty(tmp_path, monkeypatch):
