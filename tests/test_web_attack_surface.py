@@ -53,3 +53,35 @@ def test_attack_surface_graph_shows_empty_state_for_no_pivot_edges(page, live_se
         timeout=5000,
     )
     assert "No pivot relationships have been recorded" in page.locator("#graph-tbody").inner_text()
+
+
+def test_attack_surface_graph_renders_untrusted_evidence_as_text(page, live_server):
+    marker = '<img src=x onerror="window.__graphXss=1">'
+    payload = {
+        "edges": [
+            {
+                "parent": {"kind": "host", "id": "127.0.0.1"},
+                "relation": "observed",
+                "child": {"kind": "service", "id": "test"},
+                "evidence": marker,
+                "created_at": 1700000000,
+            }
+        ]
+    }
+    page.route(
+        "**/api/pivot/graph",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(payload),
+        ),
+    )
+    page.goto(f"{live_server}/ui")
+    page.locator('.sb-item[data-page="graph"]').click()
+    page.wait_for_function(
+        "() => document.querySelector('#graph-summary')?.textContent.includes('1 recorded relationship')",
+        timeout=5000,
+    )
+    assert marker in page.locator("#graph-tbody").inner_text()
+    assert page.locator("#graph-tbody img").count() == 0
+    assert page.evaluate("window.__graphXss") is None
