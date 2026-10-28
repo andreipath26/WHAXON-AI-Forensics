@@ -101,7 +101,7 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
     verified_filter.click()
     verified_filter.click()
     page.wait_for_function(
-        "(total) => document.querySelectorAll('#whaxon-findings-list [data-finding-index]:visible').length === total",
+        "(total) => Array.from(document.querySelectorAll('#whaxon-findings-list [data-finding-index]')).filter(el => getComputedStyle(el).display !== 'none').length === total",
         arg=total,
         timeout=5000,
     )
@@ -116,7 +116,7 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
     assert page.locator("#whaxon-findings-list [data-finding-index]:visible").count() == 0
     search.fill("")
     page.wait_for_function(
-        "(total) => document.querySelectorAll('#whaxon-findings-list [data-finding-index]:visible').length === total",
+        "(total) => Array.from(document.querySelectorAll('#whaxon-findings-list [data-finding-index]')).filter(el => getComputedStyle(el).display !== 'none').length === total",
         arg=total,
         timeout=5000,
     )
