@@ -145,3 +145,10 @@ def test_scope_header_reflects_disabled_enforcement(page, live_server):
         assert "SCOPE ENFORCEMENT DISABLED" in page.locator("header").inner_text()
     finally:
         _save_scope(page, before)
+
+def test_scope_header_shows_the_actual_configured_target(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    scope = _read_scope(page)
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    assert target in page.locator("header").inner_text()
