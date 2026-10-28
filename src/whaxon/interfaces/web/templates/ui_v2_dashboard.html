@@ -15,10 +15,10 @@
 <div class="flex items-center gap-space-xs">
 <span class="font-label-sm text-label-sm uppercase text-tertiary">SECURITY NOTICE // KERNEL ACCESS</span>
 <span class="font-code-sm text-code-sm text-outline">|</span>
-<span class="font-code-sm text-code-sm text-on-surface">Default Local Engine Credentials Detected</span>
+<span class="font-code-sm text-code-sm text-on-surface">Credential Configuration Before Network Exposure</span>
 </div>
 <p class="font-body-sm text-body-sm text-on-surface-variant">
-              Engine listening on <code class="rounded bg-surface-container px-1 py-0.5 font-code-sm text-code-sm text-secondary">127.0.0.1:5001</code> using default HTTP Basic authentication (<span class="font-code-sm text-code-sm text-tertiary">whaxon:whaxon</span>). Run <code class="rounded bg-surface-container px-1 py-0.5 font-code-sm text-code-sm text-primary">whaxon auth --set-pass</code> or configure keyvault.
+              Before exposing WHAXON on a network, configure a unique operator and strong password using <code class="rounded bg-surface-container px-1 py-0.5 font-code-sm text-code-sm text-primary">whaxon auth --set-pass</code> or the <code class="rounded bg-surface-container px-1 py-0.5 font-code-sm text-code-sm text-secondary">WHAXON_AUTH_USER</code> / <code class="rounded bg-surface-container px-1 py-0.5 font-code-sm text-code-sm text-secondary">WHAXON_AUTH_PASS_HASH</code> environment variables.
             </p>
 </div>
 </div>
@@ -550,16 +550,166 @@
         });
       }
     }
+    // Keep the canonical dashboard layout, but make each visible control do a
+    // real supported action. Unsupported demo-only panels remain hidden below.
+    let actionStatus = document.getElementById("dashboard-action-status");
+    if (!actionStatus) {
+      actionStatus = document.createElement("div");
+      actionStatus.id = "dashboard-action-status";
+      actionStatus.className = "mx-gutter-lg mt-space-md rounded-lg bg-surface-container-low px-space-md py-space-sm font-code-sm text-code-sm text-on-surface-variant";
+      actionStatus.setAttribute("role", "status");
+      actionStatus.setAttribute("aria-live", "polite");
+      actionStatus.hidden = true;
+      const mainContent = document.querySelector("main > div");
+      if (mainContent) mainContent.insertBefore(actionStatus, mainContent.children[1] || null);
+    }
+    const showActionStatus = (message, kind = "info") => {
+      actionStatus.hidden = false;
+      actionStatus.textContent = message;
+      actionStatus.classList.toggle("text-error", kind === "error");
+      actionStatus.classList.toggle("text-primary", kind === "success");
+      actionStatus.classList.toggle("text-on-surface-variant", kind === "info");
+    };
+    const buttonLabel = button => {
+      const clone = button.cloneNode(true);
+      clone.querySelectorAll(".material-symbols-outlined").forEach(icon => icon.remove());
+      return textOf(clone).replace(/\s+/g, " ").trim();
+    };
+    const route = path => { window.location.href = path; };
+    const filterInput = [...document.querySelectorAll("input")].find(input => (input.placeholder || "").includes("Filter by ID"));
+    if (filterInput) {
+      filterInput.setAttribute("aria-label", "Filter recent job history");
+      filterInput.addEventListener("input", () => {
+        const term = filterInput.value.trim().toLowerCase();
+        const body = document.querySelector("table tbody");
+        if (!body) return;
+        body.querySelectorAll("tr").forEach(row => {
+          const isEmptyMessage = row.textContent.includes("No job history has been recorded");
+          row.hidden = !isEmptyMessage && !row.textContent.toLowerCase().includes(term);
+        });
+      });
+    }
+    async function exportHistory() {
+      try {
+        const response = await fetch("/api/history");
+        if (!response.ok) throw new Error("History HTTP " + response.status);
+        const records = await response.json();
+        const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), jobs: records }, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "whaxon-history-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        showActionStatus("Exported " + (Array.isArray(records) ? records.length : 0) + " recorded job(s) as JSON.", "success");
+      } catch (error) {
+        showActionStatus("History export failed: " + error.message, "error");
+      }
+    }
+    async function haltActiveJobs() {
+      try {
+        const response = await fetch("/api/history");
+        if (!response.ok) throw new Error("History HTTP " + response.status);
+        const records = await response.json();
+        const active = (Array.isArray(records) ? records : []).filter(job =>
+          ["running", "queued", "pending"].includes(String(job.status || "").toLowerCase())
+        );
+        if (!active.length) {
+          showActionStatus("No running or queued jobs were found. Nothing was cancelled.");
+          return;
+        }
+        if (!window.confirm("Cancel " + active.length + " active WHAXON job(s)? This cannot be undone.")) return;
+        const results = await Promise.all(active.map(async job => {
+          const id = job.id || job.job_id;
+          if (!id) return false;
+          const result = await fetch("/api/jobs/" + encodeURIComponent(id) + "/cancel", { method: "POST" });
+          if (!result.ok) return false;
+          const body = await result.json();
+          return body.ok === true;
+        }));
+        const cancelled = results.filter(Boolean).length;
+        showActionStatus("Cancellation requested for " + cancelled + " of " + active.length + " active job(s). Refreshing job state.", cancelled ? "success" : "error");
+        await load();
+      } catch (error) {
+        showActionStatus("Emergency halt failed: " + error.message, "error");
+      }
+    }
+    function importBurpXml() {
+      const picker = document.createElement("input");
+      picker.type = "file";
+      picker.accept = ".xml,application/xml,text/xml";
+      picker.hidden = true;
+      picker.addEventListener("change", async () => {
+        const file = picker.files && picker.files[0];
+        if (!file) { picker.remove(); return; }
+        if (!file.name.toLowerCase().endsWith(".xml")) {
+          showActionStatus("Artifact import currently supports Burp XML exports (.xml) only.", "error");
+          picker.remove();
+          return;
+        }
+        const form = new FormData();
+        form.append("file", file);
+        try {
+          const response = await fetch("/api/import/burp", { method: "POST", body: form });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || ("Import HTTP " + response.status));
+          showActionStatus("Imported " + result.count + " finding(s) from " + file.name + ". Opening Findings.", "success");
+          window.location.href = "/ui-v2/findings";
+        } catch (error) {
+          showActionStatus("Artifact import failed: " + error.message, "error");
+        } finally {
+          picker.remove();
+        }
+      }, { once: true });
+      document.body.appendChild(picker);
+      picker.click();
+    }
     document.querySelectorAll("button").forEach(button => {
-      const clone = button.cloneNode(true); clone.querySelectorAll(".material-symbols-outlined").forEach(icon => icon.remove()); const label = textOf(clone).replace(/\s+/g, " ");
-      if (/^(Launch Wizard|Continue Setup)$/.test(label)) {
-        button.addEventListener("click", () => { window.location.href = "/ui-v2/scope"; });
-      } else if (/^(Start New Engagement|Terminal Log|Inspect Ledger)$/.test(label)) {
-        button.addEventListener("click", () => { window.location.href = "/ui-v2/run"; });
-      } else {
-        button.style.display = "none";
-        button.setAttribute("aria-hidden", "true");
+      const label = buttonLabel(button);
+      if (button.dataset.dashboardWired === "true") return;
+      let handler = null;
+      if (/^(No active engagement \(No target selected\)|New|Switch Target Session|Start New Engagement|Launch Wizard|Continue Setup)$/.test(label)) {
+        handler = () => route("/ui-v2/scope");
+      } else if (label === "Terminal Log") {
+        handler = () => route("/ui-v2/run");
+      } else if (label === "Inspect Ledger") {
+        handler = () => route("/ui-v2/audit");
+      } else if (label === "Emergency Halt Scan") {
+        handler = haltActiveJobs;
+      } else if (label === "Upload Artifact") {
+        handler = importBurpXml;
+      } else if (label === "Export Archive") {
+        handler = exportHistory;
+      } else if (label === "Configure Filters") {
+        handler = () => {
+          if (filterInput) {
+            filterInput.focus();
+            showActionStatus("Type in the job-history filter to narrow the visible records.");
+          } else {
+            showActionStatus("The job-history filter is unavailable on this page.", "error");
+          }
+        };
+      } else if (label === "CLI Help") {
+        handler = () => showActionStatus("CLI help: run 'whaxon --help' in your terminal. Credential setup: 'whaxon auth --set-pass'.");
+      } else if (label === "Update Credentials Now") {
+        handler = () => showActionStatus("For safety, credentials are configured outside this dashboard using 'whaxon auth --set-pass' or WHAXON_AUTH_USER / WHAXON_AUTH_PASS_HASH, then restart the server.");
+      } else if (label === "Deploy Mock") {
+        // This belongs to a demo-only panel, which is hidden below.
         button.disabled = true;
+        button.title = "Demo-only action; no live backend operation exists.";
+      } else {
+        // Do not leave a visible button that silently does nothing.
+        button.disabled = true;
+        button.title = "No live backend action is available for this control.";
+      }
+      if (handler) {
+        button.addEventListener("click", event => {
+          event.preventDefault();
+          Promise.resolve(handler()).catch(error => showActionStatus("Action failed: " + error.message, "error"));
+        });
+        button.dataset.dashboardWired = "true";
       }
     });
     document.querySelectorAll("h2").forEach(h => {
