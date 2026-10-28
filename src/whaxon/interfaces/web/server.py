@@ -1522,6 +1522,29 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             results.append({"session_id": str(sid), "candidates": cands})
         return jsonify({"sessions": results})
 
+    @app.get("/api/ui-v2/findings")
+    def api_ui_v2_findings():
+        """Return bounded persisted job/finding records for lightweight UI panels.
+
+        Unlike the full report endpoint, this deliberately avoids report
+        enrichment and pivot-chain generation so auxiliary pages remain
+        responsive even when optional report enrichment is slow.
+        """
+        try:
+            jobs = registry.core.store.history(limit=500)
+            entries = []
+            for job in jobs:
+                entries.append({
+                    "job": job,
+                    "findings": registry.core.store.get_findings(job["id"]) or [],
+                })
+            return jsonify({"jobs": entries})
+        except Exception as exc:
+            return jsonify({
+                "error": "Unable to load live findings",
+                "detail": str(exc),
+            }), 500
+
     @app.get("/api/report")
     def api_report():
         """Generate an engagement report.
