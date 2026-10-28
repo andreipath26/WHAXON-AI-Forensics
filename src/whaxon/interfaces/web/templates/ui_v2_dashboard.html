@@ -202,26 +202,26 @@
 <span class="font-label-sm text-label-sm uppercase text-outline">Option 02</span>
 <h2 class="font-headline-md text-headline-md text-on-surface font-semibold">Import Existing Assessment Profile</h2>
 <p class="mt-1 font-body-sm text-body-sm text-on-surface-variant">
-              Ingest reconnaissance manifests, raw scanner states, or exported configuration rules directly into the engine.
+              Import a Burp XML export into WHAXON findings. Nmap and scope-profile imports are not wired yet.
             </p>
 </div>
 <div class="grid grid-cols-3 gap-space-xs">
 <div class="flex flex-col items-center justify-center rounded bg-surface-container-lowest p-space-sm text-center">
 <span class="font-code-sm text-code-sm text-secondary font-medium">burp.xml</span>
-<span class="font-label-sm text-label-sm text-outline">Sitemap</span>
+<span class="font-label-sm text-label-sm text-outline">Supported</span>
 </div>
 <div class="flex flex-col items-center justify-center rounded bg-surface-container-lowest p-space-sm text-center">
 <span class="font-code-sm text-code-sm text-secondary font-medium">nmap.gnmap</span>
-<span class="font-label-sm text-label-sm text-outline">Ports/OS</span>
+<span class="font-label-sm text-label-sm text-outline">Not wired yet</span>
 </div>
 <div class="flex flex-col items-center justify-center rounded bg-surface-container-lowest p-space-sm text-center">
 <span class="font-code-sm text-code-sm text-secondary font-medium">scope.json</span>
-<span class="font-label-sm text-label-sm text-outline">WHAXON Std</span>
+<span class="font-label-sm text-label-sm text-outline">Not wired yet</span>
 </div>
 </div>
 </div>
 <div class="mt-space-lg pt-space-md flex items-center justify-between">
-<span class="font-label-sm text-label-sm text-outline">DRAG &amp; DROP SUPPORTED</span>
+<span class="font-label-sm text-label-sm text-outline">BURP XML ONLY · DRAG &amp; DROP</span>
 <button class="flex items-center gap-space-xs rounded bg-surface-container-high px-space-md py-1.5 font-code-sm text-code-sm text-on-surface hover:bg-surface-variant hover:text-secondary transition-colors" type="button">
 <span class="material-symbols-outlined text-xs">upload</span>
 <span>Upload Artifact</span>
@@ -680,35 +680,52 @@
         showActionStatus("Emergency halt failed: " + error.message, "error");
       }
     }
+    async function uploadBurpFile(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".xml")) {
+        showActionStatus("This import currently accepts Burp XML exports (.xml) only; Nmap and scope-profile imports are not wired yet.", "error");
+        return;
+      }
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const response = await fetch("/api/import/burp", { method: "POST", body: form });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || ("Import HTTP " + response.status));
+        showActionStatus("Imported " + result.count + " finding(s) from " + file.name + ". Opening Findings.", "success");
+        window.location.href = "/ui-v2/findings";
+      } catch (error) {
+        showActionStatus("Artifact import failed: " + error.message, "error");
+      }
+    }
     function importBurpXml() {
       const picker = document.createElement("input");
       picker.type = "file";
       picker.accept = ".xml,application/xml,text/xml";
       picker.hidden = true;
-      picker.addEventListener("change", async () => {
+      picker.addEventListener("change", () => {
         const file = picker.files && picker.files[0];
-        if (!file) { picker.remove(); return; }
-        if (!file.name.toLowerCase().endsWith(".xml")) {
-          showActionStatus("Artifact import currently supports Burp XML exports (.xml) only.", "error");
-          picker.remove();
-          return;
-        }
-        const form = new FormData();
-        form.append("file", file);
-        try {
-          const response = await fetch("/api/import/burp", { method: "POST", body: form });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || ("Import HTTP " + response.status));
-          showActionStatus("Imported " + result.count + " finding(s) from " + file.name + ". Opening Findings.", "success");
-          window.location.href = "/ui-v2/findings";
-        } catch (error) {
-          showActionStatus("Artifact import failed: " + error.message, "error");
-        } finally {
-          picker.remove();
-        }
+        picker.remove();
+        uploadBurpFile(file);
       }, { once: true });
       document.body.appendChild(picker);
       picker.click();
+    }
+    const importHeading = [...document.querySelectorAll("h2")].find(h => textOf(h) === "Import Existing Assessment Profile");
+    const importCard = importHeading?.closest(".group.relative.flex.flex-col");
+    if (importCard && importCard.dataset.dropWired !== "true") {
+      importCard.dataset.dropWired = "true";
+      importCard.addEventListener("dragover", event => {
+        event.preventDefault();
+        importCard.classList.add("ring-2", "ring-secondary");
+      });
+      importCard.addEventListener("dragleave", () => importCard.classList.remove("ring-2", "ring-secondary"));
+      importCard.addEventListener("drop", event => {
+        event.preventDefault();
+        importCard.classList.remove("ring-2", "ring-secondary");
+        const file = event.dataTransfer?.files?.[0];
+        if (file) uploadBurpFile(file);
+      });
     }
     document.querySelectorAll("button").forEach(button => {
       const label = buttonLabel(button);
@@ -758,7 +775,7 @@
     });
     document.querySelectorAll("h2").forEach(h => {
       const title = textOf(h);
-      if (title === "Import Existing Assessment Profile" || title === "Explore Lab Environments") {
+      if (title === "Explore Lab Environments") {
         const card = h.closest(".rounded-lg.bg-surface-container-low") || h.parentElement?.parentElement?.parentElement;
         if (card) card.style.display = "none";
       }
