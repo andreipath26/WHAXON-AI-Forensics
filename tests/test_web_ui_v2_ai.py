@@ -98,6 +98,8 @@ def test_ai_strategy_gate_authorize_button_records_real_pending_answer(page, liv
 
 
 def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_pending_run(page, live_server):
+    page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.goto(f"{live_server}/ui-v2/ai")
     page.wait_for_function(
         "() => document.documentElement.dataset.aiGateReady === 'true'",
