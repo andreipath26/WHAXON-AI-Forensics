@@ -318,93 +318,213 @@
 </div>
 </div>
 </section>
-<!-- KEYBOARD HOOK MICRO-INTERACTION SCRIPT -->
-<script>
-    (function initStrategyGate() {
-      const authBtn = document.getElementById('btn-authorize');
-      const rejectBtn = document.getElementById('btn-reject');
 
-      function handleAction(action) {
-        if (action === 'authorize') {
-          authBtn.classList.add('scale-95', 'opacity-75');
-          authBtn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">sync</span><div class="flex flex-col items-start leading-none text-left"><span class="font-label-md text-label-md uppercase font-bold">DISPATCHING...</span></div>';
-          setTimeout(() => {
-            alert('Payload successfully dispatched to orchestration runner! Target proxy engaged.');
-            authBtn.classList.remove('scale-95', 'opacity-75');
-            authBtn.innerHTML = '<span class="material-symbols-outlined text-base">done_all</span><div class="flex flex-col items-start leading-none text-left"><span class="font-label-md text-label-md uppercase font-bold">EXECUTED</span></div>';
-          }, 800);
-        } else {
-          rejectBtn.classList.add('scale-95', 'opacity-75');
-          setTimeout(() => {
-            const reason = prompt('Specify rejection reason for AI Planner replanning loop:', 'Alternative surface probe preferred');
-            if (reason) {
-              alert('Proposal rejected. AI Planner feedback cycle re-routed.');
-            }
-            rejectBtn.classList.remove('scale-95', 'opacity-75');
-          }, 200);
-        }
-      }
-
-      if (authBtn) {
-        authBtn.addEventListener('click', () => handleAction('authorize'));
-      }
-      if (rejectBtn) {
-        rejectBtn.addEventListener('click', () => handleAction('reject'));
-      }
-
-      window.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleAction('authorize');
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          handleAction('reject');
-        }
-      });
-    })();
-  </script>
 </div></main></div>
 <script>
 (function(){
- const routes={"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/reports","job-execution-history":"/ui-v2/history","system-diagnostics-and-health":"/ui-v2/diagnostics","evidence-file-inspector":"/ui-v2/evidence","ai-strategy-gate":"/ui-v2/ai",
-    "remediation-retest-studio": "/ui-v2/retest",
-    "correlated-attack-chains": "/ui-v2/chains",
-    "adapter-and-plugin-manager": "/ui-v2/adapters",
-    "settings-and-api-explorer": "/ui-v2/settings",
-    "cryptographic-audit-log": "/ui-v2/audit",
- "attack-surface-continuous-monitoring": "/ui-v2/monitoring",
- "bas-detection-validation": "/ui-v2/bas",
- "bug-bounty-live-browser-studio": "/ui-v2/bug-bounty",
- "compliance-framework-crosswalk": "/ui-v2/compliance",
- "ptaas-client-portal": "/ui-v2/ptaas",
- "threat-intel-exploit-arsenal": "/ui-v2/threat-intel",
- "trust-layer-approvals-queue": "/ui-v2/approvals",
- "attack-surface-and-continuous-monitoring": "/ui-v2/monitoring",
- "bug-bounty-and-live-browser-studio": "/ui-v2/bug-bounty",
- "bug-bounty-live-browser": "/ui-v2/bug-bounty",
- "threat-intel-and-exploit-arsenal": "/ui-v2/threat-intel",
- "bas-and-detection-validation": "/ui-v2/bas",
- "compliance-and-framework-crosswalk": "/ui-v2/compliance",
- "scope-targets": "/ui-v2/scope",
- "run-orchestration": "/ui-v2/run",
- "trust-layer-findings": "/ui-v2/findings",
- "ptes-coverage-reports": "/ui-v2/reports",
- "system-diagnostics-health": "/ui-v2/diagnostics",
- "adapter-plugin-manager": "/ui-v2/adapters",
- "settings-secrets-vault": "/ui-v2/settings",
- "settings-and-secrets-vault": "/ui-v2/settings",
- "trust-layer-approvals-queue-modal": "/ui-v2/approvals"
+ "use strict";
+ const routes={
+  "dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run",
+  "trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/report",
+  "job-execution-history":"/ui-v2/history","system-diagnostics-and-health":"/ui-v2/diagnostics",
+  "evidence-file-inspector":"/ui-v2/evidence","ai-strategy-gate":"/ui-v2/ai",
+  "remediation-retest-studio":"/ui-v2/retest","correlated-attack-chains":"/ui-v2/chains",
+  "adapter-and-plugin-manager":"/ui-v2/adapters","settings-and-api-explorer":"/ui-v2/settings",
+  "cryptographic-audit-log":"/ui-v2/audit","attack-surface-continuous-monitoring":"/ui-v2/monitoring",
+  "bas-detection-validation":"/ui-v2/bas","bug-bounty-live-browser-studio":"/ui-v2/bug-bounty",
+  "compliance-framework-crosswalk":"/ui-v2/compliance","ptaas-client-portal":"/ui-v2/ptaas",
+  "threat-intel-exploit-arsenal":"/ui-v2/threat-intel","trust-layer-approvals-queue":"/ui-v2/approvals",
+  "attack-surface-and-continuous-monitoring":"/ui-v2/monitoring","bug-bounty-and-live-browser-studio":"/ui-v2/bug-bounty",
+  "bug-bounty-live-browser":"/ui-v2/bug-bounty","threat-intel-and-exploit-arsenal":"/ui-v2/threat-intel",
+  "bas-and-detection-validation":"/ui-v2/bas","compliance-and-framework-crosswalk":"/ui-v2/compliance",
+  "scope-targets":"/ui-v2/scope","run-orchestration":"/ui-v2/run","trust-layer-findings":"/ui-v2/findings",
+  "ptes-coverage-reports":"/ui-v2/report","system-diagnostics-health":"/ui-v2/diagnostics",
+  "adapter-plugin-manager":"/ui-v2/adapters","settings-secrets-vault":"/ui-v2/settings",
+  "settings-and-secrets-vault":"/ui-v2/settings","trust-layer-approvals-queue-modal":"/ui-v2/approvals"
  };
- document.querySelectorAll("a[data-path]").forEach(a=>{const p=routes[a.dataset.path];if(p){a.href=p;a.style.display="";}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});
+ const textOf=n=>(n?.textContent||"").trim();
+ const node=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value==null||value===""?"Not recorded":String(value);if(cls)n.className=cls;return n;};
+ const makeButton=(label,cls,handler)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.className=cls;b.addEventListener("click",handler);return b;};
+ document.querySelectorAll("a[data-path]").forEach(a=>{const p=routes[a.dataset.path];if(p){a.href=p;a.style.display="";a.removeAttribute("aria-hidden");}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});
  const main=document.querySelector("main");if(!main)return;
- const panel=document.createElement("section");panel.id="whaxon-ai-gate";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
- panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Live AI strategy gate</h2><p class="mt-1 text-on-surface-variant">AI runs are submitted only after the target passes the current WHAXON scope check.</p><form id="ai-run-form" class="mt-4 grid gap-3"><label class="grid gap-1">Target<input id="ai-target" required class="rounded bg-surface-container-lowest p-2" placeholder="https://authorized-target.example"></label><label class="grid gap-1">Goal<textarea id="ai-goal" required rows="3" class="rounded bg-surface-container-lowest p-2" placeholder="Describe the authorized assessment objective"></textarea></label><button class="rounded bg-primary px-4 py-2 text-on-primary font-semibold justify-self-start" type="submit">Check scope and submit AI run</button></form><p id="ai-run-status" class="mt-3 text-on-surface-variant">Loading live AI run state…</p><h3 class="mt-5 font-headline-sm">Recorded AI runs</h3><div id="ai-run-list" class="mt-2 grid gap-2"></div>';
+ const panel=document.createElement("section");
+ panel.id="whaxon-ai-gate";
+ panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
+ panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Live AI strategy gate</h2><p class="mt-1 text-on-surface-variant">AI runs require a server-side scope check. Human approval pauses are recorded before an answer is accepted.</p><form id="ai-run-form" class="mt-4 grid gap-3"><label class="grid gap-1">Target<input id="ai-target" required class="rounded bg-surface-container-lowest p-2" placeholder="https://authorized-target.example"></label><label class="grid gap-1">Goal<textarea id="ai-goal" required rows="3" class="rounded bg-surface-container-lowest p-2" placeholder="Describe the authorized assessment objective"></textarea></label><button class="rounded bg-primary px-4 py-2 text-on-primary font-semibold justify-self-start" type="submit">Check scope and submit AI run</button></form><p id="ai-run-status" class="mt-3 text-on-surface-variant" role="status" aria-live="polite">Loading live AI run state…</p><h3 class="mt-5 font-headline-sm">Awaiting operator approval</h3><div id="ai-pending-list" class="mt-2 grid gap-2"></div><h3 class="mt-5 font-headline-sm">Recorded AI runs</h3><div id="ai-run-list" class="mt-2 grid gap-2"></div>';
  main.prepend(panel);
- const status=panel.querySelector("#ai-run-status"),list=panel.querySelector("#ai-run-list"),form=panel.querySelector("#ai-run-form");
- const node=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value==null||value===""?"—":String(value);if(cls)n.className=cls;return n;};
- async function load(){try{const [rr,pr]=await Promise.all([fetch("/api/ai/runs"),fetch("/api/ai/pending")]);if(!rr.ok||!pr.ok)throw new Error("HTTP "+rr.status+"/"+pr.status);const runs=await rr.json(),pending=await pr.json();list.replaceChildren();for(const run of (Array.isArray(runs)?runs:[])){const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";card.append(node("div",run.run_id||run.id,"font-code-sm text-primary"),node("div",run.status||"status unavailable","font-semibold mt-1"),node("div",run.goal||"Goal not recorded","mt-1 text-on-surface-variant"));list.append(card);}status.textContent=(Array.isArray(runs)?runs.length:0)+" recorded AI runs · "+(Array.isArray(pending)?pending.length:0)+" pending approval(s).";if(!list.children.length)list.append(node("p","No AI runs have been recorded.","text-on-surface-variant"));}catch(e){status.textContent="AI run state could not be loaded: "+e.message;}}
- form.addEventListener("submit",async e=>{e.preventDefault();const target=panel.querySelector("#ai-target").value.trim(),goal=panel.querySelector("#ai-goal").value.trim();status.textContent="Checking target against current scope…";const submit=form.querySelector("button[type=submit]");submit.disabled=true;try{const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});const verdict=await check.json();if(!check.ok||verdict.allowed!==true)throw new Error(verdict.reason||verdict.error||"Target was not confirmed in scope");const response=await fetch("/api/ai/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target,goal})});const data=await response.json();if(!response.ok)throw new Error(data.error||("HTTP "+response.status));status.textContent="AI run submitted: "+(data.run_id||"ID unavailable");form.reset();await load();}catch(error){status.textContent="AI run not submitted: "+error.message;}finally{submit.disabled=false;}});
- load();
+ const status=panel.querySelector("#ai-run-status"),list=panel.querySelector("#ai-run-list"),pendingList=panel.querySelector("#ai-pending-list"),form=panel.querySelector("#ai-run-form");
+ const targetInput=panel.querySelector("#ai-target"),goalInput=panel.querySelector("#ai-goal");
+ let recordedRuns=[],pendingRuns=[],scopeData=null,answerInProgress=false;
+ const proposalHeading=[...document.querySelectorAll("h2")].find(n=>textOf(n).startsWith("AI Planner proposes spawning"));
+ const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
+ const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
+ const commandCode=commandCard?.querySelector("code");
+ const wireHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="HTTP Request Wire Preview");
+ const wireCard=wireHeading?.closest("div.bg-surface-container.rounded-xl");
+ if(wireCard)wireCard.style.display="none";
+ const confidenceValue=[...document.querySelectorAll("span")].find(n=>textOf(n)==="89.4%");
+ const confidenceNote=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("Model Threshold:"));
+ const authBtn=document.getElementById("btn-authorize"),rejectBtn=document.getElementById("btn-reject");
+ const proposalDetails=()=>pendingRuns[0]?.pending_question||null;
+ const activeProposalText=()=>{const q=proposalDetails();return q?(q.rationale||q.goal||JSON.stringify(q)):"No live proposal is awaiting operator input.";};
+ function setDecisionButtons(){
+   const available=pendingRuns.length>0&&!answerInProgress;
+   [authBtn,rejectBtn].forEach(b=>{if(!b)return;b.disabled=!available;b.classList.toggle("opacity-50",!available);b.title=available?"Respond to the currently recorded pending AI question":"No pending AI question is awaiting an operator response.";});
+   if(proposalHeading)proposalHeading.textContent=activeProposalText();
+ }
+ async function answerPending(run,answer,note){
+   if(!run||answerInProgress)return;
+   answerInProgress=true;setDecisionButtons();status.textContent="Recording operator response…";
+   try{
+     const response=await fetch("/api/ai/runs/"+encodeURIComponent(run.id)+"/answer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answer,user:"local",note:note||""})});
+     const data=await response.json();
+     if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+     status.textContent="Operator response recorded for "+run.id+". Refreshing the AI run state.";
+     await load();
+   }catch(error){status.textContent="Operator response was not recorded: "+error.message;}
+   finally{answerInProgress=false;setDecisionButtons();}
+ }
+ if(authBtn)authBtn.addEventListener("click",()=>{if(pendingRuns[0])answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate");});
+ if(rejectBtn)rejectBtn.addEventListener("click",()=>{if(!pendingRuns[0])return;const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason===null)return;answerPending(pendingRuns[0],"no: "+(reason.trim()||"rejected by operator"),reason.trim());});
+ if(commandCard){
+   const copyButton=commandCard.querySelector("button");
+   if(copyButton)copyButton.addEventListener("click",async()=>{
+     const value=commandCode?.textContent||"No live proposal is awaiting operator input.";
+     try{await navigator.clipboard.writeText(value);status.textContent="Recorded proposal details copied.";}
+     catch(_){status.textContent="Clipboard access was denied by the browser.";}
+   });
+   const topLabels=[...commandCard.querySelectorAll("span")];
+   const toolLabel=topLabels.find(n=>textOf(n).startsWith("TOOL:"));
+   if(toolLabel)toolLabel.textContent="LIVE PROPOSAL DETAILS";
+   const proxyLabel=topLabels.find(n=>textOf(n)==="SANDBOXED PROXY ROUTED");
+   if(proxyLabel)proxyLabel.textContent="RECORDED DATA ONLY";
+   const rateLabel=topLabels.find(n=>textOf(n)==="RATE LIMIT:");
+   if(rateLabel?.nextElementSibling)rateLabel.nextElementSibling.textContent="Not recorded";
+   const proxyValue=topLabels.find(n=>textOf(n)==="INSPECTION PROXY:");
+   if(proxyValue?.nextElementSibling)proxyValue.nextElementSibling.textContent="Not recorded";
+ }
+ const riskValues=new Set(["LOW RISK","ZERO","MINIMAL"]);
+ document.querySelectorAll("span").forEach(n=>{if(riskValues.has(textOf(n)))n.textContent="Not measured";});
+ const ledger=document.querySelector("table tbody");
+ function renderLedger(){
+   if(!ledger)return;
+   ledger.replaceChildren();
+   if(!recordedRuns.length){const row=document.createElement("tr"),cell=document.createElement("td");cell.colSpan=5;cell.className="py-3 px-space-md text-on-surface-variant";cell.textContent="No AI runs have been recorded.";row.append(cell);ledger.append(row);return;}
+   recordedRuns.slice(0,20).forEach(run=>{
+     const row=document.createElement("tr");row.className="bg-surface-container-lowest/60 hover:bg-surface-container-high transition-colors";
+     const decision=run.status==="waiting"?"Awaiting operator":"Not recorded";
+     const outcome=run.error||run.status||"Status unavailable";
+     [run.id,run.goal,"Not recorded",decision,outcome].forEach(value=>{const cell=document.createElement("td");cell.className="py-2 px-space-md font-code-sm text-code-sm text-on-surface-variant";cell.textContent=value==null||value===""?"Not recorded":String(value);row.append(cell);});
+     ledger.append(row);
+   });
+ }
+ function renderRuns(){
+   list.replaceChildren();
+   if(!recordedRuns.length){list.append(node("p","No AI runs have been recorded.","text-on-surface-variant"));return;}
+   recordedRuns.slice(0,20).forEach(run=>{
+     const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";
+     card.append(node("div",run.id||run.run_id,"font-code-sm text-primary"),node("div",run.status||"Status unavailable","font-semibold mt-1"),node("div",run.goal||"Goal not recorded","mt-1 text-on-surface-variant"));
+     if(run.error)card.append(node("p","Error: "+run.error,"mt-2 text-error text-sm"));
+     list.append(card);
+   });
+ }
+ function renderPending(){
+   pendingList.replaceChildren();
+   if(!pendingRuns.length){pendingList.append(node("p","No AI runs are currently waiting for an operator answer.","text-on-surface-variant"));return;}
+   pendingRuns.forEach(run=>{
+     const q=run.pending_question&&typeof run.pending_question==="object"?run.pending_question:{};
+     const card=document.createElement("article");card.className="rounded-lg border border-tertiary/30 bg-surface-container p-space-md";
+     card.append(node("div",run.id,"font-code-sm text-tertiary"),node("div",q.rationale||run.goal||"Operator answer requested","font-semibold mt-1"),node("div","Target: "+(q.target||"Not recorded")+" · Phase: "+(q.proposed_phase||run.phase||"Not recorded"),"mt-1 text-on-surface-variant text-sm"));
+     const actions=document.createElement("div");actions.className="mt-3 flex flex-wrap gap-2";
+     actions.append(makeButton("Authorize / answer yes","rounded bg-primary px-3 py-2 text-on-primary font-semibold",()=>answerPending(run,"yes","Authorized through WHAXON AI Strategy Gate")));
+     actions.append(makeButton("Reject / re-plan","rounded bg-error-container px-3 py-2 text-on-error font-semibold",()=>{const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason!==null)answerPending(run,"no: "+(reason.trim()||"rejected by operator"),reason.trim());}));
+     if(answerInProgress)actions.querySelectorAll("button").forEach(b=>b.disabled=true);
+     card.append(actions);pendingList.append(card);
+   });
+ }
+ function renderProposal(){
+   setDecisionButtons();
+   const q=proposalDetails();
+   if(commandCode)commandCode.textContent=q?JSON.stringify(q,null,2):"No live proposal is awaiting operator input.";
+   if(confidenceValue){
+     const score=Number(q?.confidence);
+     confidenceValue.textContent=q&&Number.isFinite(score)?(score<=1?(score*100):score).toFixed(1)+"%":"—";
+   }
+   if(confidenceNote){
+     const score=Number(q?.confidence);
+     confidenceNote.textContent=q&&Number.isFinite(score)?"Recorded proposal confidence; not a proof of safety":"Confidence score unavailable until a live proposal is recorded.";
+   }
+   const donut=[...document.querySelectorAll("svg path")].find(p=>p.getAttribute("stroke-dasharray")==="89.4, 100");
+   const score=Number(q?.confidence);
+   if(donut)donut.setAttribute("stroke-dasharray",q&&Number.isFinite(score)?String(Math.max(0,Math.min(100,score<=1?score*100:score)))+", 100":"0, 100");
+ }
+ async function load(){
+   const results=await Promise.allSettled([
+     fetch("/api/ai/runs").then(r=>{if(!r.ok)throw new Error("runs HTTP "+r.status);return r.json();}),
+     fetch("/api/ai/pending").then(r=>{if(!r.ok)throw new Error("pending HTTP "+r.status);return r.json();}),
+     fetch("/api/scope").then(r=>{if(!r.ok)throw new Error("scope HTTP "+r.status);return r.json();})
+   ]);
+   const rr=results[0],pr=results[1],sr=results[2];
+   recordedRuns=rr.status==="fulfilled"&&Array.isArray(rr.value)?rr.value:[];
+   pendingRuns=pr.status==="fulfilled"&&Array.isArray(pr.value)?pr.value:[];
+   scopeData=sr.status==="fulfilled"?sr.value:null;
+   if(rr.status!=="fulfilled"||pr.status!=="fulfilled"){
+     status.textContent="AI run state unavailable: "+(rr.status!=="fulfilled"?(rr.reason?.message||"runs endpoint failed"):(pr.reason?.message||"pending endpoint failed"));
+   }else{
+     status.textContent=recordedRuns.length+" recorded AI run(s) · "+pendingRuns.length+" awaiting operator answer(s).";
+   }
+   if(scopeData){
+     const engagementButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
+     if(engagementButton){const spans=engagementButton.querySelectorAll("span");if(spans[0])spans[0].textContent=scopeData.engagement||"Active scope";if(spans[1])spans[1].textContent="("+(scopeData.in_scope?.[0]||"No target configured")+")";}
+     document.querySelectorAll("header span,header div").forEach(n=>{
+       if(textOf(n)==="(IN SCOPE)")n.textContent=scopeData.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
+       if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
+     });
+   }else{
+     document.querySelectorAll("header span,header div").forEach(n=>{if(textOf(n)==="(IN SCOPE)")n.textContent="(STATUS UNAVAILABLE";if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent="SCOPE STATUS UNAVAILABLE";});
+   }
+   renderRuns();renderPending();renderLedger();renderProposal();
+   document.documentElement.dataset.aiGateReady="true";
+ }
+ form.addEventListener("submit",async e=>{
+   e.preventDefault();
+   const target=targetInput.value.trim(),goal=goalInput.value.trim(),submit=form.querySelector("button[type=submit]");
+   status.textContent="Checking target against current scope…";submit.disabled=true;
+   try{
+     const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});
+     const verdict=await check.json();
+     if(!check.ok||verdict.allowed!==true)throw new Error(verdict.reason||verdict.error||"Target was not confirmed in scope");
+     const response=await fetch("/api/ai/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target,goal})});
+     const data=await response.json();
+     if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+     status.textContent="AI run submitted: "+(data.run_id||"ID unavailable");
+     form.reset();await load();
+   }catch(error){status.textContent="AI run not submitted: "+error.message;}
+   finally{submit.disabled=false;}
+ });
+ const terminalButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Terminal Log"));
+ if(terminalButton)terminalButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
+ const newButton=[...document.querySelectorAll("header button")].find(b=>/\bNew\b/.test(textOf(b)));
+ if(newButton){newButton.title="Configure a new engagement and its authorized scope";newButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
+ const haltButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Emergency Halt Scan"));
+ if(haltButton)haltButton.addEventListener("click",async()=>{
+   try{
+     const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
+     const jobs=await response.json(),active=(Array.isArray(jobs)?jobs:[]).filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
+     if(!active.length){status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
+     if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+     let cancelled=0;
+     for(const job of active){const id=job.id||job.job_id;if(!id)continue;const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(result.ok){const body=await result.json();if(body.ok===true)cancelled++;}}
+     status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
+   }catch(error){status.textContent="Emergency halt failed: "+error.message;}
+ });
+ window.addEventListener("keydown",e=>{
+   if(e.target!==document.body||!pendingRuns.length||answerInProgress)return;
+   if(e.key==="Enter"){e.preventDefault();answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate (keyboard shortcut)");}
+   else if(e.key==="Escape"){e.preventDefault();const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason!==null)answerPending(pendingRuns[0],"no: "+(reason.trim()||"rejected by operator"),reason.trim());}
+ });
+ load().catch(error=>{status.textContent="AI gate failed to load: "+error.message;document.documentElement.dataset.aiGateReady="true";});
+ window.setInterval(()=>{if(!answerInProgress)load().catch(()=>{});},3000);
 })();
 </script>
 </body></html>
