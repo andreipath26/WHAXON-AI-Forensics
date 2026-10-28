@@ -626,11 +626,18 @@
     if (samplePanel) samplePanel.style.display = "none";
     document.querySelectorAll("h2").forEach(h=>{
       const t=textOf(h);
-      if(t.includes("PTES Phase Execution & Telemetry Tracker")||t.includes("Evidence Summary")||t.includes("Local Evidence Locker")){
+      if(t.includes("PTES Phase Execution & Telemetry Tracker")||t.includes("Coverage Gap Matrix")||t.includes("Report Synthesis & Compliance Profiler")||t.includes("Evidence Summary")||t.includes("Local Evidence Locker")){
         const panel=h.closest("section")||h.parentElement?.parentElement?.parentElement;
         if(panel)panel.style.display="none";
       }
     });
+    const scopeLabel=[...document.querySelectorAll("main span")].find(n=>textOf(n)==="Scope Compliance & Verification");
+    const scopePanel=scopeLabel?.closest("div.bg-surface-container-low");
+    if(scopePanel)scopePanel.style.display="none";
+    for(const label of ["6 curl-verified","STRICT_WHITELIST"]){
+      const item=[...document.querySelectorAll("main span")].find(n=>textOf(n)===label);
+      if(item?.parentElement)item.parentElement.style.display="none";
+    }
   }
   load().catch(()=>{});
 })();
