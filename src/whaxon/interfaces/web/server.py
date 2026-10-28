@@ -563,10 +563,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/ai/run")
     @limiter.limit("10 per minute")
     def ai_run():
+        import json as _json
+        import time as _time
+
         data = request.get_json(silent=True) or {}
         goal = (data.get("goal") or "").strip()
         if not goal:
-            return {"error": "goal required"}, 400
+            return {"error": "goal required; AI run was not started"}, 400
         target = (data.get("target") or "").strip() or None
         if target is None:
             try:
@@ -574,12 +577,57 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 target = extract_target(goal)
             except Exception:
                 target = None
+        if not target:
+            return {"error": "target required; AI run was not started"}, 400
+        try:
+            match = registry.core.scope.check(target)
+        except Exception:
+            app.logger.exception("Scope evaluation failed before AI run")
+            return {"error": "scope evaluation failed; AI run was not started"}, 503
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
+            return {
+                "error": f"target out of scope: {reason}; AI run was not started",
+                "matched_rule": getattr(match, "matched_rule", None),
+            }, 403
+
         run_id = "ai-" + uuid.uuid4().hex[:12]
         core.store.create_ai_run(run_id, goal)
-        _lock = target
+
+        async def ask_human(action):
+            # Persist the exact pending action and pause until the operator
+            # answers through /api/ai/runs/<run_id>/answer.
+            question = {
+                "run_id": run_id,
+                "kind": action.kind,
+                "rationale": action.rationale,
+                "tool_id": action.tool_id,
+                "target": action.target or target,
+                "extra_args": action.extra_args,
+                "confidence": action.confidence,
+                "proposed_phase": action.proposed_phase,
+            }
+            store = registry.core.store
+            store.set_ai_run_waiting(run_id, _json.dumps(question))
+            current = store.get_ai_run(run_id) or {}
+            answer_seq = len(current.get("steps") or []) + 1
+            deadline = _time.monotonic() + 1800
+            while _time.monotonic() < deadline:
+                for approval in store.list_approvals(run_id):
+                    if int(approval.get("seq", -1)) == answer_seq:
+                        return str(approval.get("answer") or "")
+                await __import__("asyncio").sleep(0.25)
+            raise TimeoutError("operator approval timed out; AI run stopped")
+
         def _factory():
             from whaxon.core.ai_bridge import build_executor
-            return build_executor(core, target_lock=_lock)
+            return build_executor(
+                core,
+                target_lock=target,
+                ai_run_id=run_id,
+                ask_human=ask_human,
+            )
+
         runner.submit(lambda: _ai_run_blocking(core, _factory, run_id, goal, core.store))
         return {"run_id": run_id}, 202
 
