@@ -620,6 +620,10 @@
       root.insertBefore(banner,root.firstChild);
     }
     // Phase coverage and cryptographic evidence panels remain hidden until the API provides real phase/evidence records.
+    // Never present the supplied illustrative curl proof as if it were live evidence.
+    const sampleProof = [...document.querySelectorAll("main span")].find(n => textOf(n).startsWith("Sample Deterministic Proof:"));
+    const samplePanel = sampleProof?.closest("div.bg-surface-container-lowest");
+    if (samplePanel) samplePanel.style.display = "none";
     document.querySelectorAll("h2").forEach(h=>{
       const t=textOf(h);
       if(t.includes("PTES Phase Execution & Telemetry Tracker")||t.includes("Evidence Summary")||t.includes("Local Evidence Locker")){
