@@ -54,7 +54,10 @@ def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_s
         timeout=8000,
     )
     page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
-    assert "No running or queued jobs were found" in page.locator("#dashboard-action-status").inner_text()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
 
 
 def test_dashboard_cli_help_and_credentials_controls_explain_real_setup(page, live_server):
