@@ -617,6 +617,8 @@
     const buttonLabel = button => {
       const clone = button.cloneNode(true);
       clone.querySelectorAll(".material-symbols-outlined").forEach(icon => icon.remove());
+      // Preserve word boundaries when adjacent inline spans have no source whitespace.
+      clone.querySelectorAll("span").forEach(span => span.append(document.createTextNode(" ")));
       return textOf(clone).replace(/\s+/g, " ").trim();
     };
     const route = path => { window.location.href = path; };
