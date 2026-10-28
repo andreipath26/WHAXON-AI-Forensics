@@ -1672,81 +1672,81 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         """Canonical report and PTES page backed by live report APIs."""
         return render_template("ui_v2_report.html")
 
-@app.get("/ui-v2/reports")
+    @app.get("/ui-v2/reports")
     def ui_v2_reports():
         """Canonical report page backed by the live report API."""
         return render_template("ui_v2_reports.html")
 
-@app.get("/ui-v2/history")
+    @app.get("/ui-v2/history")
     def ui_v2_history():
         """Canonical job history page backed by recorded WHAXON jobs."""
         return render_template("ui_v2_history.html")
 
-@app.get("/ui-v2/diagnostics")
+    @app.get("/ui-v2/diagnostics")
     def ui_v2_diagnostics():
         """Canonical diagnostics page backed by live health and tool APIs."""
         return render_template("ui_v2_diagnostics.html")
 
-@app.get("/ui-v2/evidence")
+    @app.get("/ui-v2/evidence")
     def ui_v2_evidence():
         """Canonical evidence inspector backed by recorded job evidence."""
         return render_template("ui_v2_evidence.html")
 
-@app.get("/ui-v2/ai")
+    @app.get("/ui-v2/ai")
     def ui_v2_ai():
         """Canonical AI strategy gate backed by live AI run and scope APIs."""
         return render_template("ui_v2_ai.html")
 
-@app.get("/ui-v2/retest")
+    @app.get("/ui-v2/retest")
     def ui_v2_retest():
         """Canonical remediation retest page backed by verified findings."""
         return render_template("ui_v2_retest.html")
 
-@app.get("/ui-v2/chains")
+    @app.get("/ui-v2/chains")
     def ui_v2_chains():
         """Canonical attack-chain page backed by stored pivot graph data."""
         return render_template("ui_v2_chains.html")
 
-@app.get("/ui-v2/adapters")
+    @app.get("/ui-v2/adapters")
     def ui_v2_adapters():
         """Canonical adapter manager backed by the live tool catalog."""
         return render_template("ui_v2_adapters.html")
 
-@app.get("/ui-v2/settings")
+    @app.get("/ui-v2/settings")
     def ui_v2_settings():
         """Read-only settings and API explorer with secret redaction."""
         return render_template("ui_v2_settings.html")
 
-@app.get("/ui-v2/audit")
+    @app.get("/ui-v2/audit")
     def ui_v2_audit():
         """Show recorded execution metadata without inventing cryptographic claims."""
         return render_template("ui_v2_audit.html")
 
-@app.get("/ui-v2/monitoring")
+    @app.get("/ui-v2/monitoring")
     def ui_v2_monitoring():
         return render_template("ui_v2_monitoring.html")
 
-@app.get("/ui-v2/bas")
+    @app.get("/ui-v2/bas")
     def ui_v2_bas():
         return render_template("ui_v2_bas.html")
 
-@app.get("/ui-v2/bug-bounty")
+    @app.get("/ui-v2/bug-bounty")
     def ui_v2_bug_bounty():
         return render_template("ui_v2_bug_bounty.html")
 
-@app.get("/ui-v2/compliance")
+    @app.get("/ui-v2/compliance")
     def ui_v2_compliance():
         return render_template("ui_v2_compliance.html")
 
-@app.get("/ui-v2/ptaas")
+    @app.get("/ui-v2/ptaas")
     def ui_v2_ptaas():
         return render_template("ui_v2_ptaas.html")
 
-@app.get("/ui-v2/threat-intel")
+    @app.get("/ui-v2/threat-intel")
     def ui_v2_threat_intel():
         return render_template("ui_v2_threat_intel.html")
 
-@app.get("/ui-v2/approvals")
+    @app.get("/ui-v2/approvals")
     def ui_v2_approvals():
         return render_template("ui_v2_approvals.html")
 
