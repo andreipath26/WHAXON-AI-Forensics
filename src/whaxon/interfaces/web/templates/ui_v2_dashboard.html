@@ -525,7 +525,7 @@
       if (textOf(n) === "STRICT BOUNDARY ENFORCED") n.textContent = scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : "SCOPE ENFORCEMENT ENABLED";
     });
     const engagementButton = [...document.querySelectorAll("header button")].find(button =>
-      buttonLabel(button).startsWith("No active engagement") || buttonLabel(button).startsWith("Active scope")
+      button.textContent.includes("No active engagement") || button.textContent.includes("Active scope")
     );
     if (engagementButton) {
       const spans = engagementButton.querySelectorAll("span");
