@@ -23,8 +23,14 @@ def test_report_page_hides_illustrative_proof_and_evidence_panels(page, live_ser
         timeout=5000,
     )
     assert page.get_by_text("Sample Deterministic Proof: FINDING-SQLI-001 (auth-endpoint)").is_hidden()
+    assert page.get_by_role("heading", name="PTES Phase Execution & Telemetry Tracker").is_hidden()
+    assert page.get_by_role("heading", name="Coverage Gap Matrix").is_hidden()
+    assert page.get_by_role("heading", name="Report Synthesis & Compliance Profiler").is_hidden()
     assert page.get_by_role("heading", name="Evidence Summary").is_hidden()
     assert page.get_by_role("heading", name="Local Evidence Locker").is_hidden()
+    assert page.get_by_text("Scope Compliance & Verification").is_hidden()
+    assert page.get_by_text("6 curl-verified").is_hidden()
+    assert page.get_by_text("STRICT_WHITELIST").is_hidden()
 
 
 def test_report_preview_fetches_live_markdown(page, live_server):
