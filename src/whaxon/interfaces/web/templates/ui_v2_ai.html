@@ -356,6 +356,12 @@
  const targetInput=panel.querySelector("#ai-target"),goalInput=panel.querySelector("#ai-goal");
  let recordedRuns=[],pendingRuns=[],scopeData=null,answerInProgress=false;
  const proposalHeading=[...document.querySelectorAll("h2")].find(n=>textOf(n).startsWith("AI Planner proposes spawning"));
+ const proposalIntro=proposalHeading?.parentElement?.querySelector("p");
+ const waitingLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="WAITING FOR OPERATOR AUTHORIZATION");
+ const actionIdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("ACTION_ID:"));
+ const activeTargetLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Active Target Endpoint");
+ const activePhaseLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Operational Phase");
+ const traceCards=["Fingerprint Correlation & Boundary Analysis","Timing Anomaly Detection","Orchestration Tool Selection"].map(label=>{const title=[...document.querySelectorAll("span")].find(n=>textOf(n)===label);const card=title?.closest("div.bg-surface-container-lowest.p-space-md.rounded");return {title,description:card?.querySelector("p")};});
  const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
  const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
  const commandCode=commandCard?.querySelector("code");
@@ -444,7 +450,12 @@
  }
  function renderProposal(){
    setDecisionButtons();
-   const q=proposalDetails();
+   const run=pendingRuns[0]||null,q=proposalDetails();
+   if(proposalIntro)proposalIntro.textContent=q?"Operator response required for the recorded AI question. Tool execution remains guarded by the server and executor.":"No live proposal is awaiting operator input. New AI runs must pass the current server-side scope check.";
+   if(waitingLabel)waitingLabel.textContent=run?"WAITING FOR OPERATOR AUTHORIZATION":"NO PENDING OPERATOR APPROVAL";
+   if(actionIdLabel)actionIdLabel.textContent="ACTION_ID: "+(run?.id||"—");
+   if(activeTargetLabel?.nextElementSibling)activeTargetLabel.nextElementSibling.textContent=q?.target||"No active target selected";
+   if(activePhaseLabel?.nextElementSibling)activePhaseLabel.nextElementSibling.textContent=q?.proposed_phase||run?.phase||recordedRuns[0]?.phase||"No active phase recorded";
    if(commandCode)commandCode.textContent=q?JSON.stringify(q,null,2):"No live proposal is awaiting operator input.";
    if(confidenceValue){
      const score=Number(q?.confidence);
@@ -454,9 +465,16 @@
      const score=Number(q?.confidence);
      confidenceNote.textContent=q&&Number.isFinite(score)?"Recorded proposal confidence; not a proof of safety":"Confidence score unavailable until a live proposal is recorded.";
    }
-   const donut=[...document.querySelectorAll("svg path")].find(p=>p.getAttribute("stroke-dasharray")==="89.4, 100");
+   const donut=[...document.querySelectorAll("svg path")].find(p=>p.getAttribute("stroke-dasharray")==="89.4, 100"||p.getAttribute("stroke-dasharray")==="0, 100");
    const score=Number(q?.confidence);
    if(donut)donut.setAttribute("stroke-dasharray",q&&Number.isFinite(score)?String(Math.max(0,Math.min(100,score<=1?score*100:score)))+", 100":"0, 100");
+   const traceText=[
+     q?.rationale||"No live AI rationale is recorded for the current page.",
+     "Current scope is checked by the server before an AI run starts; the executor checks scope again before running tools.",
+     q?["Tool: "+(q.tool_id||"not specified"),"Target: "+(q.target||"not recorded"),"Arguments: "+(q.extra_args||"none recorded")].join(" · "):"No action is awaiting operator approval."
+   ];
+   const traceTitles=[run?"Recorded AI rationale":"Live AI rationale","Server-side scope enforcement","Pending action details"];
+   traceCards.forEach((card,i)=>{if(card.title)card.title.textContent=traceTitles[i];if(card.description)card.description.textContent=traceText[i];});
  }
  async function load(){
    const results=await Promise.allSettled([
@@ -475,7 +493,7 @@
    }
    if(scopeData){
      const engagementButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
-     if(engagementButton){const spans=engagementButton.querySelectorAll("span");if(spans[0])spans[0].textContent=scopeData.engagement||"Active scope";if(spans[1])spans[1].textContent="("+(scopeData.in_scope?.[0]||"No target configured")+")";}
+     if(engagementButton){const spans=engagementButton.querySelectorAll("span");if(spans[0])spans[0].textContent=scopeData.engagement||"Active scope";if(spans[1])spans[1].textContent="("+(Array.isArray(scopeData.in_scope)?scopeData.in_scope.length:0)+" scope rule(s))";}
      document.querySelectorAll("header span,header div").forEach(n=>{
        if(textOf(n)==="(IN SCOPE)")n.textContent=scopeData.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
        if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
@@ -507,7 +525,9 @@
  const newButton=[...document.querySelectorAll("header button")].find(b=>/\bNew\b/.test(textOf(b)));
  if(newButton){newButton.title="Configure a new engagement and its authorized scope";newButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
  const haltButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Emergency Halt Scan"));
- if(haltButton)haltButton.addEventListener("click",async()=>{
+ if(haltButton)haltButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
+ /* Active-job cancellation is implemented on the Run page, which owns the live job list. */
+ /* if(haltButton)haltButton.addEventListener("click",async()=>{
    try{
      const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
      const jobs=await response.json(),active=(Array.isArray(jobs)?jobs:[]).filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
@@ -517,7 +537,7 @@
      for(const job of active){const id=job.id||job.job_id;if(!id)continue;const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(result.ok){const body=await result.json();if(body.ok===true)cancelled++;}}
      status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
    }catch(error){status.textContent="Emergency halt failed: "+error.message;}
- });
+ }); */
  window.addEventListener("keydown",e=>{
    if(e.target!==document.body||!pendingRuns.length||answerInProgress)return;
    if(e.key==="Enter"){e.preventDefault();answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate (keyboard shortcut)");}
