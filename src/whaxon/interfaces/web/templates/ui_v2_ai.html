@@ -397,7 +397,7 @@
  }
  async function answerPending(run,answer,note){
    if(!run||answerInProgress)return;
-   answerInProgress=true;setDecisionButtons();status.textContent="Recording operator response…";
+   answerInProgress=true;setDecisionButtons();renderPending();status.textContent="Recording operator response…";
    try{
      const response=await fetch("/api/ai/runs/"+encodeURIComponent(run.id)+"/answer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answer,user:"local",note:note||""})});
      const data=await response.json();
