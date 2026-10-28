@@ -7,7 +7,7 @@ def test_report_page_loads_and_uses_live_report_counts(page, live_server):
     assert response is not None and response.status == 200
     page.wait_for_function(
         "() => [...document.querySelectorAll('main div')].some(n => "
-        "n.textContent.includes('Live report data:') && n.textContent.includes('findings'))",
+        "document.documentElement.dataset.reportReady === 'true' && n.textContent.includes('Live report data:') && n.textContent.includes('findings'))",
         timeout=5000,
     )
     assert page.locator("#previewBtn").is_visible()
@@ -19,18 +19,21 @@ def test_report_page_hides_illustrative_proof_and_evidence_panels(page, live_ser
     page.goto(f"{live_server}/ui-v2/report")
     page.wait_for_function(
         "() => [...document.querySelectorAll('main div')].some(n => "
-        "n.textContent.includes('Live report data:'))",
+        "document.documentElement.dataset.reportReady === 'true' && n.textContent.includes('Live report data:'))",
         timeout=5000,
     )
     assert page.get_by_text("Sample Deterministic Proof: FINDING-SQLI-001 (auth-endpoint)").is_hidden()
     assert page.get_by_role("heading", name="PTES Phase Execution & Telemetry Tracker").is_hidden()
     assert page.get_by_role("heading", name="Coverage Gap Matrix").is_hidden()
-    assert page.get_by_role("heading", name="Report Synthesis & Compliance Profiler").is_hidden()
+    assert page.get_by_role("heading", name="Report Synthesis & Compliance Profiler").is_visible()
     assert page.get_by_role("heading", name="Evidence Summary").is_hidden()
     assert page.get_by_role("heading", name="Local Evidence Locker").is_hidden()
     assert page.get_by_text("Scope Compliance & Verification").is_hidden()
     assert page.get_by_text("6 curl-verified").is_hidden()
     assert page.get_by_text("STRICT_WHITELIST").is_hidden()
+    assert page.get_by_text("Select Report Modules to Compile").is_hidden()
+    assert page.get_by_text("Correlate Standards & Compliance Matrix").is_hidden()
+    assert page.get_by_text("6 deterministic findings with reproducible curl replay proofs.").is_hidden()
 
 
 def test_report_preview_fetches_live_markdown(page, live_server):
