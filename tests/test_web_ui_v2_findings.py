@@ -121,3 +121,27 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
         timeout=5000,
     )
     assert page.locator("#whaxon-findings-list #whaxon-findings-empty").count() == 0
+
+def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw_line(page, live_server):
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
+        timeout=8000,
+    )
+
+    # "protocol" exists in the structured finding data, not the scanner raw line.
+    search = page.locator("#whaxon-finding-filter")
+    search.fill("protocol")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 2",
+        timeout=5000,
+    )
+    assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 2
+
+    search.fill("")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
+        timeout=5000,
+    )
+    proof = page.locator("#curl-proof-payload")
+    assert "22/tcp open ssh OpenSSH 9.6" in proof.inner_text()
