@@ -147,5 +147,5 @@ def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw
     ssh_finding.click()
     proof = page.locator("#curl-proof-payload")
     assert "22/tcp open ssh OpenSSH 9.6" in proof.inner_text()
-    assert "Retest Outcomes" in page.locator("main").inner_text()
-    assert "Refuted" in page.locator("#whaxon-kpi-fixed").evaluate("(el) => el.parentElement.innerText")
+    assert "Retest Outcomes" in page.locator("main").evaluate("(el) => el.textContent")
+    assert "Refuted" in page.locator("#whaxon-kpi-fixed").evaluate("(el) => el.parentElement.textContent")
