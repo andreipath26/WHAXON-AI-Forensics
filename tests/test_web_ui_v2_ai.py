@@ -31,3 +31,79 @@ def test_dashboard_links_to_ai_strategy_gate(page, live_server):
     link = page.locator('a[data-path="ai-strategy-gate"]')
     assert link.is_visible()
     assert link.get_attribute("href") == "/ui-v2/ai"
+
+def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofed(page, live_server):
+    page.route(
+        "**/api/scope/check",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"allowed":true,"reason":"client says allowed"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    page.locator("#ai-target").fill("https://example.com")
+    page.locator("#ai-goal").fill("Assess this explicitly out-of-scope target")
+    with page.expect_response(
+        lambda response: response.request.method == "POST"
+        and response.url.endswith("/api/ai/run")
+    ) as response_info:
+        page.locator("#ai-run-form button[type=submit]").click()
+    assert response_info.value.status == 403
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.toLowerCase().includes('out of scope')",
+        timeout=8000,
+    )
+
+
+def test_ai_strategy_gate_authorize_button_records_real_pending_answer(page, live_server):
+    calls = []
+
+    def pending(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"ai-pending-ui-test","goal":"test authorized phase transition","phase":"recon","pending_question":{"rationale":"Confirm the next phase","target":"127.0.0.1","confidence":0.9,"proposed_phase":"enum"}}]',
+        )
+
+    def runs(route):
+        route.fulfill(status=200, content_type="application/json", body="[]")
+
+    def answer(route):
+        calls.append({"method": route.request.method, "body": route.request.post_data_json})
+        route.fulfill(status=200, content_type="application/json", body='{"ok":true,"run_id":"ai-pending-ui-test","seq":1}')
+
+    page.route("**/api/ai/pending", pending)
+    page.route("**/api/ai/runs", runs)
+    page.route("**/api/ai/runs/ai-pending-ui-test/answer", answer)
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.querySelector('#ai-pending-list')?.textContent.includes('Confirm the next phase')",
+        timeout=8000,
+    )
+    assert page.locator("#btn-authorize").is_enabled()
+    page.locator("#btn-authorize").click()
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('Operator response recorded')",
+        timeout=8000,
+    )
+    assert len(calls) == 1
+    assert calls[0]["method"] == "POST"
+    assert calls[0]["body"]["answer"] == "yes"
+    assert calls[0]["body"]["user"] == "local"
+
+
+def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_pending_run(page, live_server):
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    assert page.locator("#btn-authorize").is_disabled()
+    assert page.locator("#btn-reject").is_disabled()
+    assert page.get_by_text("HTTP Request Wire Preview").is_hidden()
+    assert page.locator("#ai-pending-list").inner_text().find("No AI runs are currently waiting") >= 0
