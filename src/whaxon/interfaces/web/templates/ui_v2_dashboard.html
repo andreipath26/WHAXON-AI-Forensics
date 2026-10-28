@@ -428,7 +428,34 @@
     "scope-and-targets": "/ui-v2/scope",
     "run-and-orchestration": "/ui-v2/run",
     "trust-layer-and-findings": "/ui-v2/findings",
-    "ptes-coverage-and-reports": "/ui-v2/report"
+    "ptes-coverage-and-reports": "/ui-v2/report",
+    "ai-strategy-gate":"/ui-v2/ai",
+    "remediation-retest-studio":"/ui-v2/retest",
+    "correlated-attack-chains":"/ui-v2/chains",
+    "job-execution-history":"/ui-v2/history",
+    "evidence-file-inspector":"/ui-v2/evidence",
+    "cryptographic-audit-log":"/ui-v2/audit",
+    "system-diagnostics-and-health":"/ui-v2/diagnostics",
+    "adapter-and-plugin-manager":"/ui-v2/adapters",
+    "ai-strategy-gate":"/ui-v2/ai",
+    "remediation-retest-studio":"/ui-v2/retest",
+    "correlated-attack-chains":"/ui-v2/chains",
+    "job-execution-history":"/ui-v2/history",
+    "evidence-file-inspector":"/ui-v2/evidence",
+    "cryptographic-audit-log":"/ui-v2/audit",
+    "system-diagnostics-and-health":"/ui-v2/diagnostics",
+    "adapter-and-plugin-manager":"/ui-v2/adapters",
+    "settings-and-api-explorer":"/ui-v2/settings",
+    "settings-and-secrets-vault":"/ui-v2/settings",
+    "system-diagnostics-health":"/ui-v2/diagnostics",
+    "adapter-plugin-manager":"/ui-v2/adapters",
+    "ptaas-client-portal":"/ui-v2/ptaas",
+    "attack-surface-and-continuous-monitoring":"/ui-v2/monitoring",
+    "bug-bounty-and-live-browser-studio":"/ui-v2/bug-bounty",
+    "threat-intel-and-exploit-arsenal":"/ui-v2/threat-intel",
+    "bas-and-detection-validation":"/ui-v2/bas",
+    "compliance-and-framework-crosswalk":"/ui-v2/compliance",
+    "trust-layer-approvals-queue-modal":"/ui-v2/approvals"
   };
   document.querySelectorAll("a[data-path]").forEach(a => {
     const href = routes[a.dataset.path];
@@ -563,6 +590,35 @@
   load().catch(() => {
     const body = document.querySelector("table tbody");
     if (body) body.innerHTML = '<tr><td colspan="7" class="px-space-md py-space-lg text-center text-error">Live job history could not be loaded.</td></tr>';
+  });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  const canonicalRoutes = {
+    "ai-strategy-gate": "/ui-v2/ai",
+    "remediation-retest-studio": "/ui-v2/retest",
+    "correlated-attack-chains": "/ui-v2/chains",
+    "job-execution-history": "/ui-v2/history",
+    "evidence-file-inspector": "/ui-v2/evidence",
+    "cryptographic-audit-log": "/ui-v2/audit",
+    "system-diagnostics-and-health": "/ui-v2/diagnostics",
+    "adapter-and-plugin-manager": "/ui-v2/adapters",
+    "settings-and-api-explorer": "/ui-v2/settings",
+    "settings-and-secrets-vault": "/ui-v2/settings",
+    "system-diagnostics-health": "/ui-v2/diagnostics",
+    "adapter-plugin-manager": "/ui-v2/adapters",
+    "ptaas-client-portal": "/ui-v2/ptaas"
+  };
+  document.querySelectorAll("a[data-path]").forEach(function (link) {
+    const route = canonicalRoutes[link.dataset.path];
+    if (!route) return;
+    link.href = route;
+    link.hidden = false;
+    link.style.display = "";
+    link.removeAttribute("aria-hidden");
+    link.removeAttribute("tabindex");
   });
 })();
 </script>
