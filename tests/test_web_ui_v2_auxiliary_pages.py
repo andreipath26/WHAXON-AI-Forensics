@@ -459,6 +459,8 @@ def test_bas_halt_is_live_and_provider_simulation_controls_are_not_actionable(pa
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():
+        if button.evaluate("(el) => el.closest('#whaxon-live-bas') !== null"):
+            continue
         assert button.is_disabled(), f"Unwired BAS action remains enabled: {button.inner_text()}"
     assert "not connected" in page.locator("#whaxon-live-bas").inner_text().lower()
     assert "42.8%" not in page.locator("main").inner_text()
