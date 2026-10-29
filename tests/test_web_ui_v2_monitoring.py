@@ -103,7 +103,7 @@ def test_monitoring_header_reflects_live_scope_and_routes_to_scope_run_and_audit
     assert page.url.endswith("/ui-v2/run")
 
     page.goto(f"{live_server}/ui-v2/monitoring")
-    page.get_by_role("button", name="Stream Full Cryptographic Audit Logs").click()
+    page.locator("main button").filter(has_text="Stream Full Cryptographic Audit Logs").click()
     page.wait_for_url("**/ui-v2/audit")
     assert page.url.endswith("/ui-v2/audit")
 
@@ -125,7 +125,7 @@ def test_monitoring_halt_uses_live_history_and_unsupported_controls_are_disabled
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():
-        if button.locator("#monitoring-refresh").count():
+        if button.get_attribute("id") == "monitoring-refresh":
             assert button.is_enabled()
         elif "Stream Full Cryptographic Audit Logs" in button.inner_text():
             assert button.is_enabled()
