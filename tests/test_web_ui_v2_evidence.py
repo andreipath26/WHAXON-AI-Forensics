@@ -98,4 +98,4 @@ def test_evidence_inspector_saves_notes_and_uploads_files(page, live_server):
 def test_evidence_layout_remains_available_beside_live_inspector(page, live_server):
     page.goto(f"{live_server}/ui-v2/evidence")
     assert page.locator("#whaxon-live-evidence").is_visible()
-    assert page.get_by_role("heading", name="Recorded evidence inspector").is_visible()
+    assert page.get_by_text("RECORDED EVIDENCE INSPECTOR", exact=True).is_visible()
