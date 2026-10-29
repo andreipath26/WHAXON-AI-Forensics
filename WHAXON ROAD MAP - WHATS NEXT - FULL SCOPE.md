@@ -2248,3 +2248,142 @@ Required UI states and interactions:
 7. Update the UI interaction audit, user documentation, §19 acceptance status and §38 release checklist with observed test evidence.
 
 **Cross-references:** §19 new default UI integration and acceptance; §26.12 bounty URL ingestion; §38 release blockers; §40 dependency readiness; existing web UI interaction audit.
+
+---
+
+# 42. MULTI-TARGET AND SUBNET-WIDE PENTEST ORCHESTRATION (NEW)
+
+**Status:** Proposed roadmap addition; queued for implementation. This is an orchestration and scope-management capability, not a claim that current WHAXON already supports multi-target or CIDR-wide engagements.
+
+## 42.1 Goal and product benchmark
+
+WHAXON should support an authorized engagement against one target, a list of targets, or an explicitly approved network range/subnet without requiring the operator to manually start each target as a separate engagement. It should manage the engagement as one coordinated job while retaining independent state, evidence and results for every target.
+
+Use publicly documented capabilities from Pentera and Horizon3.ai NodeZero as product-design references:
+- Pentera describes coordinated exposure validation across internal networks, external assets, cloud and web applications, with attack-path context, progress visibility, guardrails and consolidated evidence.
+- NodeZero documents explicit scope using IPs/CIDR ranges, include/exclude lists, multiple network segments, live progress and prioritization based on contextual attack paths.
+- These references are design benchmarks only. Do not claim feature parity without implemented and tested evidence.
+
+Reference material:
+- Pentera Platform: https://pentera.io/pentera-platform/
+- Pentera Surface: https://pentera.io/pentera-surface/
+- NodeZero Platform: https://horizon3.ai/nodezero/
+- NodeZero internal test scope: https://docs.horizon3ai.com/quickstart/internal/
+- NodeZero deployment and scope strategy: https://docs.horizon3ai.com/portal/deployment_strategy/
+
+## 42.2 Engagement input and scope model
+
+Support three explicit target input modes:
+1. **Single target:** current single-target workflow remains supported and behaviorally compatible.
+2. **Target list:** multiple explicitly named hostnames, URLs and/or IP addresses, normalized into a single engagement with one result record per target.
+3. **CIDR/network scope:** explicitly supplied IPv4 and IPv6 CIDR ranges where supported, plus multiple ranges and explicit include/exclude entries.
+
+Each engagement must persist:
+- Engagement ID, operator, creation/start/end times, approved purpose and selected test profile.
+- Original scope input, normalized scope, scope source, exclusions, approval record and policy version.
+- Per-target discovery, reachability, scan, validation and report states, with timestamps and failure reasons.
+- Execution settings: concurrency, rate limits, timeout budget, permitted test classes, impact limits, stop conditions and cancellation state.
+- Audit trail linking each action and finding to the target, scope decision, tool/version, raw evidence and normalized result.
+
+Normalize and validate CIDR inputs before any network activity. Clearly show the number of addresses implied by each range and the aggregate estimated target count. Detect malformed ranges, duplicate/overlapping entries, impossible or unsupported address families and conflicting include/exclude rules. Require explicit operator confirmation of the normalized scope and estimated scale before starting a range-wide engagement.
+
+## 42.3 Deterministic scope enforcement — security-critical
+
+- **Fail closed:** no scan or target-bearing action starts if authorization, target scope or policy cannot be confirmed.
+- A URL, discovered hostname, DNS answer, redirect, link, certificate SAN, tool output or AI suggestion does not itself grant authorization to test the resulting asset.
+- Apply the deterministic scope gate before every target-bearing operation, including redirects, DNS resolution changes, child processes, discovered hosts, validation/replay and follow-on checks.
+- Exclusions take precedence over inclusions. Display exclusions and explain why excluded assets were skipped.
+- No silent scope expansion. Newly discovered assets outside the approved scope may be recorded as untested leads, but cannot be scanned until the operator reviews and approves an amended scope.
+- Revalidate resolved IPs and redirects at execution time to address DNS changes/rebinding and prevent scope checks from being bypassed through alternate address representations.
+- Separate public internet ranges, private/internal ranges, loopback, link-local, multicast, reserved and otherwise non-routable address handling. Do not assume that an RFC1918 range is authorized merely because it is private.
+- For subnet tests, enforce the same approved scope at discovery, scan, validation and report stages. A parent engagement does not waive a per-action scope check.
+- Never infer authorization to test an entire public CIDR from one permitted hostname or IP. Require documented ownership/authorization and explicit approval for the exact range.
+
+## 42.4 Scheduling, concurrency and resilience
+
+- Implement a central engagement/job coordinator that can queue, start, pause where supported, cancel and resume eligible work without losing evidence.
+- Allow configurable concurrency and per-host/per-network rate limits, with conservative safe defaults and clear resource-impact warnings.
+- Prevent one slow, unreachable or failing target from incorrectly failing the entire engagement. Track target outcomes independently and report partial completion accurately.
+- Enforce global and per-target deadlines, retries with bounded backoff, duplicate-work prevention and cancellation propagation to child processes.
+- Support queueing and controlled parallelism only after confirming the installed tools and execution environment can safely support it; default to sequential execution when concurrency safety is unknown.
+- Provide real-time or refreshable progress: queued, scope-approved, discovering, scanning, validating, completed, partial, skipped, blocked, failed and cancelled.
+- Provide an emergency stop/stop-all control that halts new actions immediately and propagates cancellation to active work where supported. State clearly when a tool cannot be stopped instantly.
+- Capture tool-level errors and partial output per target; a process exit code alone must not imply a successful assessment.
+- Add resource budgets and back-pressure so large ranges cannot exhaust memory, process slots, sockets, disk, API quotas or external services.
+
+## 42.5 Subnet discovery and network assessment
+
+- Support explicit CIDR-based inventory/reachability discovery before deeper testing, with the operator able to choose discovery-only versus approved deeper testing.
+- Distinguish discovered, reachable, scanned, validated and actually tested assets. Do not present an unresponsive host as secure or a discovered host as tested.
+- Map services and findings back to the exact host, port, protocol, tool and evidence that produced them.
+- Support multiple approved subnets and segmented environments in one engagement, while retaining per-range controls and independent exclusions.
+- Show coverage gaps such as unreachable addresses, filtered ports, unsupported protocols, unavailable tools, authentication limitations, timeouts and targets skipped by policy.
+- Treat network inventory as potentially sensitive. Redact secrets and minimize retained data; provide retention controls and safe exports.
+- Do not make lateral movement, credential access, destructive exploitation, persistence, data exfiltration or other high-impact actions implicit in “subnet pentest.” These require separately defined capabilities, explicit authorization and approval gates under §39.7 and the applicable test policy.
+
+## 42.6 Unified findings and reporting
+
+- Generate a parent engagement report plus target-level evidence/report views.
+- Aggregate findings across targets, deduplicate equivalent findings without discarding per-host evidence, and distinguish one shared root cause from multiple affected assets.
+- Show per-target and overall status, tested/untested counts, scope exclusions, coverage limitations, errors, tool versions, timestamps and policy/scope version.
+- Preserve exact request/response or command evidence where applicable, reproducible validation steps, confidence/verification status, remediation and provenance.
+- Support export/API integration only after verifying access controls and redaction; never combine findings in a way that loses the affected asset or its evidence.
+- Include an executive summary and asset-level technical details, with severity and verified business impact clearly distinguished from estimates.
+
+## 42.7 UI and workflow requirements
+
+Integrate into the existing approved WHAXON UI; **no redesign**. Extend the current engagement/scan workflow rather than creating a disconnected parallel interface.
+
+- Provide a target-mode selector for single target, target list and CIDR/subnet scope.
+- Provide an editable include/exclude scope editor with CIDR validation, duplicate/overlap warnings and estimated host count.
+- Before launch, show the exact normalized scope, exclusions, selected test classes, rate/concurrency settings, potential impact, authorization confirmation and any scope warnings.
+- Display an engagement overview with global progress and a target table that can be filtered by status, severity, hostname/IP, service and error.
+- Provide target detail views for evidence, tool execution, scope decisions, validation status and remediation.
+- Add pause/cancel/stop-all actions where supported, with clear confirmation for stopping an entire engagement.
+- Make partial completion and skipped/blocked targets visible; never display a green “complete” state when coverage is partial or unknown.
+- Every control must be wired to a real backend contract. Frontend state must never be the authorization boundary.
+
+## 42.8 Backend architecture and integration
+
+- Define a versioned engagement schema and job API/CLI contract that supports multiple target records while preserving compatibility with the existing single-target contract.
+- Reuse the existing scanner/adapters and deterministic Trust Layer rather than duplicating tool logic in a new orchestration path.
+- Ensure every adapter receives a target-specific execution context and performs scope checks before execution and validation.
+- Persist jobs and target state so restart/reload does not lose the audit trail; define safe recovery behavior for interrupted jobs.
+- Use bounded worker pools and a durable queue where appropriate. Do not introduce distributed execution until local orchestration, persistence and cancellation are correct and tested.
+- Keep concurrency, retries and scope decisions deterministic and observable. Never let the LLM choose or expand the authoritative scope.
+- Integrate dependency readiness (§40), the approved UI (§41), per-tool acceptance gates (§39.9), retest/replay and the reporting pipeline.
+- Provide clear CLI support, for example a target-list file or explicit CIDR argument, with dry-run/plan output before active testing. Final syntax should follow existing CLI conventions.
+
+## 42.9 Acceptance criteria
+
+1. Existing single-target scans continue to pass all existing tests and produce compatible results.
+2. A target-list engagement creates independent states and evidence for every input target, including unreachable and failed targets.
+3. Valid CIDR ranges are normalized correctly; malformed or unsupported ranges fail before any network traffic.
+4. The displayed estimated target count matches the normalized scope; unusually large ranges require explicit, additional confirmation and configured limits.
+5. Include/exclude conflicts resolve deterministically with exclusions taking precedence; blocked assets receive no target-bearing requests.
+6. Redirects, DNS changes/rebinding, discovered hosts, alternate IP forms, child processes and replay actions cannot bypass the scope gate.
+7. A newly discovered out-of-scope host remains untested unless the operator explicitly approves an amended scope.
+8. Concurrency and rate limits are enforced and observable; unknown/unsafe concurrency defaults to sequential execution.
+9. Cancelling one target behaves as documented; stop-all prevents new work and propagates cancellation to active workers as far as supported.
+10. One target failure does not erase successful results from other targets; aggregate reports accurately describe partial completion.
+11. Reports preserve per-target evidence and deduplicate only at the aggregate presentation layer.
+12. Tests cover IPv4/IPv6 behavior where supported, private/reserved ranges, overlaps, exclusions, empty ranges, large scopes, duplicate targets, DNS/redirect changes, timeouts, partial output, cancellation, restart/recovery and resource limits.
+13. Security tests prove frontend manipulation, LLM output, tool output and discovered assets cannot authorize or expand scope.
+14. End-to-end browser tests verify target selection, scope review, launch approval, progress, filtering, cancellation and accurate report states using the existing UI.
+15. Documentation explains authorization requirements, supported target types, safe defaults, scale limits, concurrency, limitations and evidence retention.
+
+## 42.10 Recommended implementation sequence
+
+1. Audit current CLI/API/job runner to establish exactly which paths accept a single target and which state/results are persisted. Record evidence; do not assume multi-target support is absent or present without tests.
+2. Define the engagement/target data model and backward-compatible single-target contract.
+3. Implement deterministic scope normalization, include/exclude evaluation, CIDR validation and dry-run plan output.
+4. Implement multi-target job orchestration sequentially first, with per-target states, failure isolation and parent engagement reporting.
+5. Add bounded concurrency, rate limits, deadlines, cancellation and restart recovery only after sequential orchestration passes tests.
+6. Add subnet discovery and explicit scope-size/impact confirmation.
+7. Integrate target-list/CIDR inputs and progress controls into the existing approved UI.
+8. Add aggregate and per-target reporting, evidence provenance and coverage disclosure.
+9. Run security, integration, UI and clean-environment tests; update §19, §38 and the existing UI interaction audit with actual results.
+10. Benchmark coverage, runtime, resource consumption, false positives and failure isolation on controlled lab networks of increasing size before setting production scale limits.
+
+**Definition of done:** one operator-approved engagement can safely manage one target, a target list or a bounded CIDR scope; all actions remain deterministically scope-gated; each target has independent auditable results; and the final report clearly distinguishes tested, untested, blocked and failed assets.
+
