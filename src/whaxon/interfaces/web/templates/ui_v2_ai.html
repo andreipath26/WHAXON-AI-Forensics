@@ -614,7 +614,24 @@
  const newButton=[...document.querySelectorAll("header button")].find(b=>/\bNew\b/.test(textOf(b)));
  if(newButton){newButton.title="Configure a new engagement and its authorized scope";newButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
  const haltButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Emergency Halt Scan"));
- if(haltButton)haltButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
+ if(haltButton)haltButton.addEventListener("click",async()=>{
+   try{
+     const response=await fetch("/api/history");
+     if(!response.ok)throw new Error("History HTTP "+response.status);
+     const jobs=await response.json();
+     const active=(Array.isArray(jobs)?jobs:[]).filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
+     if(!active.length){status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
+     if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+     let cancelled=0;
+     for(const job of active){
+       const id=job.id||job.job_id;
+       if(!id)continue;
+       const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});
+       if(result.ok){const body=await result.json();if(body.ok===true)cancelled++;}
+     }
+     status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
+   }catch(error){status.textContent="Emergency halt failed: "+error.message;}
+ });
  /* Active-job cancellation is handled on the Run page, which owns the live job list. */
  window.addEventListener("keydown",e=>{
    if(e.target!==document.body||!pendingRuns.length||answerInProgress)return;
