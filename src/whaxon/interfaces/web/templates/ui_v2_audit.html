@@ -720,7 +720,7 @@
 (function(){
   "use strict";
   const buttons=[...document.querySelectorAll("header button")];
-  const text=button=>(button.textContent||"").replace(/\s+/g," ").trim();
+  const text=button=>{const clone=button.cloneNode(true);clone.querySelectorAll(".material-symbols-outlined").forEach(node=>node.remove());return (clone.textContent||"").replace(/\s+/g," ").trim();};
   const wireRoute=(button,path)=>{if(button)button.addEventListener("click",event=>{event.preventDefault();window.location.href=path;});};
   wireRoute(buttons.find(button=>/\bNew\b|New Engagement/i.test(text(button))),"/ui-v2/scope");
   wireRoute(buttons.find(button=>/LOGS|Terminal Log/i.test(text(button))),"/ui-v2/run");
