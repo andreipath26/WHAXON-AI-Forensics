@@ -29,3 +29,53 @@ def test_adapter_reference_actions_are_not_misrepresented_as_live(page, live_ser
     resign = page.locator("button").filter(has_text="Re-sign Manifest")
     if resign.count():
         assert resign.is_disabled()
+
+def test_adapter_header_uses_live_scope_and_global_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/adapters")
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('catalog tools')"
+        " || document.querySelector('#adapter-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/adapters")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_adapter_halt_uses_live_history_and_static_mutations_are_disabled(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.goto(f"{live_server}/ui-v2/adapters")
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('catalog tools')"
+        " || document.querySelector('#adapter-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+    for control_id in ("btn-sync", "btn-reload", "btn-register", "btn-mock-test", "btn-resign", "btn-save-conf"):
+        assert page.locator(f"#{control_id}").is_disabled(), f"Disconnected adapter control remains enabled: {control_id}"
+    assert page.locator("#adapter-refresh").is_enabled()
+    assert page.locator("#adapter-filter").is_enabled()
+    assert "read-only visual references" in page.locator("#whaxon-live-adapters").inner_text()
+
