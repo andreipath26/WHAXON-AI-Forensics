@@ -733,7 +733,7 @@
     grid.append(card);
    });
    if(search)search.oninput=()=>{const q=search.value.toLowerCase().trim();grid.querySelectorAll("article").forEach(card=>card.style.display=card.dataset.search.includes(q)?"":"none");};
-  }catch(e){grid.replaceChildren();add(grid,"Live monitoring data unavailable: "+e.message,"p-4 text-sm text-amber-300");}
+  }catch(e){summary.querySelector("#monitoring-summary-status").textContent="Live monitoring summary unavailable: "+e.message;grid.replaceChildren();add(grid,"Live monitoring data unavailable: "+e.message,"p-4 text-sm text-amber-300");}
  }
  load();
  summary.querySelector("#monitoring-refresh").addEventListener("click",load);
