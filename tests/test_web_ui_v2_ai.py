@@ -173,6 +173,46 @@ def test_ai_strategy_gate_engagement_button_opens_scope_page(page, live_server):
     page.wait_for_url("**/ui-v2/scope", timeout=8000)
 
 
+def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_server):
+    submitted = []
+
+    def scope_check(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"allowed":true,"reason":"matched local loopback rule"}',
+        )
+
+    def submit(route):
+        submitted.append(route.request.post_data_json)
+        route.fulfill(
+            status=202,
+            content_type="application/json",
+            body='{"run_id":"ai-ui-submit-test"}',
+        )
+
+    page.route("**/api/scope/check", scope_check)
+    page.route("**/api/ai/run", submit)
+    page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    page.locator("#ai-target").fill("127.0.0.1")
+    page.locator("#ai-goal").fill("Review the authorized local target")
+    page.locator("#ai-run-form button[type=submit]").click()
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('AI run submitted: ai-ui-submit-test')",
+        timeout=8000,
+    )
+    assert submitted == [{
+        "target": "127.0.0.1",
+        "goal": "Review the authorized local target",
+    }]
+
+
 def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_pending_run(page, live_server):
     page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
