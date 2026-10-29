@@ -69,4 +69,69 @@
  load();
 })();
 </script>
+
+<script id="whaxon-retest-header-wiring">
+(function(){
+ "use strict";
+ const headerButtons=[...document.querySelectorAll("header button")];
+ const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+ const go=(b,path)=>{if(!b)return;b.addEventListener("click",e=>{e.preventDefault();window.location.href=path;});};
+ const engagement=headerButtons.find(b=>b.querySelector(".material-symbols-outlined")&&/arrow_drop_down/.test(b.textContent||""))||headerButtons.find(b=>/ENG-|No engagement selected|Active scope|Scope unavailable/i.test(b.textContent||""));
+ go(engagement,"/ui-v2/scope");
+ go(headerButtons.find(b=>/^New$/i.test(label(b))),"/ui-v2/scope");
+ go(headerButtons.find(b=>/Terminal Log|^LOGS$/i.test(label(b))),"/ui-v2/run");
+ const panel=document.getElementById("whaxon-live-retest");
+ const status=panel?.querySelector("#retest-status");
+ const report=message=>{if(status)status.textContent=message;};
+ const halt=headerButtons.find(b=>/Emergency Halt Scan|HALT SCAN/i.test(label(b)));
+ if(halt)halt.addEventListener("click",async e=>{
+  e.preventDefault();
+  try{
+   const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
+   const data=await response.json(),jobs=Array.isArray(data)?data:(Array.isArray(data.jobs)?data.jobs:[]);
+   const active=jobs.filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+   if(!active.length){report("No running or queued jobs were found. Nothing was cancelled.");return;}
+   if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+   const results=await Promise.all(active.map(async job=>{const id=job.id||job.job_id;if(!id)return false;try{const r=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!r.ok)return false;const body=await r.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}}));
+   report("Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).");
+  }catch(error){report("Emergency halt failed: "+error.message);}
+ });
+ async function reflectScope(){
+  const spans=engagement?engagement.querySelectorAll("span"):[];
+  const targetLabel=[...document.querySelectorAll("header span")].find(n=>(n.textContent||"").trim().startsWith("Target:"));
+  const stateLabel=[...document.querySelectorAll("header span")].find(n=>["(IN SCOPE)","(RULE CONFIGURED)","(NO TARGET RULE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((n.textContent||"").trim()));
+  const boundary=[...document.querySelectorAll("header span")].find(n=>/STRICT BOUNDARY ENFORCED|SCOPE CONFIGURATION LOADED|SCOPE ENFORCEMENT DISABLED|SCOPE STATUS UNAVAILABLE/.test((n.textContent||"").trim()));
+  try{
+   const r=await fetch("/api/scope");if(!r.ok)throw new Error("Scope HTTP "+r.status);
+   const scope=await r.json(),targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+   const target=targets.length?targets[0]:"No target configured";
+   if(spans.length>1){spans[0].textContent=scope.engagement&&scope.engagement!=="default"?scope.engagement:"Active scope";spans[1].textContent="("+target+")";}
+   if(targetLabel)targetLabel.textContent="Target: "+target;
+   if(stateLabel)stateLabel.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+   if(boundary)boundary.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE CONFIGURATION LOADED";
+  }catch(_){
+   if(spans.length>1){spans[0].textContent="Scope unavailable";spans[1].textContent="(status unavailable)";}
+   if(targetLabel)targetLabel.textContent="Target: unavailable";
+   if(stateLabel)stateLabel.textContent="(STATUS UNAVAILABLE)";
+   if(boundary)boundary.textContent="SCOPE STATUS UNAVAILABLE";
+  }
+ }
+ reflectScope();
+ document.querySelectorAll("main button").forEach(button=>{
+  if(panel?.contains(button))return;
+  button.removeAttribute("onclick");button.disabled=true;button.setAttribute("aria-disabled","true");
+  button.title="Unavailable: only verified finding retests are connected to a live WHAXON endpoint.";
+ });
+ document.querySelectorAll("main [onclick]").forEach(node=>{
+  if(panel?.contains(node))return;
+  node.removeAttribute("onclick");node.setAttribute("aria-disabled","true");node.setAttribute("tabindex","-1");
+  node.style.pointerEvents="none";node.style.cursor="default";
+ });
+ if(panel){
+  const note=document.createElement("p");note.className="mt-2 text-sm text-on-surface-variant";
+  note.textContent="Only persisted finding records with identifiers are listed. Retest is enabled only for findings already marked verified, and the server must re-check scope before replay. Static replay claims and fixture controls are not live evidence.";
+  const h=panel.querySelector("h2");if(h)h.insertAdjacentElement("afterend",note);
+ }
+})();
+</script>
 </body></html>
