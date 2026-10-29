@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Keep only the newest validation run for a branch/PR; rapid UI commits should
+# not leave several full Python-matrix runs competing for the same runners.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest

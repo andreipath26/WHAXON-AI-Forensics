@@ -442,7 +442,7 @@
       if (footer[0] && footerLeft) footer[0].textContent = footerLeft;
       if (footer[1] && footerRight) footer[1].textContent = footerRight;
     };
-    setMetric(0, String(ruleList("in_scope").length), "Configured rules", "Engagement: " + (scope.engagement || "Unnamed"), "From scope.json");
+    setMetric(0, String(ruleList("in_scope").length), "Configured rules", "Engagement: " + (scope.engagement || "Unnamed"), "From active config");
     setMetric(1, String(cidrs), "CIDR rules", "Host rules: " + (ruleList("in_scope").length - cidrs), "No route claims");
     setMetric(2, String(ruleList("out_of_scope").length), "Explicit deny rules", "Out-of-scope rules", "Evaluated first");
     const engineCard = metricCards[3];
@@ -458,7 +458,7 @@
     const badge = [...document.querySelectorAll("h2")].find(el => el.textContent.includes("In-Scope Target Registry"))?.parentElement?.querySelector("span");
     if (badge) badge.textContent = rows.length + " rules loaded";
     const headerTarget = [...document.querySelectorAll("header span")].find(el => /Target:|Live scope/.test(el.textContent));
-    if (headerTarget) headerTarget.textContent = "Live scope: " + (scope.engagement || "Unnamed engagement");
+    if (headerTarget) headerTarget.textContent = "Target: " + (ruleList("in_scope")[0] || "No target configured");
     const denyHeading = [...document.querySelectorAll("h3")].find(el => el.textContent.includes("Strict Deny Rules"));
     const denyCard = denyHeading?.closest(".bg-surface-container-low");
     if (denyCard) {
@@ -483,8 +483,10 @@
       const warning = denyCard.querySelector("p");
       if (warning) warning.textContent = "Explicit exclusions take precedence over in-scope rules. WHAXON checks them before runner actions; network-level egress controls remain recommended.";
     }
-    const status = document.querySelector("header span.text-on-surface-variant");
-    if (status && status.textContent.includes("STRICT BOUNDARY")) status.textContent = scope.enabled ? "STRICT BOUNDARY ENFORCED" : "SCOPE ENFORCEMENT DISABLED";
+    const status = [...document.querySelectorAll("header span")].find(el =>
+      el.textContent.includes("STRICT BOUNDARY ENFORCED") || el.textContent.includes("SCOPE ENFORCEMENT DISABLED")
+    );
+    if (status) status.textContent = scope.enabled ? "STRICT BOUNDARY ENFORCED" : "SCOPE ENFORCEMENT DISABLED";
     const footer = document.querySelector("#targetTableBody")?.closest(".overflow-x-auto")?.parentElement?.querySelector(".p-space-md.bg-surface-container-lowest");
     if (footer) footer.textContent = "LIVE CONFIGURATION · " + ruleList("in_scope").length + " in-scope · " + ruleList("out_of_scope").length + " excluded";
     // Remove unsupported navigation and all demo-only panels that claim invented hosts or metrics.

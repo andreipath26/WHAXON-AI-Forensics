@@ -379,7 +379,7 @@
     filters.forEach(button => {
       const label = (button.textContent || "").trim();
       const key = /^Success/i.test(label) ? "success" : (/^Failed/i.test(label) ? "failed" : "all");
-      if (/Scope-Blocked|Active \/ Queued/i.test(label)) { button.hidden = true; return; }
+      if (/Scope-Blocked|Active \/ Queued/i.test(label)) { button.hidden = true; button.style.display = "none"; return; }
       button.textContent = key === "all" ? "All (" + jobs.length + ")" :
         (key === "success" ? "Success (" + jobs.filter(j => j.status === "finished" && Number(j.exit_code) === 0).length + ")" :
           "Failed (" + jobs.filter(j => j.status === "failed" || (j.exit_code != null && Number(j.exit_code) !== 0)).length + ")");
@@ -388,11 +388,20 @@
   }
   if (tbody) tbody.replaceChildren();
   document.querySelectorAll('main > section, main > div').forEach(node => { if (!node.querySelector('#history-live-summary') && !node.querySelector('table')) node.hidden = true; });
-  if (integrityButton) integrityButton.hidden = true;
+  if (integrityButton) { integrityButton.hidden = true; integrityButton.style.display = "none"; }
+  document.querySelectorAll("main *").forEach(node => {
+    if (node.children.length) return;
+    if ((node.textContent || "").trim() === "Page 1 of 3 (Total 42 records)") {
+      const footer = node.closest(".border-t");
+      if (footer) footer.style.display = "none";
+      else node.textContent = "Pagination unavailable for this live view";
+    }
+  });
   document.querySelectorAll("button").forEach(button => {
     if (button === exportButton || filters.includes(button)) return;
     if (table && table.contains(button)) return;
     button.hidden = true;
+    button.style.display = "none";
     button.disabled = true;
     button.setAttribute("aria-hidden", "true");
   });

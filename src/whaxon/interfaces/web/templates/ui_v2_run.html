@@ -548,6 +548,17 @@
   const stdout = $("terminal-stdout");
   const statusEl = $("run-job-status");
   const jobEl = $("run-job-id");
+  const cliInput = $("cli-input");
+  if (cliInput) {
+    cliInput.disabled = true;
+    cliInput.placeholder = "Shell commands are disabled; use the tool selector above";
+    cliInput.title = "Arbitrary shell commands are not supported by the guarded web runner.";
+    cliInput.setAttribute("aria-label", "Shell command input disabled; use the tool selector above");
+  }
+  const passiveRunButton = $("run-passive-btn");
+  if (passiveRunButton) passiveRunButton.title = "Runs the selected tool through the guarded runner; a separate passive mode is not exposed by the current backend.";
+  const activeRunButton = $("run-active-btn");
+  if (activeRunButton) activeRunButton.title = "Starts the selected tool through the guarded runner after scope validation.";
   let currentJob = null;
   let source = null;
   let currentStatus = "idle";
@@ -587,13 +598,15 @@
     stdout.append(row);
     stdout.scrollTop = stdout.scrollHeight;
   }
+  function updateElapsed() {
+    const elapsed = $("elapsed-timer");
+    if (!elapsed || !startedAt || currentStatus === "idle") return;
+    elapsed.textContent = Math.floor((Date.now() - startedAt) / 1000) + "s";
+  }
   function setStatus(status) {
     currentStatus = status || "unknown";
     if (statusEl) statusEl.textContent = currentStatus.toUpperCase();
-    const elapsed = $("elapsed-timer");
-    if (elapsed && startedAt && !["finished","failed","cancelled","idle"].includes(currentStatus)) {
-      elapsed.textContent = Math.floor((Date.now()-startedAt)/1000) + "s";
-    }
+    updateElapsed();
     const pauseText = $("btn-pause-text");
     if (pauseText) pauseText.textContent = ["running","queued"].includes(currentStatus) ? "Cancel Job" : "No Active Job";
     const pause = $("btn-pause");
@@ -669,7 +682,14 @@
       }
     };
     source.onerror = () => {
-      if (source && ["finished","failed","cancelled"].includes(currentStatus)) { source.close(); source=null; }
+      const socket = $("run-sse-state");
+      if (source && ["finished","failed","cancelled"].includes(currentStatus)) {
+        source.close(); source = null;
+        if (socket) { socket.textContent = "Disconnected"; socket.className = "font-label-sm text-label-sm text-outline"; }
+      } else if (socket) {
+        socket.textContent = "Reconnecting";
+        socket.className = "font-label-sm text-label-sm text-tertiary";
+      }
     };
   }
   async function cancelJob() {
@@ -740,6 +760,12 @@
   });
   const clearButton = [...document.querySelectorAll("button[title='Clear buffer']")][0];
   clearButton?.addEventListener("click", clearLog);
+  // Keep elapsed time live while a runner job is active and release timers on navigation.
+  timerId = window.setInterval(updateElapsed, 1000);
+  window.addEventListener("pagehide", () => {
+    if (timerId !== null) window.clearInterval(timerId);
+    source?.close();
+  });
   // The AI planner endpoint does not enforce the same scope boundary as /api/run;
   // keep AI execution controls hidden until its authorization flow is hardened.
   document.querySelectorAll("button").forEach(button => {

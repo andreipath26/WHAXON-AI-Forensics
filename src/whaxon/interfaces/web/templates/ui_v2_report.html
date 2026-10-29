@@ -604,9 +604,9 @@
     const data=rr.status==="fulfilled"?rr.value:{};
     const scope=sr.status==="fulfilled"?sr.value:{};
     document.querySelectorAll("header span,header div").forEach(n=>{
-      if(textOf(n)==="Target: No target selected")n.textContent="Target: "+(scope.in_scope?.[0]||"No target configured");
-      if(textOf(n)==="(IN SCOPE)")n.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
-      if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
+      if(textOf(n)==="Target: No target selected")n.textContent=sr.status==="fulfilled"?"Target: "+(scope.in_scope?.[0]||"No target configured"):"Target: unavailable";
+      if(textOf(n)==="(IN SCOPE)")n.textContent=sr.status!=="fulfilled"?"(STATUS UNAVAILABLE)":scope.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
+      if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=sr.status!=="fulfilled"?"SCOPE STATUS UNAVAILABLE":scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
     });
     const total=Number(data.finding_count||0), jobs=Number(data.job_count||0);
     document.querySelectorAll("span").forEach(n=>{
@@ -618,8 +618,16 @@
     const root=document.querySelector("main");
     if(root){
       const banner=document.createElement("div");
+      banner.id="whaxon-report-status";
       banner.className="mx-margin mt-space-md rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-md font-code-sm text-on-surface-variant";
-      banner.textContent="Live report data: "+jobs+" jobs · "+total+" findings. Export uses WHAXON's current report generator.";
+      banner.setAttribute("role","status");
+      banner.setAttribute("aria-live","polite");
+      if(rr.status==="fulfilled"){
+        banner.textContent="Live report data: "+jobs+" jobs · "+total+" unique findings. Export uses WHAXON's current report generator.";
+      }else{
+        banner.classList.add("border-error/40","text-error");
+        banner.textContent="Live report unavailable: "+(rr.reason?.message||"the report API could not be reached")+". Counts are unavailable; check the report API and retry.";
+      }
       root.insertBefore(banner,root.firstChild);
     }
     // Phase coverage and cryptographic evidence panels remain hidden until the API provides real phase/evidence records.
@@ -647,7 +655,21 @@
     if(standardsLabel?.parentElement)standardsLabel.parentElement.style.display="none";
     document.documentElement.dataset.reportReady="true";
   }
-  load().catch(()=>{document.documentElement.dataset.reportReady="true";});
+  load().catch(error=>{
+    const root=document.querySelector("main");
+    let banner=document.getElementById("whaxon-report-status");
+    if(!banner&&root){
+      banner=document.createElement("div");
+      banner.id="whaxon-report-status";
+      banner.className="mx-margin mt-space-md rounded-lg border border-error/40 bg-surface-container-low p-space-md font-code-sm text-error";
+      root.insertBefore(banner,root.firstChild);
+    }
+    if(banner){
+      banner.setAttribute("role","alert");
+      banner.textContent="Report page failed to load live data: "+(error?.message||"unknown error");
+    }
+    document.documentElement.dataset.reportReady="true";
+  });
 })();
 </script>
 </body></html>

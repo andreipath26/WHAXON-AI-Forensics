@@ -107,7 +107,7 @@
 <div class="flex items-center justify-between pb-space-xs">
 <div class="flex items-center gap-space-sm">
 <span class="material-symbols-outlined text-primary text-lg">psychology</span>
-<span class="font-label-md text-label-md uppercase text-on-surface tracking-wider font-semibold">AI Reasoning Trail &amp; Chain-of-Thought</span>
+<span class="font-label-md text-label-md uppercase text-on-surface tracking-wider font-semibold">AI Decision &amp; Evidence Trail</span>
 </div>
 <span class="font-label-sm text-label-sm text-secondary bg-surface-container-highest px-space-xs py-0.5 rounded">TENSOR DOCK // 350ms</span>
 </div>
@@ -115,7 +115,7 @@
 <div class="bg-surface-container-low rounded p-space-md flex flex-col gap-space-xs">
 <div class="flex items-center gap-space-xs text-outline font-label-sm text-label-sm uppercase">
 <span class="material-symbols-outlined text-xs text-secondary">input</span>
-<span>Telemetry Ingestion Context:</span>
+<span>Recorded AI proposal context:</span>
 </div>
 <p class="font-code-sm text-code-sm text-on-surface leading-relaxed">
             Nmap 7.94 detected <span class="text-secondary font-semibold">Envoy 1.18.0</span> on port <span class="text-primary font-semibold">8080</span> and <span class="text-secondary font-semibold">HTTP nginx 1.18.0</span> on port <span class="text-primary font-semibold">443</span> with <span class="text-tertiary font-semibold">glibc header fingerprint</span>.
@@ -123,7 +123,7 @@
 </div>
 <!-- CoT Deduction Steps -->
 <div class="flex flex-col gap-space-sm pt-space-xs">
-<span class="font-label-sm text-label-sm uppercase text-outline">Deterministic Deduction Sequence:</span>
+<span class="font-label-sm text-label-sm uppercase text-outline">Recorded Decision Details:</span>
 <div class="flex items-start gap-space-md bg-surface-container-lowest p-space-md rounded">
 <div class="w-6 h-6 rounded bg-surface-container-highest flex items-center justify-center font-code-sm text-code-sm text-primary font-bold shrink-0">01</div>
 <div class="flex flex-col gap-0.5">
@@ -318,93 +318,344 @@
 </div>
 </div>
 </section>
-<!-- KEYBOARD HOOK MICRO-INTERACTION SCRIPT -->
-<script>
-    (function initStrategyGate() {
-      const authBtn = document.getElementById('btn-authorize');
-      const rejectBtn = document.getElementById('btn-reject');
 
-      function handleAction(action) {
-        if (action === 'authorize') {
-          authBtn.classList.add('scale-95', 'opacity-75');
-          authBtn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">sync</span><div class="flex flex-col items-start leading-none text-left"><span class="font-label-md text-label-md uppercase font-bold">DISPATCHING...</span></div>';
-          setTimeout(() => {
-            alert('Payload successfully dispatched to orchestration runner! Target proxy engaged.');
-            authBtn.classList.remove('scale-95', 'opacity-75');
-            authBtn.innerHTML = '<span class="material-symbols-outlined text-base">done_all</span><div class="flex flex-col items-start leading-none text-left"><span class="font-label-md text-label-md uppercase font-bold">EXECUTED</span></div>';
-          }, 800);
-        } else {
-          rejectBtn.classList.add('scale-95', 'opacity-75');
-          setTimeout(() => {
-            const reason = prompt('Specify rejection reason for AI Planner replanning loop:', 'Alternative surface probe preferred');
-            if (reason) {
-              alert('Proposal rejected. AI Planner feedback cycle re-routed.');
-            }
-            rejectBtn.classList.remove('scale-95', 'opacity-75');
-          }, 200);
-        }
-      }
-
-      if (authBtn) {
-        authBtn.addEventListener('click', () => handleAction('authorize'));
-      }
-      if (rejectBtn) {
-        rejectBtn.addEventListener('click', () => handleAction('reject'));
-      }
-
-      window.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleAction('authorize');
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          handleAction('reject');
-        }
-      });
-    })();
-  </script>
 </div></main></div>
 <script>
 (function(){
- const routes={"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/reports","job-execution-history":"/ui-v2/history","system-diagnostics-and-health":"/ui-v2/diagnostics","evidence-file-inspector":"/ui-v2/evidence","ai-strategy-gate":"/ui-v2/ai",
-    "remediation-retest-studio": "/ui-v2/retest",
-    "correlated-attack-chains": "/ui-v2/chains",
-    "adapter-and-plugin-manager": "/ui-v2/adapters",
-    "settings-and-api-explorer": "/ui-v2/settings",
-    "cryptographic-audit-log": "/ui-v2/audit",
- "attack-surface-continuous-monitoring": "/ui-v2/monitoring",
- "bas-detection-validation": "/ui-v2/bas",
- "bug-bounty-live-browser-studio": "/ui-v2/bug-bounty",
- "compliance-framework-crosswalk": "/ui-v2/compliance",
- "ptaas-client-portal": "/ui-v2/ptaas",
- "threat-intel-exploit-arsenal": "/ui-v2/threat-intel",
- "trust-layer-approvals-queue": "/ui-v2/approvals",
- "attack-surface-and-continuous-monitoring": "/ui-v2/monitoring",
- "bug-bounty-and-live-browser-studio": "/ui-v2/bug-bounty",
- "bug-bounty-live-browser": "/ui-v2/bug-bounty",
- "threat-intel-and-exploit-arsenal": "/ui-v2/threat-intel",
- "bas-and-detection-validation": "/ui-v2/bas",
- "compliance-and-framework-crosswalk": "/ui-v2/compliance",
- "scope-targets": "/ui-v2/scope",
- "run-orchestration": "/ui-v2/run",
- "trust-layer-findings": "/ui-v2/findings",
- "ptes-coverage-reports": "/ui-v2/reports",
- "system-diagnostics-health": "/ui-v2/diagnostics",
- "adapter-plugin-manager": "/ui-v2/adapters",
- "settings-secrets-vault": "/ui-v2/settings",
- "settings-and-secrets-vault": "/ui-v2/settings",
- "trust-layer-approvals-queue-modal": "/ui-v2/approvals"
+ "use strict";
+ const routes={
+  "dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run",
+  "trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/report",
+  "job-execution-history":"/ui-v2/history","system-diagnostics-and-health":"/ui-v2/diagnostics",
+  "evidence-file-inspector":"/ui-v2/evidence","ai-strategy-gate":"/ui-v2/ai",
+  "remediation-retest-studio":"/ui-v2/retest","correlated-attack-chains":"/ui-v2/chains",
+  "adapter-and-plugin-manager":"/ui-v2/adapters","settings-and-api-explorer":"/ui-v2/settings",
+  "cryptographic-audit-log":"/ui-v2/audit","attack-surface-continuous-monitoring":"/ui-v2/monitoring",
+  "bas-detection-validation":"/ui-v2/bas","bug-bounty-live-browser-studio":"/ui-v2/bug-bounty",
+  "compliance-framework-crosswalk":"/ui-v2/compliance","ptaas-client-portal":"/ui-v2/ptaas",
+  "threat-intel-exploit-arsenal":"/ui-v2/threat-intel","trust-layer-approvals-queue":"/ui-v2/approvals",
+  "attack-surface-and-continuous-monitoring":"/ui-v2/monitoring","bug-bounty-and-live-browser-studio":"/ui-v2/bug-bounty",
+  "bug-bounty-live-browser":"/ui-v2/bug-bounty","threat-intel-and-exploit-arsenal":"/ui-v2/threat-intel",
+  "bas-and-detection-validation":"/ui-v2/bas","compliance-and-framework-crosswalk":"/ui-v2/compliance",
+  "scope-targets":"/ui-v2/scope","run-orchestration":"/ui-v2/run","trust-layer-findings":"/ui-v2/findings",
+  "ptes-coverage-reports":"/ui-v2/report","system-diagnostics-health":"/ui-v2/diagnostics",
+  "adapter-plugin-manager":"/ui-v2/adapters","settings-secrets-vault":"/ui-v2/settings",
+  "settings-and-secrets-vault":"/ui-v2/settings","trust-layer-approvals-queue-modal":"/ui-v2/approvals"
  };
- document.querySelectorAll("a[data-path]").forEach(a=>{const p=routes[a.dataset.path];if(p){a.href=p;a.style.display="";}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});
+ const textOf=n=>(n?.textContent||"").trim();
+ const node=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value==null||value===""?"Not recorded":String(value);if(cls)n.className=cls;return n;};
+ const makeButton=(label,cls,handler)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.className=cls;b.addEventListener("click",handler);return b;};
+ document.querySelectorAll("a[data-path]").forEach(a=>{const p=routes[a.dataset.path];if(p){a.href=p;a.style.display="";a.removeAttribute("aria-hidden");}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});
  const main=document.querySelector("main");if(!main)return;
- const panel=document.createElement("section");panel.id="whaxon-ai-gate";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
- panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Live AI strategy gate</h2><p class="mt-1 text-on-surface-variant">AI runs are submitted only after the target passes the current WHAXON scope check.</p><form id="ai-run-form" class="mt-4 grid gap-3"><label class="grid gap-1">Target<input id="ai-target" required class="rounded bg-surface-container-lowest p-2" placeholder="https://authorized-target.example"></label><label class="grid gap-1">Goal<textarea id="ai-goal" required rows="3" class="rounded bg-surface-container-lowest p-2" placeholder="Describe the authorized assessment objective"></textarea></label><button class="rounded bg-primary px-4 py-2 text-on-primary font-semibold justify-self-start" type="submit">Check scope and submit AI run</button></form><p id="ai-run-status" class="mt-3 text-on-surface-variant">Loading live AI run state…</p><h3 class="mt-5 font-headline-sm">Recorded AI runs</h3><div id="ai-run-list" class="mt-2 grid gap-2"></div>';
+ const panel=document.createElement("section");
+ panel.id="whaxon-ai-gate";
+ panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
+ panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Live AI strategy gate</h2><p class="mt-1 text-on-surface-variant">AI runs require a server-side scope check. Human approval pauses are recorded before an answer is accepted.</p><form id="ai-run-form" class="mt-4 grid gap-3"><label class="grid gap-1">Target<input id="ai-target" required class="rounded bg-surface-container-lowest p-2" placeholder="https://authorized-target.example"></label><label class="grid gap-1">Goal<textarea id="ai-goal" required rows="3" class="rounded bg-surface-container-lowest p-2" placeholder="Describe the authorized assessment objective"></textarea></label><button class="rounded bg-primary px-4 py-2 text-on-primary font-semibold justify-self-start" type="submit">Check scope and submit AI run</button></form><p id="ai-run-status" class="mt-3 text-on-surface-variant" role="status" aria-live="polite">Ready when target and goal are supplied.</p><p id="ai-live-counts" class="mt-1 text-on-surface-variant" aria-live="polite">Loading live AI run counts…</p><h3 class="mt-5 font-headline-sm">Awaiting operator approval</h3><div id="ai-pending-list" class="mt-2 grid gap-2"></div><h3 class="mt-5 font-headline-sm">Recorded AI runs</h3><div id="ai-run-list" class="mt-2 grid gap-2"></div>';
  main.prepend(panel);
- const status=panel.querySelector("#ai-run-status"),list=panel.querySelector("#ai-run-list"),form=panel.querySelector("#ai-run-form");
- const node=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value==null||value===""?"—":String(value);if(cls)n.className=cls;return n;};
- async function load(){try{const [rr,pr]=await Promise.all([fetch("/api/ai/runs"),fetch("/api/ai/pending")]);if(!rr.ok||!pr.ok)throw new Error("HTTP "+rr.status+"/"+pr.status);const runs=await rr.json(),pending=await pr.json();list.replaceChildren();for(const run of (Array.isArray(runs)?runs:[])){const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";card.append(node("div",run.run_id||run.id,"font-code-sm text-primary"),node("div",run.status||"status unavailable","font-semibold mt-1"),node("div",run.goal||"Goal not recorded","mt-1 text-on-surface-variant"));list.append(card);}status.textContent=(Array.isArray(runs)?runs.length:0)+" recorded AI runs · "+(Array.isArray(pending)?pending.length:0)+" pending approval(s).";if(!list.children.length)list.append(node("p","No AI runs have been recorded.","text-on-surface-variant"));}catch(e){status.textContent="AI run state could not be loaded: "+e.message;}}
- form.addEventListener("submit",async e=>{e.preventDefault();const target=panel.querySelector("#ai-target").value.trim(),goal=panel.querySelector("#ai-goal").value.trim();status.textContent="Checking target against current scope…";const submit=form.querySelector("button[type=submit]");submit.disabled=true;try{const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});const verdict=await check.json();if(!check.ok||verdict.allowed!==true)throw new Error(verdict.reason||verdict.error||"Target was not confirmed in scope");const response=await fetch("/api/ai/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target,goal})});const data=await response.json();if(!response.ok)throw new Error(data.error||("HTTP "+response.status));status.textContent="AI run submitted: "+(data.run_id||"ID unavailable");form.reset();await load();}catch(error){status.textContent="AI run not submitted: "+error.message;}finally{submit.disabled=false;}});
- load();
+ const status=panel.querySelector("#ai-run-status"),counts=panel.querySelector("#ai-live-counts"),list=panel.querySelector("#ai-run-list"),pendingList=panel.querySelector("#ai-pending-list"),form=panel.querySelector("#ai-run-form");
+ const targetInput=panel.querySelector("#ai-target"),goalInput=panel.querySelector("#ai-goal");
+ let recordedRuns=[],pendingRuns=[],scopeData=null,answerInProgress=false;
+ const proposalHeading=[...document.querySelectorAll("h2")].find(n=>textOf(n).startsWith("AI Planner proposes spawning"));
+ const proposalIntro=proposalHeading?.parentElement?.querySelector("p");
+ const waitingLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="WAITING FOR OPERATOR AUTHORIZATION");
+ const hitlLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="STRICT HUMAN-IN-THE-LOOP (HITL) ENFORCED");
+ const actionIdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("ACTION_ID:"));
+ const activeTargetLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Active Target Endpoint");
+ const activePhaseLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Operational Phase");
+ const autonomousLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Autonomous Engine");
+ const sessionAuthLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Session Token Auth");
+ const proposalDetailsHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Recorded Proposal Details");
+ const headerTarget=[...document.querySelectorAll("header span")].find(n=>textOf(n).startsWith("Target:"));
+ const headerScope=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="(IN SCOPE)");
+ const boundaryLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="STRICT BOUNDARY ENFORCED");
+ const engineLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Engine:");
+ const engineValue=engineLabel?.nextElementSibling;
+ const portLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Port:");
+ const hostLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Host:");
+ const pyLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="Py:");
+ const modelLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="MODEL:");
+ const thresholdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="THRESH:");
+ const telemetryLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Recorded AI proposal context:");
+ const telemetryCard=telemetryLabel?.closest("div.bg-surface-container-low.rounded.p-space-md");
+ const telemetryDescription=telemetryCard?.querySelector("p");
+ const traceLatency=[...document.querySelectorAll("span")].find(n=>textOf(n)==="TENSOR DOCK // 350ms");
+ const progressBar=[...document.querySelectorAll("div")].find(n=>n.classList.contains("bg-primary")&&n.classList.contains("h-full")&&n.classList.contains("w-2/3"));
+ const traceCards=["Fingerprint Correlation & Boundary Analysis","Timing Anomaly Verification","Orchestration Tool Selection"].map(label=>{const title=[...document.querySelectorAll("span")].find(n=>textOf(n)===label);const card=title?.closest("div.bg-surface-container-lowest.p-space-md.rounded");return {title,description:card?.querySelector("p")};});
+ let aiApiAvailable=false;
+ const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
+ const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
+ if(commandHeading)commandHeading.textContent="Proposal Command Details";
+ const commandCode=commandCard?.querySelector("code");
+ const wireHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="HTTP Request Wire Preview");
+ const wireCard=wireHeading?.closest("div.bg-surface-container.rounded-xl");
+ if(wireCard)wireCard.style.display="none";
+ const confidenceValue=[...document.querySelectorAll("span")].find(n=>textOf(n)==="89.4%");
+ const confidenceNote=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("Model Threshold:"));
+ const confidenceDonut=[...document.querySelectorAll("svg path")].find(p=>p.getAttribute("stroke-dasharray")==="89.4, 100");
+ const authBtn=document.getElementById("btn-authorize"),rejectBtn=document.getElementById("btn-reject");
+ const proposalDetails=()=>pendingRuns[0]?.pending_question||null;
+ const activeProposalText=()=>{const q=proposalDetails();return q?(q.rationale||q.goal||JSON.stringify(q)):"No live proposal is awaiting operator input.";};
+ function setDecisionButtons(){
+   const available=pendingRuns.length>0&&!answerInProgress;
+   [authBtn,rejectBtn].forEach(b=>{if(!b)return;b.disabled=!available;b.classList.toggle("opacity-50",!available);b.title=available?"Respond to the currently recorded pending AI question":"No pending AI question is awaiting an operator response.";});
+   if(proposalHeading)proposalHeading.textContent=activeProposalText();
+ }
+ async function answerPending(run,answer,note){
+   if(!run||answerInProgress)return;
+   answerInProgress=true;setDecisionButtons();renderPending();status.textContent="Recording operator response…";
+   try{
+     const response=await fetch("/api/ai/runs/"+encodeURIComponent(run.id)+"/answer",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({answer,user:"local",note:note||""})});
+     const data=await response.json();
+     if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+     await load();
+     status.textContent="Operator response recorded for "+run.id+".";
+   }catch(error){status.textContent="Operator response was not recorded: "+error.message;}
+   finally{answerInProgress=false;setDecisionButtons();renderPending();}
+ }
+ if(authBtn)authBtn.addEventListener("click",()=>{if(pendingRuns[0])answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate");});
+ if(rejectBtn)rejectBtn.addEventListener("click",()=>{if(!pendingRuns[0])return;const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason===null)return;answerPending(pendingRuns[0],"no: "+(reason.trim()||"rejected by operator"),reason.trim());});
+ if(commandCard){
+   const copyButton=commandCard.querySelector("button");
+   if(copyButton)copyButton.addEventListener("click",async()=>{
+     const value=commandCode?.textContent||"No live proposal is awaiting operator input.";
+     try{await navigator.clipboard.writeText(value);status.textContent="Recorded proposal details copied.";}
+     catch(_){status.textContent="Clipboard access was denied by the browser.";}
+   });
+   const topLabels=[...commandCard.querySelectorAll("span")];
+   const toolLabel=topLabels.find(n=>textOf(n).startsWith("TOOL:"));
+   if(toolLabel)toolLabel.textContent="LIVE PROPOSAL DETAILS";
+   const proxyLabel=topLabels.find(n=>textOf(n)==="SANDBOXED PROXY ROUTED");
+   if(proxyLabel)proxyLabel.textContent="RECORDED DATA ONLY";
+   const rateLabel=topLabels.find(n=>textOf(n)==="RATE LIMIT:");
+   if(rateLabel?.nextElementSibling)rateLabel.nextElementSibling.textContent="Not recorded";
+   const proxyValue=topLabels.find(n=>textOf(n)==="INSPECTION PROXY:");
+   if(proxyValue?.nextElementSibling)proxyValue.nextElementSibling.textContent="Not recorded";
+ }
+ const riskValues=new Set(["LOW RISK","ZERO","MINIMAL"]);
+ document.querySelectorAll("span").forEach(n=>{if(riskValues.has(textOf(n)))n.textContent="Not measured";});
+ const ledger=document.querySelector("table tbody");
+ function renderLedger(){
+   if(!ledger)return;
+   ledger.replaceChildren();
+   if(!recordedRuns.length){const row=document.createElement("tr"),cell=document.createElement("td");cell.colSpan=5;cell.className="py-3 px-space-md text-on-surface-variant";cell.textContent="No AI runs have been recorded.";row.append(cell);ledger.append(row);return;}
+   recordedRuns.slice(0,20).forEach(run=>{
+     const row=document.createElement("tr");row.className="bg-surface-container-lowest/60 hover:bg-surface-container-high transition-colors";
+     const decision=run.status==="waiting"?"Awaiting operator":"Not recorded";
+     const outcome=run.error||run.status||"Status unavailable";
+     [run.id,run.goal,"Not recorded",decision,outcome].forEach(value=>{const cell=document.createElement("td");cell.className="py-2 px-space-md font-code-sm text-code-sm text-on-surface-variant";cell.textContent=value==null||value===""?"Not recorded":String(value);row.append(cell);});
+     ledger.append(row);
+   });
+ }
+ function renderRuns(){
+   list.replaceChildren();
+   if(!recordedRuns.length){list.append(node("p","No AI runs have been recorded.","text-on-surface-variant"));return;}
+   recordedRuns.slice(0,20).forEach(run=>{
+     const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";
+     card.append(node("div",run.id||run.run_id,"font-code-sm text-primary"),node("div",run.status||"Status unavailable","font-semibold mt-1"),node("div",run.goal||"Goal not recorded","mt-1 text-on-surface-variant"));
+     if(run.error)card.append(node("p","Error: "+run.error,"mt-2 text-error text-sm"));
+     list.append(card);
+   });
+ }
+ function renderPending(){
+   pendingList.replaceChildren();
+   if(!pendingRuns.length){pendingList.append(node("p","No AI runs are currently waiting for an operator answer.","text-on-surface-variant"));return;}
+   pendingRuns.forEach(run=>{
+     const q=run.pending_question&&typeof run.pending_question==="object"?run.pending_question:{};
+     const card=document.createElement("article");card.className="rounded-lg border border-tertiary/30 bg-surface-container p-space-md";
+     card.append(node("div",run.id,"font-code-sm text-tertiary"),node("div",q.rationale||run.goal||"Operator answer requested","font-semibold mt-1"),node("div","Target: "+(q.target||"Not recorded")+" · Phase: "+(q.proposed_phase||run.phase||"Not recorded"),"mt-1 text-on-surface-variant text-sm"));
+     const actions=document.createElement("div");actions.className="mt-3 flex flex-wrap gap-2";
+     actions.append(makeButton("Authorize / answer yes","rounded bg-primary px-3 py-2 text-on-primary font-semibold",()=>answerPending(run,"yes","Authorized through WHAXON AI Strategy Gate")));
+     actions.append(makeButton("Reject / re-plan","rounded bg-error-container px-3 py-2 text-on-error font-semibold",()=>{const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason!==null)answerPending(run,"no: "+(reason.trim()||"rejected by operator"),reason.trim());}));
+     if(answerInProgress)actions.querySelectorAll("button").forEach(b=>b.disabled=true);
+     card.append(actions);pendingList.append(card);
+   });
+ }
+ function neutralizeDemoClaims(){
+   const replacements=[
+     [/^OP\/\/7749-ALPHA(?: \(VALID\))?$/, "Operator identity not exposed"],
+     [/^Lead Security Engineer$/, "Operator role not exposed"],
+     [/^ACTIVE$/, "UI ONLINE"],
+     [/^ENG-2026-X892 AUDIT TRAIL$/, "LIVE AI AUDIT TRAIL"],
+     [/^4 \/ 12 REMAINING$/, "Step budget not exposed"],
+     [/^PTES 4: Vulnerability Analysis$/, "Phase not recorded"],
+     [/^Synaptic-Planner v2\.4$/, "Model not exposed"],
+     [/^Execution halted by Kernel Enforcement Rule #882.*$/, "No live execution event is recorded."],
+     [/^Nmap 7\.94 detected.*$/, "No scanner telemetry is attached to this proposal."],
+     [/^Envoy 1\.18\.0$/, "Not recorded"],
+     [/^HTTP nginx 1\.18\.0$/, "Not recorded"],
+     [/^glibc header fingerprint$/, "Not recorded"],
+     [/^89% probability$/, "Confidence not recorded"],
+     [/^of confirming CVE-2023-38606\.$/, "No verified confidence data is available."],
+     [/^Opted for Nuclei modular engine.*$/, "No live orchestration decision is recorded."],
+     [/^TARGET STABILITY$/, "TARGET STATUS"],
+     [/^SCOPE DRIFT$/, "SCOPE STATUS"],
+     [/^PAYLOAD NOISE$/, "PAYLOAD STATUS"],
+     [/^LOW RISK$|^ZERO$|^MINIMAL$/, "Not measured"],
+     [/^94\.2%$|^78\.1%$|^98\.0%$/, "—"],
+     [/^AUTHORIZED \(OP\/\/7749\)$/, "Not recorded"],
+     [/^REJECTED \(OP\/\/7749\)$/, "Not recorded"],
+     [/^AUTO-APPROVED$/, "Not recorded"],
+     [/^Exit Code: 0 \(Envoy found\)$/, "Not recorded"],
+     [/^Exit Code: 0 \(Nginx flagged\)$/, "Not recorded"],
+     [/^f84e\.\.\.9a01$/, "Not recorded"],
+     [/^DETERMINISTIC OK$/, "Verification not recorded"],
+     [/^WX-8492-491-HITL$/, "Not recorded"],
+     [/^probe_agent_441$/, "Not recorded"],
+     [/^mem_boundary$/, "Not recorded"],
+     [/^0x41414141.*$/, "Not recorded"],
+     [/^X-Envoy-Expected-Rq-Timeout-Ms:.*$/, "Not recorded"],
+     [/^staging-api\.corp\.net$/, "No target selected"],
+     [/^CVE-2023-38606$/, "No live finding attached"],
+     [/^#PROP-0[1-3]$/, "Not recorded"],
+     [/^8080$|^443$/, "Not recorded"],
+     [/^50 req\/sec$/, "Not recorded"],
+     [/^127\.0\.0\.1:5001$/, "Not recorded"]
+   ];
+   document.querySelectorAll("body *").forEach(el=>{
+     if(el.children.length!==0)return;
+     const value=(el.textContent||"").trim();
+     if(!value)return;
+     for(const [pattern,replacement] of replacements){
+       if(pattern.test(value)){el.textContent=replacement;break;}
+     }
+   });
+   const contextLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Recorded AI proposal context:");
+   if(contextLabel)contextLabel.textContent="Live AI proposal context:";
+   const detailsLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Recorded Decision Details:");
+   if(detailsLabel)detailsLabel.textContent="Live proposal details:";
+   const auditLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="ENG-2026-X892 AUDIT TRAIL");
+   if(auditLabel)auditLabel.textContent="LIVE AI AUDIT TRAIL";
+   const fakePayload=[...document.querySelectorAll("span")].find(n=>textOf(n)==="PAYLOAD HIGHLIGHT");
+   const fakePayloadCard=fakePayload?.closest("div.bg-surface-container.rounded-xl");
+   if(fakePayloadCard)fakePayloadCard.hidden=true;
+ }
+ function renderProposal(){
+   setDecisionButtons();
+   const run=pendingRuns[0]||null,q=proposalDetails();
+   if(proposalHeading)proposalHeading.textContent=q?"Operator approval required: "+(q.tool_id||"action not recorded"):"No AI action is currently awaiting approval";
+   if(proposalIntro)proposalIntro.textContent=q?"Operator response required for the recorded AI question. Tool execution remains guarded by the server and executor.":"No live proposal is awaiting operator input. New AI runs must pass the current server-side scope check.";
+   if(waitingLabel)waitingLabel.textContent=run?"WAITING FOR OPERATOR AUTHORIZATION":"NO PENDING OPERATOR APPROVAL";
+   if(hitlLabel)hitlLabel.textContent=run?"OPERATOR APPROVAL REQUIRED":"HUMAN APPROVAL GATE READY";
+   if(actionIdLabel)actionIdLabel.textContent="ACTION_ID: "+(run?.id||"—");
+   if(activeTargetLabel?.nextElementSibling)activeTargetLabel.nextElementSibling.textContent=q?.target||"No active target selected";
+   if(activePhaseLabel?.nextElementSibling)activePhaseLabel.nextElementSibling.textContent=q?.proposed_phase||run?.phase||recordedRuns[0]?.phase||"No active phase recorded";
+   if(autonomousLabel)autonomousLabel.textContent="AI model";
+   if(autonomousLabel?.nextElementSibling)autonomousLabel.nextElementSibling.textContent="not exposed by API";
+   if(sessionAuthLabel)sessionAuthLabel.textContent="Operator identity";
+   if(sessionAuthLabel?.nextElementSibling)sessionAuthLabel.nextElementSibling.textContent="not exposed by API";
+   if(proposalDetailsHeading)proposalDetailsHeading.textContent=q?"PENDING ACTION DETAILS":"AI ACTION DETAILS UNAVAILABLE";
+   if(headerTarget)headerTarget.textContent="Target: "+(q?.target||"No target selected");
+   if(headerScope)headerScope.textContent=!scopeData?"(STATUS UNAVAILABLE)":scopeData.enabled===false?"(ENFORCEMENT DISABLED)":q?.target?"(SCOPE CHECKED)":"(SCOPE ENFORCED)";
+   if(boundaryLabel)boundaryLabel.textContent=!scopeData?"SCOPE STATUS UNAVAILABLE":scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SERVER-SIDE SCOPE CHECK ENABLED";
+   if(engineLabel)engineLabel.textContent="AI API:";
+   if(engineValue)engineValue.textContent=aiApiAvailable?"Online":"Unavailable";
+   if(portLabel?.nextElementSibling)portLabel.nextElementSibling.textContent=window.location.port||"default";
+   if(hostLabel?.nextElementSibling)hostLabel.nextElementSibling.textContent=window.location.hostname||"unavailable";
+   if(pyLabel){pyLabel.textContent="Runtime:";if(pyLabel.nextElementSibling)pyLabel.nextElementSibling.textContent="version not exposed";}
+   if(modelLabel?.nextElementSibling)modelLabel.nextElementSibling.textContent="not exposed by API";
+   if(thresholdLabel?.nextElementSibling)thresholdLabel.nextElementSibling.textContent="not configured";
+   if(telemetryDescription)telemetryDescription.textContent=q?"No raw scanner telemetry is attached to this pending AI question. The recorded rationale and action fields are the available evidence.":"No raw scanner telemetry is attached to the current AI run. Recorded findings and evidence are available in the Findings and Reports pages.";
+   if(traceLatency)traceLatency.textContent="LIVE AI RUN STATE";
+   if(progressBar){progressBar.classList.remove("w-2/3");const score=Number(q?.confidence);progressBar.style.width=q&&Number.isFinite(score)?Math.max(0,Math.min(100,score<=1?score*100:score))+"%":"0%";}
+   if(commandCode)commandCode.textContent=q?JSON.stringify(q,null,2):"No live proposal is awaiting operator input.";
+   if(confidenceValue){
+     const score=Number(q?.confidence);
+     confidenceValue.textContent=q&&Number.isFinite(score)?(score<=1?(score*100):score).toFixed(1)+"%":"—";
+   }
+   if(confidenceNote){
+     const score=Number(q?.confidence);
+     confidenceNote.textContent=q&&Number.isFinite(score)?"Recorded proposal confidence; not a proof of safety":"Confidence score unavailable until a live proposal is recorded.";
+   }
+   const score=Number(q?.confidence);
+   if(confidenceDonut)confidenceDonut.setAttribute("stroke-dasharray",q&&Number.isFinite(score)?String(Math.max(0,Math.min(100,score<=1?score*100:score)))+", 100":"0, 100");
+   const traceText=[
+     q?.rationale||"No live AI rationale is recorded for the current page.",
+     "Current scope is checked by the server before an AI run starts; the executor checks scope again before running tools.",
+     q?["Tool: "+(q.tool_id||"not specified"),"Target: "+(q.target||"not recorded"),"Arguments: "+(q.extra_args||"none recorded")].join(" · "):"No action is awaiting operator approval."
+   ];
+   const traceTitles=[run?"Recorded AI rationale":"Live AI rationale","Server-side scope enforcement","Pending action details"];
+   traceCards.forEach((card,i)=>{if(card.title)card.title.textContent=traceTitles[i];if(card.description)card.description.textContent=traceText[i];});
+ }
+ async function load(){
+   const results=await Promise.allSettled([
+     fetch("/api/ai/runs").then(r=>{if(!r.ok)throw new Error("runs HTTP "+r.status);return r.json();}),
+     fetch("/api/ai/pending").then(r=>{if(!r.ok)throw new Error("pending HTTP "+r.status);return r.json();}),
+     fetch("/api/scope").then(r=>{if(!r.ok)throw new Error("scope HTTP "+r.status);return r.json();})
+   ]);
+   const rr=results[0],pr=results[1],sr=results[2];
+   recordedRuns=rr.status==="fulfilled"&&Array.isArray(rr.value)?rr.value:[];
+   pendingRuns=pr.status==="fulfilled"&&Array.isArray(pr.value)?pr.value:[];
+   scopeData=sr.status==="fulfilled"?sr.value:null;
+   aiApiAvailable=rr.status==="fulfilled"&&pr.status==="fulfilled";
+   if(rr.status!=="fulfilled"||pr.status!=="fulfilled"){
+     counts.textContent="AI run state unavailable: "+(rr.status!=="fulfilled"?(rr.reason?.message||"runs endpoint failed"):(pr.reason?.message||"pending endpoint failed"));
+   }else{
+     counts.textContent=recordedRuns.length+" recorded AI run(s) · "+pendingRuns.length+" awaiting operator answer(s).";
+   }
+   if(scopeData){
+     const engagementButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
+     if(engagementButton){const spans=engagementButton.querySelectorAll("span");if(spans[0])spans[0].textContent=scopeData.engagement||"Active scope";if(spans[1])spans[1].textContent="("+(Array.isArray(scopeData.in_scope)?scopeData.in_scope.length:0)+" scope rule(s))";}
+     document.querySelectorAll("header span,header div").forEach(n=>{
+       if(textOf(n)==="(IN SCOPE)")n.textContent=scopeData.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
+       if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
+     });
+   }else{
+     document.querySelectorAll("header span,header div").forEach(n=>{if(textOf(n)==="(IN SCOPE)")n.textContent="(STATUS UNAVAILABLE)";if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent="SCOPE STATUS UNAVAILABLE";});
+   }
+   neutralizeDemoClaims();renderRuns();renderPending();renderLedger();renderProposal();
+   document.documentElement.dataset.aiGateReady="true";
+ }
+ form.addEventListener("submit",async e=>{
+   e.preventDefault();
+   const target=targetInput.value.trim(),goal=goalInput.value.trim(),submit=form.querySelector("button[type=submit]");
+   status.textContent="Checking target against current scope…";submit.disabled=true;
+   try{
+     const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});
+     const verdict=await check.json();
+     if(!check.ok||verdict.allowed!==true)throw new Error(verdict.reason||verdict.error||"Target was not confirmed in scope");
+     const response=await fetch("/api/ai/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target,goal})});
+     const data=await response.json();
+     if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
+     const submittedRunId=data.run_id||"ID unavailable";
+     form.reset();
+     try{await load();}catch(_refreshError){}
+     status.textContent="AI run submitted: "+submittedRunId;
+   }catch(error){status.textContent="AI run not submitted: "+error.message;}
+   finally{submit.disabled=false;}
+ });
+ const engagementNavButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
+ if(engagementNavButton){engagementNavButton.title="Review engagement scope and target rules";engagementNavButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
+ const terminalButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Terminal Log"));
+ if(terminalButton)terminalButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
+ const newButton=[...document.querySelectorAll("header button")].find(b=>/\bNew\b/.test(textOf(b)));
+ if(newButton){newButton.title="Configure a new engagement and its authorized scope";newButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
+ const haltButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Emergency Halt Scan"));
+ if(haltButton)haltButton.addEventListener("click",async()=>{
+   try{
+     const response=await fetch("/api/history");
+     if(!response.ok)throw new Error("History HTTP "+response.status);
+     const jobs=await response.json();
+     const active=(Array.isArray(jobs)?jobs:[]).filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
+     if(!active.length){status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
+     if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+     let cancelled=0;
+     for(const job of active){
+       const id=job.id||job.job_id;
+       if(!id)continue;
+       const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});
+       if(result.ok){const body=await result.json();if(body.ok===true)cancelled++;}
+     }
+     status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
+   }catch(error){status.textContent="Emergency halt failed: "+error.message;}
+ });
+ /* Active-job cancellation is handled on the Run page, which owns the live job list. */
+ window.addEventListener("keydown",e=>{
+   if(e.target!==document.body||!pendingRuns.length||answerInProgress)return;
+   if(e.key==="Enter"){e.preventDefault();answerPending(pendingRuns[0],"yes","Authorized through WHAXON AI Strategy Gate (keyboard shortcut)");}
+   else if(e.key==="Escape"){e.preventDefault();const reason=window.prompt("Why is this proposal rejected?","Outside the approved assessment plan");if(reason!==null)answerPending(pendingRuns[0],"no: "+(reason.trim()||"rejected by operator"),reason.trim());}
+ });
+ load().catch(error=>{status.textContent="AI gate failed to load: "+error.message;document.documentElement.dataset.aiGateReady="true";});
+ window.setInterval(()=>{if(!answerInProgress)load().catch(()=>{});},3000);
 })();
 </script>
 </body></html>

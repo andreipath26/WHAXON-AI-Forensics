@@ -144,9 +144,23 @@ def test_api_answer_records_approval(tmp_path, monkeypatch) -> None:
     assert body["run_id"] == "ai-a"
     rows = core.store.list_approvals("ai-a")
     assert len(rows) == 1
-    assert rows[0]["user"] == "alice"
+    assert rows[0]["user"] == "local"  # client JSON cannot assign audit identity
     assert rows[0]["answer"] == "y"
     assert rows[0]["note"] == "ok"
+
+
+def test_api_answer_does_not_trust_loopback_basic_identity(tmp_path, monkeypatch) -> None:
+    app, core = _make_app(tmp_path, monkeypatch)
+    core.store.create_ai_run("ai-a", "g")
+    core.store.set_ai_run_waiting("ai-a", "{}")
+    r = app.test_client().post(
+        "/api/ai/runs/ai-a/answer",
+        json={"answer": "y", "user": "spoofed-name"},
+        auth=("alice", "test-password"),
+    )
+    assert r.status_code == 200
+    rows = core.store.list_approvals("ai-a")
+    assert rows[0]["user"] == "local"
 
 
 def test_api_answer_default_user(tmp_path, monkeypatch) -> None:

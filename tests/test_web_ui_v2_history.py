@@ -17,6 +17,8 @@ def test_job_history_renders_only_records_from_live_history_api(page, live_serve
     assert page.locator("#history-live-summary").is_visible()
     assert page.locator("table tbody tr").count() == len(jobs)
     visible = page.locator("body").inner_text()
+    assert "Page 1 of 3" not in visible
+    assert "Total 42 records" not in visible
     for marker in (
         "staging-api.corp.net",
         "api.internal.corp",

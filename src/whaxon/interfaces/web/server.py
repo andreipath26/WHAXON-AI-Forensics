@@ -4,10 +4,12 @@ from __future__ import annotations
 import asyncio
 import os
 import queue
+import re
 import subprocess
 import threading
 import uuid
 from pathlib import Path
+from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 from flask_limiter import Limiter
@@ -21,6 +23,25 @@ from whaxon.core.events import (
     JobOutput,
     JobStarted,
 )
+
+
+def _redact_sensitive_settings(value: Any) -> Any:
+    """Return a JSON-safe settings view without disclosing secret values."""
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            if re.search(
+                r"secret|token|password|passwd|passphrase|credential|private.?key|api.?key|authorization|bearer|access.?key|client.?secret|cookie|session.?key",
+                str(key),
+                re.IGNORECASE,
+            ):
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = _redact_sensitive_settings(item)
+        return redacted
+    if isinstance(value, (list, tuple)):
+        return [_redact_sensitive_settings(item) for item in value]
+    return value
 
 
 class JobRegistry:
@@ -524,7 +545,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "target must be a non-empty string"}, 400
         tool_id = tool_id.strip()
         target = target.strip()
-        if len(tool_id) > 128 or len(target) > 2048 or "\\x00" in target:
+        if len(tool_id) > 128 or len(target) > 2048 or "\x00" in target:
             return {"error": "tool_id or target exceeds allowed limits"}, 400
         if extra_args is None:
             extra_args = ""
@@ -563,23 +584,81 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/ai/run")
     @limiter.limit("10 per minute")
     def ai_run():
-        data = request.get_json(silent=True) or {}
-        goal = (data.get("goal") or "").strip()
-        if not goal:
-            return {"error": "goal required"}, 400
-        target = (data.get("target") or "").strip() or None
+        import json as _json
+        import time as _time
+
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object; AI run was not started"}, 400
+        goal_value = data.get("goal")
+        if not isinstance(goal_value, str) or not goal_value.strip():
+            return {"error": "goal required; AI run was not started"}, 400
+        goal = goal_value.strip()
+        target_value = data.get("target", "")
+        if target_value is None:
+            target_value = ""
+        if not isinstance(target_value, str):
+            return {"error": "target must be a string; AI run was not started"}, 400
+        target = target_value.strip() or None
+        if len(goal) > 10000 or (target is not None and (len(target) > 2048 or "\x00" in target)):
+            return {"error": "goal or target exceeds allowed limits; AI run was not started"}, 400
         if target is None:
             try:
                 from whaxon.core.targets import extract_target
                 target = extract_target(goal)
             except Exception:
                 target = None
+        if not target:
+            return {"error": "target required; AI run was not started"}, 400
+        try:
+            match = registry.core.scope.check(target)
+        except Exception:
+            app.logger.exception("Scope evaluation failed before AI run")
+            return {"error": "scope evaluation failed; AI run was not started"}, 503
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
+            return {
+                "error": f"target out of scope: {reason}; AI run was not started",
+                "matched_rule": getattr(match, "matched_rule", None),
+            }, 403
+
         run_id = "ai-" + uuid.uuid4().hex[:12]
         core.store.create_ai_run(run_id, goal)
-        _lock = target
+
+        async def ask_human(action):
+            # Persist the exact pending action and pause until the operator
+            # answers through /api/ai/runs/<run_id>/answer.
+            question = {
+                "run_id": run_id,
+                "kind": action.kind,
+                "rationale": action.rationale,
+                "tool_id": action.tool_id,
+                "target": action.target or target,
+                "extra_args": action.extra_args,
+                "confidence": action.confidence,
+                "proposed_phase": action.proposed_phase,
+            }
+            store = registry.core.store
+            store.set_ai_run_waiting(run_id, _json.dumps(question))
+            current = store.get_ai_run(run_id) or {}
+            answer_seq = len(current.get("steps") or []) + 1
+            deadline = _time.monotonic() + 1800
+            while _time.monotonic() < deadline:
+                for approval in store.list_approvals(run_id):
+                    if int(approval.get("seq", -1)) == answer_seq:
+                        return str(approval.get("answer") or "")
+                await asyncio.sleep(0.25)
+            raise TimeoutError("operator approval timed out; AI run stopped")
+
         def _factory():
             from whaxon.core.ai_bridge import build_executor
-            return build_executor(core, target_lock=_lock)
+            return build_executor(
+                core,
+                target_lock=target,
+                ai_run_id=run_id,
+                ask_human=ask_human,
+            )
+
         runner.submit(lambda: _ai_run_blocking(core, _factory, run_id, goal, core.store))
         return {"run_id": run_id}, 202
 
@@ -599,7 +678,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         answer = (data.get("answer") or "").strip()
         if not answer:
             return {"error": "answer required"}, 400
-        user = (data.get("user") or "local")
+        # Never trust an operator identity supplied in the JSON body or
+        # an unvalidated Basic header on the loopback bypass path. Remote
+        # requests have passed _auth_gate before this handler runs.
+        if request.remote_addr in ("127.0.0.1", "::1"):
+            user = "local"
+        else:
+            auth = request.authorization
+            user = auth.username if auth and auth.username else "authenticated-operator"
         note = (data.get("note") or "")
         run = core.store.get_ai_run(run_id)
         if run is None:
@@ -1468,7 +1554,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/api/settings")
     def api_settings_get():
         try:
-            return jsonify(registry.core.settings.get())
+            return jsonify(_redact_sensitive_settings(registry.core.settings.get()))
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -1479,7 +1565,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             updated = registry.core.settings.save(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        return jsonify(updated)
+        return jsonify(_redact_sensitive_settings(updated))
 
     @app.get("/api/pivot/graph")
     def api_pivot_graph():
