@@ -61,14 +61,12 @@ def test_diagnostics_layout_remains_available_and_mock_actions_are_disabled(page
 def test_diagnostics_reference_buttons_cannot_run_simulated_operations(page, live_server):
     page.goto(f"{live_server}/ui-v2/diagnostics")
     page.wait_for_function(
-        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
-        " || document.querySelector('#diagnostics-status')?.textContent.includes('could not be loaded')",
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded') "
+        "|| document.querySelector('#diagnostics-status')?.textContent.includes('could not be loaded')",
         timeout=8000,
     )
     for label in (
         "Restart Engine Daemons",
-        "Run Full Diagnostic",
-        "Export Health Report",
         "Test MSF RPC Handshake",
         "Benchmark SQLite Write Speed",
         "Probe Ollama LLM Socket",
@@ -77,10 +75,13 @@ def test_diagnostics_reference_buttons_cannot_run_simulated_operations(page, liv
         button = page.get_by_role("button", name=label)
         if button.count():
             assert button.is_disabled(), f"{label} must not run a simulated operation"
+    assert page.locator("#btn-run-diag").is_enabled(), "Run Full Diagnostic must refresh live diagnostics"
+    assert page.locator("#btn-export-json").is_enabled(), "Export Health Report must export live API data"
     for button in page.locator("main button:visible").all():
-        if button.get_attribute("id") != "diagnostics-refresh":
+        if button.get_attribute("id") in ("diagnostics-refresh", "btn-run-diag", "btn-export-json"):
+            assert button.is_enabled()
+        else:
             assert button.is_disabled(), f"Unwired diagnostic control is enabled: {button.inner_text()}"
-
 
 def test_diagnostics_terminal_log_button_navigates_to_run_workspace(page, live_server):
     page.goto(f"{live_server}/ui-v2/diagnostics")
