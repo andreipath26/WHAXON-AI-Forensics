@@ -101,3 +101,57 @@ def test_diagnostics_emergency_halt_reports_when_no_jobs_are_active(page, live_s
         "() => document.querySelector('#diagnostics-status')?.textContent.includes('No running or queued jobs were found')",
         timeout=5000,
     )
+
+def test_diagnostics_header_uses_live_scope_and_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
+        " || document.querySelector('#diagnostics-status')?.textContent.includes('Diagnostics could not be loaded')",
+        timeout=10000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    targets = scope.get("in_scope") or []
+    target = targets[0] if targets else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+
+def test_diagnostics_run_and_export_use_live_api_data(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
+        " || document.querySelector('#diagnostics-status')?.textContent.includes('Diagnostics could not be loaded')",
+        timeout=10000,
+    )
+    run_button = page.locator("#btn-run-diag")
+    assert run_button.is_enabled()
+    run_button.click()
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
+        " || document.querySelector('#diagnostics-status')?.textContent.includes('Diagnostics could not be loaded')",
+        timeout=10000,
+    )
+
+    with page.expect_download() as download_info:
+        page.locator("#btn-export-json").click()
+    download = download_info.value
+    assert download.suggested_filename == "whaxon-health-report.json"
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Exported a JSON report')"
+        " || document.querySelector('#diagnostics-status')?.textContent.includes('Health report export failed')",
+        timeout=5000,
+    )
+    assert "reference/demo control" in page.locator("#btn-restart-daemons").get_attribute("title")
+    assert page.locator("#btn-restart-daemons").is_disabled()
+    assert page.locator("#btn-run-diag").is_enabled()
+    assert page.locator("#btn-export-json").is_enabled()
+
