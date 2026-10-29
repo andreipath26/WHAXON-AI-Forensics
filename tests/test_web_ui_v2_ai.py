@@ -143,6 +143,8 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert "CVE-2023-38606" not in visible_text
     assert "staging-api.corp.net" not in visible_text
     assert "Nmap 7.94 detected" not in visible_text
+    assert "+204ms" not in visible_text
+    assert "buffer boundary stress" not in visible_text
     assert "89.4%" not in visible_text
     assert "89% probability" not in visible_text
     assert "Kiln/Ollama (Mistral-Offensive-7B)" not in visible_text
