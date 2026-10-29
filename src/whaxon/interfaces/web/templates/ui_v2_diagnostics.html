@@ -969,12 +969,13 @@
   event.preventDefault();const previous=exportButton.textContent;exportButton.disabled=true;exportButton.textContent="Exporting live health…";
   try{
    const [healthResponse,toolsResponse,scopeResponse]=await Promise.all([fetch("/api/health"),fetch("/api/tools"),fetch("/api/scope")]);
-   if(!healthResponse.ok)throw new Error("Health HTTP "+healthResponse.status);
    if(!toolsResponse.ok)throw new Error("Tool catalog HTTP "+toolsResponse.status);
-   if(!scopeResponse.ok)throw new Error("Scope HTTP "+scopeResponse.status);
-   const data={generated_at:new Date().toISOString(),source:"live WHAXON API",health:await healthResponse.json(),tools:await toolsResponse.json(),scope:await scopeResponse.json()};
+   const health=await healthResponse.json(),tools=await toolsResponse.json();
+   let scope;
+   if(scopeResponse.ok){scope=await scopeResponse.json();}else{scope={available:false,http_status:scopeResponse.status,error:"Scope data unavailable"};}
+   const data={generated_at:new Date().toISOString(),source:"live WHAXON API",health_http_status:healthResponse.status,health,tools,scope};
    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="whaxon-health-report.json";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="whaxon-health-report.json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
    if(headerStatus)headerStatus.textContent="Exported a JSON report from live /api/health, /api/tools and /api/scope data.";
   }catch(error){if(headerStatus)headerStatus.textContent="Health report export failed: "+error.message;}
   finally{exportButton.disabled=false;exportButton.textContent=previous;}
