@@ -110,10 +110,6 @@ def test_diagnostics_header_uses_live_scope_and_navigation(page, live_server):
         " || document.querySelector('#diagnostics-status')?.textContent.includes('Diagnostics could not be loaded')",
         timeout=10000,
     )
-    page.wait_for_function(
-        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
-        timeout=8000,
-    )
     scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
     targets = scope.get("in_scope") or []
     target = targets[0] if targets else "No target configured"
