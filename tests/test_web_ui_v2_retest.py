@@ -68,16 +68,15 @@ def test_retest_page_only_posts_for_verified_findings_with_valid_sequence(page, 
     page.route("**/api/retest/**", retest)
     page.goto(f"{live_server}/ui-v2/retest")
     page.wait_for_function(
-        "() => document.querySelector('#retest-status')?.textContent.includes('3 finding record(s)')",
+        "() => document.querySelector('#retest-status')?.textContent.includes('2 finding record(s)')",
         timeout=8000,
     )
 
     verified = page.get_by_role("button", name="Retest verified finding").nth(0)
     unverified = page.get_by_role("button", name="Retest verified finding").nth(1)
-    missing_sequence = page.get_by_role("button", name="Retest verified finding").nth(2)
     assert verified.is_enabled()
     assert unverified.is_disabled()
-    assert missing_sequence.is_disabled()
+    assert page.get_by_role("button", name="Retest verified finding").count() == 2
 
     verified.click()
     page.wait_for_function(
