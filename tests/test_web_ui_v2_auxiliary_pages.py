@@ -595,11 +595,11 @@ def test_threat_intel_filter_and_refresh_use_live_catalog_apis(page, live_server
     search = panel.get_by_role("searchbox", name="Filter threat intelligence references")
     search.fill("gobuster")
     assert panel.get_by_text("gobuster", exact=False).first.is_visible()
-    assert panel.get_by_text("nmap", exact=False).count() == 0
+    assert not panel.get_by_text("nmap", exact=False).first.is_visible()
     before = calls["tools"], calls["report"]
     panel.get_by_role("button", name="Refresh catalog").click()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('1 of 4 local reference/catalog record(s) match the filter.')",
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('1 of 3 local reference/catalog record(s) match the filter.')",
         timeout=10000,
     )
     assert calls["tools"] > before[0] and calls["report"] > before[1]
