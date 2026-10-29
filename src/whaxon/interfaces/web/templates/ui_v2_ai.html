@@ -384,7 +384,7 @@
  let aiApiAvailable=false;
  const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
  const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
- if(commandHeading)commandHeading.textContent="Recorded Proposal Details";
+ if(commandHeading)commandHeading.textContent="Proposal Command Details";
  const commandCode=commandCard?.querySelector("code");
  const wireHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="HTTP Request Wire Preview");
  const wireCard=wireHeading?.closest("div.bg-surface-container.rounded-xl");
