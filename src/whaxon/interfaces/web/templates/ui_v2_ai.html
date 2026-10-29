@@ -593,7 +593,7 @@
      counts.textContent=recordedRuns.length+" recorded AI run(s) · "+pendingRuns.length+" awaiting operator answer(s).";
    }
    if(scopeData){
-     const engagementButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
+     const engagementButton=[...document.querySelectorAll("header button")].find(b=>b.querySelector(".material-symbols-outlined")?.textContent.trim()==="arrow_drop_down");
      if(engagementButton){const spans=engagementButton.querySelectorAll("span");if(spans[0])spans[0].textContent=scopeData.engagement||"Active scope";if(spans[1])spans[1].textContent="("+(Array.isArray(scopeData.in_scope)?scopeData.in_scope.length:0)+" scope rule(s))";}
      document.querySelectorAll("header span,header div").forEach(n=>{
        if(textOf(n)==="(IN SCOPE)")n.textContent=scopeData.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
@@ -623,7 +623,7 @@
    }catch(error){status.textContent="AI run not submitted: "+error.message;}
    finally{submit.disabled=false;}
  });
- const engagementNavButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
+ const engagementNavButton=[...document.querySelectorAll("header button")].find(b=>b.querySelector(".material-symbols-outlined")?.textContent.trim()==="arrow_drop_down");
  if(engagementNavButton){engagementNavButton.title="Review engagement scope and target rules";engagementNavButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
  const terminalButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Terminal Log"));
  if(terminalButton)terminalButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
@@ -634,8 +634,9 @@
    try{
      const response=await fetch("/api/history");
      if(!response.ok)throw new Error("History HTTP "+response.status);
-     const jobs=await response.json();
-     const active=(Array.isArray(jobs)?jobs:[]).filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
+     const history=await response.json();
+     const jobs=Array.isArray(history)?history:(Array.isArray(history.jobs)?history.jobs:[]);
+     const active=jobs.filter(j=>["running","queued","pending"].includes(String(j.status||"").toLowerCase()));
      if(!active.length){status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
      if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
      let cancelled=0;
