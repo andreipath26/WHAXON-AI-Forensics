@@ -149,7 +149,7 @@ def test_api_answer_records_approval(tmp_path, monkeypatch) -> None:
     assert rows[0]["note"] == "ok"
 
 
-def test_api_answer_uses_authenticated_username(tmp_path, monkeypatch) -> None:
+def test_api_answer_does_not_trust_loopback_basic_identity(tmp_path, monkeypatch) -> None:
     app, core = _make_app(tmp_path, monkeypatch)
     core.store.create_ai_run("ai-a", "g")
     core.store.set_ai_run_waiting("ai-a", "{}")
@@ -160,7 +160,7 @@ def test_api_answer_uses_authenticated_username(tmp_path, monkeypatch) -> None:
     )
     assert r.status_code == 200
     rows = core.store.list_approvals("ai-a")
-    assert rows[0]["user"] == "alice"
+    assert rows[0]["user"] == "local"
 
 
 def test_api_answer_default_user(tmp_path, monkeypatch) -> None:
