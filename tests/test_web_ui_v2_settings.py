@@ -65,7 +65,7 @@ def test_settings_api_redacts_values_for_get_and_post(tmp_path, monkeypatch):
     client = app.test_client()
 
     get_response = client.get("/api/settings")
-    post_response = client.post("/api/settings", json={"service": {"timeout_seconds": 10}})
+    post_response = client.post("/api/settings", json={"service": {"timeout_seconds": 10}}, headers={"Origin": "http://localhost"})
     assert get_response.status_code == 200
     assert post_response.status_code == 200
     expected = {
