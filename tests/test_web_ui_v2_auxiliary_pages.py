@@ -126,3 +126,36 @@ def test_approval_queue_submits_answer_to_waiting_run(page, live_server):
         "answer": "Proceed only with the approved scope.",
         "note": "Reviewed against the engagement scope.",
     }]
+
+def test_bug_bounty_workspace_filters_live_jobs_and_refreshes(page, live_server):
+    calls = {"report": 0, "history": 0}
+
+    def report(route):
+        calls["report"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":['
+                 '{"job":{"id":"job-a","target":"192.0.2.10","tool":"nmap","status":"finished"},"findings":[]},'
+                 '{"job":{"id":"job-b","target":"192.0.2.20","tool":"nikto","status":"failed"},"findings":[{"seq":1}]}'
+                 ']}',
+        )
+
+    def history(route):
+        calls["history"] += 1
+        route.fulfill(status=200, content_type="application/json", body='[{"id":"job-a"},{"id":"job-b"}]')
+
+    page.route("**/api/report?format=json", report)
+    page.route("**/api/history", history)
+    page.goto(f"{live_server}/ui-v2/bug-bounty")
+    page.wait_for_function(
+        "() => document.querySelector('#bounty-workspace-search') && document.body.innerText.includes('2 report job(s)')",
+        timeout=8000,
+    )
+    page.get_by_label("Filter assessment jobs").fill("job-b")
+    assert page.locator("#whaxon-live-bug-bounty article:visible").count() == 1
+    assert "job-b" in page.locator("#whaxon-live-bug-bounty article:visible").inner_text()
+    with page.expect_response("**/api/report?format=json"):
+        page.get_by_role("button", name="Refresh workspace").click()
+    assert calls["report"] >= 2
+    assert calls["history"] >= 2
