@@ -241,3 +241,42 @@ def test_threat_intel_filters_local_references_and_refreshes_catalog(page, live_
         page.get_by_role("button", name="Refresh catalog").click()
     assert calls["tools"] >= 2
     assert calls["report"] >= 2
+
+def test_threat_intel_catalog_filters_only_recorded_local_references(page, live_server):
+    calls = {"tools": 0, "report": 0}
+
+    def tools(route):
+        calls["tools"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"nmap","name":"Nmap","adapter_available":true,"binary_available":true},'
+                 '{"id":"nikto","name":"Nikto","adapter_available":false,"binary_available":false}]',
+        )
+
+    def report(route):
+        calls["report"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"job":{"id":"job-ti"},"findings":['
+                 '{"title":"Recorded vulnerability","cve":"CVE-2025-12345"},'
+                 '{"title":"Other finding","references":["CVE-2024-23456"]}]}]}',
+        )
+
+    page.route("**/api/tools", tools)
+    page.route("**/api/report?format=json", report)
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('CVE-2025-12345')",
+        timeout=8000,
+    )
+    assert "No connected external threat-intelligence feed" in page.locator("#whaxon-live-threat-intel").inner_text()
+    page.get_by_label("Filter threat intelligence references").fill("CVE-2025-12345")
+    visible = page.locator("#whaxon-live-threat-intel article:visible").all_inner_texts()
+    assert visible
+    assert any("CVE-2025-12345" in text for text in visible)
+    assert all("CVE-2024-23456" not in text for text in visible)
+    with page.expect_response("**/api/tools"):
+        page.get_by_role("button", name="Refresh catalog").click()
+    assert calls["tools"] >= 2 and calls["report"] >= 2
