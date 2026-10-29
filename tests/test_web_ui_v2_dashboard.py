@@ -149,3 +149,48 @@ def test_dashboard_posts_burp_xml_and_opens_findings(page, live_server):
     assert len(calls) == 1
     assert calls[0]["method"] == "POST"
     assert "multipart/form-data" in calls[0]["content_type"]
+
+
+
+def test_dashboard_does_not_claim_scope_rule_when_target_list_is_empty(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"enabled":true,"in_scope":[],"engagement":"empty-scope-test"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('NO TARGET RULE CONFIGURED')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "(NO TARGET RULE)" in header
+    assert "target: no target configured" in header.lower()
+    assert "(CONFIGURED RULE)" not in header
+    assert "SCOPE ENFORCEMENT ENABLED" not in header
+
+
+
+def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"scope backend unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "(STATUS UNAVAILABLE)" in header
+    assert "target: unavailable" in header.lower()
+    assert "(NO TARGET RULE)" not in header
+    assert "NO TARGET RULE CONFIGURED" not in header
+    assert "SCOPE ENFORCEMENT ENABLED" not in header
