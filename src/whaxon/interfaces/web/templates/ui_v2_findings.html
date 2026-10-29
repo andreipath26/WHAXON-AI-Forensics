@@ -495,7 +495,7 @@ function wireFilters(){
     const key=kind==="sev"?"severity":kind==="state"?"status":"adapter";
     g.querySelectorAll("button").forEach(button=>{
       const token=button.textContent.trim().toLowerCase().split(/\\s+/)[0].replace(/\\s*\\(.*/, "");
-      const normalized=kind==="sev"?(token==="crit"?"critical":token==="med"?"medium":token):token;
+      const normalized=kind==="sev"?(token==="crit"?"critical":token==="med"?"medium":token):kind==="state"&&token==="review"?"review_needed":token;
       const active=filters[key]?normalized===filters[key]:token==="all";
       button.classList.remove("ring-1","ring-primary/50");
       button.setAttribute("aria-pressed",active?"true":"false");
