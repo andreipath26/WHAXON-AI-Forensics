@@ -59,7 +59,7 @@ def test_evidence_inspector_saves_notes_and_uploads_files(page, live_server):
             calls.append({
                 "method": "POST",
                 "content_type": route.request.headers.get("content-type", ""),
-                "body": route.request.post_data or "",
+                "body": route.request.post_data or (route.request.post_data_buffer or b"").decode("latin-1", errors="replace"),
             })
             route.fulfill(
                 status=201,
