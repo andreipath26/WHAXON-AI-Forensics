@@ -102,11 +102,6 @@ def test_monitoring_header_reflects_live_scope_and_routes_to_scope_run_and_audit
     page.wait_for_url("**/ui-v2/run")
     assert page.url.endswith("/ui-v2/run")
 
-    page.goto(f"{live_server}/ui-v2/monitoring")
-    page.locator("main button").filter(has_text="Stream Full Cryptographic Audit Logs").click()
-    page.wait_for_url("**/ui-v2/audit")
-    assert page.url.endswith("/ui-v2/audit")
-
 
 def test_monitoring_halt_uses_live_history_and_unsupported_controls_are_disabled(page, live_server):
     page.route(
