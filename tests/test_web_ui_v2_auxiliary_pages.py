@@ -32,6 +32,9 @@ def test_bug_bounty_hides_unimplemented_browser_actions(page, live_server):
     assert page.locator("#whaxon-live-bug-bounty").count() == 1
     for label in ("CLEAR CACHE", "DUMP DOM SNAPSHOT", "SEND TO VALIDATOR", "DIFF ANALYSIS", "PING SEC-OPS"):
         assert page.locator("button:visible").filter(has_text=label).count() == 0
+    visible = page.locator("body").inner_text()
+    assert "24 Ev/s" not in visible
+    assert "api.staging.internal" not in visible
 
 
 def test_ptaas_hides_unimplemented_client_actions(page, live_server):
@@ -40,3 +43,6 @@ def test_ptaas_hides_unimplemented_client_actions(page, live_server):
     assert page.locator("#whaxon-live-ptaas").count() == 1
     for label in ("PING SEC-OPS", "REQUEST RETEST", "VIEW RAW PACKET", "VIEW SCRIPT"):
         assert page.locator("button:visible").filter(has_text=label).count() == 0
+    visible = page.locator("body").inner_text()
+    assert "BOLA / IDOR in Merchant Transfer Settlement Route" not in visible
+    assert "REPRODUCIBLE EXPLOIT ARTIFACT" not in visible
