@@ -394,7 +394,6 @@ def test_threat_intel_header_uses_live_scope_and_real_navigation(page, live_serv
 
 def test_threat_intel_halt_uses_live_history_and_demo_controls_are_disabled(page, live_server):
     page.goto(f"{live_server}/ui-v2/threat-intel")
-    status = page.locator("#whaxon-live-threat-intel [role=status]")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('external threat-intelligence feed')"
         " || document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('Live catalog unavailable')",
