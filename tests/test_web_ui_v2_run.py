@@ -149,3 +149,21 @@ def test_run_page_clear_buffer_clears_terminal_output(page, live_server):
     )
     page.locator("button[title='Clear buffer']").click()
     assert page.locator("#terminal-stdout").inner_text().strip() == ""
+
+
+
+def test_run_page_disables_ai_planner_toggle_without_scope_enforcement(page, live_server):
+    page.goto(f"{live_server}/ui-v2/run")
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    toggle = page.locator("#ai-planner-toggle")
+    assert toggle.is_disabled()
+    assert not toggle.is_checked()
+    assert "scope enforcement is not verified" in toggle.get_attribute("title").lower()
+    planner_card = toggle.locator("xpath=ancestor::div[contains(@class, 'bg-surface-container-low')][1]")
+    assert "AI planner execution is disabled" in planner_card.inner_text()
+    assert "GATE: NOT VERIFIED" in planner_card.inner_text()
+    assert "GATE: ENFORCED" not in planner_card.inner_text()
+    assert page.locator("#toggle-planner-gate").is_hidden()
