@@ -93,13 +93,17 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
         timeout=8000,
     )
     total = page.locator("#whaxon-findings-list [data-finding-index]:visible").count()
+    assert page.get_by_role("button", name="ALL").count() >= 3
+    assert page.locator("div.bg-surface-container-lowest.px-space-xs.py-1.rounded button[aria-pressed=true]").count() == 3
     heading = page.locator("#whaxon-findings-heading")
     assert "shown of" in heading.inner_text().lower()
     assert "4 in buffer" not in heading.inner_text().lower()
 
     verified_filter = page.get_by_role("button", name=re.compile(r"VERIFIED"))
     verified_filter.click()
+    assert verified_filter.get_attribute("aria-pressed") == "true"
     verified_filter.click()
+    assert page.get_by_role("button", name="ALL").nth(1).get_attribute("aria-pressed") == "true"
     page.wait_for_function(
         "(total) => Array.from(document.querySelectorAll('#whaxon-findings-list [data-finding-index]')).filter(el => getComputedStyle(el).display !== 'none').length === total",
         arg=total,
