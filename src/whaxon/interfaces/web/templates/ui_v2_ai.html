@@ -358,6 +358,7 @@
  const proposalHeading=[...document.querySelectorAll("h2")].find(n=>textOf(n).startsWith("AI Planner proposes spawning"));
  const proposalIntro=proposalHeading?.parentElement?.querySelector("p");
  const waitingLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="WAITING FOR OPERATOR AUTHORIZATION");
+ const hitlLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="STRICT HUMAN-IN-THE-LOOP (HITL) ENFORCED");
  const actionIdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("ACTION_ID:"));
  const activeTargetLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Active Target Endpoint");
  const activePhaseLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Operational Phase");
@@ -529,6 +530,7 @@
    if(proposalHeading)proposalHeading.textContent=q?"Operator approval required: "+(q.tool_id||"action not recorded"):"No AI action is currently awaiting approval";
    if(proposalIntro)proposalIntro.textContent=q?"Operator response required for the recorded AI question. Tool execution remains guarded by the server and executor.":"No live proposal is awaiting operator input. New AI runs must pass the current server-side scope check.";
    if(waitingLabel)waitingLabel.textContent=run?"WAITING FOR OPERATOR AUTHORIZATION":"NO PENDING OPERATOR APPROVAL";
+   if(hitlLabel)hitlLabel.textContent=run?"OPERATOR APPROVAL REQUIRED":"HUMAN APPROVAL GATE READY";
    if(actionIdLabel)actionIdLabel.textContent="ACTION_ID: "+(run?.id||"—");
    if(activeTargetLabel?.nextElementSibling)activeTargetLabel.nextElementSibling.textContent=q?.target||"No active target selected";
    if(activePhaseLabel?.nextElementSibling)activePhaseLabel.nextElementSibling.textContent=q?.proposed_phase||run?.phase||recordedRuns[0]?.phase||"No active phase recorded";
