@@ -79,3 +79,71 @@ def test_adapter_halt_uses_live_history_and_static_mutations_are_disabled(page, 
     assert page.locator("#adapter-filter").is_enabled()
     assert "read-only visual references" in page.locator("#whaxon-live-adapters").inner_text()
 
+
+
+def test_adapter_catalog_filter_refresh_and_truthful_reference_status(page, live_server):
+    calls = {"count": 0}
+
+    def tools(route):
+        calls["count"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"nmap","name":"Nmap","category":"recon","transport":"cli",'
+                 '"adapter_available":true,"binary_available":true},'
+                 '{"id":"nikto","name":"Nikto","category":"vuln","transport":"cli",'
+                 '"adapter_available":false,"binary_available":false}]',
+        )
+
+    page.route("**/api/tools", tools)
+    page.goto(f"{live_server}/ui-v2/adapters")
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('2 of 2 catalog tools')",
+        timeout=8000,
+    )
+    assert page.locator("#adapter-list article").count() == 2
+    page.get_by_label("Filter tools").fill("nmap")
+    assert page.locator("#adapter-list article:visible").count() == 1
+    assert "Nmap" in page.locator("#adapter-list article:visible").inner_text()
+    assert "Nikto" not in page.locator("#adapter-list article:visible").inner_text()
+
+    with page.expect_response("**/api/tools"):
+        page.get_by_role("button", name="Refresh catalog").click()
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('2 of 2 catalog tools')",
+        timeout=8000,
+    )
+    assert calls["count"] >= 2
+
+    visible = page.locator("body").inner_text()
+    assert "100%" not in visible
+    assert "SEC-RUNNER-V3.4 [KERNEL-ISOLATION: ACTIVE]" not in visible
+    assert "HASH DETERMINISTIC CHECK: PASSED" not in visible
+    assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
+    assert "read-only visual reference" in page.locator("#whaxon-live-adapters").inner_text().lower()
+
+
+def test_adapter_catalog_failure_is_truthful_and_recoverable(page, live_server):
+    calls = {"count": 0}
+
+    def unavailable(route):
+        calls["count"] += 1
+        route.fulfill(status=503, content_type="application/json", body='{"error":"catalog offline"}')
+
+    page.route("**/api/tools", unavailable)
+    page.goto(f"{live_server}/ui-v2/adapters")
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('HTTP 503')",
+        timeout=8000,
+    )
+    assert page.locator("#adapter-list article").count() == 0
+    refresh = page.get_by_role("button", name="Refresh catalog")
+    assert refresh.is_enabled()
+    with page.expect_response("**/api/tools"):
+        refresh.click()
+    page.wait_for_function(
+        "() => document.querySelector('#adapter-status')?.textContent.includes('HTTP 503')",
+        timeout=8000,
+    )
+    assert calls["count"] >= 2
+    assert refresh.is_enabled()
