@@ -68,3 +68,42 @@ def test_audit_ledger_filters_live_records_and_refreshes(page, live_server):
         page.get_by_role("button", name="Refresh ledger").click()
     page.wait_for_function("() => document.querySelector('#audit-status')?.textContent.includes('1 of 2 execution record(s)')")
     assert calls["count"] >= 2
+
+
+
+def test_audit_reference_controls_are_disabled_except_live_ledger_actions(page, live_server):
+    page.goto(f"{live_server}/ui-v2/audit")
+    page.wait_for_function(
+        "() => document.querySelector('#audit-status')?.textContent.includes('execution record(s)')"
+        " || document.querySelector('#audit-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    for button in page.locator("main button:visible").all():
+        if button.get_attribute("id") not in {"audit-refresh", "audit-export"}:
+            assert button.is_disabled(), f"Unwired audit reference control is enabled: {button.inner_text()}"
+
+
+def test_audit_header_new_and_logs_buttons_open_real_workspaces(page, live_server):
+    page.goto(f"{live_server}/ui-v2/audit")
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/audit")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_audit_header_halt_button_uses_live_job_history(page, live_server):
+    page.goto(f"{live_server}/ui-v2/audit")
+    page.wait_for_function(
+        "() => document.querySelector('#audit-status')?.textContent.includes('execution record(s)')"
+        " || document.querySelector('#audit-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#audit-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
