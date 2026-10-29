@@ -64,6 +64,7 @@ def test_audit_ledger_filters_live_records_and_refreshes(page, live_server):
     assert page.locator(".audit-card:visible").count() == 1
     assert "job-beta" in page.locator(".audit-card:visible").inner_text()
     assert "job-alpha" not in page.locator(".audit-card:visible").inner_text()
-    page.get_by_role("button", name="Refresh ledger").click()
+    with page.expect_response("**/api/history"):
+        page.get_by_role("button", name="Refresh ledger").click()
     page.wait_for_function("() => document.querySelector('#audit-status')?.textContent.includes('1 of 2 execution record(s)')")
     assert calls["count"] >= 2
