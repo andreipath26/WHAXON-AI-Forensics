@@ -130,40 +130,29 @@
 <!-- Search Field -->
 <div class="relative flex-1">
 <span class="material-symbols-outlined absolute left-3 top-2 text-outline text-lg">search</span>
-<input class="w-full h-8 pl-9 pr-3 rounded bg-surface-container-lowest text-on-surface font-code-sm text-code-sm placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary transition-all" placeholder="Filter by job ID, tool (nmap, nuclei, sqlmap, ffuf), target URL, or operator..." type="text" value=""/>
+<input class="w-full h-8 pl-9 pr-3 rounded bg-surface-container-lowest text-on-surface font-code-sm text-code-sm placeholder:text-outline focus:outline-none focus:ring-1 focus:ring-secondary transition-all" id="history-search" placeholder="Filter by recorded job ID, tool, or target..." type="text" value=""/>
 </div>
 <!-- Filter Selectors -->
 <div class="flex flex-wrap items-center gap-space-sm shrink-0">
 <!-- Tool Filter -->
 <div class="flex items-center bg-surface-container-lowest px-2 py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline uppercase mr-1.5">TOOL:</span>
-<select class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-pointer">
-<option value="all">All Tools (Nuclei, Nmap, ffuf, SQLMap, Nikto)</option>
-<option value="nuclei">nuclei (24)</option>
-<option value="nmap">nmap (8)</option>
-<option value="sqlmap">sqlmap (5)</option>
-<option value="ffuf">ffuf (3)</option>
-<option value="nikto">nikto (2)</option>
+<select id="history-tool-filter" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-pointer">
+<option value="all">All recorded tools</option>
 </select>
 </div>
 <!-- Date Filter -->
 <div class="flex items-center bg-surface-container-lowest px-2 py-1 rounded">
 <span class="material-symbols-outlined text-xs text-outline mr-1">calendar_today</span>
-<select class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-pointer">
-<option value="7d">Past 7 Days</option>
-<option value="24h">Past 24 Hours</option>
-<option value="30d">Past 30 Days</option>
-<option value="all">Full Engagement Cycle</option>
+<select id="history-date-filter" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-not-allowed" disabled title="Date filtering is unavailable because the history API does not record timestamps">
+<option value="unavailable">Date filter unavailable (timestamps not recorded)</option>
 </select>
 </div>
 <!-- Mode Selector -->
 <div class="flex items-center bg-surface-container-lowest px-2 py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline uppercase mr-1.5">RUNNER:</span>
-<select class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-pointer">
-<option value="all">All Modes</option>
-<option value="hitl">HITL (Human-in-the-Loop)</option>
-<option value="auto">Autonomous Engine</option>
-<option value="manual">Manual CLI</option>
+<select id="history-runner-filter" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-not-allowed" disabled title="Runner mode filtering is unavailable because the history API does not record runner mode">
+<option value="unavailable">Runner mode unavailable (not recorded)</option>
 </select>
 </div>
 </div>
@@ -300,6 +289,8 @@
   const exportButton = [...document.querySelectorAll("button")].find(b => /Export Ledger/i.test(b.textContent || ""));
   const integrityButton = [...document.querySelectorAll("button")].find(b => /Verify Integrity/i.test(b.textContent || ""));
   const filters = [...document.querySelectorAll("button")].filter(b => /^(?:All|Success|Failed|Scope-Blocked|Active \/ Queued)/i.test((b.textContent || "").trim()));
+  const searchInput = document.getElementById("history-search");
+  const toolFilter = document.getElementById("history-tool-filter");
   let jobs = [];
   let activeFilter = "all";
   const text = (tag, value, className) => {
@@ -313,8 +304,12 @@
       ? "text-primary" : "text-error";
   }
   function matches(job) {
-    if (activeFilter === "success") return job.status === "finished" && Number(job.exit_code) === 0;
-    if (activeFilter === "failed") return job.status === "failed" || (job.exit_code != null && Number(job.exit_code) !== 0);
+    if (activeFilter === "success" && !(job.status === "finished" && Number(job.exit_code) === 0)) return false;
+    if (activeFilter === "failed" && !(job.status === "failed" || (job.exit_code != null && Number(job.exit_code) !== 0))) return false;
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    if (query && ![job.id, job.tool, job.target].some(value => String(value ?? "").toLowerCase().includes(query))) return false;
+    const selectedTool = toolFilter?.value || "all";
+    if (selectedTool !== "all" && String(job.tool || "").toLowerCase() !== selectedTool) return false;
     return true;
   }
   function render() {
@@ -428,11 +423,20 @@
     link.href = url; link.download = "whaxon-job-history.json";
     document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(url);
   });
+  searchInput?.addEventListener("input", render);
+  toolFilter?.addEventListener("change", render);
   fetch("/api/history").then(response => {
     if (!response.ok) throw new Error("HTTP " + response.status);
     return response.json();
   }).then(data => {
     jobs = Array.isArray(data) ? data : [];
+    if (toolFilter) {
+      const selected = toolFilter.value || "all";
+      const tools = [...new Set(jobs.map(job => String(job.tool || "").trim()).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+      toolFilter.replaceChildren(new Option("All recorded tools (" + tools.length + ")", "all"));
+      tools.forEach(tool => toolFilter.add(new Option(tool, tool.toLowerCase())));
+      if ([...toolFilter.options].some(option => option.value === selected)) toolFilter.value = selected;
+    }
     render();
   }).catch(error => {
     if (tbody) tbody.replaceChildren();

@@ -51,3 +51,54 @@ def test_dashboard_navigation_reaches_job_history(page, live_server):
     assert link.get_attribute("href") == "/ui-v2/history"
     history_response = page.request.get(f"{live_server}/ui-v2/history")
     assert history_response.status == 200
+
+
+
+def test_history_search_and_tool_filter_operate_on_live_records(page, live_server):
+    def history(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='['
+                 '{"id":"job-alpha","tool":"nmap","status":"finished","target":"192.0.2.10","exit_code":0,"duration_s":1.2},'
+                 '{"id":"job-beta","tool":"nikto","status":"failed","target":"192.0.2.20","exit_code":2,"duration_s":2.4}'
+                 ']',
+        )
+
+    page.route("**/api/history", history)
+    page.goto(f"{live_server}/ui-v2/history")
+    page.wait_for_function(
+        "() => document.querySelector('#history-live-summary')?.textContent.includes('2 recorded jobs')",
+        timeout=8000,
+    )
+    rows = page.locator("table tbody tr")
+    assert rows.count() == 2
+    tool_filter = page.locator("#history-tool-filter")
+    assert [tool_filter.locator("option").nth(i).get_attribute("value") for i in range(tool_filter.locator("option").count())] == ["all", "nikto", "nmap"]
+
+    page.locator("#history-search").fill("job-beta")
+    assert rows.count() == 1
+    assert "job-beta" in rows.first.inner_text()
+    page.locator("#history-search").fill("")
+    tool_filter.select_option("nmap")
+    assert rows.count() == 1
+    assert "job-alpha" in rows.first.inner_text()
+
+    tool_filter.select_option("all")
+    page.get_by_role("button", name="Failed (1)", exact=True).click()
+    assert rows.count() == 1
+    assert "job-beta" in rows.first.inner_text()
+
+
+def test_history_disables_filters_that_need_unrecorded_metadata(page, live_server):
+    page.goto(f"{live_server}/ui-v2/history")
+    page.wait_for_function(
+        "() => !document.querySelector('#history-live-summary')?.textContent.includes('Loading')",
+        timeout=8000,
+    )
+    assert page.locator("#history-date-filter").is_disabled()
+    assert "timestamps" in page.locator("#history-date-filter").get_attribute("title")
+    assert page.locator("#history-runner-filter").is_disabled()
+    assert "runner mode" in page.locator("#history-runner-filter").get_attribute("title")
+    assert "Date filter unavailable" in page.locator("#history-date-filter").inner_text()
+    assert "Runner mode unavailable" in page.locator("#history-runner-filter").inner_text()
