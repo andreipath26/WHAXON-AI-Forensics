@@ -579,7 +579,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not isinstance(target_value, str):
             return {"error": "target must be a string; AI run was not started"}, 400
         target = target_value.strip() or None
-        if len(goal) > 10000 or (target is not None and (len(target) > 2048 or "\\x00" in target)):
+        if len(goal) > 10000 or (target is not None and (len(target) > 2048 or "\x00" in target)):
             return {"error": "goal or target exceeds allowed limits; AI run was not started"}, 400
         if target is None:
             try:
