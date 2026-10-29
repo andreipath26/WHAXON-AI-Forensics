@@ -27,3 +27,25 @@ def test_dashboard_links_to_live_diagnostics(page, live_server):
     link = page.locator('a[data-path="system-diagnostics-and-health"]')
     assert link.is_visible()
     assert link.get_attribute("href") == "/ui-v2/diagnostics"
+
+def test_diagnostics_page_does_not_report_simulated_checks_as_live(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/diagnostics")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded') "
+        "|| document.querySelector('#diagnostics-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    visible = page.locator("body").inner_text()
+    for marker in (
+        "All Tests Passed",
+        "ACK RECEIVED (0.9ms)",
+        "PID 8891 killed",
+        "out_of_scope_drops",
+        "msf_version",
+        "ALL SUBSYSTEMS HEALTHY",
+        "whaxon_health_diagnostics_",
+    ):
+        assert marker not in visible, f"Simulated diagnostic output must not be shown: {marker}"
+    assert page.locator("#whaxon-live-diagnostics").is_visible()
+
