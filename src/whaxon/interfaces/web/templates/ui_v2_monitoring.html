@@ -702,6 +702,8 @@
  const grid=document.getElementById("asset-ledger-container");
  const search=document.getElementById("asset-search-input");
  if(!grid)return;
+ const ledgerSection=grid.closest("section");
+ if(ledgerSection&&ledgerSection.parentElement){Array.from(ledgerSection.parentElement.children).forEach(child=>{if(child!==ledgerSection)child.style.display="none";});ledgerSection.querySelectorAll("button").forEach(button=>{button.disabled=true;button.style.display="none";button.setAttribute("aria-hidden","true");});}
  grid.replaceChildren();
  const status=document.createElement("p");status.className="p-4 text-sm text-slate-400";status.textContent="Loading recorded WHAXON jobs and findings…";grid.append(status);
  const add=(parent,text,cls)=>{const n=document.createElement("div");n.textContent=text==null||text===""?"—":String(text);if(cls)n.className=cls;parent.append(n);};
