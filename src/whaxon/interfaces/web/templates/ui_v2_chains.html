@@ -490,7 +490,11 @@
  const main=document.querySelector("main");if(!main)return;
  const panel=document.createElement("section");panel.id="whaxon-live-chains";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
  panel.innerHTML='<div class="flex items-center justify-between gap-3"><h2 class="font-headline-lg text-headline-lg">Recorded attack-chain relationships</h2><button id="chains-refresh" type="button" class="rounded bg-surface-container-high px-3 py-2">Refresh</button></div><p id="chains-status" class="mt-2 text-on-surface-variant">Loading stored graph relationships…</p><div id="chains-list" class="mt-3 grid gap-2"></div>';
- main.prepend(panel);const status=panel.querySelector("#chains-status"),list=panel.querySelector("#chains-list");
+ main.prepend(panel);
+ // The canonical mockup includes a fabricated compromise narrative, credential
+ // strings and exploit output. Do not present those fixtures as live graph evidence.
+ Array.from(main.children).forEach(child=>{if(child!==panel)child.hidden=true;});
+const status=panel.querySelector("#chains-status"),list=panel.querySelector("#chains-list");
  const add=(parent,value,cls)=>{const n=document.createElement("div");n.textContent=value==null||value===""?"—":String(value);if(cls)n.className=cls;parent.append(n);};
  async function refresh(){status.textContent="Loading stored graph relationships…";list.replaceChildren();try{const response=await fetch("/api/pivot/graph");const data=await response.json();if(!response.ok)throw new Error("HTTP "+response.status);const edges=Array.isArray(data)?data:(Array.isArray(data.edges)?data.edges:[]);status.textContent=edges.length+" relationship(s) returned by the WHAXON graph API.";if(!edges.length){add(list,"No attack-chain relationships have been recorded.","text-on-surface-variant");return;}for(const edge of edges){const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";add(card,edge.source||edge.from||edge.parent||"Source not recorded","font-code-sm text-primary");add(card,"→ "+(edge.target||edge.to||edge.child||"Target not recorded"),"mt-1 font-code-sm");add(card,edge.kind||edge.type||edge.relationship||"Relationship type not recorded","mt-1 text-on-surface-variant");list.append(card);}}catch(e){status.textContent="Graph data could not be loaded: "+e.message;}}
  panel.querySelector("#chains-refresh").addEventListener("click",refresh);refresh();
