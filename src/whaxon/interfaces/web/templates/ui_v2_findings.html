@@ -124,7 +124,7 @@
 <div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-xs py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline px-space-xs">SEV:</span>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm bg-surface-container text-on-surface hover:text-primary" type="button">ALL</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm bg-error-container/30 text-error font-bold" type="button">CRIT (1)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-error hover:bg-surface-container" type="button">CRIT (1)</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-tertiary hover:bg-surface-container" type="button">HIGH (2)</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-secondary hover:bg-surface-container" type="button">MED (1)</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-outline-variant hover:bg-surface-container" type="button">LOW (0)</button>
@@ -132,14 +132,16 @@
 <!-- Trust State Filter Group -->
 <div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-xs py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline px-space-xs">STATE:</span>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm bg-primary/20 text-primary font-bold" type="button">VERIFIED (6)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">ALL</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-primary hover:bg-surface-container" type="button">VERIFIED (6)</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-tertiary hover:bg-surface-container" type="button">CANDIDATE (11)</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">REVIEW NEEDED</button>
 </div>
 <!-- Tool Origin Filter Group -->
 <div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-xs py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline px-space-xs">ADAPTER:</span>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm bg-surface-container text-on-surface" type="button">Nuclei</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">ALL</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">Nuclei</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">sqlmap</button>
 <button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">Nikto</button>
 </div>
@@ -489,21 +491,33 @@ function renderList(){
 function selectFinding(index){selected=findings[index-1];if(!selected)return;detail.style.visibility="visible";list.querySelectorAll('[id^="finding-card-"]').forEach(c=>{const on=Number(c.dataset.findingIndex)===index-1;c.classList.toggle("ring-1",on);c.classList.toggle("ring-primary/40",on);c.classList.toggle("bg-surface-container",on);});const f=selected,raw=f.raw;document.getElementById("selected-finding-title").textContent=safe(f.title);document.getElementById("selected-finding-severity").textContent=f.severity.toUpperCase()+" SEVERITY";document.getElementById("selected-finding-cvss").textContent=raw.cvss||raw.cvss_score?"CVSS "+(raw.cvss||raw.cvss_score):"CVSS not recorded";document.getElementById("selected-finding-target").textContent=safe(f.target);document.getElementById("selected-finding-engine").textContent=safe(f.source);document.getElementById("selected-finding-phase").textContent=safe(raw.ptes_phase||raw.phase);document.getElementById("selected-finding-status").textContent=label(f.status);const replayButton=document.getElementById("replay-btn");if(replayButton){replayButton.disabled=!f.jobId||f.seq==null;const replayLabel=replayButton.querySelector("span:last-child");if(replayLabel)replayLabel.textContent=f.status==="verified"?"Retest Verified Finding":"Validate Finding";replayButton.title=f.status==="verified"?"Re-run validation for this verified finding":"Validate this candidate finding";}document.getElementById("selected-finding-verdict").textContent="Recorded status: "+label(f.status);document.getElementById("selected-finding-verdict-detail").textContent="Job "+safe(f.jobId)+", finding sequence "+safe(f.seq)+". No stronger verification claim is inferred from status alone.";const hasEvidence=v=>v!=null&&!(typeof v==="string"&&!v.trim())&&!(typeof v==="object"&&!Array.isArray(v)&&Object.keys(v).length===0);const ctx=[raw.request_context,raw.proof,raw.evidence,raw.output,raw.raw_line,raw.data,raw].find(hasEvidence)||raw;proof.textContent=typeof ctx==="string"?ctx:JSON.stringify(ctx,null,2);const ev=document.getElementById("selected-finding-evidence");ev.textContent=typeof ctx==="string"?ctx.slice(0,180):JSON.stringify(ctx).slice(0,180);document.getElementById("selected-finding-evidence-detail").textContent=raw.description||raw.data?.message||raw.data?.description||"Evidence shown above is the data recorded for this finding.";const telemetry=document.getElementById("selected-finding-telemetry");const hasTiming=raw.timing_delta_ms!=null||raw.baseline_ms!=null;if(telemetry)telemetry.style.display=hasTiming?"":"none";const timingSummary=document.getElementById("selected-finding-timing-summary");if(timingSummary&&hasTiming)timingSummary.textContent="Baseline: "+safe(raw.baseline_ms)+" ms · Delta: "+safe(raw.timing_delta_ms)+" ms";if(telemetry){const bars=telemetry.querySelector(".w-full.h-16");if(bars)bars.replaceChildren();}const phaseFooter=document.getElementById("ptes-phase-footer");if(phaseFooter){const phase=raw.ptes_phase||raw.phase;phaseFooter.style.display=phase?"":"none";const phaseValue=phaseFooter.querySelector(".font-semibold");if(phaseValue)phaseValue.textContent=String(phase);}}
 function wireFilters(){
   const groups=[...document.querySelectorAll("div.bg-surface-container-lowest.px-space-xs.py-1.rounded")];
+  const updateGroup=(g,kind)=>{
+    const key=kind==="sev"?"severity":kind==="state"?"status":"adapter";
+    g.querySelectorAll("button").forEach(button=>{
+      const token=button.textContent.trim().toLowerCase().split(/\\s+/)[0].replace(/\\s*\\(.*/, "");
+      const normalized=kind==="sev"?(token==="crit"?"critical":token==="med"?"medium":token):token;
+      const active=filters[key]?normalized===filters[key]:token==="all";
+      button.classList.remove("ring-1","ring-primary/50");
+      button.setAttribute("aria-pressed",active?"true":"false");
+      if(active)button.classList.add("ring-1","ring-primary/50");
+    });
+  };
   groups.forEach(g=>{
     const labelNode=g.querySelector("span");
     const kind=(labelNode?.textContent||"").trim().replace(":","").toLowerCase();
+    if(!["sev","state","adapter"].includes(kind))return;
+    updateGroup(g,kind);
     g.querySelectorAll("button").forEach(b=>{
       const original=b.textContent.trim(),match=original.match(/^([A-Z]+)/i);
       b.addEventListener("click",()=>{
         const token=(match?match[1]:original).toLowerCase();
         let key="",next="";
         if(kind==="sev"){key="severity";next=token==="all"?"":token==="crit"?"critical":token==="med"?"medium":token==="high"?"high":token==="low"?"low":"";}
-        else if(kind==="state"){key="status";next=token==="verified"?"verified":token==="candidate"?"candidate":token==="review"?"review_needed":"";}
+        else if(kind==="state"){key="status";next=token==="all"?"":token==="verified"?"verified":token==="candidate"?"candidate":token==="review"?"review_needed":"";}
         else if(kind==="adapter"){key="adapter";next=token==="all"?"":token;}
         if(!key)return;
         filters[key]=next&&filters[key]===next?"":next;
-        g.querySelectorAll("button").forEach(x=>x.classList.remove("ring-1","ring-primary/50"));
-        if(filters[key]||token==="all")b.classList.add("ring-1","ring-primary/50");
+        updateGroup(g,kind);
         renderList();
       });
     });
