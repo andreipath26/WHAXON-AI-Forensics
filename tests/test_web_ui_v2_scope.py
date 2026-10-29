@@ -124,3 +124,68 @@ def test_scope_rules_remain_editable_after_enforcement_is_disabled(page, live_se
     assert saved["status"] == 200
     assert "scope-edit.example.com" in saved["body"]["in_scope"]
     assert saved["body"]["enabled"] is False
+
+
+
+def test_scope_target_modal_saves_only_after_authorization_confirmation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.locator("#openTargetModalBtn").click()
+    assert page.locator("#targetModal").is_visible()
+    page.locator("#modalTargetInput").fill("scope-ui-add.example.com")
+    page.locator("#saveTargetBtn").click()
+    assert "Confirm that written authorization exists" in page.locator("#scope-ui-notice").inner_text()
+    assert "scope-ui-add.example.com" not in page.locator("#targetTableBody").inner_text()
+    page.locator("#authConfirmCheckbox").check()
+    page.locator("#saveTargetBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=8000,
+    )
+    assert "scope-ui-add.example.com" in page.locator("#targetTableBody").inner_text()
+    scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
+    assert "scope-ui-add.example.com" in scope["in_scope"]
+
+
+def test_scope_deny_rule_prompt_persists_explicit_exclusion(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.once("dialog", lambda dialog: dialog.accept("blocked-ui.example.com"))
+    page.locator("#addDenyRuleBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
+    assert "blocked-ui.example.com" in scope["out_of_scope"]
+    assert "blocked-ui.example.com" in page.locator("body").inner_text()
+
+
+def test_scope_json_import_persists_supported_scope_shape(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.locator("#openImportDrawerBtn").click()
+    assert page.locator("#importDrawer").is_visible()
+    page.locator("#importDrawer textarea").fill(
+        '{"engagement":"UI import verification","enabled":true,"in_scope":["127.0.0.1","scope-import.example.com"],"out_of_scope":["blocked-import.example.com"],"notes":"browser test"}'
+    )
+    page.locator("#executeImportBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
+    assert scope["engagement"] == "UI import verification"
+    assert "scope-import.example.com" in scope["in_scope"]
+    assert "blocked-import.example.com" in scope["out_of_scope"]
+    assert "browser test" in scope["notes"]
+    assert not page.locator("#importDrawer").is_visible()
