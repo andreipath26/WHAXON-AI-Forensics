@@ -286,10 +286,13 @@ def test_canonical_auxiliary_page_shells_are_preserved(page, live_server):
     assert page.get_by_text("BAS & DETECTION VALIDATION", exact=True).is_visible()
     page.goto(f"{live_server}/ui-v2/bug-bounty")
     page.wait_for_function(
-        "() => document.body.innerText.includes('BROWSER AUTOMATION: NOT CONNECTED')",
+        "() => document.querySelector('#whaxon-live-bug-bounty')?.innerText.includes('Browser automation is not connected to this page.')",
         timeout=8000,
     )
-    assert page.get_by_text("BROWSER AUTOMATION: NOT CONNECTED", exact=True).is_visible()
+    bounty_panel = page.locator("#whaxon-live-bug-bounty")
+    assert bounty_panel.is_visible()
+    assert "Browser automation is not connected to this page." in bounty_panel.inner_text()
+    assert page.get_by_role("button", name="Refresh workspace").is_visible()
     page.goto(f"{live_server}/ui-v2/ptaas")
     assert page.get_by_role("heading", name="Self-Service Scoping & Assessment Dispatcher").is_visible()
 
