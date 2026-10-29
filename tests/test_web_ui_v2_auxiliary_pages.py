@@ -285,6 +285,10 @@ def test_canonical_auxiliary_page_shells_are_preserved(page, live_server):
     page.goto(f"{live_server}/ui-v2/bas")
     assert page.get_by_text("BAS & DETECTION VALIDATION", exact=True).is_visible()
     page.goto(f"{live_server}/ui-v2/bug-bounty")
+    page.wait_for_function(
+        "() => document.body.innerText.includes('BROWSER AUTOMATION: NOT CONNECTED')",
+        timeout=8000,
+    )
     assert page.get_by_text("BROWSER AUTOMATION: NOT CONNECTED", exact=True).is_visible()
     page.goto(f"{live_server}/ui-v2/ptaas")
     assert page.get_by_role("heading", name="Self-Service Scoping & Assessment Dispatcher").is_visible()
