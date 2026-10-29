@@ -380,7 +380,7 @@
  const telemetryDescription=telemetryCard?.querySelector("p");
  const traceLatency=[...document.querySelectorAll("span")].find(n=>textOf(n)==="TENSOR DOCK // 350ms");
  const progressBar=[...document.querySelectorAll("div")].find(n=>n.classList.contains("bg-primary")&&n.classList.contains("h-full")&&n.classList.contains("w-2/3"));
- const traceCards=["Fingerprint Correlation & Boundary Analysis","Timing Anomaly Verification","Orchestration Tool Selection"].map(label=>{const title=[...document.querySelectorAll("span")].find(n=>textOf(n)===label);const card=title?.closest("div.bg-surface-container-lowest.p-space-md.rounded");return {title,description:card?.querySelector("p")};});
+ const traceCards=["Fingerprint Correlation & Boundary Analysis","Timing Anomaly Detection","Orchestration Tool Selection"].map(label=>{const title=[...document.querySelectorAll("span")].find(n=>textOf(n)===label);const card=title?.closest("div.bg-surface-container-lowest.p-space-md.rounded");return {title,description:card?.querySelector("p")};});
  let aiApiAvailable=false;
  const commandHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Proposed CLI Command");
  const commandCard=commandHeading?.closest("div.bg-surface-container.rounded-xl");
