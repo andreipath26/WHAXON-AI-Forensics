@@ -61,7 +61,7 @@
  // credentials, timing results and a hard-coded replay command. Keep the canonical
  // shell/navigation, but never present fixture data as a live assessment.
  /* Suppress the static exploit story and hard-coded evidence while retaining the page shell. */
- const fixtureMarkers=/FINDING-SQLI-001|api\\.internal\\.corp|uid=0\\(root\\)|SQL Injection in Catalog Query Engine|payload accepted|differential proof|0\.92 confidence|verified exploit/i;
+ const fixtureMarkers=/FINDING-SQLI-001|staging-api\\.corp\\.net|api\\.internal\\.corp|uid=0\\(root\\)|SQL Injection in Catalog Query Engine|pg_sleep\\(5\\)|K9#xL9!pQ_corp_secret|AKIAIOSFODNN7EXAMPLE|5,009ms|COMMIT 3-WAY VERDICT TO AUDIT LEDGER|RE-EXECUTE IMMEDIATE PROBE|payload accepted|differential proof|0\\.92 confidence|verified exploit/i;
  main.querySelectorAll("h1,h2,h3,h4,p,pre,code,span,div").forEach(node=>{if(node.children.length||!fixtureMarkers.test(node.textContent||""))return;const card=node.closest("article,section,[class*='rounded-xl'],[class*='rounded-lg']");if(card&&card!==panel){card.hidden=true;card.style.display="none";}else{node.hidden=true;node.style.display="none";}});
  
 
