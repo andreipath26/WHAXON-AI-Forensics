@@ -600,7 +600,7 @@
    }else{
      document.querySelectorAll("header span,header div").forEach(n=>{if(textOf(n)==="(IN SCOPE)")n.textContent="(STATUS UNAVAILABLE)";if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent="SCOPE STATUS UNAVAILABLE";});
    }
-   renderRuns();renderPending();renderLedger();renderProposal();neutralizeDemoClaims();
+   neutralizeDemoClaims();renderRuns();renderPending();renderLedger();renderProposal();
    document.documentElement.dataset.aiGateReady="true";
  }
  form.addEventListener("submit",async e=>{
