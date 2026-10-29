@@ -183,8 +183,8 @@ def test_run_page_header_reflects_live_scope_without_claiming_strict_boundary(pa
         timeout=8000,
     )
     header = page.locator("header").inner_text()
-    assert "Target: 192.0.2.44" in header
-    assert "(RULE CONFIGURED)" in header
-    assert "SCOPE CONFIGURATION LOADED" in header
-    assert "STRICT BOUNDARY ENFORCED" not in header
+    assert "target: 192.0.2.44" in header.lower()
+    assert "(rule configured)" in header.lower()
+    assert "scope configuration loaded" in header.lower()
+    assert "strict boundary enforced" not in header.lower()
 
