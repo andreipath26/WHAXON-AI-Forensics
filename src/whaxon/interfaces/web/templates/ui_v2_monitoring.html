@@ -705,8 +705,8 @@
  const ledgerSection=grid.closest("section");
  document.querySelectorAll("main *").forEach(node=>{if(node.children.length)return;if(/^PAGE 1 OF 6$/i.test((node.textContent||"").trim())){const footer=node.closest(".border-t");if(footer)footer.style.display="none";else node.textContent="Pagination unavailable for this live view";}});
  const pageWrapper=grid.closest("main > div");
- if(ledgerSection&&pageWrapper){Array.from(pageWrapper.children).forEach(child=>{if(!child.contains(ledgerSection))child.style.display="none";});}
- if(ledgerSection&&ledgerSection.parentElement){Array.from(ledgerSection.parentElement.children).forEach(child=>{if(child!==ledgerSection)child.style.display="none";});ledgerSection.querySelectorAll("button").forEach(button=>{button.disabled=true;button.style.display="none";button.setAttribute("aria-hidden","true");});}
+ if(ledgerSection&&pageWrapper){/* Preserve the canonical monitoring layout and its navigation. */}
+ if(ledgerSection&&ledgerSection.parentElement){/* Keep the live ledger beside the existing page sections. */ledgerSection.querySelectorAll("button").forEach(button=>{button.disabled=true;button.style.display="none";button.setAttribute("aria-hidden","true");});}
  const summary=document.createElement("div");summary.id="monitoring-live-summary";summary.className="mb-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4";summary.innerHTML='<div class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-semibold text-slate-100">Live monitoring summary</h2><button id="monitoring-refresh" type="button" class="rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">Refresh data</button></div><p id="monitoring-summary-status" role="status" aria-live="polite" class="mt-2 text-sm text-slate-400">Loading current jobs and scope…</p>';if(ledgerSection)ledgerSection.insertBefore(summary,grid);
  grid.replaceChildren();
  const status=document.createElement("p");status.className="p-4 text-sm text-slate-400";status.textContent="Loading recorded WHAXON jobs and findings…";grid.append(status);
