@@ -167,3 +167,24 @@ def test_run_page_disables_ai_planner_toggle_without_scope_enforcement(page, liv
     assert "GATE: NOT VERIFIED" in planner_card.inner_text()
     assert "GATE: ENFORCED" not in planner_card.inner_text()
     assert page.locator("#toggle-planner-gate").is_hidden()
+
+def test_run_page_header_reflects_live_scope_without_claiming_strict_boundary(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"run-scope-test","enabled":true,"in_scope":["192.0.2.44"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/run")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('192.0.2.44')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "target: 192.0.2.44" in header.lower()
+    assert "(rule configured)" in header.lower()
+    assert "scope configuration loaded" in header.lower()
+    assert "strict boundary enforced" not in header.lower()
+

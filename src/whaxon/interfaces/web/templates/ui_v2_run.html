@@ -798,6 +798,26 @@
       button.setAttribute("aria-hidden", "true");
     }
   });
+  // The runner header must reflect the active scope API, never template demo text.
+  async function reflectLiveScopeHeader() {
+    const targetLabel = [...document.querySelectorAll("header span")].find(node => (node.textContent || "").trim().startsWith("Target:"));
+    const stateLabel = [...document.querySelectorAll("header span")].find(node => ["(IN SCOPE)", "(RULE CONFIGURED)", "(NO TARGET RULE)", "(STATUS UNAVAILABLE)", "(ENFORCEMENT DISABLED)"].includes((node.textContent || "").trim()));
+    const boundaryLabel = [...document.querySelectorAll("header span")].find(node => ["STRICT BOUNDARY ENFORCED", "SCOPE CONFIGURATION LOADED", "SCOPE ENFORCEMENT ENABLED", "SCOPE ENFORCEMENT DISABLED", "SCOPE STATUS UNAVAILABLE"].includes((node.textContent || "").trim()));
+    try {
+      const response = await fetch("/api/scope");
+      if (!response.ok) throw new Error("Scope HTTP " + response.status);
+      const scope = await response.json();
+      const targets = Array.isArray(scope.in_scope) ? scope.in_scope : [];
+      if (targetLabel) targetLabel.textContent = "Target: " + (targets[0] || "No target configured");
+      if (stateLabel) stateLabel.textContent = scope.enabled === false ? "(ENFORCEMENT DISABLED)" : targets.length ? "(RULE CONFIGURED)" : "(NO TARGET RULE)";
+      if (boundaryLabel) boundaryLabel.textContent = scope.enabled === false ? "SCOPE ENFORCEMENT DISABLED" : "SCOPE CONFIGURATION LOADED";
+    } catch (_) {
+      if (targetLabel) targetLabel.textContent = "Target: unavailable";
+      if (stateLabel) stateLabel.textContent = "(STATUS UNAVAILABLE)";
+      if (boundaryLabel) boundaryLabel.textContent = "SCOPE STATUS UNAVAILABLE";
+    }
+  }
+  reflectLiveScopeHeader();
   disableFakeControls();
   clearLog();
   line("No job output yet. This panel will show events returned by the live WHAXON runner.", "whaxon.web");
