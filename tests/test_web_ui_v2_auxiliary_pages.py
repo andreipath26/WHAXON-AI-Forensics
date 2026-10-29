@@ -159,3 +159,28 @@ def test_bug_bounty_workspace_filters_live_jobs_and_refreshes(page, live_server)
         page.get_by_role("button", name="Refresh workspace").click()
     assert calls["report"] >= 2
     assert calls["history"] >= 2
+
+def test_compliance_crosswalk_filters_and_exports_only_recorded_mappings(page, live_server):
+    page.route(
+        "**/api/ui-v2/findings",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"job":{"id":"job-c"},"findings":['
+                 '{"seq":1,"title":"SQL injection","cwe":"CWE-89","owasp":"A03","verification_status":"verified"},'
+                 '{"seq":2,"title":"Missing header","cwe":"CWE-693","verification_status":"candidate"}]}]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/compliance")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-compliance')?.innerText.includes('2 of 2 recorded finding(s)')",
+        timeout=8000,
+    )
+    assert page.locator("#whaxon-live-compliance article").count() == 2
+    page.get_by_label("Filter framework crosswalk").fill("CWE-89")
+    assert page.locator("#whaxon-live-compliance article:visible").count() == 1
+    assert "SQL injection" in page.locator("#whaxon-live-compliance article:visible").inner_text()
+    with page.expect_download() as download_info:
+        page.get_by_role("button", name="Export crosswalk JSON").click()
+    download = download_info.value
+    assert download.suggested_filename == "whaxon-framework-crosswalk.json"
