@@ -285,8 +285,7 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
         "() => document.documentElement.dataset.aiGateReady === 'true'",
         timeout=8000,
     )
-    engagement = page.locator("header button").filter(has=page.locator(".material-symbols-outlined").filter(has_text="arrow_drop_down"))
-    # Locate the engagement selector by its dropdown icon; its text changes after the first live read.
+    # The engagement selector text changes after each live scope read.
     engagement = page.locator("header button").filter(has_text="scope-one")
     assert engagement.is_visible()
     page.locator("#ai-target").fill("127.0.0.1")
