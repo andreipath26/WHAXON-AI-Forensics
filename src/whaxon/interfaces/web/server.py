@@ -657,11 +657,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         answer = (data.get("answer") or "").strip()
         if not answer:
             return {"error": "answer required"}, 400
-        # Never trust an operator identity supplied in the JSON body.
-        # Remote Basic-auth deployments record the authenticated username;
-        # local loopback operation is explicitly attributed to "local".
-        auth = request.authorization
-        user = auth.username if auth and auth.username else "local"
+        # Never trust an operator identity supplied in the JSON body or
+        # an unvalidated Basic header on the loopback bypass path. Remote
+        # requests have passed _auth_gate before this handler runs.
+        if request.remote_addr in ("127.0.0.1", "::1"):
+            user = "local"
+        else:
+            auth = request.authorization
+            user = auth.username if auth and auth.username else "authenticated-operator"
         note = (data.get("note") or "")
         run = core.store.get_ai_run(run_id)
         if run is None:
