@@ -184,3 +184,24 @@ def test_compliance_crosswalk_filters_and_exports_only_recorded_mappings(page, l
         page.get_by_role("button", name="Export crosswalk JSON").click()
     download = download_info.value
     assert download.suggested_filename == "whaxon-framework-crosswalk.json"
+
+def test_ptaas_portal_filters_recorded_reports_and_findings(page, live_server):
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":['
+                 '{"job":{"id":"job-a","target":"192.0.2.10","tool":"nmap","status":"finished"},"findings":[]},'
+                 '{"job":{"id":"job-b","target":"192.0.2.20","tool":"nikto","status":"finished"},"findings":[{"title":"Missing header","severity":"low","cwe":"CWE-693"}]}'
+                 ']}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/ptaas")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-ptaas')?.innerText.includes('2 of 2 recorded job(s)')",
+        timeout=8000,
+    )
+    page.get_by_label("Filter client reports").fill("CWE-693")
+    assert page.locator("#whaxon-live-ptaas article:visible").count() == 1
+    assert "job-b" in page.locator("#whaxon-live-ptaas article:visible").inner_text()
