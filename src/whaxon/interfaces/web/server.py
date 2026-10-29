@@ -647,7 +647,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         answer = (data.get("answer") or "").strip()
         if not answer:
             return {"error": "answer required"}, 400
-        user = (data.get("user") or "local")
+        # Never trust an operator identity supplied in the JSON body.
+        # Remote Basic-auth deployments record the authenticated username;
+        # local loopback operation is explicitly attributed to "local".
+        auth = request.authorization
+        user = auth.username if auth and auth.username else "local"
         note = (data.get("note") or "")
         run = core.store.get_ai_run(run_id)
         if run is None:
