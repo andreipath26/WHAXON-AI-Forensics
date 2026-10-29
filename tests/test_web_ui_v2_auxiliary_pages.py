@@ -308,3 +308,59 @@ def test_compliance_page_hides_unimplemented_signed_export(page, live_server):
     page.goto(f"{live_server}/ui-v2/compliance")
     assert page.locator("#whaxon-live-compliance").count() == 1
     assert page.locator("button:visible").filter(has_text="Compile Signed Matrix").count() == 0
+
+
+
+def test_compliance_header_reflects_live_scope_and_global_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/compliance")
+    page.wait_for_function(
+        "() => document.querySelector('#compliance-status')?.textContent.includes('recorded finding(s)')"
+        " || document.querySelector('#compliance-status')?.textContent.includes('Live data request timed out')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.get_by_role("button", name="Configure Scope").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/compliance")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_compliance_header_halt_button_uses_live_job_history(page, live_server):
+    page.goto(f"{live_server}/ui-v2/compliance")
+    page.wait_for_function(
+        "() => document.querySelector('#compliance-status')?.textContent.includes('recorded finding(s)')"
+        " || document.querySelector('#compliance-status')?.textContent.includes('Live data request timed out')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#compliance-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+
+
+def test_compliance_disables_disconnected_reference_controls(page, live_server):
+    page.goto(f"{live_server}/ui-v2/compliance")
+    page.wait_for_function(
+        "() => document.querySelector('#compliance-status')?.textContent.includes('recorded finding(s)')"
+        " || document.querySelector('#compliance-status')?.textContent.includes('Live data request timed out')",
+        timeout=8000,
+    )
+    for button in page.locator("main button:visible").all():
+        inside_panel = button.evaluate("(el) => el.closest('#whaxon-live-compliance') !== null")
+        if inside_panel or "Configure Scope" in button.inner_text():
+            continue
+        assert button.is_disabled(), f"Unwired compliance reference control is enabled: {button.inner_text()}"

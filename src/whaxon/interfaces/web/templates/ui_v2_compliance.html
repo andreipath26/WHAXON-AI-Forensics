@@ -560,14 +560,70 @@
  const main=document.querySelector("main");if(!main)return;
  const panel=document.createElement("section");panel.id="whaxon-live-compliance";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
  const heading=document.createElement("h2");heading.className="font-headline-lg text-headline-lg";heading.textContent="Loading live WHAXON data…";panel.append(heading);
- const status=document.createElement("p");status.className="mt-2 text-sm text-on-surface-variant";status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.textContent="Fetching current backend state.";panel.append(status);
+ const status=document.createElement("p");status.id="compliance-status";status.className="mt-2 text-sm text-on-surface-variant";status.setAttribute("role","status");status.setAttribute("aria-live","polite");status.textContent="Fetching current backend state.";panel.append(status);
  const controls=document.createElement("div");controls.className="mt-3 flex flex-wrap gap-2";const search=document.createElement("input");search.type="search";search.setAttribute("aria-label","Filter framework crosswalk");search.placeholder="Filter findings, CWE, CVE, OWASP or job ID";search.className="min-w-0 flex-1 rounded bg-surface-container-lowest px-3 py-2";const exportButton=document.createElement("button");exportButton.type="button";exportButton.textContent="Export crosswalk JSON";exportButton.className="rounded bg-surface-container-high px-3 py-2";controls.append(search,exportButton);panel.append(controls);
  const list=document.createElement("div");list.className="mt-3 grid gap-3";panel.append(list);const marker=Array.from(main.querySelectorAll("*")).find(el=>el.children.length===0&&(el.textContent||"").includes("Crosswalk Engine v4.2"));const header=marker?.closest("section.bg-surface-container-low");const host=header?.parentElement;if(header&&host){host.insertBefore(panel,header.nextSibling);header.querySelectorAll("*").forEach(el=>{if(el.children.length)return;const t=(el.textContent||"").trim();if(/Crosswalk Engine v4\.2/i.test(t))el.textContent="Recorded Finding Crosswalk";else if(/DETERMINISTIC_SYNCHRONIZED|ALL FRAMEWORKS COMPLIANT|100% COMPLIANT|CERTIFIED|ATTESTED|SIGNED/i.test(t)){el.textContent="NOT ESTABLISHED BY RECORDED DATA";el.classList.remove("text-primary","text-secondary","text-tertiary");el.classList.add("text-outline");}});/* Preserve the canonical layout; page-specific fixture guards below remove unsupported sample claims. */}else main.prepend(panel);
  const cardFor=(title,detail)=>{const c=document.createElement("article");c.className="rounded-lg border border-outline-variant/30 bg-surface-container p-space-md";const h=document.createElement("h3");h.className="font-headline-sm";h.textContent=String(title||"—");const p=document.createElement("p");p.className="mt-2 text-sm text-on-surface-variant";p.textContent=String(detail||"—");c.append(h,p);return c;};
  const hideUnsupported=/Deploy Mock|Launch Exploit|Execute Payload|Auto-Remediate|Browser Shell|Start Attack|Run Exploit|Approve All|Export Archive|Create Invoice|Send to Client|Generate Compliance Score|Mark Compliant|Auditor Crosswalk PDF|Export Package|Compile Signed Matrix|Signed Matrix|Sign Compliance/i;
  document.querySelectorAll("button").forEach(b=>{if(hideUnsupported.test((b.innerText||b.textContent||"").trim())){b.disabled=true;b.hidden=true;b.style.display="none";b.setAttribute("aria-hidden","true");}});
- document.querySelectorAll("button").forEach(b=>{if(/Configure Scope/i.test((b.innerText||b.textContent||"").trim()))b.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});});
+ document.querySelectorAll("button").forEach(b=>{if(/Configure Scope/i.test((b.innerText||b.textContent||"").trim()))b.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});});main.querySelectorAll("button,input,select,textarea").forEach(control=>{if(panel.contains(control))return;if(control.tagName==="BUTTON"&&/Configure Scope/i.test(control.textContent||""))return;control.disabled=true;control.setAttribute("aria-disabled","true");control.title="Reference control only; this action is not connected to live compliance data.";});
  const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165/i;
  main.querySelectorAll("*").forEach(n=>{if(n.children.length)return;if(sample.test(n.textContent||"")){const c=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(c)c.hidden=true;else n.textContent="Live data unavailable";}});
  let rows=[];function render(){list.replaceChildren();const q=search.value.toLowerCase().trim();const shown=rows.filter(f=>[f.title,f.name,f.kind,f.severity,f.jobId,f.owasp,f.cwe,f.cve,f.references].flat().filter(Boolean).join(" ").toLowerCase().includes(q));status.textContent=shown.length+" of "+rows.length+" recorded finding(s) match the filter. Framework mappings are shown only when recorded on the finding.";if(!shown.length){list.textContent=q?"No findings match this filter.":"No recorded findings are available for crosswalk. Framework coverage is not inferred without finding metadata.";return;}shown.forEach(f=>{const mappings=[f.owasp,f.cwe,f.cve,f.references].flat().filter(Boolean).join(" · ");list.append(cardFor((f.title||f.name||f.kind||"Finding without title")+" · job "+(f.jobId||"not recorded"),mappings||"No framework mapping recorded on this finding."));});}async function load(){status.textContent="Loading persisted findings…";try{const r=await Promise.race([fetch("/api/ui-v2/findings"),new Promise((_,reject)=>setTimeout(()=>reject(new Error("Live data request timed out")),5000))]);if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json();rows=(Array.isArray(d.jobs)?d.jobs:[]).flatMap(x=>(x.findings||[]).map(f=>({...f,jobId:x.job?.id||x.job_id})));heading.textContent="Evidence-backed framework crosswalk";render();}catch(e){heading.textContent="Live data unavailable";status.textContent=e.message;list.replaceChildren();}}search.addEventListener("input",render);exportButton.addEventListener("click",()=>{const blob=new Blob([JSON.stringify({generated_at:new Date().toISOString(),source:"WHAXON persisted findings",findings:rows},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="whaxon-framework-crosswalk.json";a.click();URL.revokeObjectURL(url);status.textContent="Exported "+rows.length+" persisted finding record(s) as JSON.";});load();
- })();</script></body></html>
+ })();</script><script>
+(function(){
+  "use strict";
+  const headerButtons=[...document.querySelectorAll("header button")];
+  const text=button=>{const clone=button.cloneNode(true);clone.querySelectorAll(".material-symbols-outlined").forEach(node=>node.remove());return (clone.textContent||"").replace(/\s+/g," ").trim();};
+  const route=(button,path)=>{if(button)button.addEventListener("click",event=>{event.preventDefault();window.location.href=path;});};
+  const engagement=headerButtons.find(button=>/ENG-|Active scope|No active engagement/i.test(button.textContent||""));
+  route(engagement,"/ui-v2/scope");
+  route(headerButtons.find(button=>/^New$/i.test(text(button))),"/ui-v2/scope");
+  route(headerButtons.find(button=>/Terminal Log|LOGS/i.test(text(button))),"/ui-v2/run");
+  const halt=headerButtons.find(button=>/Emergency Halt Scan|HALT SCAN/i.test(text(button)));
+  if(halt)halt.addEventListener("click",async event=>{
+    event.preventDefault();
+    const status=document.getElementById("compliance-status");
+    try{
+      const response=await fetch("/api/history");
+      if(!response.ok)throw new Error("History HTTP "+response.status);
+      const history=await response.json();
+      const active=(Array.isArray(history)?history:[]).filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+      if(!active.length){if(status)status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
+      if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+      const results=await Promise.all(active.map(async job=>{
+        const id=job.id||job.job_id;if(!id)return false;
+        const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});
+        if(!result.ok)return false;
+        const body=await result.json().catch(()=>({}));
+        return body.ok===true;
+      }));
+      if(status)status.textContent="Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).";
+    }catch(error){if(status)status.textContent="Emergency halt failed: "+error.message;}
+  });
+  async function reflectScope(){
+    const targetLabel=[...document.querySelectorAll("header span")].find(node=>(node.textContent||"").trim().startsWith("Target:"));
+    const stateLabel=[...document.querySelectorAll("header span")].find(node=>["(IN SCOPE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((node.textContent||"").trim()));
+    const boundaryLabel=[...document.querySelectorAll("header span")].find(node=>(node.textContent||"").trim()==="STRICT BOUNDARY ENFORCED");
+    try{
+      const response=await fetch("/api/scope");
+      if(!response.ok)throw new Error("Scope HTTP "+response.status);
+      const scope=await response.json();
+      const target=Array.isArray(scope.in_scope)&&scope.in_scope.length?scope.in_scope[0]:"No target configured";
+      const engagementName=scope.engagement&&scope.engagement!=="default"?scope.engagement:"Active scope";
+      const spans=engagement?.querySelectorAll("span");
+      if(spans&&spans.length>1){spans[0].textContent=engagementName;spans[1].textContent="("+target+")";}
+      if(targetLabel)targetLabel.textContent="Target: "+target;
+      if(stateLabel)stateLabel.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":scope.in_scope?.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+      if(boundaryLabel)boundaryLabel.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE CONFIGURATION LOADED";
+    }catch(_){
+      if(engagement){const spans=engagement.querySelectorAll("span");if(spans.length>1){spans[0].textContent="Scope unavailable";spans[1].textContent="(status unavailable)";}}
+      if(targetLabel)targetLabel.textContent="Target: unavailable";
+      if(stateLabel)stateLabel.textContent="(STATUS UNAVAILABLE)";
+      if(boundaryLabel)boundaryLabel.textContent="SCOPE STATUS UNAVAILABLE";
+    }
+  }
+  reflectScope();
+})();
+</script>
+</body></html>
