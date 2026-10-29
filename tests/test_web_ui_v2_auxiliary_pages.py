@@ -288,3 +288,16 @@ def test_canonical_auxiliary_page_shells_are_preserved(page, live_server):
     assert page.get_by_text("BROWSER AUTOMATION: NOT CONNECTED", exact=True).is_visible()
     page.goto(f"{live_server}/ui-v2/ptaas")
     assert page.get_by_role("heading", name="Self-Service Scoping & Assessment Dispatcher").is_visible()
+
+def test_threat_intel_preserves_layout_without_exposing_unwired_replay(page, live_server):
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    assert page.get_by_text("Threat Intelligence · Local References", exact=True).is_visible()
+    for label in ("Inspect Exploit Code", "Execute Curl Replay Test", "View Nuclei Heuristics"):
+        assert page.get_by_role("button", name=label).count() == 0
+    assert page.get_by_role("button", name="Refresh catalog").is_visible()
+
+
+def test_compliance_page_hides_unimplemented_signed_export(page, live_server):
+    page.goto(f"{live_server}/ui-v2/compliance")
+    assert page.locator("#whaxon-live-compliance").count() == 1
+    assert page.locator("button:visible").filter(has_text="Compile Signed Matrix").count() == 0
