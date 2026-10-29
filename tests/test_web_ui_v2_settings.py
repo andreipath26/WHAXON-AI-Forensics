@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 from whaxon.core import Core
-from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, _redact_sensitive_settings, create_app
+from whaxon.interfaces.web.server import (
+    AsyncRunner,
+    JobRegistry,
+    _redact_sensitive_settings,
+    create_app,
+)
 
 
 def test_settings_explorer_loads_and_redacts_settings(page, live_server):
