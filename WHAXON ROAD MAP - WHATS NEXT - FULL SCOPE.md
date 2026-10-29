@@ -738,6 +738,8 @@ Client portal · Self-service scoping · On-demand test launches · Real-time st
 
 Finding state machine (open → acknowledged → in-progress → resolved → verified → closed) · Remediation evidence · Retest workflow · Regression tracking · Client-facing status · Time-to-fix metrics.
 
+**Expanded remediation specification:** See [WHAXON Competitor Capability and Remediation Roadmap Addendum](WHAXON%20Competitor%20Capability%20and%20Remediation%20Roadmap%20Addendum.md) for the full lifecycle: root-cause analysis, broad vulnerability/target coverage, WHAXON and imported scanner findings, reviewable patch generation, isolated validation, approval-controlled application, rollback/recovery, post-fix retesting, audit evidence, acceptance criteria and coverage metrics. This is queued scope, not implemented functionality. Keep patch generation separate from permission to apply; approval-based application is the default, and the UI-first gate in §44 remains in force.
+
 **Effort: 6–8 sessions (~15–20h).**
 
 ## 20.3 Attack Surface Management / continuous monitoring
@@ -1959,6 +1961,7 @@ The following items are deferred until v1.0 is fully deployed. They represent th
 *   **Static Mapping:** Add `data/remediation_rules.json`. Map verified finding kinds (e.g., `sqli`) to exact remediation text (e.g., "Use parameterized queries").
 *   **Report Enrichment:** The report renders the remediation context *next* to the verified proof.
 *   **Post-Fix Verification:** The report includes the exact `whaxon retest` command for the client to verify the patch.
+*   **Scope note:** This earlier proof-driven remediation slice is expanded by the [remediation roadmap addendum](WHAXON%20Competitor%20Capability%20and%20Remediation%20Roadmap%20Addendum.md), which adds cross-tool finding intake, patch generation/testing/application safeguards, rollback and auditable verification. Do not mark those broader capabilities DONE until implemented and acceptance-tested.
 
 ---
 
