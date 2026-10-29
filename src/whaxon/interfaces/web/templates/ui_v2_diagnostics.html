@@ -981,4 +981,55 @@
   document.getElementById("diagnostics-refresh").addEventListener("click",refresh);refresh();
 })();
 </script>
+
+<script id="whaxon-diagnostics-live-actions">
+(function(){
+ "use strict";
+ const headerButtons=[...document.querySelectorAll("header button")];
+ const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+ const headerStatus=document.getElementById("diagnostics-status");
+ const engagement=headerButtons.find(b=>/ENG-|Active scope|Scope unavailable/i.test(b.textContent||""));
+ const newButton=headerButtons.find(b=>/^New$/i.test(label(b)));
+ [engagement,newButton].forEach(button=>{if(!button)return;button.disabled=false;button.removeAttribute("aria-disabled");button.title="Open the live scope configuration.";button.addEventListener("click",event=>{event.preventDefault();window.location.href="/ui-v2/scope";});});
+ async function loadScope(){
+  const spans=engagement?engagement.querySelectorAll("span"):[];
+  const target=[...document.querySelectorAll("header span")].find(n=>(n.textContent||"").trim().startsWith("Target:"));
+  const scopeBadge=[...document.querySelectorAll("header span")].find(n=>["(IN SCOPE)","(RULE CONFIGURED)","(NO TARGET RULE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((n.textContent||"").trim()));
+  const boundary=[...document.querySelectorAll("header span")].find(n=>/STRICT BOUNDARY ENFORCED|SCOPE CONFIGURATION LOADED|SCOPE ENFORCEMENT DISABLED|SCOPE STATUS UNAVAILABLE/.test((n.textContent||"").trim()));
+  try{
+   const r=await fetch("/api/scope");if(!r.ok)throw new Error("Scope HTTP "+r.status);
+   const scope=await r.json(),targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+   const name=scope.engagement&&scope.engagement!=="default"?scope.engagement:"Active scope";
+   const targetName=targets.length?targets[0]:"No target configured";
+   if(spans.length>1){spans[0].textContent=name;spans[1].textContent="("+targetName+")";}
+   if(target)target.textContent="Target: "+targetName;
+   if(scopeBadge)scopeBadge.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+   if(boundary)boundary.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE CONFIGURATION LOADED";
+  }catch(_){
+   if(spans.length>1){spans[0].textContent="Scope unavailable";spans[1].textContent="(status unavailable)";}
+   if(target)target.textContent="Target: unavailable";
+   if(scopeBadge)scopeBadge.textContent="(STATUS UNAVAILABLE)";
+   if(boundary)boundary.textContent="SCOPE STATUS UNAVAILABLE";
+  }
+ }
+ loadScope();
+ const run=document.getElementById("btn-run-diag");
+ if(run){run.disabled=false;run.removeAttribute("aria-disabled");run.addEventListener("click",event=>{event.preventDefault();document.getElementById("diagnostics-refresh")?.click();document.getElementById("diagnostics-checks")?.scrollIntoView({behavior:"smooth",block:"start"});});}
+ const exportButton=document.getElementById("btn-export-json");
+ if(exportButton){exportButton.disabled=false;exportButton.removeAttribute("aria-disabled");exportButton.addEventListener("click",async event=>{
+  event.preventDefault();const previous=exportButton.textContent;exportButton.disabled=true;exportButton.textContent="Exporting live health…";
+  try{
+   const [healthResponse,toolsResponse,scopeResponse]=await Promise.all([fetch("/api/health"),fetch("/api/tools"),fetch("/api/scope")]);
+   if(!healthResponse.ok)throw new Error("Health HTTP "+healthResponse.status);
+   if(!toolsResponse.ok)throw new Error("Tool catalog HTTP "+toolsResponse.status);
+   if(!scopeResponse.ok)throw new Error("Scope HTTP "+scopeResponse.status);
+   const data={generated_at:new Date().toISOString(),source:"live WHAXON API",health:await healthResponse.json(),tools:await toolsResponse.json(),scope:await scopeResponse.json()};
+   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="whaxon-health-report.json";document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
+   if(headerStatus)headerStatus.textContent="Exported a JSON report from live /api/health, /api/tools and /api/scope data.";
+  }catch(error){if(headerStatus)headerStatus.textContent="Health report export failed: "+error.message;}
+  finally{exportButton.disabled=false;exportButton.textContent=previous;}
+ });}
+})();
+</script>
 </body></html>
