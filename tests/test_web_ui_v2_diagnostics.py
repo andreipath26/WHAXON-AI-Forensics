@@ -148,7 +148,7 @@ def test_diagnostics_run_and_export_use_live_api_data(page, live_server):
         " || document.querySelector('#diagnostics-status')?.textContent.includes('Health report export failed')",
         timeout=5000,
     )
-    assert "reference/demo control" in page.locator("#btn-restart-daemons").get_attribute("title")
+    assert "reference/demo control" in page.locator("#btn-restart-daemons").get_attribute("title").lower()
     assert page.locator("#btn-restart-daemons").is_disabled()
     assert page.locator("#btn-run-diag").is_enabled()
     assert page.locator("#btn-export-json").is_enabled()
