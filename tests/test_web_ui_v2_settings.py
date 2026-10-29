@@ -88,3 +88,36 @@ def test_settings_reference_controls_are_not_mistaken_for_live_writes(page, live
     assert page.locator("main input:disabled, main select:disabled, main textarea:disabled").count() == page.locator("main input, main select, main textarea").count()
     assert page.locator("main button:disabled").count() > 0
     assert "configuration writes are not connected" in page.locator("main").inner_text()
+
+
+def test_settings_header_logs_button_opens_the_run_workspace(page, live_server):
+    page.goto(f"{live_server}/ui-v2/settings")
+    page.get_by_role("button", name="LOGS").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_settings_header_halt_button_uses_live_job_history(page, live_server):
+    page.goto(f"{live_server}/ui-v2/settings")
+    page.wait_for_function(
+        "() => document.querySelector('#settings-status')?.textContent.includes('Settings loaded read-only')"
+        " || document.querySelector('#settings-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.get_by_role("button", name="HALT SCAN").click()
+    page.wait_for_function(
+        "() => document.querySelector('#settings-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+
+
+def test_settings_reference_controls_are_disabled_except_live_refresh(page, live_server):
+    page.goto(f"{live_server}/ui-v2/settings")
+    page.wait_for_function(
+        "() => document.querySelector('#settings-status')?.textContent.includes('Settings loaded read-only')"
+        " || document.querySelector('#settings-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    for button in page.locator("main button:visible").all():
+        if button.get_attribute("id") != "settings-refresh":
+            assert button.is_disabled(), f"Unwired settings control is enabled: {button.inner_text()}"
