@@ -26,7 +26,7 @@ def test_attack_chain_page_never_displays_fictional_compromise_evidence(page, li
     response = page.goto(f"{live_server}/ui-v2/chains")
     assert response is not None and response.status == 200
     page.wait_for_function(
-        "() => document.querySelector('#chains-status')?.textContent.includes('relationship(s) returned') "
+        "() => document.querySelector('#chains-status')?.textContent.includes('recorded relationship(s) match the filter') "
         "|| document.querySelector('#chains-status')?.textContent.includes('could not be loaded')",
         timeout=8000,
     )
