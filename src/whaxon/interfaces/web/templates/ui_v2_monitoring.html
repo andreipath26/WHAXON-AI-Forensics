@@ -707,6 +707,7 @@
  const pageWrapper=grid.closest("main > div");
  if(ledgerSection&&pageWrapper){Array.from(pageWrapper.children).forEach(child=>{if(!child.contains(ledgerSection))child.style.display="none";});}
  if(ledgerSection&&ledgerSection.parentElement){Array.from(ledgerSection.parentElement.children).forEach(child=>{if(child!==ledgerSection)child.style.display="none";});ledgerSection.querySelectorAll("button").forEach(button=>{button.disabled=true;button.style.display="none";button.setAttribute("aria-hidden","true");});}
+ const summary=document.createElement("div");summary.id="monitoring-live-summary";summary.className="mb-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4";summary.innerHTML='<div class="flex flex-wrap items-center justify-between gap-2"><h2 class="font-semibold text-slate-100">Live monitoring summary</h2><button id="monitoring-refresh" type="button" class="rounded bg-slate-800 px-3 py-2 text-sm text-slate-100">Refresh data</button></div><p id="monitoring-summary-status" role="status" aria-live="polite" class="mt-2 text-sm text-slate-400">Loading current jobs and scope…</p>';if(ledgerSection)ledgerSection.insertBefore(summary,grid);
  grid.replaceChildren();
  const status=document.createElement("p");status.className="p-4 text-sm text-slate-400";status.textContent="Loading recorded WHAXON jobs and findings…";grid.append(status);
  const add=(parent,text,cls)=>{const n=document.createElement("div");n.textContent=text==null||text===""?"—":String(text);if(cls)n.className=cls;parent.append(n);};
@@ -716,6 +717,10 @@
    if(!rr.ok||!hr.ok||!sr.ok)throw new Error("One or more live APIs returned an error");
    const report=await rr.json(), history=await hr.json(), scope=await sr.json();
    const jobs=Array.isArray(report.jobs)?report.jobs:[];
+   const historyRows=Array.isArray(history)?history:[];
+   const findingsTotal=jobs.reduce((total,x)=>total+(Array.isArray(x.findings)?x.findings.length:0),0);
+   const scopeState=scope&&typeof scope==="object"?scope:{};
+   summary.querySelector("#monitoring-summary-status").textContent="Report jobs: "+jobs.length+" · History records: "+historyRows.length+" · Recorded findings: "+findingsTotal+" · Scope enforcement: "+(scopeState.enabled===true?"enabled":scopeState.enabled===false?"disabled":"not reported")+" · Scope rules: "+(Array.isArray(scopeState.in_scope)?scopeState.in_scope.length:0)+" in-scope / "+(Array.isArray(scopeState.out_of_scope)?scopeState.out_of_scope.length:0)+" excluded.";
    const rows=jobs.map(x=>({job:x.job||{},findings:Array.isArray(x.findings)?x.findings:[]}));
    grid.replaceChildren();
    if(!rows.length){add(grid,"No recorded jobs yet. Run an in-scope job to populate this live view.","p-4 text-sm text-slate-400");return;}
@@ -731,6 +736,7 @@
   }catch(e){grid.replaceChildren();add(grid,"Live monitoring data unavailable: "+e.message,"p-4 text-sm text-amber-300");}
  }
  load();
+ summary.querySelector("#monitoring-refresh").addEventListener("click",load);
 })();
 </script>
 <script>(function(){const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165/i;document.querySelectorAll("#asset-ledger-container .asset-card").forEach(card=>{if(sample.test(card.textContent||""))card.remove();});document.body.querySelectorAll("*").forEach(n=>{if(n.children.length)return;if(sample.test(n.textContent||""))n.textContent="Live data unavailable";});})();</script></body></html>
