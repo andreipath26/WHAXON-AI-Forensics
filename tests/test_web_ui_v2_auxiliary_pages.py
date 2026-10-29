@@ -46,3 +46,39 @@ def test_ptaas_hides_unimplemented_client_actions(page, live_server):
     visible = page.locator("body").inner_text()
     assert "BOLA / IDOR in Merchant Transfer Settlement Route" not in visible
     assert "REPRODUCIBLE EXPLOIT ARTIFACT" not in visible
+
+def test_bas_validation_only_offers_actions_for_real_sequence_ids(page, live_server):
+    calls = []
+
+    def findings(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"job":{"id":"job-bas"},"findings":['
+                 '{"seq":3,"kind":"recorded finding","severity":"low","verification_status":"candidate"},'
+                 '{"seq":null,"kind":"missing sequence","severity":"high","verification_status":"candidate"}]}]}',
+        )
+
+    def validate(route):
+        calls.append(route.request.url)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"status":"candidate","reason":"no deterministic replay signal"}',
+        )
+
+    page.route("**/api/ui-v2/findings", findings)
+    page.route("**/api/validate/**", validate)
+    page.goto(f"{live_server}/ui-v2/bas")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-bas-status')?.textContent.includes('2 persisted finding(s)') || document.body.innerText.includes('2 persisted finding(s)')",
+        timeout=8000,
+    )
+    buttons = page.get_by_role("button", name="Validate recorded finding")
+    assert buttons.count() == 1
+    buttons.first.click()
+    page.wait_for_function(
+        "() => document.body.innerText.includes('Validation result: candidate')",
+        timeout=8000,
+    )
+    assert calls == [f"{live_server}/api/validate/job-bas/3"]
