@@ -78,7 +78,7 @@ def test_evidence_inspector_saves_notes_and_uploads_files(page, live_server):
     )
 
     page.get_by_label("Evidence note title").fill("Reproduction notes")
-    page.get_by_label("Evidence note").fill("Observed response reproduced from the recorded request.")
+    page.get_by_label("Evidence note", exact=True).fill("Observed response reproduced from the recorded request.")
     page.get_by_role("button", name="Save note").click()
     page.wait_for_function("() => document.querySelector('#evidence-status')?.textContent.includes('Evidence note saved')", timeout=8000)
     assert calls and '"kind":"note"' in calls[0]["body"]
