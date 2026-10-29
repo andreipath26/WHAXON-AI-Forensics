@@ -524,7 +524,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "target must be a non-empty string"}, 400
         tool_id = tool_id.strip()
         target = target.strip()
-        if len(tool_id) > 128 or len(target) > 2048 or "\\x00" in target:
+        if len(tool_id) > 128 or len(target) > 2048 or "\x00" in target:
             return {"error": "tool_id or target exceeds allowed limits"}, 400
         if extra_args is None:
             extra_args = ""
