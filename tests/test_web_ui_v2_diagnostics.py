@@ -138,6 +138,7 @@ def test_diagnostics_run_and_export_use_live_api_data(page, live_server):
         timeout=10000,
     )
 
+    assert page.locator("#btn-export-json").get_attribute("onclick") is None
     with page.expect_download() as download_info:
         page.locator("#btn-export-json").click()
     download = download_info.value
