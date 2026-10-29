@@ -566,11 +566,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         import json as _json
         import time as _time
 
-        data = request.get_json(silent=True) or {}
-        goal = (data.get("goal") or "").strip()
-        if not goal:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object; AI run was not started"}, 400
+        goal_value = data.get("goal")
+        if not isinstance(goal_value, str) or not goal_value.strip():
             return {"error": "goal required; AI run was not started"}, 400
-        target = (data.get("target") or "").strip() or None
+        goal = goal_value.strip()
+        target_value = data.get("target", "")
+        if target_value is None:
+            target_value = ""
+        if not isinstance(target_value, str):
+            return {"error": "target must be a string; AI run was not started"}, 400
+        target = target_value.strip() or None
+        if len(goal) > 10000 or (target is not None and (len(target) > 2048 or "\\x00" in target)):
+            return {"error": "goal or target exceeds allowed limits; AI run was not started"}, 400
         if target is None:
             try:
                 from whaxon.core.targets import extract_target
