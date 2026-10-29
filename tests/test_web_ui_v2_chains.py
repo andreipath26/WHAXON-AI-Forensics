@@ -26,7 +26,7 @@ def test_attack_chain_page_never_displays_fictional_compromise_evidence(page, li
     response = page.goto(f"{live_server}/ui-v2/chains")
     assert response is not None and response.status == 200
     page.wait_for_function(
-        "() => document.querySelector('#chains-status')?.textContent.includes('recorded relationship(s) match the filter') "
+        "() => document.querySelector('#chains-status')?.textContent.includes('recorded relationship(s) match the filters') "
         "|| document.querySelector('#chains-status')?.textContent.includes('could not be loaded')",
         timeout=8000,
     )
@@ -59,7 +59,7 @@ def test_attack_chain_page_renders_recorded_edges_and_refreshes(page, live_serve
     page.route("**/api/pivot/graph", graph)
     page.goto(f"{live_server}/ui-v2/chains")
     page.wait_for_function(
-        "() => document.querySelector('#chains-status')?.textContent.includes('1 of 1 recorded relationship(s) match the filter')",
+        "() => document.querySelector('#chains-status')?.textContent.includes('1 of 1 recorded relationship(s) match the filters')",
         timeout=8000,
     )
     rendered = page.locator("#chains-list").inner_text()
