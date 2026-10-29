@@ -74,7 +74,7 @@ def test_history_search_and_tool_filter_operate_on_live_records(page, live_serve
     rows = page.locator("table tbody tr")
     assert rows.count() == 2
     tool_filter = page.locator("#history-tool-filter")
-    assert [tool_filter.locator("option").nth(i).get_attribute("value") for i in range(tool_filter.locator("option").count())] == ["all", "nmap", "nikto"]
+    assert [tool_filter.locator("option").nth(i).get_attribute("value") for i in range(tool_filter.locator("option").count())] == ["all", "nikto", "nmap"]
 
     page.locator("#history-search").fill("job-beta")
     assert rows.count() == 1
