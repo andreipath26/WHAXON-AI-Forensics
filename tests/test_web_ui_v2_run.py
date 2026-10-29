@@ -161,7 +161,7 @@ def test_run_page_disables_ai_planner_toggle_without_scope_enforcement(page, liv
     toggle = page.locator("#ai-planner-toggle")
     assert toggle.is_disabled()
     assert not toggle.is_checked()
-    assert "scope enforcement is not verified" in toggle.get_attribute("title").lower()
+    assert "does not enforce the same scope boundary" in toggle.get_attribute("title").lower()
     planner_card = toggle.locator("xpath=ancestor::div[contains(@class, 'bg-surface-container-low')][1]")
     assert "AI planner execution is disabled" in planner_card.inner_text()
     assert "GATE: NOT VERIFIED" in planner_card.inner_text()
