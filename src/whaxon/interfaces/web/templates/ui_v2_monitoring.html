@@ -749,7 +749,7 @@
   const headerButtons=[...document.querySelectorAll("header button")];
   const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
   const go=(b,path)=>{if(!b)return;b.disabled=false;b.hidden=false;b.style.display="";b.removeAttribute("aria-hidden");b.addEventListener("click",e=>{e.preventDefault();window.location.href=path;});};
-  const engagement=headerButtons.find(b=>/ENG-|No active engagement|Active scope|Scope unavailable/i.test(b.textContent||""));
+  const engagement=headerButtons.find(b=>b.querySelector(".material-symbols-outlined")&&/arrow_drop_down/.test(b.textContent||""))||headerButtons.find(b=>/ENG-|No active engagement|Active scope|Scope unavailable/i.test(b.textContent||""));
   go(engagement,"/ui-v2/scope");
   const newButton=headerButtons.find(b=>/^New$/i.test(label(b)));
   go(newButton,"/ui-v2/scope");
