@@ -812,34 +812,7 @@
       `;
     }
 
-    // Diagnostic Full Run Button Trigger
-    document.getElementById('btn-run-diag')?.addEventListener('click', function() {
-      const btn = this;
-      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">refresh</span><span>Running Diagnostic Suite...</span>`;
-      btn.disabled = true;
-
-      setTimeout(() => {
-        triggerSelfCheck('ebpf');
-      }, 200);
-
-      setTimeout(() => {
-        triggerSelfCheck('msf');
-      }, 500);
-
-      setTimeout(() => {
-        triggerSelfCheck('sqlite');
-      }, 800);
-
-      setTimeout(() => {
-        btn.innerHTML = `<span class="material-symbols-outlined text-sm">check_circle</span><span>All Tests Passed</span>`;
-        btn.className = "flex items-center gap-space-xs px-space-lg py-1.5 bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded shadow-md";
-        setTimeout(() => {
-          btn.innerHTML = `<span class="material-symbols-outlined text-sm">play_circle</span><span>Run Full Diagnostic [F5]</span>`;
-          btn.className = "flex items-center gap-space-xs px-space-lg py-1.5 bg-primary-container hover:bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded shadow-md transition-all active:scale-95";
-          btn.disabled = false;
-        }, 2000);
-      }, 1200);
-    });
+    // Full diagnostic actions are wired to live API refresh below; no simulated result handler.
 
     // F5 Key Shortcut handling to simulate refresh without app reboot
     window.addEventListener('keydown', function(e) {
@@ -849,31 +822,7 @@
       }
     });
 
-    // Export Health Report JSON Simulation
-    document.getElementById('btn-export-json')?.addEventListener('click', function() {
-      const report = {
-        timestamp: new Date().toISOString(),
-        system_status: "ALL SUBSYSTEMS HEALTHY",
-        uptime_seconds: 1656764,
-        metrics: {
-          postgres_latency_ms: 1.2,
-          msf_connected: true,
-          msf_version: "6.4.12-dev",
-          ebpf_enforcing: true,
-          out_of_scope_drops: 412,
-          worker_nodes_active: 4,
-          cpu_load_percent: 24.2,
-          ram_allocated_gb: 4.8
-        }
-      };
-      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `whaxon_health_diagnostics_${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    // Export is generated only from live API data by the page wiring below.
 
     // Restart Engine Daemons Simulation with Visual Feedback
     document.getElementById('btn-restart-daemons')?.addEventListener('click', function() {
@@ -979,6 +928,58 @@
   const add=(parent,label,value)=>{const card=document.createElement("div");card.className="rounded-lg bg-surface-container p-space-md";const title=document.createElement("div");title.className="font-label-sm text-outline uppercase";title.textContent=label;const result=document.createElement("div");result.className="mt-1 font-code-md";result.textContent=value;card.append(title,result);parent.append(card);};
   async function refresh(){const status=document.getElementById("diagnostics-status"),checks=document.getElementById("diagnostics-checks"),button=document.getElementById("diagnostics-refresh");button.disabled=true;button.textContent="Refreshing…";status.textContent="Refreshing live diagnostics…";checks.replaceChildren();try{const [hr,tr]=await Promise.all([fetch("/api/health"),fetch("/api/tools")]);if(!tr.ok)throw new Error("Tool catalog HTTP "+tr.status);const health=await hr.json(),toolsData=await tr.json(),tools=Array.isArray(toolsData)?toolsData:(Array.isArray(toolsData.tools)?toolsData.tools:null);if(!tools)throw new Error("Tool catalog response has an unexpected format");add(checks,"WHAXON health",health.status||"not reported");Object.entries(health.checks&&typeof health.checks==="object"?health.checks:{}).forEach(([k,v])=>add(checks,"Health · "+k,typeof v==="string"?v:JSON.stringify(v)));add(checks,"Catalog tools",String(tools.length));add(checks,"Adapter + binary available",String(tools.filter(t=>t.adapter_available===true&&t.binary_available===true).length));add(checks,"Unavailable tool binaries",String(tools.filter(t=>t.binary_available===false).length));add(checks,"Availability not reported",String(tools.filter(t=>typeof t.binary_available!=="boolean").length));status.textContent="Live values loaded from /api/health and /api/tools. Health HTTP "+hr.status+(hr.ok?"":" (degraded/unhealthy)")+"; tools HTTP "+tr.status+".";}catch(e){status.textContent="Diagnostics could not be loaded: "+e.message;checks.replaceChildren();}finally{button.disabled=false;button.textContent="Refresh";}}
   document.getElementById("diagnostics-refresh").addEventListener("click",refresh);refresh();
+})();
+</script>
+
+<script id="whaxon-diagnostics-live-actions">
+(function(){
+ "use strict";
+ const headerButtons=[...document.querySelectorAll("header button")];
+ const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+ const headerStatus=document.getElementById("diagnostics-status");
+ const engagement=headerButtons.find(b=>/ENG-|Active scope|Scope unavailable/i.test(b.textContent||""));
+ const newButton=headerButtons.find(b=>/^New$/i.test(label(b)));
+ [engagement,newButton].forEach(button=>{if(!button)return;button.disabled=false;button.removeAttribute("aria-disabled");button.title="Open the live scope configuration.";button.addEventListener("click",event=>{event.preventDefault();window.location.href="/ui-v2/scope";});});
+ async function loadScope(){
+  const spans=engagement?engagement.querySelectorAll("span"):[];
+  const target=[...document.querySelectorAll("header span")].find(n=>(n.textContent||"").trim().startsWith("Target:"));
+  const scopeBadge=[...document.querySelectorAll("header span")].find(n=>["(IN SCOPE)","(RULE CONFIGURED)","(NO TARGET RULE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((n.textContent||"").trim()));
+  const boundary=[...document.querySelectorAll("header span")].find(n=>/STRICT BOUNDARY ENFORCED|SCOPE CONFIGURATION LOADED|SCOPE ENFORCEMENT DISABLED|SCOPE STATUS UNAVAILABLE/.test((n.textContent||"").trim()));
+  try{
+   const r=await fetch("/api/scope");if(!r.ok)throw new Error("Scope HTTP "+r.status);
+   const scope=await r.json(),targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+   const name=scope.engagement&&scope.engagement!=="default"?scope.engagement:"Active scope";
+   const targetName=targets.length?targets[0]:"No target configured";
+   if(spans.length>1){spans[0].textContent=name;spans[1].textContent="("+targetName+")";}
+   if(target)target.textContent="Target: "+targetName;
+   if(scopeBadge)scopeBadge.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+   if(boundary)boundary.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE CONFIGURATION LOADED";
+  }catch(_){
+   if(spans.length>1){spans[0].textContent="Scope unavailable";spans[1].textContent="(status unavailable)";}
+   if(target)target.textContent="Target: unavailable";
+   if(scopeBadge)scopeBadge.textContent="(STATUS UNAVAILABLE)";
+   if(boundary)boundary.textContent="SCOPE STATUS UNAVAILABLE";
+  }
+ }
+ loadScope();
+ const run=document.getElementById("btn-run-diag");
+ if(run){run.removeAttribute("onclick");run.disabled=false;run.removeAttribute("aria-disabled");run.addEventListener("click",event=>{event.preventDefault();document.getElementById("diagnostics-refresh")?.click();document.getElementById("diagnostics-checks")?.scrollIntoView({behavior:"smooth",block:"start"});});}
+ const exportButton=document.getElementById("btn-export-json");
+ if(exportButton){exportButton.removeAttribute("onclick");exportButton.disabled=false;exportButton.removeAttribute("aria-disabled");exportButton.addEventListener("click",async event=>{
+  event.preventDefault();const previous=exportButton.textContent;exportButton.disabled=true;exportButton.textContent="Exporting live health…";
+  try{
+   const [healthResponse,toolsResponse,scopeResponse]=await Promise.all([fetch("/api/health"),fetch("/api/tools"),fetch("/api/scope")]);
+   if(!toolsResponse.ok)throw new Error("Tool catalog HTTP "+toolsResponse.status);
+   const health=await healthResponse.json(),tools=await toolsResponse.json();
+   let scope;
+   if(scopeResponse.ok){scope=await scopeResponse.json();}else{scope={available:false,http_status:scopeResponse.status,error:"Scope data unavailable"};}
+   const data={generated_at:new Date().toISOString(),source:"live WHAXON API",health_http_status:healthResponse.status,health,tools,scope};
+   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="whaxon-health-report.json";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   if(headerStatus)headerStatus.textContent="Exported a JSON report from live /api/health, /api/tools and /api/scope data.";
+  }catch(error){if(headerStatus)headerStatus.textContent="Health report export failed: "+error.message;}
+  finally{exportButton.disabled=false;exportButton.textContent=previous;}
+ });}
 })();
 </script>
 </body></html>
