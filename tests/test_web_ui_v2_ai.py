@@ -103,7 +103,7 @@ def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
         route.fulfill(
             status=200,
             content_type="application/json",
-            body='[{"id":"job-to-cancel","status":"running"}]',
+            body='{"jobs":[{"id":"job-to-cancel","status":"running"}]}',
         )
 
     def cancel(route):
@@ -253,3 +253,50 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert "RECORDED PROPOSAL DETAILS" not in visible_text
     assert "Recorded Proposal Details" not in visible_text
     assert "Target: No target selected" in page.locator("header span").filter(has_text="Target:").first.text_content()
+
+
+
+def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(page, live_server):
+    scope_calls = {"count": 0}
+
+    def scope(route):
+        scope_calls["count"] += 1
+        engagement = "scope-one" if scope_calls["count"] == 1 else "scope-two"
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"' + engagement + '","in_scope":["127.0.0.1"],"enabled":true}',
+        )
+
+    page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.route("**/api/scope", scope)
+    page.route(
+        "**/api/scope/check",
+        lambda route: route.fulfill(status=200, content_type="application/json", body='{"allowed":true,"reason":"matched test scope"}'),
+    )
+    page.route(
+        "**/api/ai/run",
+        lambda route: route.fulfill(status=202, content_type="application/json", body='{"run_id":"scope-refresh-test"}'),
+    )
+
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    # The engagement selector text changes after each live scope read.
+    engagement = page.locator("header button").filter(has_text="scope-one")
+    assert engagement.is_visible()
+    page.locator("#ai-target").fill("127.0.0.1")
+    page.locator("#ai-goal").fill("Check scope refresh behavior")
+    page.locator("#ai-run-form button[type=submit]").click()
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('AI run submitted: scope-refresh-test')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('header button')].some(b => b.textContent.includes('scope-two'))",
+        timeout=8000,
+    )
+    assert scope_calls["count"] >= 2
