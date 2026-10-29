@@ -391,7 +391,7 @@
   if (integrityButton) integrityButton.hidden = true;
   document.querySelectorAll("main *").forEach(node => {
     if (node.children.length) return;
-    if (/^Page 1 of 3 \\(Total 42 records\\)$/.test((node.textContent || "").trim())) {
+    if ((node.textContent || "").trim() === "Page 1 of 3 (Total 42 records)") {
       const footer = node.closest(".border-t");
       if (footer) footer.style.display = "none";
       else node.textContent = "Pagination unavailable for this live view";
