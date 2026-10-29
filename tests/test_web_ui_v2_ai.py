@@ -62,19 +62,18 @@ def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofe
 
 def test_ai_strategy_gate_authorize_button_records_real_pending_answer(page, live_server):
     calls = []
+    pending_state = {"active": True}
 
     def pending(route):
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='[{"id":"ai-pending-ui-test","goal":"test authorized phase transition","phase":"recon","pending_question":{"rationale":"Confirm the next phase","target":"127.0.0.1","confidence":0.9,"proposed_phase":"enum"}}]',
-        )
+        body = '[{"id":"ai-pending-ui-test","goal":"test authorized phase transition","phase":"recon","pending_question":{"rationale":"Confirm the next phase","target":"127.0.0.1","confidence":0.9,"proposed_phase":"enum"}}]' if pending_state["active"] else "[]"
+        route.fulfill(status=200, content_type="application/json", body=body)
 
     def runs(route):
         route.fulfill(status=200, content_type="application/json", body="[]")
 
     def answer(route):
         calls.append({"method": route.request.method, "body": route.request.post_data_json})
+        pending_state["active"] = False
         route.fulfill(status=200, content_type="application/json", body='{"ok":true,"run_id":"ai-pending-ui-test","seq":1}')
 
     page.route("**/api/ai/pending", pending)
@@ -129,19 +128,18 @@ def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
 
 def test_ai_strategy_gate_reject_records_reason(page, live_server):
     calls = []
+    pending_state = {"active": True}
 
     def pending(route):
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='[{"id":"ai-reject-ui-test","goal":"test rejected phase transition","phase":"recon","pending_question":{"rationale":"Confirm the next phase","target":"127.0.0.1","confidence":0.9,"proposed_phase":"enum"}}]',
-        )
+        body = '[{"id":"ai-reject-ui-test","goal":"test rejected phase transition","phase":"recon","pending_question":{"rationale":"Confirm the next phase","target":"127.0.0.1","confidence":0.9,"proposed_phase":"enum"}}]' if pending_state["active"] else "[]"
+        route.fulfill(status=200, content_type="application/json", body=body)
 
     def runs(route):
         route.fulfill(status=200, content_type="application/json", body="[]")
 
     def answer(route):
         calls.append(route.request.post_data_json)
+        pending_state["active"] = False
         route.fulfill(status=200, content_type="application/json", body='{"ok":true,"run_id":"ai-reject-ui-test","seq":1}')
 
     page.route("**/api/ai/pending", pending)
