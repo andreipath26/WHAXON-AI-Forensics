@@ -520,3 +520,124 @@ def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server):
         assert button.is_disabled(), f"Disconnected approval control remains enabled: {button.inner_text()}"
     assert page.get_by_role("button", name="Refresh queue").is_enabled()
 
+
+
+def test_threat_intel_uses_live_scope_and_local_catalog_only(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"test-engagement","in_scope":["https://target.example"],"enabled":true}',
+        ),
+    )
+    page.route(
+        "**/api/tools",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"tools":[{"name":"nmap","adapter_available":true,"binary_available":false}]}',
+        ),
+    )
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"findings":[{"title":"Recorded issue","description":"CVE-2024-12345"}]}]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.innerText.includes('No connected external threat-intelligence feed')",
+        timeout=10000,
+    )
+    header = page.locator("header").inner_text()
+    assert "test-engagement" in header
+    assert "https://target.example" in header
+    assert "SCOPE CONFIGURATION LOADED" in header
+    panel = page.locator("#whaxon-live-threat-intel")
+    assert "CVE-2024-12345" in panel.inner_text()
+    assert "nmap" in panel.inner_text()
+    assert "No connected external threat-intelligence feed is claimed" in panel.inner_text()
+    assert "194,821 CVEs" not in page.locator("main").inner_text()
+    assert "45,910 PoCs" not in page.locator("main").inner_text()
+
+
+def test_threat_intel_filter_and_refresh_use_live_catalog_apis(page, live_server):
+    calls = {"tools": 0, "report": 0}
+
+    def tools(route):
+        calls["tools"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"tools":[{"name":"nmap","adapter_available":true,"binary_available":true},{"name":"gobuster","adapter_available":false,"binary_available":false}]}',
+        )
+
+    def report(route):
+        calls["report"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"findings":[{"title":"Recorded issue","description":"CVE-2025-12345"}]}]}',
+        )
+
+    page.route("**/api/tools", tools)
+    page.route("**/api/report?format=json", report)
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    panel = page.locator("#whaxon-live-threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('gobuster')",
+        timeout=10000,
+    )
+    assert calls["tools"] >= 1 and calls["report"] >= 1
+    search = panel.get_by_role("searchbox", name="Filter threat intelligence references")
+    search.fill("gobuster")
+    assert panel.get_by_text("gobuster", exact=False).first.is_visible()
+    assert panel.get_by_text("nmap", exact=False).count() == 0
+    before = calls["tools"], calls["report"]
+    panel.get_by_role("button", name="Refresh catalog").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('1 of 4 local reference/catalog record(s) match the filter.')",
+        timeout=10000,
+    )
+    assert calls["tools"] > before[0] and calls["report"] > before[1]
+
+
+def test_threat_intel_halt_uses_history_and_disables_unwired_controls(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body="[]"
+        ),
+    )
+    page.route(
+        "**/api/tools",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='{"tools":[]}'
+        ),
+    )
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='{"jobs":[]}'
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    panel = page.locator("#whaxon-live-threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('No connected external threat-intelligence feed')",
+        timeout=10000,
+    )
+    page.get_by_role("button", name="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.innerText.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+    for button in page.locator("main button:visible").all():
+        if button.evaluate("(el) => el.closest('#whaxon-live-threat-intel') !== null"):
+            assert not button.is_disabled()
+        else:
+            assert button.is_disabled(), f"Unwired threat-intel control remains enabled: {button.inner_text()}"
+    assert panel.get_by_role("button", name="Refresh catalog").is_enabled()
