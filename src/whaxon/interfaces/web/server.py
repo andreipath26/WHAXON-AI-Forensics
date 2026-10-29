@@ -31,7 +31,7 @@ def _redact_sensitive_settings(value: Any) -> Any:
         redacted = {}
         for key, item in value.items():
             if re.search(
-                r"secret|token|password|passwd|credential|private.?key|api.?key|authorization|bearer|access.?key|client.?secret",
+                r"secret|token|password|passwd|passphrase|credential|private.?key|api.?key|authorization|bearer|access.?key|client.?secret|cookie|session.?key",
                 str(key),
                 re.IGNORECASE,
             ):
