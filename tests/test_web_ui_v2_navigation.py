@@ -46,3 +46,21 @@ def test_dashboard_uses_live_state_and_hides_fake_engagements(page, live_server)
     assert page.locator('a[data-path="scope-and-targets"]').get_attribute("href") == "/ui-v2/scope"
     assert page.locator('a[data-path="run-and-orchestration"]').get_attribute("href") == "/ui-v2/run"
     assert page.locator('a[data-path="trust-layer-and-findings"]').get_attribute("href") == "/ui-v2/findings"
+
+
+def test_dashboard_navigation_exposes_all_advanced_workspaces(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+    expected = {
+        "attack-surface-and-continuous-monitoring": "/ui-v2/monitoring",
+        "bug-bounty-and-live-browser-studio": "/ui-v2/bug-bounty",
+        "ptaas-client-portal": "/ui-v2/ptaas",
+        "threat-intel-and-exploit-arsenal": "/ui-v2/threat-intel",
+        "bas-and-detection-validation": "/ui-v2/bas",
+        "compliance-and-framework-crosswalk": "/ui-v2/compliance",
+        "trust-layer-approvals-queue-modal": "/ui-v2/approvals",
+    }
+    for data_path, href in expected.items():
+        link = page.locator(f'a[data-path="{data_path}"]')
+        assert link.is_visible(), f"missing visible navigation link: {data_path}"
+        assert link.get_attribute("href") == href
