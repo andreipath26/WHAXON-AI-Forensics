@@ -205,3 +205,39 @@ def test_ptaas_portal_filters_recorded_reports_and_findings(page, live_server):
     page.get_by_label("Filter client reports").fill("CWE-693")
     assert page.locator("#whaxon-live-ptaas article:visible").count() == 1
     assert "job-b" in page.locator("#whaxon-live-ptaas article:visible").inner_text()
+
+def test_threat_intel_filters_local_references_and_refreshes_catalog(page, live_server):
+    calls = {"tools": 0, "report": 0}
+
+    def tools(route):
+        calls["tools"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"nmap","name":"Nmap","adapter_available":true,"binary_available":true},'
+                 '{"id":"nikto","name":"Nikto","adapter_available":false,"binary_available":false}]',
+        )
+
+    def report(route):
+        calls["report"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"job":{"id":"job-ti"},"findings":['
+                 '{"title":"Known issue","cve":"CVE-2024-12345"}]}]}',
+        )
+
+    page.route("**/api/tools", tools)
+    page.route("**/api/report?format=json", report)
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('CVE-2024-12345')",
+        timeout=8000,
+    )
+    assert page.locator("#whaxon-live-threat-intel article").count() == 3
+    page.get_by_label("Filter threat intelligence references").fill("CVE-2024-12345")
+    assert page.locator("#whaxon-live-threat-intel article:visible").count() == 1
+    with page.expect_response("**/api/tools"):
+        page.get_by_role("button", name="Refresh catalog").click()
+    assert calls["tools"] >= 2
+    assert calls["report"] >= 2
