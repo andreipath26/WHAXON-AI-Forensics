@@ -812,34 +812,7 @@
       `;
     }
 
-    // Diagnostic Full Run Button Trigger
-    document.getElementById('btn-run-diag')?.addEventListener('click', function() {
-      const btn = this;
-      btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">refresh</span><span>Running Diagnostic Suite...</span>`;
-      btn.disabled = true;
-
-      setTimeout(() => {
-        triggerSelfCheck('ebpf');
-      }, 200);
-
-      setTimeout(() => {
-        triggerSelfCheck('msf');
-      }, 500);
-
-      setTimeout(() => {
-        triggerSelfCheck('sqlite');
-      }, 800);
-
-      setTimeout(() => {
-        btn.innerHTML = `<span class="material-symbols-outlined text-sm">check_circle</span><span>All Tests Passed</span>`;
-        btn.className = "flex items-center gap-space-xs px-space-lg py-1.5 bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded shadow-md";
-        setTimeout(() => {
-          btn.innerHTML = `<span class="material-symbols-outlined text-sm">play_circle</span><span>Run Full Diagnostic [F5]</span>`;
-          btn.className = "flex items-center gap-space-xs px-space-lg py-1.5 bg-primary-container hover:bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded shadow-md transition-all active:scale-95";
-          btn.disabled = false;
-        }, 2000);
-      }, 1200);
-    });
+    // Full diagnostic actions are wired to live API refresh below; no simulated result handler.
 
     // F5 Key Shortcut handling to simulate refresh without app reboot
     window.addEventListener('keydown', function(e) {
@@ -849,31 +822,7 @@
       }
     });
 
-    // Export Health Report JSON Simulation
-    document.getElementById('btn-export-json')?.addEventListener('click', function() {
-      const report = {
-        timestamp: new Date().toISOString(),
-        system_status: "ALL SUBSYSTEMS HEALTHY",
-        uptime_seconds: 1656764,
-        metrics: {
-          postgres_latency_ms: 1.2,
-          msf_connected: true,
-          msf_version: "6.4.12-dev",
-          ebpf_enforcing: true,
-          out_of_scope_drops: 412,
-          worker_nodes_active: 4,
-          cpu_load_percent: 24.2,
-          ram_allocated_gb: 4.8
-        }
-      };
-      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `whaxon_health_diagnostics_${Date.now()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    });
+    // Export is generated only from live API data by the page wiring below.
 
     // Restart Engine Daemons Simulation with Visual Feedback
     document.getElementById('btn-restart-daemons')?.addEventListener('click', function() {
