@@ -49,3 +49,10 @@ def test_diagnostics_page_does_not_report_simulated_checks_as_live(page, live_se
         assert marker not in visible, f"Simulated diagnostic output must not be shown: {marker}"
     assert page.locator("#whaxon-live-diagnostics").is_visible()
 
+def test_diagnostics_layout_remains_available_and_mock_actions_are_disabled(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    assert page.get_by_role("heading", name="System Diagnostics & Health Monitor").is_visible()
+    assert page.locator("#diagnostics-refresh").is_visible()
+    restart = page.get_by_role("button", name="Restart Engine Daemons")
+    if restart.count():
+        assert restart.is_disabled()
