@@ -831,9 +831,56 @@ api-v3-staging.internal.stripe.com
  const controls=document.createElement("div");controls.className="mt-3 flex flex-wrap gap-2";const search=document.createElement("input");search.type="search";search.setAttribute("aria-label","Filter client reports");search.placeholder="Filter target, tool, status, job ID or finding";search.className="min-w-0 flex-1 rounded bg-surface-container-lowest px-3 py-2";const refresh=document.createElement("button");refresh.type="button";refresh.textContent="Refresh reports";refresh.className="rounded bg-surface-container-high px-3 py-2";controls.append(search,refresh);panel.append(controls);
  const list=document.createElement("div");list.className="mt-3 grid gap-3";panel.append(list);const marker=Array.from(main.querySelectorAll("*")).find(el=>el.children.length===0&&(el.textContent||"").includes("ACCREDITED ROE ACTIVE"));const header=marker?.closest("div.bg-surface-container-low");const host=header?.parentElement;if(header&&host){host.insertBefore(panel,header.nextSibling);header.querySelectorAll("*").forEach(el=>{if(el.children.length)return;const t=(el.textContent||"").trim();if(/ACCREDITED ROE ACTIVE|0x9f32|PROD-SYSTEM|TAMPER-PROOF|MERKLE|ED25519|SIGNED/i.test(t)){el.textContent="NOT RECORDED";el.classList.remove("text-primary","text-secondary","text-tertiary","text-on-primary-container");el.classList.add("text-outline");}});/* Preserve canonical page sections; the page-specific fixture filter removes unsupported sample content. */}else main.prepend(panel);
  const cardFor=(title,detail)=>{const c=document.createElement("article");c.className="rounded-lg border border-outline-variant/30 bg-surface-container p-space-md";const h=document.createElement("h3");h.className="font-headline-sm";h.textContent=String(title||"—");const p=document.createElement("p");p.className="mt-2 text-sm text-on-surface-variant";p.textContent=String(detail||"—");c.append(h,p);return c;};
- const hideUnsupported=/Deploy Mock|Launch Exploit|Execute Payload|Auto-Remediate|Browser Shell|Start Attack|Run Exploit|Approve All|Export Archive|Create Invoice|Send to Client|Generate Compliance Score|Mark Compliant|Ping Sec-Ops|Request Retest|View Raw Packet|View Script|Request Scope Expansion|Confirm Scope Expansion|Export Evidence|Download Exploit|Reproduce Vulnerability|Expand Scope|Schedule Retest|Run Pre-Flight|Sign & Submit ROE Addendum/i;
+ const hideUnsupported=/Deploy Mock|Launch Exploit|Execute Payload|Auto-Remediate|Browser Shell|Start Attack|Run Exploit|Approve All|Export Archive|Create Invoice|Send to Client|Generate Compliance Score|Mark Compliant|Ping Sec-Ops|Request Retest|View Raw Packet|View Script|Request Scope Expansion|Confirm Scope Expansion|Export Evidence|Download Exploit|Reproduce Vulnerability|Run Pre-Flight|Sign & Submit ROE Addendum/i;
  document.querySelectorAll("button").forEach(b=>{if(hideUnsupported.test((b.innerText||b.textContent||"").trim())){b.disabled=true;b.hidden=true;b.style.display="none";b.setAttribute("aria-hidden","true");}});
  const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165|BOLA \/ IDOR in Merchant Transfer Settlement Route|REPRODUCIBLE EXPLOIT ARTIFACT/i;
  main.querySelectorAll("h1,h2,h3,h4,p,pre,code,span").forEach(n=>{if(!sample.test(n.textContent||""))return;const c=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(c&&c!==panel&&!panel.contains(c)){c.hidden=true;c.style.display="none";}else{n.hidden=true;n.style.display="none";}});
  let records=[];function render(){list.replaceChildren();const q=search.value.toLowerCase().trim();const shown=records.filter(x=>{const job=x.job||{},findings=Array.isArray(x.findings)?x.findings:[];return [job.id,job.target,job.tool,job.status,...findings.flatMap(f=>[f.title,f.name,f.kind,f.severity,f.cve,f.cwe])].join(" ").toLowerCase().includes(q);});const findingCount=records.reduce((n,x)=>n+(Array.isArray(x.findings)?x.findings.length:0),0);status.textContent=shown.length+" of "+records.length+" recorded job(s) match the filter · "+findingCount+" total recorded finding(s).";const links=document.createElement("div");links.className="flex flex-wrap gap-2";const a=document.createElement("a");a.href="/api/report?format=json";a.textContent="Open live report JSON";a.className="rounded bg-primary px-3 py-2 text-slate-950";const b=document.createElement("a");b.href="/ui-v2/reports";b.textContent="Open report builder";b.className="rounded bg-surface-container-high px-3 py-2";links.append(a,b);list.append(links);if(!shown.length){const empty=cardFor("No matching reports",q?"No recorded jobs or findings match this filter.":"No report jobs have been recorded yet.");list.append(empty);return;}shown.forEach(x=>{const job=x.job||{},findings=Array.isArray(x.findings)?x.findings:[];const card=cardFor((job.target||"Target not recorded")+" · "+(job.status||"status not recorded"),"Tool: "+(job.tool||job.tool_id||"not recorded")+" · Job: "+(job.id||"ID unavailable")+" · Recorded findings: "+findings.length);if(findings.length){const details=document.createElement("ul");details.className="mt-3 list-disc pl-5 text-sm text-on-surface-variant";findings.slice(0,20).forEach(f=>{const li=document.createElement("li");li.textContent=(f.title||f.name||f.kind||"Finding")+" · "+(f.severity||"severity not recorded")+" · "+(f.verification_status||f.status||"status not recorded");details.append(li);});if(findings.length>20){const more=document.createElement("p");more.className="mt-2 text-xs text-outline";more.textContent=(findings.length-20)+" additional finding(s) omitted from this summary.";card.append(details,more);}else card.append(details);}list.append(card);});}async function load(){refresh.disabled=true;refresh.textContent="Loading…";status.textContent="Loading report data…";try{const r=await fetch("/api/report?format=json");if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json();records=Array.isArray(d.jobs)?d.jobs:[];heading.textContent="Client report portal";render();}catch(e){heading.textContent="Live data unavailable";status.textContent="Report data could not be loaded: "+e.message;list.replaceChildren();}finally{refresh.disabled=false;refresh.textContent="Refresh reports";}}search.addEventListener("input",render);refresh.addEventListener("click",load);load();
- })();</script></body></html>
+ })();</script>
+<script id="whaxon-ptaas-header-wiring">
+(function(){
+ "use strict";
+ const headerButtons=[...document.querySelectorAll("header button")];
+ const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+ const go=(b,path)=>{if(!b)return;b.removeAttribute("onclick");b.disabled=false;b.hidden=false;b.style.display="";b.removeAttribute("aria-hidden");b.removeAttribute("aria-disabled");b.addEventListener("click",e=>{e.preventDefault();window.location.href=path;});};
+ go(headerButtons.find(b=>/Terminal Log|^LOGS$/i.test(label(b))),"/ui-v2/run");
+ const panel=document.getElementById("whaxon-live-ptaas");
+ const status=panel?.querySelector('[role="status"]');
+ if(status)status.id="ptaas-status";
+ const report=message=>{if(status)status.textContent=message;};
+ const halt=headerButtons.find(b=>/Emergency Halt Scan|HALT SCAN/i.test(label(b)));
+ if(halt)halt.addEventListener("click",async e=>{
+  e.preventDefault();
+  try{
+   const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
+   const data=await response.json(),jobs=Array.isArray(data)?data:(Array.isArray(data.jobs)?data.jobs:[]);
+   const active=jobs.filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+   if(!active.length){report("No running or queued jobs were found. Nothing was cancelled.");return;}
+   if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+   const results=await Promise.all(active.map(async job=>{const id=job.id||job.job_id;if(!id)return false;try{const r=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!r.ok)return false;const body=await r.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}}));
+   report("Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).");
+  }catch(error){report("Emergency halt failed: "+error.message);}
+ });
+ const expand=[...document.querySelectorAll("main button")].find(b=>/^EXPAND SCOPE$/i.test(label(b)));
+ const schedule=[...document.querySelectorAll("main button")].find(b=>/^SCHEDULE RETEST$/i.test(label(b)));
+ [expand,schedule].forEach(b=>{if(b){b.removeAttribute("onclick");b.disabled=false;b.hidden=false;b.style.display="";b.removeAttribute("aria-hidden");}});
+ if(expand)expand.addEventListener("click",e=>{e.preventDefault();window.location.href="/ui-v2/scope";});
+ if(schedule)schedule.addEventListener("click",e=>{e.preventDefault();window.location.href="/ui-v2/retest";});
+ document.querySelectorAll("main button").forEach(button=>{
+  if(panel?.contains(button)||button===expand||button===schedule)return;
+  button.removeAttribute("onclick");button.disabled=true;button.setAttribute("aria-disabled","true");
+  button.title="Unavailable: this PTaaS action is not connected to a live WHAXON backend workflow.";
+ });
+ document.querySelectorAll("main [onclick]").forEach(node=>{
+  if(panel?.contains(node))return;
+  node.removeAttribute("onclick");node.setAttribute("aria-disabled","true");node.setAttribute("tabindex","-1");
+  node.style.pointerEvents="none";node.style.cursor="default";
+ });
+ if(panel){
+  const note=document.createElement("p");note.className="mt-2 text-sm text-on-surface-variant";
+  note.textContent="This portal displays recorded WHAXON report jobs and findings. Accredited-job dispatch, pre-flight certification, executive certificate signing, client notifications, and scope addendum signing are not connected to live backend workflows.";
+  const h=panel.querySelector("h2");if(h)h.insertAdjacentElement("afterend",note);
+ }
+})();
+</script>
+</body></html>
