@@ -514,10 +514,10 @@
  main.querySelectorAll("*").forEach(node=>{
   if(node.children.length||!fixtureMarkers.test(node.textContent||""))return;
   const card=node.closest("article, section, [class*='rounded-xl'], [class*='rounded-lg']");
-  if(card&&card!==panel)card.hidden=true;
-  else node.hidden=true;
+  if(card&&card!==panel){card.hidden=true;card.style.display="none";}
+  else{node.hidden=true;node.style.display="none";}
  });
- if(narrativeSection)narrativeSection.hidden=true;
+ if(narrativeSection){narrativeSection.hidden=true;narrativeSection.style.display="none";}
  // Keep the original header actions functional instead of leaving decorative controls.
  const recomputeButton=headerSection?.querySelector("#btn-recompute");
  if(recomputeButton)recomputeButton.title="Refresh recorded relationships from the WHAXON graph API.";
