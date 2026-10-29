@@ -116,3 +116,58 @@ def test_attack_chain_page_filters_and_exports_recorded_graph(page, live_server)
     with page.expect_download() as download_info:
         page.get_by_role("button", name="Export graph JSON").click()
     assert download_info.value.suggested_filename == "whaxon-attack-chain-graph.json"
+
+def test_attack_chain_header_reflects_live_scope_and_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/chains")
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('recorded relationship(s) match the filters')"
+        " || document.querySelector('#chains-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/chains")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_attack_chain_halt_uses_live_history_and_disables_unwired_actions(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.goto(f"{live_server}/ui-v2/chains")
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('recorded relationship(s) match the filters')"
+        " || document.querySelector('#chains-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+    for label in (
+        "Export PTES Chapter",
+        "Add Custom Mitigation Rule",
+        "Generate Red Team Retest Script",
+    ):
+        button = page.locator("main button").filter(has_text=label).first
+        assert button.count() == 1, f"Expected canonical control to remain visible in DOM: {label}"
+        assert button.is_disabled(), f"Unsupported action should be disabled: {label}"
+    assert page.get_by_role("button", name="Refresh").is_enabled()
+    assert page.get_by_role("button", name="Export graph JSON").is_enabled()
+
