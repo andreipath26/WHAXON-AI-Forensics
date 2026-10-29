@@ -50,3 +50,24 @@ def test_reports_preview_opens_and_closes(page, live_server):
     assert modal.is_visible()
     page.locator("#closePreviewBtn").click()
     assert not modal.is_visible()
+
+
+
+def test_reports_reference_configuration_is_disabled_and_evidence_availability_is_truthful(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/reports")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('#live-report-summary')?.textContent.includes('Generated from the current WHAXON report API')",
+        timeout=8000,
+    )
+    selectors = page.locator('input[type="checkbox"]')
+    assert selectors.count() >= 4
+    for index in range(selectors.count()):
+        assert selectors.nth(index).is_disabled()
+        assert selectors.nth(index).is_checked() is False
+    assert page.locator("#live-evidence-unavailable").is_visible()
+    assert "NOT CONNECTED" in page.locator("body").inner_text()
+    assert "SYNCED" not in page.locator("body").inner_text()
+    assert "Reference layout only; this selection is not applied to live exports." in page.locator("body").inner_text()
+    assert page.get_by_role("button", name="Export JSON", exact=True).is_enabled()
+    assert page.get_by_role("button", name="Download Markdown", exact=True).is_enabled()
