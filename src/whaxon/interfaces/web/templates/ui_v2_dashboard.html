@@ -521,8 +521,8 @@
     const target = scope.in_scope?.[0] || "No target configured";
     document.querySelectorAll("header span, header div").forEach(n => {
       if (textOf(n) === "Target: No target selected") n.textContent = "Target: " + target;
-      if (textOf(n) === "(IN SCOPE)") n.textContent = scope.enabled === false ? "(ENFORCEMENT DISABLED)" : "(CONFIGURED RULE)";
-      if (textOf(n) === "STRICT BOUNDARY ENFORCED") n.textContent = scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : "SCOPE ENFORCEMENT ENABLED";
+      if (textOf(n) === "(IN SCOPE)") n.textContent = scope.enabled === false ? "(ENFORCEMENT DISABLED)" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "(RULE CONFIGURED)" : "(NO TARGET RULE)");
+      if (textOf(n) === "STRICT BOUNDARY ENFORCED") n.textContent = scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "SCOPE ENFORCEMENT ENABLED" : "NO TARGET RULE CONFIGURED");
     });
     const engagementButton = [...document.querySelectorAll("header button")].find(button =>
       button.textContent.includes("No active engagement") || button.textContent.includes("Active scope")
