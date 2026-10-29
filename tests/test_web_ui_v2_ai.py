@@ -118,6 +118,16 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert "Kiln/Ollama (Mistral-Offensive-7B)" not in visible_text
     assert "LOW RISK" not in visible_text
     assert "Nuclei basic tech-detect" not in visible_text
+    assert "PTES 4: Vulnerability Analysis" not in visible_text
+    assert "Synaptic-Planner v2.4" not in visible_text
+    assert "OP//7749-ALPHA" not in visible_text
+    assert "4 / 12 REMAINING" not in visible_text
+    assert "DETERMINISTIC OK" not in visible_text
+    assert "WX-8492-491" not in visible_text
+    assert "94.2%" not in visible_text
+    assert "78.1%" not in visible_text
+    assert "98.0%" not in visible_text
+    assert "50 req/sec" not in visible_text
     assert "Chain-of-Thought" not in visible_text
     assert "Live AI strategy gate" in visible_text
     assert "No AI action is currently awaiting approval" in visible_text
