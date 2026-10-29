@@ -364,3 +364,52 @@ def test_compliance_disables_disconnected_reference_controls(page, live_server):
         if inside_panel or "Configure Scope" in button.inner_text():
             continue
         assert button.is_disabled(), f"Unwired compliance reference control is enabled: {button.inner_text()}"
+
+def test_threat_intel_header_uses_live_scope_and_real_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('external threat-intelligence feed')"
+        " || document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('Live catalog unavailable')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_threat_intel_halt_uses_live_history_and_demo_controls_are_disabled(page, live_server):
+    page.goto(f"{live_server}/ui-v2/threat-intel")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('external threat-intelligence feed')"
+        " || document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('Live catalog unavailable')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('No running or queued jobs were found')"
+        " || document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('Emergency halt failed:')",
+        timeout=5000,
+    )
+    for button in page.locator("main button:visible").all():
+        inside_live_panel = button.evaluate("(el) => el.closest('#whaxon-live-threat-intel') !== null")
+        if inside_live_panel:
+            assert not button.is_disabled(), f"Live catalog control unexpectedly disabled: {button.inner_text()}"
+        else:
+            assert button.is_disabled(), f"Disconnected threat-intel control is enabled: {button.inner_text()}"
+    assert page.get_by_role("button", name="Refresh catalog").is_enabled()
+

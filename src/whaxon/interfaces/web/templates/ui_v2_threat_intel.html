@@ -657,4 +657,68 @@
  const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-20\d{2}-\d{4,}|EXPLOIT CODE|CURL REPLAY|NUCLEI HEURISTICS|ACTIVE EXPLOIT|POC AVAILABLE|uid=0\(root\)|184,209|7f83b165/i;
  main.querySelectorAll("*").forEach(n=>{if(n.children.length||!sample.test(n.textContent||""))return;if(header&&header.contains(n)){n.textContent="NOT REPORTED";return;}const c=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(c&&c!==panel&&!panel.contains(c)){c.hidden=true;c.style.display="none";}else{n.textContent="Live data unavailable";}});
  let records=[];function applyFilter(){const q=search.value.toLowerCase().trim();let shown=0;for(const card of list.children){const match=card.textContent.toLowerCase().includes(q);card.hidden=!match;if(match)shown++;}if(records.length)status.textContent=shown+" of "+records.length+" local reference/catalog record(s) match the filter. No connected external threat-intelligence feed is claimed; only local references are shown.";}async function load(){refresh.disabled=true;refresh.textContent="Loading…";status.textContent="Loading local findings and tool catalog…";try{const [tr,rr]=await Promise.all([fetch("/api/tools"),fetch("/api/report?format=json")]);if(!tr.ok||!rr.ok)throw new Error("Live catalog unavailable");const toolsData=await tr.json(),d=await rr.json();const tools=Array.isArray(toolsData)?toolsData:(Array.isArray(toolsData.tools)?toolsData.tools:[]);const findings=(Array.isArray(d.jobs)?d.jobs:[]).flatMap(x=>Array.isArray(x.findings)?x.findings:[]);list.replaceChildren();records=[];heading.textContent="Live tool catalog and finding references";const refs=new Set();findings.forEach(f=>{const text=[f.title,f.description,f.cve,f.references].flat().filter(Boolean).join(" ");(text.match(/CVE-\d{4}-\d{4,}/gi)||[]).forEach(x=>refs.add(x.toUpperCase()));});if(refs.size)[...refs].sort().forEach(cve=>records.push(cardFor("Recorded CVE reference",cve)));else records.push(cardFor("Recorded CVE references","No CVE references recorded in current findings."));tools.forEach(t=>records.push(cardFor(t.name||t.id||"Tool","Adapter: "+(t.adapter_available===true?"available":t.adapter_available===false?"unavailable":"not reported")+" · Binary: "+(t.binary_available===true?"available":t.binary_available===false?"unavailable":"not reported"))));records.forEach(card=>list.append(card));status.textContent="No connected external threat-intelligence feed is claimed; only locally recorded references and the tool catalog are shown.";applyFilter();}catch(e){heading.textContent="Live data unavailable";status.textContent=e.message;list.replaceChildren();}finally{refresh.disabled=false;refresh.textContent="Refresh catalog";}}search.addEventListener("input",applyFilter);refresh.addEventListener("click",load);load();
- })();</script></body></html>
+ })();</script>
+<script id="whaxon-threat-intel-header-wiring">
+(function(){
+  "use strict";
+  const buttons=[...document.querySelectorAll("header button")];
+  const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+  const go=(b,path)=>{if(b)b.addEventListener("click",e=>{e.preventDefault();window.location.href=path;});};
+  const engagement=buttons.find(b=>/ENG-|Active scope|Scope unavailable|No active engagement/i.test(b.textContent||""));
+  go(engagement,"/ui-v2/scope");
+  go(buttons.find(b=>/^New$/i.test(label(b))),"/ui-v2/scope");
+  go(buttons.find(b=>/Terminal Log|LOGS/i.test(label(b))),"/ui-v2/run");
+  const status=document.querySelector("#whaxon-live-threat-intel [role=\"status\"]");
+  const reportStatus=message=>{if(status)status.textContent=message;};
+  const halt=buttons.find(b=>/Emergency Halt Scan|HALT SCAN/i.test(label(b)));
+  if(halt)halt.addEventListener("click",async e=>{
+    e.preventDefault();
+    try{
+      const response=await fetch("/api/history");
+      if(!response.ok)throw new Error("History HTTP "+response.status);
+      const history=await response.json();
+      const jobs=Array.isArray(history)?history:(Array.isArray(history.jobs)?history.jobs:[]);
+      const active=jobs.filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+      if(!active.length){reportStatus("No running or queued jobs were found. Nothing was cancelled.");return;}
+      if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+      const results=await Promise.all(active.map(async job=>{
+        const id=job.id||job.job_id;if(!id)return false;
+        try{const r=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!r.ok)return false;const body=await r.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}
+      }));
+      reportStatus("Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).");
+    }catch(error){reportStatus("Emergency halt failed: "+error.message);}
+  });
+  async function reflectScope(){
+    const spans=engagement?engagement.querySelectorAll("span"):[];
+    const targetLabel=[...document.querySelectorAll("header span")].find(n=>(n.textContent||"").trim().startsWith("Target:"));
+    const stateLabel=[...document.querySelectorAll("header span")].find(n=>["(IN SCOPE)","(RULE CONFIGURED)","(NO TARGET RULE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((n.textContent||"").trim()));
+    const boundary=[...document.querySelectorAll("header span")].find(n=>/STRICT BOUNDARY ENFORCED|SCOPE CONFIGURATION LOADED|SCOPE ENFORCEMENT DISABLED|SCOPE STATUS UNAVAILABLE/.test((n.textContent||"").trim()));
+    try{
+      const r=await fetch("/api/scope");if(!r.ok)throw new Error("Scope HTTP "+r.status);
+      const scope=await r.json();
+      const targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+      const target=targets.length?targets[0]:"No target configured";
+      const name=scope.engagement&&scope.engagement!=="default"?scope.engagement:"Active scope";
+      if(spans.length>1){spans[0].textContent=name;spans[1].textContent="("+target+")";}
+      if(targetLabel)targetLabel.textContent="Target: "+target;
+      if(stateLabel)stateLabel.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+      if(boundary)boundary.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE CONFIGURATION LOADED";
+    }catch(_){
+      if(spans.length>1){spans[0].textContent="Scope unavailable";spans[1].textContent="(status unavailable)";}
+      if(targetLabel)targetLabel.textContent="Target: unavailable";
+      if(stateLabel)stateLabel.textContent="(STATUS UNAVAILABLE)";
+      if(boundary)boundary.textContent="SCOPE STATUS UNAVAILABLE";
+    }
+  }
+  reflectScope();
+  // Keep the live local-reference panel usable; static demo controls outside it are not real workflows.
+  const live=document.getElementById("whaxon-live-threat-intel");
+  document.querySelectorAll("main button").forEach(b=>{
+    if(live&&live.contains(b))return;
+    b.disabled=true;
+    b.title="Unavailable: this control is not connected to a live WHAXON workflow.";
+    b.setAttribute("aria-disabled","true");
+  });
+})();
+</script>
+</body></html>
