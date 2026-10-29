@@ -37,7 +37,7 @@
 <span class="font-code-sm text-code-sm text-outline tracking-wider">SEC-RUNNER-V3.4 [KERNEL-ISOLATION: ACTIVE]</span>
 </div>
 <p class="font-body-md text-body-md text-on-surface-variant max-w-4xl">
-        Manage third-party tool adapters, verify entry point trust signatures (SC-02), configure default CLI flags, and install custom community plugins. Execution boundaries are guarded via deterministic runtime manifests.
+        Review the live tool catalog below. The legacy adapter matrix is a read-only visual reference; configuration, signing, plugin registration, and adapter execution are not connected to live backend workflows.
       </p>
 </div>
 </div>
@@ -937,12 +937,16 @@
   document.querySelectorAll("main .adapter-card").forEach(card=>{if(live&&live.contains(card))return;card.style.pointerEvents="none";card.style.cursor="default";card.setAttribute("aria-disabled","true");});
   const replace={
     "VERIFIED":"REFERENCE ONLY",
+    "100%":"Not reported by live API",
+    "READY":"STATUS NOT REPORTED",
+    "SEC-RUNNER-V3.4 [KERNEL-ISOLATION: ACTIVE]":"Adapter runtime status not reported",
     "HASH DETERMINISTIC CHECK: PASSED (sha256:4b91...88c2)":"Signature status not exposed by live API",
     "Live Entry Point Signature Pipeline (SC-02 Telemetry)":"Adapter pipeline reference layout",
     "Ed25519 Verify":"Signature verification not reported",
     "gVisor Sandbox Spec":"Sandbox status not reported",
     "Execution Engine [PID: 28941]":"Execution engine status not reported",
-    "LATENCY: 0.8ms":"Latency not measured"
+    "LATENCY: 0.8ms":"Latency not measured",
+    "Manifest signatures re-verified successfully.":"No live signature verification result is available."
   };
   document.querySelectorAll("main *").forEach(node=>{
     if(node.children.length||live?.contains(node))return;
