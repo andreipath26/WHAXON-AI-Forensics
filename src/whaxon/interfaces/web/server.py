@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import queue
+import re
 import subprocess
 import threading
 import uuid
@@ -28,10 +29,10 @@ def _redact_sensitive_settings(value):
     if isinstance(value, dict):
         redacted = {}
         for key, item in value.items():
-            if __import__("re").search(
+            if re.search(
                 r"secret|token|password|passwd|credential|private.?key|api.?key|authorization|bearer|access.?key|client.?secret",
                 str(key),
-                __import__("re").IGNORECASE,
+                re.IGNORECASE,
             ):
                 redacted[key] = "[REDACTED]"
             else:
