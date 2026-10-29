@@ -1,6 +1,8 @@
 """Browser coverage for the live attack-chain graph page."""
 from __future__ import annotations
 
+import json
+
 
 def test_attack_chain_page_uses_live_graph_api(page, live_server):
     graph = page.request.get(f"{live_server}/api/pivot/graph")
@@ -115,7 +117,13 @@ def test_attack_chain_page_filters_and_exports_recorded_graph(page, live_server)
     assert "node-c" in page.locator("#chains-list article:visible").inner_text()
     with page.expect_download() as download_info:
         page.locator("#chains-export").click()
-    assert download_info.value.suggested_filename == "whaxon-attack-chain-graph.json"
+    download = download_info.value
+    assert download.suggested_filename == "whaxon-attack-chain-graph.json"
+    with open(download.path(), encoding="utf-8") as file:
+        payload = json.load(file)
+    assert payload["source"] == "WHAXON recorded graph API"
+    assert len(payload["edges"]) == 2
+    assert payload["edges"][1]["evidence"] == "evidence beta"
 
 def test_attack_chain_header_reflects_live_scope_and_navigation(page, live_server):
     page.goto(f"{live_server}/ui-v2/chains")
@@ -171,3 +179,48 @@ def test_attack_chain_halt_uses_live_history_and_disables_unwired_actions(page, 
     assert page.get_by_role("button", name="Refresh").is_enabled()
     assert page.locator("#chains-export").is_enabled()
 
+
+
+def test_attack_chain_failed_refresh_clears_stale_edges_before_export(page, live_server):
+    calls = {"count": 0}
+
+    def graph(route):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"edges":[{"source":"old-node","target":"stale-node","relation":"connects","evidence":"old evidence"}]}',
+            )
+        else:
+            route.fulfill(
+                status=503,
+                content_type="application/json",
+                body='{"error":"graph temporarily unavailable"}',
+            )
+
+    page.route("**/api/pivot/graph", graph)
+    page.goto(f"{live_server}/ui-v2/chains")
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('1 of 1 recorded relationship(s)')",
+        timeout=8000,
+    )
+    assert "stale-node" in page.locator("#chains-list").inner_text()
+
+    page.get_by_role("button", name="Refresh").click()
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('Graph data could not be loaded: graph temporarily unavailable')",
+        timeout=8000,
+    )
+    assert page.locator("#chains-list").inner_text() == ""
+
+    with page.expect_download() as download_info:
+        page.locator("#chains-export").click()
+    with open(download_info.value.path(), encoding="utf-8") as file:
+        payload = json.load(file)
+    assert payload["edges"] == []
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('Exported 0 recorded relationship(s)')",
+        timeout=5000,
+    )
+    assert calls["count"] == 2
