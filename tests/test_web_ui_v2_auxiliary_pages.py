@@ -82,3 +82,47 @@ def test_bas_validation_only_offers_actions_for_real_sequence_ids(page, live_ser
         timeout=8000,
     )
     assert calls == [f"{live_server}/api/validate/job-bas/3"]
+
+def test_approval_queue_submits_answer_to_waiting_run(page, live_server):
+    pending_calls = {"count": 0}
+    answers = []
+
+    def pending(route):
+        pending_calls["count"] += 1
+        body = (
+            '[{"run_id":"run-123","goal":"Review the proposed in-scope plan","status":"waiting"}]'
+            if pending_calls["count"] == 1 else "[]"
+        )
+        route.fulfill(status=200, content_type="application/json", body=body)
+
+    def runs(route):
+        route.fulfill(status=200, content_type="application/json", body="[]")
+
+    def answer(route):
+        answers.append(route.request.post_data_json)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"ok":true,"run_id":"run-123","seq":1}',
+        )
+
+    page.route("**/api/ai/pending", pending)
+    page.route("**/api/ai/runs", runs)
+    page.route("**/api/ai/runs/run-123/answer", answer)
+    page.goto(f"{live_server}/ui-v2/approvals")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('1 pending item(s)')",
+        timeout=8000,
+    )
+    page.get_by_label("Answer for run run-123").fill("Proceed only with the approved scope.")
+    page.get_by_label("Approval note for run run-123").fill("Reviewed against the engagement scope.")
+    with page.expect_response("**/api/ai/runs/run-123/answer"):
+        page.get_by_role("button", name="Submit answer").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('Answer recorded for run run-123')",
+        timeout=8000,
+    )
+    assert answers == [{
+        "answer": "Proceed only with the approved scope.",
+        "note": "Reviewed against the engagement scope.",
+    }]
