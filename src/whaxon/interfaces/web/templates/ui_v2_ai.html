@@ -473,6 +473,8 @@
  function neutralizeDemoClaims(){
    const replacements=[
      [/^OP\/\/7749-ALPHA(?: \(VALID\))?$/, "Operator identity not exposed"],
+     [/^Lead Security Engineer$/, "Operator role not exposed"],
+     [/^ACTIVE$/, "UI ONLINE"],
      [/^ENG-2026-X892 AUDIT TRAIL$/, "LIVE AI AUDIT TRAIL"],
      [/^4 \/ 12 REMAINING$/, "Step budget not exposed"],
      [/^PTES 4: Vulnerability Analysis$/, "Phase not recorded"],
