@@ -109,3 +109,46 @@ def test_report_api_failure_is_not_reported_as_zero_findings(page, live_server):
     assert "503" in status
     assert "0 jobs" not in status
     assert "0 unique findings" not in status
+
+
+
+def test_report_header_does_not_claim_scope_rule_when_no_targets_exist(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"enabled":true,"in_scope":[],"engagement":"empty-report-scope"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/report")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('NO TARGET RULE CONFIGURED')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text().lower()
+    assert "(no target rule)" in header
+    assert "target: no target configured" in header
+    assert "(configured rule)" not in header
+    assert "scope status from live configuration" not in header
+
+
+def test_report_header_reports_scope_api_failure_as_unavailable(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"scope backend unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/report")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text().lower()
+    assert "(status unavailable)" in header
+    assert "target: unavailable" in header
+    assert "(configured rule)" not in header
+    assert "scope status from live configuration" not in header
