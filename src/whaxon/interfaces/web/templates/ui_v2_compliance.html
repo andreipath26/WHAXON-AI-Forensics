@@ -561,7 +561,7 @@
  const panel=document.createElement("section");panel.id="whaxon-live-compliance";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
  const heading=document.createElement("h2");heading.className="font-headline-lg text-headline-lg";heading.textContent="Loading live WHAXON data…";panel.append(heading);
  const status=document.createElement("p");status.className="mt-2 text-sm text-on-surface-variant";status.textContent="Fetching current backend state.";panel.append(status);
- const list=document.createElement("div");list.className="mt-3 grid gap-3";panel.append(list);main.prepend(panel);
+ const list=document.createElement("div");list.className="mt-3 grid gap-3";panel.append(list);main.prepend(panel);Array.from(main.children).forEach(child=>{if(child!==panel)child.style.display="none";});
  const cardFor=(title,detail)=>{const c=document.createElement("article");c.className="rounded-lg border border-outline-variant/30 bg-surface-container p-space-md";const h=document.createElement("h3");h.className="font-headline-sm";h.textContent=String(title||"—");const p=document.createElement("p");p.className="mt-2 text-sm text-on-surface-variant";p.textContent=String(detail||"—");c.append(h,p);return c;};
  const hideUnsupported=/Deploy Mock|Launch Exploit|Execute Payload|Auto-Remediate|Browser Shell|Start Attack|Run Exploit|Approve All|Export Archive|Create Invoice|Send to Client|Generate Compliance Score|Mark Compliant/i;
  document.querySelectorAll("button").forEach(b=>{if(hideUnsupported.test((b.innerText||b.textContent||"").trim())){b.disabled=true;b.hidden=true;b.setAttribute("aria-hidden","true");}});
