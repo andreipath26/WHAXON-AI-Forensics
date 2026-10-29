@@ -703,6 +703,8 @@
  const search=document.getElementById("asset-search-input");
  if(!grid)return;
  const ledgerSection=grid.closest("section");
+ const pageWrapper=grid.closest("main > div");
+ if(ledgerSection&&pageWrapper){Array.from(pageWrapper.children).forEach(child=>{if(!child.contains(ledgerSection))child.style.display="none";});}
  if(ledgerSection&&ledgerSection.parentElement){Array.from(ledgerSection.parentElement.children).forEach(child=>{if(child!==ledgerSection)child.style.display="none";});ledgerSection.querySelectorAll("button").forEach(button=>{button.disabled=true;button.style.display="none";button.setAttribute("aria-hidden","true");});}
  grid.replaceChildren();
  const status=document.createElement("p");status.className="p-4 text-sm text-slate-400";status.textContent="Loading recorded WHAXON jobs and findings…";grid.append(status);
