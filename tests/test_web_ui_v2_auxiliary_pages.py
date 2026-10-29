@@ -413,3 +413,54 @@ def test_threat_intel_halt_uses_live_history_and_demo_controls_are_disabled(page
             assert button.is_disabled(), f"Disconnected threat-intel control is enabled: {button.inner_text()}"
     assert page.get_by_role("button", name="Refresh catalog").is_enabled()
 
+def test_bas_header_uses_live_scope_and_global_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/bas")
+    page.wait_for_function(
+        "() => document.querySelector('#bas-status')?.textContent.includes('persisted finding(s)')"
+        " || document.querySelector('#bas-status')?.textContent.includes('No recorded findings')"
+        " || document.querySelector('#bas-status')?.textContent.includes('Live data unavailable')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/bas")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_bas_halt_is_live_and_provider_simulation_controls_are_not_actionable(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.goto(f"{live_server}/ui-v2/bas")
+    page.wait_for_function(
+        "() => document.querySelector('#bas-status')?.textContent.includes('persisted finding(s)')"
+        " || document.querySelector('#bas-status')?.textContent.includes('No recorded findings')"
+        " || document.querySelector('#bas-status')?.textContent.includes('Live data unavailable')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#bas-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+    for button in page.locator("main button:visible").all():
+        assert button.is_disabled(), f"Unwired BAS action remains enabled: {button.inner_text()}"
+    assert "not connected" in page.locator("#whaxon-live-bas").inner_text().lower()
+    assert "42.8%" not in page.locator("main").inner_text()
+    assert "CROWDSTRIKE + DEFENDER" not in page.locator("main").inner_text()
+
