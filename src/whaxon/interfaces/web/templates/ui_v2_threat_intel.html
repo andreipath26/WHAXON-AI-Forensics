@@ -668,7 +668,7 @@
   go(engagement,"/ui-v2/scope");
   go(buttons.find(b=>/^New$/i.test(label(b))),"/ui-v2/scope");
   go(buttons.find(b=>/Terminal Log|LOGS/i.test(label(b))),"/ui-v2/run");
-  const status=document.querySelector("#whaxon-live-threat-intel [data-threat-status]");
+  const status=document.querySelector("#whaxon-live-threat-intel [role=\"status\"]");
   const reportStatus=message=>{if(status)status.textContent=message;};
   const halt=buttons.find(b=>/Emergency Halt Scan|HALT SCAN/i.test(label(b)));
   if(halt)halt.addEventListener("click",async e=>{
