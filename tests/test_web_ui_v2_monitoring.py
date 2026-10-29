@@ -16,6 +16,10 @@ def test_monitoring_page_loads_canonical_design_and_live_state(page, live_server
     visible = page.locator("body").inner_text()
     assert "api.internal.corp" not in visible
     assert "ENG-2026-X892" not in visible
+    assert "CVE-2023-38606" not in visible
+    assert "uid=0(root)" not in visible
+    assert "184,209" not in visible
+    assert page.locator("#asset-ledger-container .asset-card").count() == 0
 
 
 def test_monitoring_page_uses_live_apis_and_hides_unsupported_controls(page, live_server):
