@@ -97,6 +97,36 @@ def test_ai_strategy_gate_authorize_button_records_real_pending_answer(page, liv
     assert calls[0]["body"]["user"] == "local"
 
 
+def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
+    calls = []
+
+    def history(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"job-to-cancel","status":"running"}]',
+        )
+
+    def cancel(route):
+        calls.append(route.request.method)
+        route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
+
+    page.route("**/api/history", history)
+    page.route("**/api/jobs/job-to-cancel/cancel", cancel)
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    page.get_by_role("button", name="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('1 of 1 active job(s)')",
+        timeout=8000,
+    )
+    assert calls == ["POST"]
+
+
 def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_pending_run(page, live_server):
     page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
