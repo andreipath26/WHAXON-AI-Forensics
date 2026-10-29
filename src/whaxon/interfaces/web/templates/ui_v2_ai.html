@@ -611,6 +611,8 @@
    }catch(error){status.textContent="AI run not submitted: "+error.message;}
    finally{submit.disabled=false;}
  });
+ const engagementNavButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
+ if(engagementNavButton){engagementNavButton.title="Review engagement scope and target rules";engagementNavButton.addEventListener("click",()=>{window.location.href="/ui-v2/scope";});}
  const terminalButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("Terminal Log"));
  if(terminalButton)terminalButton.addEventListener("click",()=>{window.location.href="/ui-v2/run";});
  const newButton=[...document.querySelectorAll("header button")].find(b=>/\bNew\b/.test(textOf(b)));
