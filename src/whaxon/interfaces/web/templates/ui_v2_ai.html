@@ -350,9 +350,9 @@
  const panel=document.createElement("section");
  panel.id="whaxon-ai-gate";
  panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
- panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Live AI strategy gate</h2><p class="mt-1 text-on-surface-variant">AI runs require a server-side scope check. Human approval pauses are recorded before an answer is accepted.</p><form id="ai-run-form" class="mt-4 grid gap-3"><label class="grid gap-1">Target<input id="ai-target" required class="rounded bg-surface-container-lowest p-2" placeholder="https://authorized-target.example"></label><label class="grid gap-1">Goal<textarea id="ai-goal" required rows="3" class="rounded bg-surface-container-lowest p-2" placeholder="Describe the authorized assessment objective"></textarea></label><button class="rounded bg-primary px-4 py-2 text-on-primary font-semibold justify-self-start" type="submit">Check scope and submit AI run</button></form><p id="ai-run-status" class="mt-3 text-on-surface-variant" role="status" aria-live="polite">Loading live AI run state…</p><h3 class="mt-5 font-headline-sm">Awaiting operator approval</h3><div id="ai-pending-list" class="mt-2 grid gap-2"></div><h3 class="mt-5 font-headline-sm">Recorded AI runs</h3><div id="ai-run-list" class="mt-2 grid gap-2"></div>';
+ panel.innerHTML='<h2 class="font-headline-lg text-headline-lg">Live AI strategy gate</h2><p class="mt-1 text-on-surface-variant">AI runs require a server-side scope check. Human approval pauses are recorded before an answer is accepted.</p><form id="ai-run-form" class="mt-4 grid gap-3"><label class="grid gap-1">Target<input id="ai-target" required class="rounded bg-surface-container-lowest p-2" placeholder="https://authorized-target.example"></label><label class="grid gap-1">Goal<textarea id="ai-goal" required rows="3" class="rounded bg-surface-container-lowest p-2" placeholder="Describe the authorized assessment objective"></textarea></label><button class="rounded bg-primary px-4 py-2 text-on-primary font-semibold justify-self-start" type="submit">Check scope and submit AI run</button></form><p id="ai-run-status" class="mt-3 text-on-surface-variant" role="status" aria-live="polite">Ready when target and goal are supplied.</p><p id="ai-live-counts" class="mt-1 text-on-surface-variant" aria-live="polite">Loading live AI run counts…</p><h3 class="mt-5 font-headline-sm">Awaiting operator approval</h3><div id="ai-pending-list" class="mt-2 grid gap-2"></div><h3 class="mt-5 font-headline-sm">Recorded AI runs</h3><div id="ai-run-list" class="mt-2 grid gap-2"></div>';
  main.prepend(panel);
- const status=panel.querySelector("#ai-run-status"),list=panel.querySelector("#ai-run-list"),pendingList=panel.querySelector("#ai-pending-list"),form=panel.querySelector("#ai-run-form");
+ const status=panel.querySelector("#ai-run-status"),counts=panel.querySelector("#ai-live-counts"),list=panel.querySelector("#ai-run-list"),pendingList=panel.querySelector("#ai-pending-list"),form=panel.querySelector("#ai-run-form");
  const targetInput=panel.querySelector("#ai-target"),goalInput=panel.querySelector("#ai-goal");
  let recordedRuns=[],pendingRuns=[],scopeData=null,answerInProgress=false;
  const proposalHeading=[...document.querySelectorAll("h2")].find(n=>textOf(n).startsWith("AI Planner proposes spawning"));
@@ -586,9 +586,9 @@
    scopeData=sr.status==="fulfilled"?sr.value:null;
    aiApiAvailable=rr.status==="fulfilled"&&pr.status==="fulfilled";
    if(rr.status!=="fulfilled"||pr.status!=="fulfilled"){
-     status.textContent="AI run state unavailable: "+(rr.status!=="fulfilled"?(rr.reason?.message||"runs endpoint failed"):(pr.reason?.message||"pending endpoint failed"));
+     counts.textContent="AI run state unavailable: "+(rr.status!=="fulfilled"?(rr.reason?.message||"runs endpoint failed"):(pr.reason?.message||"pending endpoint failed"));
    }else{
-     status.textContent=recordedRuns.length+" recorded AI run(s) · "+pendingRuns.length+" awaiting operator answer(s).";
+     counts.textContent=recordedRuns.length+" recorded AI run(s) · "+pendingRuns.length+" awaiting operator answer(s).";
    }
    if(scopeData){
      const engagementButton=[...document.querySelectorAll("header button")].find(b=>textOf(b).includes("ENG-2026-X892"));
