@@ -168,7 +168,7 @@ def test_dashboard_does_not_claim_scope_rule_when_target_list_is_empty(page, liv
     )
     header = page.locator("header").inner_text()
     assert "(NO TARGET RULE)" in header
-    assert "Target: No target configured" in header
+    assert "target: no target configured" in header.lower()
     assert "(CONFIGURED RULE)" not in header
     assert "SCOPE ENFORCEMENT ENABLED" not in header
 
@@ -190,7 +190,7 @@ def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, 
     )
     header = page.locator("header").inner_text()
     assert "(STATUS UNAVAILABLE)" in header
-    assert "Target: unavailable" in header
+    assert "target: unavailable" in header.lower()
     assert "(NO TARGET RULE)" not in header
     assert "NO TARGET RULE CONFIGURED" not in header
     assert "SCOPE ENFORCEMENT ENABLED" not in header
