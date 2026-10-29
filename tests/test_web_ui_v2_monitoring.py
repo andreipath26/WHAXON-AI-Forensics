@@ -22,6 +22,7 @@ def test_monitoring_page_loads_canonical_design_and_live_state(page, live_server
     assert "99.4%" not in visible
     assert "Rogue Port Exposed" not in visible
     assert "DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE" not in visible
+    assert "PAGE 1 OF 6" not in visible
     assert page.locator("#asset-search-input").is_visible()
     assert page.locator("#asset-ledger-container .asset-card").count() == 0
 
