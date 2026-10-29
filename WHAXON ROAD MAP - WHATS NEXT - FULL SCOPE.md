@@ -2486,3 +2486,46 @@ Publish the benchmark methodology, versions, exclusions, sample sizes, limitatio
 
 **Definition of done:** WHAXON maintains an evidence-backed competitor matrix, a measured baseline, a prioritized differentiation plan and repeatable tests that demonstrate improvement in customer outcomes without weakening scope enforcement, evidence integrity or product reliability.
 
+## 44. EXECUTION ORDER AND UI-FIRST GATE FOR MULTI-TARGET / COMPETITIVE WORK (NEW — DEFERRED)
+
+**Priority decision:** The multi-target/subnet orchestration work in §42 and the competitive parity/differentiation programme in §43 are approved roadmap goals, but their implementation is explicitly deferred until the existing approved WHAXON UI is fully functional end to end. Recording these goals in the roadmap does not authorize starting their implementation before the gate below is passed.
+
+### 44.1 Current priority: finish the existing UI without redesign
+
+1. Preserve the approved UI files, page structure, visual design, and intended interactions. Do not redesign, replace, or create mock versions of the UI.
+2. Audit every existing page and user-visible control against its actual route, frontend handler, backend endpoint, data model, and permission/scope checks.
+3. Repair broken or inert controls and incomplete workflows using the existing design.
+4. Verify loading, empty, success, validation-error, backend-error, cancellation, and permission-denied states where applicable.
+5. Add or repair automated tests for routes, templates, API integration, frontend behavior, and critical end-to-end workflows. Use browser automation such as Playwright where available.
+6. Keep a page-by-page checklist with evidence of what was tested. Do not label a page or the UI complete based only on rendering, mocked data, static inspection, or a successful build.
+
+### 44.2 UI completion gate — required before §42 or §43 implementation begins
+
+The UI is considered functionally complete only when all of the following are demonstrated against the real application:
+
+- Every existing page loads through its intended route and uses the approved design.
+- Every visible interactive control has a defined, working behavior or is clearly and intentionally disabled with an explanation.
+- Critical workflows are wired to real backend/API behavior and persisted or returned data; no success state is fabricated from mock data.
+- Forms, validation, scope/authorization errors, empty states, network failures, and backend failures are handled without silently losing data or misrepresenting success.
+- Authentication, authorization, scope enforcement, and destructive-action protections are preserved across UI and API paths.
+- Automated route, integration, regression, and critical end-to-end tests pass in the documented test environment.
+- Browser testing covers every page and its critical interactions, with failures fixed or explicitly recorded as release blockers.
+- A final audit report lists pages and controls tested, test commands/results, known limitations, and any remaining blockers. “Fully functional” must be supported by this evidence, not an estimate.
+
+### 44.3 Work allowed while the implementation is deferred
+
+- Roadmap planning, architecture notes, acceptance criteria, competitor-documentation research, and preparation of safe benchmark methodology may continue when they do not interrupt or destabilize UI completion.
+- Do not begin multi-target/CIDR runtime implementation, broad competitor-parity feature work, or benchmark-driven expansion until the UI gate is passed.
+- Do not treat this deferral as cancellation: §42 and §43 remain planned work, sequenced after the gate.
+- If a UI fix exposes a prerequisite security or correctness defect, fix or document it as part of making the current workflow reliable; do not use it as an excuse to start unrelated expansion.
+
+### 44.4 Post-gate execution sequence
+
+1. **Pass and document the UI gate in §44.2.**
+2. Re-audit the current CLI, API, job model, target/scope validation, scanner adapters, cancellation, reporting, and tests before changing orchestration behavior.
+3. Implement §42 in small, testable vertical slices: single-target compatibility; explicit target lists; bounded CIDR/subnet scope with exclusions and approval; per-target authorization checks; bounded concurrency/cancellation; partial and consolidated results; then UI integration using the approved design.
+4. Establish the seeded-lab benchmark baseline and competitor capability matrix in §43 before making superiority claims.
+5. Implement prioritized differentiation gaps one at a time, with regression tests and repeatable measurements.
+6. Release only capabilities that pass their acceptance criteria; update the roadmap and claims to match verified behavior.
+
+**Sequencing rule:** UI functional completion first; multi-target/subnet orchestration second; measured competitive differentiation third. No redesign and no unsupported superiority claims.
