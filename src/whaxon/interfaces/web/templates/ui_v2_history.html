@@ -389,6 +389,14 @@
   if (tbody) tbody.replaceChildren();
   document.querySelectorAll('main > section, main > div').forEach(node => { if (!node.querySelector('#history-live-summary') && !node.querySelector('table')) node.hidden = true; });
   if (integrityButton) integrityButton.hidden = true;
+  document.querySelectorAll("main *").forEach(node => {
+    if (node.children.length) return;
+    if (/^Page 1 of 3 \\(Total 42 records\\)$/.test((node.textContent || "").trim())) {
+      const footer = node.closest(".border-t");
+      if (footer) footer.style.display = "none";
+      else node.textContent = "Pagination unavailable for this live view";
+    }
+  });
   document.querySelectorAll("button").forEach(button => {
     if (button === exportButton || filters.includes(button)) return;
     if (table && table.contains(button)) return;
