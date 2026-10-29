@@ -1,7 +1,8 @@
 """Browser coverage for the read-only settings/API explorer."""
 from __future__ import annotations
 
-from whaxon.interfaces.web.server import _redact_sensitive_settings
+from whaxon.core import Core
+from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, _redact_sensitive_settings, create_app
 
 
 def test_settings_explorer_loads_and_redacts_settings(page, live_server):
@@ -47,3 +48,29 @@ def test_settings_redaction_recurses_through_nested_values():
         },
         "items": [{"password": "[REDACTED]"}],
     }
+
+
+def test_settings_api_redacts_values_for_get_and_post(tmp_path, monkeypatch):
+    core = Core(data_dir=tmp_path)
+    registry = JobRegistry(core)
+    runner = AsyncRunner(core)
+    raw = {
+        "api_key": "do-not-disclose",
+        "service": {"password": "also-private", "timeout_seconds": 10},
+    }
+    monkeypatch.setattr(core.settings, "get", lambda: raw)
+    monkeypatch.setattr(core.settings, "save", lambda _data: raw)
+    app = create_app(core, registry, runner)
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    get_response = client.get("/api/settings")
+    post_response = client.post("/api/settings", json={"service": {"timeout_seconds": 10}})
+    assert get_response.status_code == 200
+    assert post_response.status_code == 200
+    expected = {
+        "api_key": "[REDACTED]",
+        "service": {"password": "[REDACTED]", "timeout_seconds": 10},
+    }
+    assert get_response.get_json() == expected
+    assert post_response.get_json() == expected
