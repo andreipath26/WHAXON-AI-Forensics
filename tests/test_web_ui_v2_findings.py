@@ -93,13 +93,17 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
         timeout=8000,
     )
     total = page.locator("#whaxon-findings-list [data-finding-index]:visible").count()
+    assert page.get_by_role("button", name="ALL").count() >= 3
+    assert page.locator("div.bg-surface-container-lowest.px-space-xs.py-1.rounded button[aria-pressed=true]").count() == 3
     heading = page.locator("#whaxon-findings-heading")
     assert "shown of" in heading.inner_text().lower()
     assert "4 in buffer" not in heading.inner_text().lower()
 
     verified_filter = page.get_by_role("button", name=re.compile(r"VERIFIED"))
     verified_filter.click()
+    assert verified_filter.get_attribute("aria-pressed") == "true"
     verified_filter.click()
+    assert page.get_by_role("button", name="ALL").nth(1).get_attribute("aria-pressed") == "true"
     page.wait_for_function(
         "(total) => Array.from(document.querySelectorAll('#whaxon-findings-list [data-finding-index]')).filter(el => getComputedStyle(el).display !== 'none').length === total",
         arg=total,
@@ -147,5 +151,46 @@ def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw
     ssh_finding.click()
     proof = page.locator("#curl-proof-payload")
     assert "22/tcp open ssh OpenSSH 9.6" in proof.inner_text()
-    assert "Retest Outcomes" in page.locator("body").evaluate("(el) => el.textContent")
+    assert "Verification Outcomes" in page.locator("body").evaluate("(el) => el.textContent")
     assert "Refuted" in page.locator("#whaxon-kpi-fixed").evaluate("(el) => el.parentElement.textContent")
+
+
+def test_findings_header_uses_live_scope_without_claiming_unverified_enforcement(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"ENG-LIVE-42","in_scope":["example.test"],"enabled":false}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelector('#findings-scope-status')?.textContent.includes('ENG-LIVE-42')",
+        timeout=5000,
+    )
+    status = page.locator("#findings-scope-status")
+    assert "example.test" in status.inner_text()
+    assert "enforcement disabled" in status.inner_text().lower()
+    assert "Scope is checked by the backend for each action" not in page.locator("body").inner_text()
+
+
+def test_findings_kpi_bars_match_live_report_counts(page, live_server):
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
+        timeout=8000,
+    )
+    total_text = page.locator("#whaxon-findings-count").inner_text()
+    total = int(total_text.rsplit(" ", 1)[-1])
+    assert total >= 0
+    verified = int(page.locator("#whaxon-kpi-verified").inner_text())
+    candidate = int(page.locator("#whaxon-kpi-candidate").inner_text())
+    verified_width = page.locator("#whaxon-kpi-verified-bar").evaluate("(el) => parseFloat(el.style.width)")
+    candidate_width = page.locator("#whaxon-kpi-candidate-bar").evaluate("(el) => parseFloat(el.style.width)")
+    expected_verified = verified / total * 100 if total else 0
+    expected_candidate = candidate / total * 100 if total else 0
+    assert abs(verified_width - expected_verified) < 0.1
+    assert abs(candidate_width - expected_candidate) < 0.1
+    assert page.locator("#whaxon-kpi-fixed-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
+    assert page.locator("#whaxon-kpi-vulnerable-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
