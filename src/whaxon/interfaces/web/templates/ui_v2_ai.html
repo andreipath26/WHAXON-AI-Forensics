@@ -362,6 +362,9 @@
  const actionIdLabel=[...document.querySelectorAll("span")].find(n=>textOf(n).startsWith("ACTION_ID:"));
  const activeTargetLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Active Target Endpoint");
  const activePhaseLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Operational Phase");
+ const autonomousLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Autonomous Engine");
+ const sessionAuthLabel=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Session Token Auth");
+ const proposalDetailsHeading=[...document.querySelectorAll("span")].find(n=>textOf(n)==="Recorded Proposal Details");
  const headerTarget=[...document.querySelectorAll("header span")].find(n=>textOf(n).startsWith("Target:"));
  const headerScope=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="(IN SCOPE)");
  const boundaryLabel=[...document.querySelectorAll("header span")].find(n=>textOf(n)==="STRICT BOUNDARY ENFORCED");
@@ -534,6 +537,11 @@
    if(actionIdLabel)actionIdLabel.textContent="ACTION_ID: "+(run?.id||"—");
    if(activeTargetLabel?.nextElementSibling)activeTargetLabel.nextElementSibling.textContent=q?.target||"No active target selected";
    if(activePhaseLabel?.nextElementSibling)activePhaseLabel.nextElementSibling.textContent=q?.proposed_phase||run?.phase||recordedRuns[0]?.phase||"No active phase recorded";
+   if(autonomousLabel)autonomousLabel.textContent="AI model";
+   if(autonomousLabel?.nextElementSibling)autonomousLabel.nextElementSibling.textContent="not exposed by API";
+   if(sessionAuthLabel)sessionAuthLabel.textContent="Operator identity";
+   if(sessionAuthLabel?.nextElementSibling)sessionAuthLabel.nextElementSibling.textContent="not exposed by API";
+   if(proposalDetailsHeading)proposalDetailsHeading.textContent=q?"PENDING ACTION DETAILS":"AI ACTION DETAILS UNAVAILABLE";
    if(headerTarget)headerTarget.textContent="Target: "+(q?.target||"No target selected");
    if(headerScope)headerScope.textContent=!scopeData?"(STATUS UNAVAILABLE)":scopeData.enabled===false?"(ENFORCEMENT DISABLED)":q?.target?"(SCOPE CHECKED)":"(SCOPE ENFORCED)";
    if(boundaryLabel)boundaryLabel.textContent=!scopeData?"SCOPE STATUS UNAVAILABLE":scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SERVER-SIDE SCOPE CHECK ENABLED";
