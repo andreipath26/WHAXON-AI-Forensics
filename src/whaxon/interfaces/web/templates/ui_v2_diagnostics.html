@@ -936,7 +936,45 @@
  const diagnosticFixtureMarkers=/All Tests Passed|ACK RECEIVED \(0\.9ms\)|PID 8891 killed|out_of_scope_drops|msf_version|ALL SUBSYSTEMS HEALTHY|whaxon_health_diagnostics_/i;
  main.querySelectorAll("*").forEach(node=>{if(node.children.length||!diagnosticFixtureMarkers.test(node.textContent||""))return;const card=node.closest("article,section,[class*='rounded-xl'],[class*='rounded-lg']");if(card&&card!==panel){card.hidden=true;card.style.display="none";}else{node.textContent="Not reported by live diagnostics";}});
 
- main.querySelectorAll("button").forEach(button=>{if(panel.contains(button))return;if(/Restart Engine Daemons|Run Full Diagnostic|Export Health Report/i.test(button.textContent||"")){button.disabled=true;button.setAttribute("aria-disabled","true");button.title="This reference control is not connected to a backend action.";}});
+ // Only the live refresh control and the two genuine global navigation/operations
+ // controls remain active. All template-only diagnostic probes are simulations.
+ document.querySelectorAll("button").forEach(button=>{
+   if(panel.contains(button))return;
+   const label=(button.textContent||"").replace(/\s+/g," ").trim();
+   if(/Terminal Log/i.test(label)){
+     button.addEventListener("click",event=>{event.preventDefault();window.location.href="/ui-v2/run";});
+     return;
+   }
+   if(/Emergency Halt Scan/i.test(label)){
+     button.addEventListener("click",async event=>{
+       event.preventDefault();
+       const status=document.getElementById("diagnostics-status");
+       try{
+         const historyResponse=await fetch("/api/history");
+         if(!historyResponse.ok)throw new Error("History HTTP "+historyResponse.status);
+         const history=await historyResponse.json();
+         const active=(Array.isArray(history)?history:[]).filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+         if(!active.length){if(status)status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
+         if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+         const results=await Promise.all(active.map(async job=>{
+           const id=job.id||job.job_id;if(!id)return false;
+           const response=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});
+           if(!response.ok)return false;
+           const body=await response.json().catch(()=>({}));
+           return body.ok===true;
+         }));
+         const cancelled=results.filter(Boolean).length;
+         if(status)status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
+         await refresh();
+         if(status)status.textContent="Cancellation requested for "+cancelled+" of "+active.length+" active job(s).";
+       }catch(error){if(status)status.textContent="Emergency halt failed: "+error.message;}
+     });
+     return;
+   }
+   button.disabled=true;
+   button.setAttribute("aria-disabled","true");
+   button.title="Reference/demo control; no live backend operation is available.";
+ });
 
   const add=(parent,label,value)=>{const card=document.createElement("div");card.className="rounded-lg bg-surface-container p-space-md";const title=document.createElement("div");title.className="font-label-sm text-outline uppercase";title.textContent=label;const result=document.createElement("div");result.className="mt-1 font-code-md";result.textContent=value;card.append(title,result);parent.append(card);};
   async function refresh(){const status=document.getElementById("diagnostics-status"),checks=document.getElementById("diagnostics-checks"),button=document.getElementById("diagnostics-refresh");button.disabled=true;button.textContent="Refreshing…";status.textContent="Refreshing live diagnostics…";checks.replaceChildren();try{const [hr,tr]=await Promise.all([fetch("/api/health"),fetch("/api/tools")]);if(!tr.ok)throw new Error("Tool catalog HTTP "+tr.status);const health=await hr.json(),toolsData=await tr.json(),tools=Array.isArray(toolsData)?toolsData:(Array.isArray(toolsData.tools)?toolsData.tools:null);if(!tools)throw new Error("Tool catalog response has an unexpected format");add(checks,"WHAXON health",health.status||"not reported");Object.entries(health.checks&&typeof health.checks==="object"?health.checks:{}).forEach(([k,v])=>add(checks,"Health · "+k,typeof v==="string"?v:JSON.stringify(v)));add(checks,"Catalog tools",String(tools.length));add(checks,"Adapter + binary available",String(tools.filter(t=>t.adapter_available===true&&t.binary_available===true).length));add(checks,"Unavailable tool binaries",String(tools.filter(t=>t.binary_available===false).length));add(checks,"Availability not reported",String(tools.filter(t=>typeof t.binary_available!=="boolean").length));status.textContent="Live values loaded from /api/health and /api/tools. Health HTTP "+hr.status+(hr.ok?"":" (degraded/unhealthy)")+"; tools HTTP "+tr.status+".";}catch(e){status.textContent="Diagnostics could not be loaded: "+e.message;checks.replaceChildren();}finally{button.disabled=false;button.textContent="Refresh";}}

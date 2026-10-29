@@ -56,3 +56,48 @@ def test_diagnostics_layout_remains_available_and_mock_actions_are_disabled(page
     restart = page.get_by_role("button", name="Restart Engine Daemons")
     if restart.count():
         assert restart.is_disabled()
+
+
+def test_diagnostics_reference_buttons_cannot_run_simulated_operations(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
+        " || document.querySelector('#diagnostics-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    for label in (
+        "Restart Engine Daemons",
+        "Run Full Diagnostic",
+        "Export Health Report",
+        "Test MSF RPC Handshake",
+        "Benchmark SQLite Write Speed",
+        "Probe Ollama LLM Socket",
+        "Check eBPF Filter Integrity",
+    ):
+        button = page.get_by_role("button", name=label)
+        if button.count():
+            assert button.is_disabled(), f"{label} must not run a simulated operation"
+    for button in page.locator("main button:visible").all():
+        if button.get_attribute("id") != "diagnostics-refresh":
+            assert button.is_disabled(), f"Unwired diagnostic control is enabled: {button.inner_text()}"
+
+
+def test_diagnostics_terminal_log_button_navigates_to_run_workspace(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.get_by_role("button", name="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_diagnostics_emergency_halt_reports_when_no_jobs_are_active(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
+        " || document.querySelector('#diagnostics-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    page.get_by_role("button", name="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
