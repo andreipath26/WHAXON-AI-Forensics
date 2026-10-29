@@ -60,7 +60,10 @@
  // The supplied visual below this point contains a fixed, fictional exploit story,
  // credentials, timing results and a hard-coded replay command. Keep the canonical
  // shell/navigation, but never present fixture data as a live assessment.
- /* Keep the canonical page sections visible alongside the live workflow panel. */
+ /* Suppress the static exploit story and hard-coded evidence while retaining the page shell. */
+ const fixtureMarkers=/FINDING-SQLI-001|api\\.internal\\.corp|uid=0\\(root\\)|SQL Injection in Catalog Query Engine|payload accepted|differential proof|0\.92 confidence|verified exploit/i;
+ main.querySelectorAll("h1,h2,h3,h4,p,pre,code,span,div").forEach(node=>{if(node.children.length||!fixtureMarkers.test(node.textContent||""))return;const card=node.closest("article,section,[class*='rounded-xl'],[class*='rounded-lg']");if(card&&card!==panel){card.hidden=true;card.style.display="none";}else{node.hidden=true;node.style.display="none";}});
+ 
 
  const status=panel.querySelector("#retest-status"),list=panel.querySelector("#retest-list");
  const node=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value==null||value===""?"—":String(value);if(cls)n.className=cls;return n;};
