@@ -53,7 +53,7 @@ def test_attack_chain_page_renders_recorded_edges_and_refreshes(page, live_serve
         route.fulfill(
             status=200,
             content_type="application/json",
-            body='{"edges":[{"source":"job-a/finding-1","target":"job-b/finding-2","kind":"observed pivot"}],"count":1}',
+            body='{"edges":[{"parent":{"kind":"exploit","id":"job-a/finding-1"},"child":{"kind":"session","id":"job-b/finding-2"},"relation":"from_exploit","evidence":"recorded test evidence","created_at":1793260000}],"count":1}',
         )
 
     page.route("**/api/pivot/graph", graph)
@@ -63,9 +63,10 @@ def test_attack_chain_page_renders_recorded_edges_and_refreshes(page, live_serve
         timeout=8000,
     )
     rendered = page.locator("#chains-list").inner_text()
-    assert "job-a/finding-1" in rendered
-    assert "job-b/finding-2" in rendered
-    assert "observed pivot" in rendered
+    assert "exploit:job-a/finding-1" in rendered
+    assert "session:job-b/finding-2" in rendered
+    assert "from_exploit" in rendered
+    assert "recorded test evidence" in rendered
     assert calls["count"] == 1
 
     page.get_by_role("button", name="Refresh").click()
