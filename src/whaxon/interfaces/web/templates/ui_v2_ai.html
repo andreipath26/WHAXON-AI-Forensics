@@ -545,8 +545,8 @@
    if(sessionAuthLabel?.nextElementSibling)sessionAuthLabel.nextElementSibling.textContent="not exposed by API";
    if(proposalDetailsHeading)proposalDetailsHeading.textContent=q?"PENDING ACTION DETAILS":"AI ACTION DETAILS UNAVAILABLE";
    if(headerTarget)headerTarget.textContent="Target: "+(q?.target||"No target selected");
-   if(headerScope)headerScope.textContent=!scopeData?"(STATUS UNAVAILABLE)":scopeData.enabled===false?"(ENFORCEMENT DISABLED)":q?.target?"(SCOPE CHECKED)":"(SCOPE ENFORCED)";
-   if(boundaryLabel)boundaryLabel.textContent=!scopeData?"SCOPE STATUS UNAVAILABLE":scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SERVER-SIDE SCOPE CHECK ENABLED";
+   if(headerScope)headerScope.textContent=!scopeData||typeof scopeData.enabled!=="boolean"?"(STATUS UNAVAILABLE)":scopeData.enabled===false?"(ENFORCEMENT DISABLED)":q?.target?"(TARGET REQUIRES SERVER CHECK)":"(RULE CONFIGURED)";
+   if(boundaryLabel)boundaryLabel.textContent=!scopeData||typeof scopeData.enabled!=="boolean"?"SCOPE STATUS UNAVAILABLE":scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE RULE CONFIGURED";
    if(engineLabel)engineLabel.textContent="AI API:";
    if(engineValue)engineValue.textContent=aiApiAvailable?"Online":"Unavailable";
    if(portLabel?.nextElementSibling)portLabel.nextElementSibling.textContent=window.location.port||"default";
@@ -596,8 +596,8 @@
      const engagementButton=[...document.querySelectorAll("header button")].find(b=>b.querySelector(".material-symbols-outlined")?.textContent.trim()==="arrow_drop_down");
      if(engagementButton){const spans=engagementButton.querySelectorAll("span");if(spans[0])spans[0].textContent=scopeData.engagement||"Active scope";if(spans[1])spans[1].textContent="("+(Array.isArray(scopeData.in_scope)?scopeData.in_scope.length:0)+" scope rule(s))";}
      document.querySelectorAll("header span,header div").forEach(n=>{
-       if(textOf(n)==="(IN SCOPE)")n.textContent=scopeData.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
-       if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
+       if(textOf(n)==="(IN SCOPE)")n.textContent=typeof scopeData.enabled!=="boolean"?"(STATUS UNAVAILABLE)":scopeData.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
+       if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=typeof scopeData.enabled!=="boolean"?"SCOPE STATUS UNAVAILABLE":scopeData.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
      });
    }else{
      document.querySelectorAll("header span,header div").forEach(n=>{if(textOf(n)==="(IN SCOPE)")n.textContent="(STATUS UNAVAILABLE)";if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent="SCOPE STATUS UNAVAILABLE";});

@@ -300,3 +300,37 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
         timeout=8000,
     )
     assert scope_calls["count"] >= 2
+
+
+
+def test_ai_pending_target_is_not_labelled_scope_checked_before_server_verdict(page, live_server):
+    page.route(
+        "**/api/ai/runs",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.route(
+        "**/api/ai/pending",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"pending-scope-test","pending_question":{"target":"203.0.113.10","rationale":"Pending proposal for browser test","proposed_phase":"validation","tool_id":"nmap"}}]',
+        ),
+    )
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"enabled":true,"in_scope":["192.0.2.0/24"],"out_of_scope":[]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true' && document.querySelector('#ai-pending-list')?.innerText.includes('pending-scope-test')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "(TARGET REQUIRES SERVER CHECK)" in header
+    assert "(SCOPE CHECKED)" not in header
+    assert "SCOPE RULE CONFIGURED" in header
+    assert "SERVER-SIDE SCOPE CHECK ENABLED" not in header
