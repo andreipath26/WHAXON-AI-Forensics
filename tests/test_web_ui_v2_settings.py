@@ -31,8 +31,9 @@ def test_settings_redaction_recurses_through_nested_values():
         "api_key": "never-return-this",
         "service": {
             "client_secret": "also-private",
+            "passphrase": "private-passphrase",
             "timeout_seconds": 10,
-            "headers": [{"Authorization": "Bearer very-private", "Accept": "application/json"}],
+            "headers": [{"Authorization": "Bearer very-private", "Cookie": "session=private", "Accept": "application/json"}],
         },
         "items": [{"password": "hidden"}],
     }
@@ -40,8 +41,9 @@ def test_settings_redaction_recurses_through_nested_values():
         "api_key": "[REDACTED]",
         "service": {
             "client_secret": "[REDACTED]",
+            "passphrase": "[REDACTED]",
             "timeout_seconds": 10,
-            "headers": [{"Authorization": "[REDACTED]", "Accept": "application/json"}],
+            "headers": [{"Authorization": "[REDACTED]", "Cookie": "[REDACTED]", "Accept": "application/json"}],
         },
         "items": [{"password": "[REDACTED]"}],
     }
