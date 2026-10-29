@@ -719,6 +719,45 @@
 <script>
 (function(){
   "use strict";
+
+  const header=document.querySelector("header");
+  const engagementButton=header&&[...header.querySelectorAll("button")].find(button=>(button.textContent||"").includes("ENG-2026-X892"));
+  const engagementNode=engagementButton&&[...engagementButton.querySelectorAll("span")].find(node=>(node.textContent||"").trim()==="ENG-2026-X892");
+  const targetNode=header&&[...header.querySelectorAll("span")].find(node=>(node.textContent||"").trim().startsWith("Target:"));
+  const scopeStateNode=header&&[...header.querySelectorAll("span")].find(node=>["(IN SCOPE)","(RULE CONFIGURED)","(NO TARGET RULE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((node.textContent||"").trim()));
+  const boundaryNode=header&&[...header.querySelectorAll("span")].find(node=>/STRICT BOUNDARY ENFORCED|SCOPE STATUS FROM LIVE CONFIGURATION|SCOPE ENFORCEMENT DISABLED|SCOPE STATUS UNAVAILABLE/.test((node.textContent||"").trim()));
+  const liveScopeStatus=document.createElement("div");
+  liveScopeStatus.id="audit-live-scope-status";
+  liveScopeStatus.className="hidden xl:flex max-w-sm truncate items-center rounded border border-outline-variant/40 bg-surface-container-lowest px-space-sm py-1 font-label-sm text-label-sm text-on-surface-variant";
+  liveScopeStatus.setAttribute("role","status");
+  liveScopeStatus.setAttribute("aria-live","polite");
+  liveScopeStatus.textContent="Loading live scope…";
+  if(engagementButton?.parentElement)engagementButton.parentElement.insertAdjacentElement("afterend",liveScopeStatus);
+  (async function loadAuditScope(){
+    try{
+      const response=await fetch("/api/scope",{headers:{"Accept":"application/json"}});
+      if(!response.ok)throw new Error("Scope HTTP "+response.status);
+      const scope=await response.json();
+      const targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+      const engagement=String(scope.engagement||"No active engagement");
+      const target=targets.length?targets.join(", "):"No target configured";
+      const state=scope.enabled===false?"ENFORCEMENT DISABLED":targets.length?"RULE CONFIGURED":"NO TARGET RULE";
+      if(engagementNode)engagementNode.textContent=engagement;
+      if(targetNode)targetNode.textContent="Target: "+target;
+      if(scopeStateNode)scopeStateNode.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+      if(boundaryNode)boundaryNode.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":targets.length?"SCOPE STATUS FROM LIVE CONFIGURATION":"NO TARGET RULE CONFIGURED";
+      liveScopeStatus.textContent="Target: "+target+" · "+state;
+      liveScopeStatus.title=liveScopeStatus.textContent;
+    }catch(error){
+      if(engagementNode)engagementNode.textContent="Unavailable";
+      if(targetNode)targetNode.textContent="Target: unavailable";
+      if(scopeStateNode)scopeStateNode.textContent="(STATUS UNAVAILABLE)";
+      if(boundaryNode)boundaryNode.textContent="SCOPE STATUS UNAVAILABLE";
+      liveScopeStatus.textContent="Scope status unavailable";
+      liveScopeStatus.title="Live scope could not be loaded: "+error.message;
+    }
+  })();
+
   const buttons=[...document.querySelectorAll("header button")];
   const text=button=>{const clone=button.cloneNode(true);clone.querySelectorAll(".material-symbols-outlined").forEach(node=>node.remove());return (clone.textContent||"").replace(/\s+/g," ").trim();};
   const wireRoute=(button,path)=>{if(button)button.addEventListener("click",event=>{event.preventDefault();window.location.href=path;});};
