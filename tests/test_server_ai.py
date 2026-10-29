@@ -132,7 +132,7 @@ def test_ai_run_answer_records_operator_response(tmp_path, monkeypatch):
     approvals = core.store.list_approvals("ai-waiting")
     assert len(approvals) == 1
     assert approvals[0]["answer"] == "yes"
-    assert approvals[0]["user"] == "operator"
+    assert approvals[0]["user"] == "local"  # JSON-supplied identity is not trusted
 
 
 def test_ai_run_waits_for_real_operator_answer(tmp_path, monkeypatch):
