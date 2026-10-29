@@ -114,7 +114,7 @@ def test_attack_chain_page_filters_and_exports_recorded_graph(page, live_server)
     assert page.locator("#chains-list article:visible").count() == 1
     assert "node-c" in page.locator("#chains-list article:visible").inner_text()
     with page.expect_download() as download_info:
-        page.get_by_role("button", name="Export graph JSON").click()
+        page.locator("#chains-export").click()
     assert download_info.value.suggested_filename == "whaxon-attack-chain-graph.json"
 
 def test_attack_chain_header_reflects_live_scope_and_navigation(page, live_server):
@@ -169,5 +169,5 @@ def test_attack_chain_halt_uses_live_history_and_disables_unwired_actions(page, 
         assert button.count() == 1, f"Expected canonical control to remain visible in DOM: {label}"
         assert button.is_disabled(), f"Unsupported action should be disabled: {label}"
     assert page.get_by_role("button", name="Refresh").is_enabled()
-    assert page.get_by_role("button", name="Export graph JSON").is_enabled()
+    assert page.locator("#chains-export").is_enabled()
 
