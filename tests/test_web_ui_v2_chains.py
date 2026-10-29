@@ -71,7 +71,7 @@ def test_attack_chain_page_renders_recorded_edges_and_refreshes(page, live_serve
 
     page.get_by_role("button", name="Refresh").click()
     page.wait_for_function(
-        "() => document.querySelector('#chains-status')?.textContent.includes('1 relationship(s) returned')",
+        "() => document.querySelector('#chains-status')?.textContent.includes('1 of 1 recorded relationship(s) match the filters')",
         timeout=8000,
     )
     assert calls["count"] >= 2
