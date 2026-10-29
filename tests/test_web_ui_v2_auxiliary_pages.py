@@ -466,3 +466,57 @@ def test_bas_halt_is_live_and_provider_simulation_controls_are_not_actionable(pa
     assert "42.8%" not in page.locator("main").inner_text()
     assert "CROWDSTRIKE + DEFENDER" not in page.locator("main").inner_text()
 
+def test_approvals_header_reflects_live_scope_and_terminal_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/approvals")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('pending item(s)')"
+        " || document.querySelector('#whaxon-live-approvals')?.innerText.includes('Live data unavailable')",
+        timeout=10000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    targets = scope.get("in_scope") or []
+    target = targets[0] if targets else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+    assert "STRICT BOUNDARY ENFORCED" not in header
+
+    page.get_by_role("button", name="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server):
+    calls = {"pending": 0}
+
+    def pending(route):
+        calls["pending"] += 1
+        route.fulfill(status=200, content_type="application/json", body="[]")
+
+    page.route("**/api/ai/pending", pending)
+    page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.route("**/api/history", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.goto(f"{live_server}/ui-v2/approvals")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('0 pending item(s)')",
+        timeout=8000,
+    )
+    before = calls["pending"]
+    page.get_by_role("button", name="Refresh queue").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('0 pending item(s)')",
+        timeout=8000,
+    )
+    assert calls["pending"] > before
+
+    page.get_by_role("button", name="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+    for button in page.locator("main button:visible").all():
+        if button.evaluate("(el) => el.closest('#whaxon-live-approvals') !== null"):
+            continue
+        assert button.is_disabled(), f"Disconnected approval control remains enabled: {button.inner_text()}"
+    assert page.get_by_role("button", name="Refresh queue").is_enabled()
+
