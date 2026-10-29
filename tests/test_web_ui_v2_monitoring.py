@@ -125,9 +125,7 @@ def test_monitoring_halt_uses_live_history_and_unsupported_controls_are_disabled
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():
-        if button.get_attribute("id") == "monitoring-refresh":
-            assert button.is_enabled()
-        elif "Stream Full Cryptographic Audit Logs" in button.inner_text():
+        if button.get_attribute("id") == "monitoring-refresh" or "Stream Full Cryptographic Audit Logs" in button.inner_text():
             assert button.is_enabled()
         else:
             assert button.is_disabled(), f"Unsupported monitoring action remains enabled: {button.inner_text()}"
