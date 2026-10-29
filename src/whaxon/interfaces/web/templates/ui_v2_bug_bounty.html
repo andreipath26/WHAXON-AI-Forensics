@@ -676,4 +676,56 @@
  const sample=/staging-api\.corp\.net|api\.staging\.internal|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165|24 Ev\/s/i;
  main.querySelectorAll("*").forEach(n=>{if(n.children.length||!sample.test(n.textContent||""))return;const c=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(header&&(header.contains(n)||(c&&c.contains(header)))){n.textContent="NOT REPORTED";return;}if(c&&c!==panel&&!panel.contains(c)){c.hidden=true;c.style.display="none";}else{n.hidden=true;n.style.display="none";}});
  let records=[];function render(){list.replaceChildren();const q=search.value.toLowerCase().trim();const shown=records.filter(x=>[x.job?.target,x.job?.tool,x.job?.status,x.job?.id].join(" ").toLowerCase().includes(q));status.textContent=shown.length+" of "+records.length+" recorded assessment job(s) match the filter. Browser automation controls are not available in this view.";if(!shown.length){list.textContent=q?"No assessment jobs match this filter.":"No recorded assessment jobs yet. Start an in-scope run to populate this workspace.";return;}shown.forEach(x=>{const job=x.job||{},findings=Array.isArray(x.findings)?x.findings:[];const card=cardFor((job.target||"Target not recorded")+" · "+(job.status||"unknown"),"Tool: "+(job.tool||job.tool_id||"not recorded")+" · Findings recorded: "+findings.length+" · Job: "+(job.id||"unknown"));const actions=document.createElement("div");actions.className="mt-3 flex flex-wrap gap-2";for(const [label,url] of [["Open findings","/ui-v2/findings"],["Open reports","/ui-v2/reports"],["View job history","/ui-v2/history"]]){const a=document.createElement("a");a.href=url;a.textContent=label;a.className="rounded bg-surface-container-high px-3 py-2 text-sm";actions.append(a);}card.append(actions);list.append(card);});}async function load(){refresh.disabled=true;refresh.textContent="Loading…";status.textContent="Loading recorded assessment jobs…";try{const [r,h]=await Promise.all([fetch("/api/report?format=json"),fetch("/api/history")]);if(!r.ok||!h.ok)throw new Error("Live API unavailable");const d=await r.json(),hist=await h.json();records=Array.isArray(d.jobs)?d.jobs:[];const historyCount=Array.isArray(hist)?hist.length:0;heading.textContent="Recorded assessment workspace";render();status.textContent=records.length+" report job(s) and "+historyCount+" history record(s) loaded from WHAXON. Browser automation is not connected to this page.";}catch(e){heading.textContent="Live data unavailable";status.textContent=e.message;list.replaceChildren();}finally{refresh.disabled=false;refresh.textContent="Refresh workspace";}}search.addEventListener("input",render);refresh.addEventListener("click",load);load();
- })();</script></body></html>
+ })();</script>
+<script id="whaxon-bug-bounty-header-wiring">
+(function(){
+ "use strict";
+ const headerButtons=[...document.querySelectorAll("header button")];
+ const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+ const go=(b,path)=>{if(!b)return;b.addEventListener("click",e=>{e.preventDefault();window.location.href=path;});};
+ go(headerButtons.find(b=>/Terminal Log|^LOGS$/i.test(label(b))),"/ui-v2/run");
+ const panel=document.getElementById("whaxon-live-bug-bounty");
+ const status=panel?.querySelector('[role="status"]');
+ if(status)status.id="bounty-status";
+ const report=message=>{if(status)status.textContent=message;};
+ const halt=headerButtons.find(b=>/Emergency Halt Scan|HALT SCAN/i.test(label(b)));
+ if(halt)halt.addEventListener("click",async e=>{
+  e.preventDefault();
+  try{
+   const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
+   const data=await response.json(),jobs=Array.isArray(data)?data:(Array.isArray(data.jobs)?data.jobs:[]);
+   const active=jobs.filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+   if(!active.length){report("No running or queued jobs were found. Nothing was cancelled.");return;}
+   if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+   const results=await Promise.all(active.map(async job=>{const id=job.id||job.job_id;if(!id)return false;try{const r=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!r.ok)return false;const body=await r.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}}));
+   report("Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).");
+  }catch(error){report("Emergency halt failed: "+error.message);}
+ });
+ document.querySelectorAll("main button").forEach(button=>{
+  if(panel?.contains(button))return;
+  button.disabled=true;button.setAttribute("aria-disabled","true");
+  button.title="Unavailable: browser automation, request replay, cache mutation and finding promotion are not connected to the WHAXON backend.";
+ });
+ const fake=/CDP SENSORS ACTIVE|JS EVAL HOOKS|DOM MUTATION LOG|COMMITTED_SETTLED|PASS \[200 OK\]|SKIPPED \/ FORCED|FORCED TARGET|INSPECTOR: POST|24 Ev\/s|OTP Challenge Stage|Execute Settlement|Live HAR Intercept Stream|POST \/app\/transfer\/commit|Browser automation: not connected/i;
+ document.querySelectorAll("main *").forEach(node=>{
+  if(panel?.contains(node))return;
+  const value=(node.textContent||"").trim();
+  if(!value||value.length>120||!fake.test(value))return;
+  node.hidden=true;node.style.setProperty("display","none","important");
+  const card=node.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low, .bg-surface-container-lowest");
+  if(card){card.hidden=true;card.style.setProperty("display","none","important");}
+ });
+
+ document.querySelectorAll("main div.bg-surface-container-lowest").forEach(card=>{
+  if(/COMMITTED_SETTLED|X-BugBounty-Hunter|USER_A_CTX/i.test(card.textContent||"")){
+   card.hidden=true;card.style.setProperty("display","none","important");
+  }
+ });
+ if(panel){
+  const note=document.createElement("p");note.className="mt-2 text-sm text-on-surface-variant";
+  note.textContent="This page lists persisted WHAXON assessment jobs only. Browser/CDP instrumentation, HAR interception, request replay, transaction execution and finding promotion are not connected; simulated evidence and controls are not actionable.";
+  const h=panel.querySelector("h2");if(h)h.insertAdjacentElement("afterend",note);
+ }
+})();
+</script>
+</body></html>
