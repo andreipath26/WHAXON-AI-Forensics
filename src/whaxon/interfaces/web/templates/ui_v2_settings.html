@@ -951,4 +951,33 @@
  main.querySelectorAll("h2,h3").forEach(heading=>{if(/AI Provider|Target Credentials|Wordlist Directories|Platform API Tokens|Webhooks|Issue Scoped Platform Token|Store Target Credential/i.test(heading.textContent||"")){const note=document.createElement("p");note.className="mt-1 text-xs text-outline";note.textContent="Reference layout only · configuration writes are not connected";heading.insertAdjacentElement("afterend",note);}});
  /* Keep the canonical page sections visible alongside the live workflow panel. */const status=panel.querySelector("#settings-status"),output=panel.querySelector("#settings-json"),endpoints=panel.querySelector("#settings-endpoints"),refresh=panel.querySelector("#settings-refresh");const safe=(v)=>{if(Array.isArray(v))return v.map(safe);if(v&&typeof v==="object"){const out={};for(const [k,x] of Object.entries(v)){out[k]=/secret|token|password|passwd|credential|private.?key|api.?key|authorization|bearer/i.test(k)?"[REDACTED]":safe(x);}return out;}return v;};async function load(){refresh.disabled=true;refresh.textContent="Loading…";status.textContent="Loading settings…";endpoints.replaceChildren();try{const responses=await Promise.all([fetch("/api/settings",{headers:{"Accept":"application/json"}}),fetch("/api/health",{headers:{"Accept":"application/json"}}),fetch("/api/tools",{headers:{"Accept":"application/json"}})]);const [sr,hr,tr]=responses;let settings;try{settings=await sr.json();}catch(_){throw new Error("Settings API returned invalid JSON");}if(!sr.ok)throw new Error("Settings API HTTP "+sr.status);output.textContent=JSON.stringify(safe(settings),null,2);status.textContent="Settings loaded read-only. Health HTTP "+hr.status+"; tool catalog HTTP "+tr.status+".";for(const [label,url,response] of [["Settings","/api/settings",sr],["Health","/api/health",hr],["Tools","/api/tools",tr]]){const row=document.createElement("div");row.className="rounded-lg bg-surface-container p-space-md";const title=document.createElement("div");title.className="font-semibold";title.textContent=label+" · HTTP "+response.status;const link=document.createElement("a");link.href=url;link.target="_blank";link.rel="noopener noreferrer";link.className="text-secondary underline";link.textContent="Open read-only endpoint";row.append(title,link);endpoints.append(row);}}catch(e){status.textContent="Settings could not be loaded: "+e.message;}finally{refresh.disabled=false;refresh.textContent="Refresh settings";}}refresh.addEventListener("click",load);load();})();
 </script>
+<script>
+(function(){
+  "use strict";
+  const headerButtons=[...document.querySelectorAll("header button")];
+  const logs=headerButtons.find(button=>/LOGS|Terminal Log/i.test(button.textContent||""));
+  if(logs)logs.addEventListener("click",event=>{event.preventDefault();window.location.href="/ui-v2/run";});
+  const halt=headerButtons.find(button=>/HALT SCAN|Emergency Halt Scan/i.test(button.textContent||""));
+  if(halt)halt.addEventListener("click",async event=>{
+    event.preventDefault();
+    const status=document.getElementById("settings-status");
+    try{
+      const response=await fetch("/api/history");
+      if(!response.ok)throw new Error("History HTTP "+response.status);
+      const history=await response.json();
+      const active=(Array.isArray(history)?history:[]).filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+      if(!active.length){if(status)status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
+      if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+      const results=await Promise.all(active.map(async job=>{
+        const id=job.id||job.job_id;if(!id)return false;
+        const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});
+        if(!result.ok)return false;
+        const body=await result.json().catch(()=>({}));
+        return body.ok===true;
+      }));
+      if(status)status.textContent="Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).";
+    }catch(error){if(status)status.textContent="Emergency halt failed: "+error.message;}
+  });
+})();
+</script>
 </body></html>
