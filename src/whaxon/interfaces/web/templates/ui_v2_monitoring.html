@@ -739,4 +739,7 @@
  summary.querySelector("#monitoring-refresh").addEventListener("click",load);
 })();
 </script>
-<script>(function(){const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165/i;document.querySelectorAll("#asset-ledger-container .asset-card").forEach(card=>{if(sample.test(card.textContent||""))card.remove();});document.body.querySelectorAll("*").forEach(n=>{if(n.children.length)return;if(sample.test(n.textContent||""))n.textContent="Live data unavailable";});})();</script></body></html>
+<script>(function(){const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-20\d{2}-\d{4,}|uid=0\(root\)|184,209|7f83b165|99\.4%|0 Boundary Violations|142 of 142 Assets Active|40\.2 MB\/s Streamed|Rogue Port Exposed|DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|ROOT \/\/ internal\.corp|Port 8080\/tcp opened|Critical Root Risk Path Active|Amass v4\.2|Subfinder Passive|Katana Crawl Daemon|142 reaffirmed|CNAME record created|WAF SAFEGUARD: ENFORCED/i;
+ document.querySelectorAll("#asset-ledger-container .asset-card").forEach(card=>{if(sample.test(card.textContent||""))card.remove();});
+ document.body.querySelectorAll("*").forEach(n=>{if(n.children.length||!sample.test(n.textContent||""))return;const card=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(card&&card.id!=="whaxon-live-monitoring"&&!card.contains(document.querySelector("#monitoring-summary-status"))){card.hidden=true;card.style.display="none";}else{n.textContent="Live data unavailable";}});
+ })();</script></body></html>
