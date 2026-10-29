@@ -106,6 +106,7 @@ def test_adapter_catalog_filter_refresh_and_truthful_reference_status(page, live
     assert page.locator("#adapter-list article:visible").count() == 1
     assert "Nmap" in page.locator("#adapter-list article:visible").inner_text()
     assert "Nikto" not in page.locator("#adapter-list article:visible").inner_text()
+    page.get_by_label("Filter tools").fill("")
 
     with page.expect_response("**/api/tools"):
         page.get_by_role("button", name="Refresh catalog").click()
