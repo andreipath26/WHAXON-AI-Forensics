@@ -100,7 +100,7 @@ def test_ai_run_rejects_nul_target(tmp_path, monkeypatch):
     app, core = _make_app(tmp_path, monkeypatch)
     response = app.test_client().post(
         "/api/ai/run",
-        json={"target": "127.0.0.1\\x00evil", "goal": "assess the local target"},
+        json={"target": "127.0.0.1\x00evil", "goal": "assess the local target"},
     )
     assert response.status_code == 400
     assert "exceeds allowed limits" in response.get_json()["error"]
