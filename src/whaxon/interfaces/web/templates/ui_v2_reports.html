@@ -612,6 +612,45 @@
   let liveMarkdown="";
   let livePreviewButton=null;
   closeBtn?.addEventListener("click",()=>{modal?.classList.add("hidden");modal?.classList.remove("flex");});
+  // Keep the canonical layout, but make reference-only configuration truthful.
+  const moduleInputs=[...document.querySelectorAll('input[type="checkbox"]')];
+  moduleInputs.forEach(input=>{
+    input.checked=false;
+    input.disabled=true;
+    input.title="Reference-only module selector; live exports come from the WHAXON report API.";
+    const label=input.closest("label");
+    if(label){
+      label.classList.add("opacity-70","cursor-not-allowed");
+      const description=label.querySelector("span.font-body-sm");
+      if(description)description.textContent="Reference layout only; this selection is not applied to live exports.";
+    }
+  });
+  const moduleHeading=[...document.querySelectorAll("h2")].find(n=>(n.textContent||"").trim()==="Report Synthesis & Compliance Profiler");
+  const moduleDescription=moduleHeading?.parentElement?.querySelector("p");
+  if(moduleDescription)moduleDescription.textContent="Live report preview and exports use recorded WHAXON report data. Reference-only module selectors are disabled.";
+  document.querySelectorAll("span").forEach(node=>{
+    const value=(node.textContent||"").trim();
+    if(value===".pdf (Audit Sign)"||value===".html (Standalone)"){
+      node.textContent=value.startsWith(".pdf")?".pdf unavailable":".html unavailable";
+      node.title="This format is not connected to the live report API.";
+    }else if(value==="SYNCED"){
+      node.textContent="NOT CONNECTED";
+      node.title="No live evidence-storage or manifest endpoint is connected on this page.";
+      node.classList.remove("text-primary");
+      node.classList.add("text-outline");
+    }
+  });
+  const evidenceHeading=[...document.querySelectorAll("h2")].find(n=>(n.textContent||"").trim()==="Local Evidence Locker");
+  const evidenceDescription=evidenceHeading?.parentElement?.querySelector("p");
+  if(evidenceDescription)evidenceDescription.textContent="Evidence-file listing and SHA-256 manifest are not connected to live storage.";
+  const evidenceSection=evidenceHeading?.closest("section");
+  if(evidenceSection&&!document.getElementById("live-evidence-unavailable")){
+    const notice=document.createElement("p");
+    notice.id="live-evidence-unavailable";
+    notice.className="mt-space-sm p-space-md rounded bg-surface-container text-on-surface-variant font-body-sm";
+    notice.textContent="No live evidence-file listing or integrity manifest is available. Sample file records are not presented as live evidence.";
+    evidenceSection.append(notice);
+  }
   const findButton=(text)=>[...document.querySelectorAll("button")].find(b=>(b.textContent||"").includes(text));
   const download=(name,content,type)=>{
     const blob=new Blob([content],{type});
