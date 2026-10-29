@@ -469,6 +469,7 @@
  function renderProposal(){
    setDecisionButtons();
    const run=pendingRuns[0]||null,q=proposalDetails();
+   if(proposalHeading)proposalHeading.textContent=q?"Operator approval required: "+(q.tool_id||"action not recorded"):"No AI action is currently awaiting approval";
    if(proposalIntro)proposalIntro.textContent=q?"Operator response required for the recorded AI question. Tool execution remains guarded by the server and executor.":"No live proposal is awaiting operator input. New AI runs must pass the current server-side scope check.";
    if(waitingLabel)waitingLabel.textContent=run?"WAITING FOR OPERATOR AUTHORIZATION":"NO PENDING OPERATOR APPROVAL";
    if(actionIdLabel)actionIdLabel.textContent="ACTION_ID: "+(run?.id||"—");
