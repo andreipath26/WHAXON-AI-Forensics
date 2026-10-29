@@ -708,11 +708,11 @@
  });
  const fake=/CDP SENSORS ACTIVE|JS EVAL HOOKS|DOM MUTATION LOG|COMMITTED_SETTLED|PASS \[200 OK\]|SKIPPED \/ FORCED|FORCED TARGET|INSPECTOR: POST|24 Ev\/s|OTP Challenge Stage|Execute Settlement|Live HAR Intercept Stream|POST \/app\/transfer\/commit|Browser automation: not connected/i;
  document.querySelectorAll("main *").forEach(node=>{
-  if(node.children.length||panel?.contains(node))return;
-  if(fake.test((node.textContent||"").trim())){
-   const card=node.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");
-   if(card)card.hidden=true;else node.textContent="Not reported by the live backend";
-  }
+  if(panel?.contains(node))return;
+  const value=(node.textContent||"").trim();
+  if(!value||value.length>120||!fake.test(value))return;
+  const card=node.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");
+  if(card)card.hidden=true;else node.textContent="Not reported by the live backend";
  });
  if(panel){
   const note=document.createElement("p");note.className="mt-2 text-sm text-on-surface-variant";
