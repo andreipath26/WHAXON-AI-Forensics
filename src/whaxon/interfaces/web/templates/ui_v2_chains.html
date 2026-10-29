@@ -508,7 +508,15 @@
  const canvas=graphSection?.querySelector("div.rounded-xl");
  if(canvas){Array.from(canvas.children).forEach(child=>{child.hidden=true;});canvas.append(panel);}
  else main.prepend(panel);
- // The final narrative section contains fabricated exploit details and is not live evidence.
+ // Remove fixture cards that assert a compromise, credentials or exploit evidence.
+ // Keep the supplied header and graph canvas; the live graph panel replaces the fixture graph.
+ const fixtureMarkers=/dns-egress\.corp|K9#xL9!pQ_corp_secret|AKIAIOSFODNN7EXAMPLE|root:x:0:0:root|sys_eval\(|ACTIVE EXPLOIT DETECTED|LETHAL COMPROMISE|Simulate Controlled Replay|api\.internal\.corp|CVE-2021-41773|68%/i;
+ main.querySelectorAll("*").forEach(node=>{
+  if(node.children.length||!fixtureMarkers.test(node.textContent||""))return;
+  const card=node.closest("article, section, [class*='rounded-xl'], [class*='rounded-lg']");
+  if(card&&card!==panel)card.hidden=true;
+  else node.hidden=true;
+ });
  if(narrativeSection)narrativeSection.hidden=true;
  // Keep the original header actions functional instead of leaving decorative controls.
  const recomputeButton=headerSection?.querySelector("#btn-recompute");
