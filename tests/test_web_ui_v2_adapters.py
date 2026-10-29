@@ -20,3 +20,12 @@ def test_dashboard_links_to_adapter_manager(page, live_server):
     link = page.locator('a[data-path="adapter-and-plugin-manager"]')
     assert link.is_visible()
     assert link.get_attribute("href") == "/ui-v2/adapters"
+
+def test_adapter_reference_actions_are_not_misrepresented_as_live(page, live_server):
+    page.goto(f"{live_server}/ui-v2/adapters")
+    mock_execution = page.get_by_role("button", name="play_arrow Test Adapter Execution with Mock Output")
+    if mock_execution.count():
+        assert mock_execution.is_disabled()
+    resign = page.get_by_role("button", name="Re-sign Manifest")
+    if resign.count():
+        assert resign.is_disabled()
