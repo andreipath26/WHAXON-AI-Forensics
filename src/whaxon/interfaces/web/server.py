@@ -23,6 +23,25 @@ from whaxon.core.events import (
 )
 
 
+def _redact_sensitive_settings(value):
+    """Return a JSON-safe settings view without disclosing secret values."""
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            if __import__("re").search(
+                r"secret|token|password|passwd|credential|private.?key|api.?key|authorization|bearer|access.?key|client.?secret",
+                str(key),
+                __import__("re").IGNORECASE,
+            ):
+                redacted[key] = "[REDACTED]"
+            else:
+                redacted[key] = _redact_sensitive_settings(item)
+        return redacted
+    if isinstance(value, (list, tuple)):
+        return [_redact_sensitive_settings(item) for item in value]
+    return value
+
+
 class JobRegistry:
     """SSE-only wrapper. Persistence lives in core.store; this class
     keeps the per-worker subscribe queues for Server-Sent Events."""
@@ -1533,7 +1552,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/api/settings")
     def api_settings_get():
         try:
-            return jsonify(registry.core.settings.get())
+            return jsonify(_redact_sensitive_settings(registry.core.settings.get()))
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -1544,7 +1563,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             updated = registry.core.settings.save(data)
         except Exception as e:
             return jsonify({"error": str(e)}), 500
-        return jsonify(updated)
+        return jsonify(_redact_sensitive_settings(updated))
 
     @app.get("/api/pivot/graph")
     def api_pivot_graph():
