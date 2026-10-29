@@ -45,3 +45,50 @@ def test_attack_chain_page_never_displays_fictional_compromise_evidence(page, li
     assert page.locator("#whaxon-live-chains").is_visible()
     assert page.locator("#chains-refresh").is_enabled()
 
+def test_attack_chain_page_renders_recorded_edges_and_refreshes(page, live_server):
+    calls = {"count": 0}
+
+    def graph(route):
+        calls["count"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"edges":[{"source":"job-a/finding-1","target":"job-b/finding-2","kind":"observed pivot"}],"count":1}',
+        )
+
+    page.route("**/api/pivot/graph", graph)
+    page.goto(f"{live_server}/ui-v2/chains")
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('1 relationship(s) returned')",
+        timeout=8000,
+    )
+    rendered = page.locator("#chains-list").inner_text()
+    assert "job-a/finding-1" in rendered
+    assert "job-b/finding-2" in rendered
+    assert "observed pivot" in rendered
+    assert calls["count"] == 1
+
+    page.get_by_role("button", name="Refresh").click()
+    page.wait_for_function("() => window.__chainsRefreshTestReady === true", timeout=1000) if False else None
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('1 relationship(s) returned')",
+        timeout=8000,
+    )
+    assert calls["count"] >= 2
+
+
+def test_attack_chain_page_surfaces_graph_api_errors(page, live_server):
+    page.route(
+        "**/api/pivot/graph",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"graph temporarily unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/chains")
+    page.wait_for_function(
+        "() => document.querySelector('#chains-status')?.textContent.includes('could not be loaded')",
+        timeout=8000,
+    )
+    assert "could not be loaded" in page.locator("#chains-status").inner_text()
