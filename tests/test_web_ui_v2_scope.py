@@ -189,3 +189,22 @@ def test_scope_json_import_persists_supported_scope_shape(page, live_server):
     assert "blocked-import.example.com" in scope["out_of_scope"]
     assert "browser test" in scope["notes"]
     assert not page.locator("#importDrawer").is_visible()
+
+def test_scope_page_does_not_claim_strict_boundary_enforcement(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"scope-label-test","enabled":true,"in_scope":["example.com"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "SCOPE ENFORCEMENT ENABLED" in header
+    assert "STRICT BOUNDARY ENFORCED" not in header
+
