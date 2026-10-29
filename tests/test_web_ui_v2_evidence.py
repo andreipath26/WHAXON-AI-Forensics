@@ -99,3 +99,55 @@ def test_evidence_layout_remains_available_beside_live_inspector(page, live_serv
     page.goto(f"{live_server}/ui-v2/evidence")
     assert page.locator("#whaxon-live-evidence").is_visible()
     assert page.get_by_text("RECORDED EVIDENCE INSPECTOR", exact=True).is_visible()
+
+
+
+def test_evidence_header_reflects_live_scope_and_navigation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/evidence")
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/evidence")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+
+def test_evidence_header_halt_button_uses_live_job_history(page, live_server):
+    page.goto(f"{live_server}/ui-v2/evidence")
+    page.wait_for_function(
+        "() => document.querySelector('#evidence-status')?.textContent.includes('No recorded jobs')"
+        " || document.querySelector('#evidence-status')?.textContent.includes('evidence record(s) loaded')"
+        " || document.querySelector('#evidence-status')?.textContent.includes('No evidence records')",
+        timeout=8000,
+    )
+    page.locator("header button").filter(has_text="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#evidence-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+
+
+def test_evidence_reference_controls_are_disabled_outside_live_inspector(page, live_server):
+    page.goto(f"{live_server}/ui-v2/evidence")
+    page.wait_for_function(
+        "() => document.querySelector('#evidence-status')?.textContent.includes('No recorded jobs')"
+        " || document.querySelector('#evidence-status')?.textContent.includes('evidence record(s) loaded')"
+        " || document.querySelector('#evidence-status')?.textContent.includes('No evidence records')",
+        timeout=8000,
+    )
+    for button in page.locator("main button:visible").all():
+        inside_live_inspector = button.evaluate("(el) => el.closest('#whaxon-live-evidence') !== null")
+        if not inside_live_inspector:
+            assert button.is_disabled(), f"Unwired evidence reference control is enabled: {button.inner_text()}"
