@@ -735,11 +735,12 @@
  reflectScope();
  const fake=/42\.8%|57\.2%|3 Caught \(Alerted\)|Mimikatz DLL|Kerberoasting Probe|FIN7 \/ APT29|DETECTION COVERAGE GAP|Splunk: 0 events|GuardDuty: SILENT|BOLA User UUID Mismatch|High-Frequency SPN Requests/i;
  document.querySelectorAll("main *").forEach(node=>{
-  if(node.children.length||panel?.contains(node))return;
-  if(fake.test((node.textContent||"").trim())){
-   const card=node.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");
-   if(card)card.hidden=true;else node.textContent="Reference data not connected";
-  }
+  if(panel?.contains(node))return;
+  const value=(node.textContent||"").trim();
+  if(!value||value.length>120||!fake.test(value))return;
+  node.hidden=true;node.style.display="none";
+  const card=node.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");
+  if(card)card.hidden=true;
  });
  document.querySelectorAll("main button").forEach(button=>{
   if(panel?.contains(button))return;
