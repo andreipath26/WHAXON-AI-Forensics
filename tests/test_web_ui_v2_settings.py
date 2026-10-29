@@ -121,3 +121,36 @@ def test_settings_reference_controls_are_disabled_except_live_refresh(page, live
     for button in page.locator("main button:visible").all():
         if button.get_attribute("id") != "settings-refresh":
             assert button.is_disabled(), f"Unwired settings control is enabled: {button.inner_text()}"
+
+
+def test_settings_header_reflects_live_engagement_and_scope(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"settings-scope-test","enabled":true,"in_scope":["192.0.2.50"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/settings")
+    page.wait_for_function(
+        "() => document.querySelector('#settings-scope-status')?.textContent.includes('192.0.2.50')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "settings-scope-test" in header
+    assert "Target: 192.0.2.50" in header
+    assert "RULE CONFIGURED" in header
+    assert "ENG-2026-X892" not in header
+
+
+def test_settings_header_reports_scope_unavailable_truthfully(page, live_server):
+    page.route("**/api/scope", lambda route: route.abort())
+    page.goto(f"{live_server}/ui-v2/settings")
+    page.wait_for_function(
+        "() => document.querySelector('#settings-scope-status')?.textContent.includes('Scope status unavailable')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "Scope status unavailable" in header
+    assert "ENG-2026-X892" not in header

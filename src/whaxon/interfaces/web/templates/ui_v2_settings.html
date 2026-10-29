@@ -954,6 +954,44 @@
 <script>
 (function(){
   "use strict";
+
+
+(function(){
+  "use strict";
+  const header=document.querySelector("header");
+  if(!header)return;
+  const engagement=[...header.querySelectorAll("span")].find(node=>(node.textContent||"").trim()==="ENG-2026-X892");
+  if(engagement){engagement.id="settings-live-engagement";}
+  const status=document.createElement("div");
+  status.id="settings-scope-status";
+  status.className="hidden lg:block max-w-xs truncate rounded bg-surface-container px-space-sm py-space-xs font-code-sm text-code-sm text-on-surface-variant";
+  status.setAttribute("role","status");
+  status.setAttribute("aria-live","polite");
+  status.textContent="Loading live scope…";
+  const chip=engagement?.parentElement;
+  if(chip)chip.insertAdjacentElement("afterend",status);
+  async function loadScope(){
+    try{
+      const response=await fetch("/api/scope",{headers:{"Accept":"application/json"}});
+      if(!response.ok)throw new Error("Scope HTTP "+response.status);
+      const scope=await response.json();
+      const targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+      if(engagement)engagement.textContent=String(scope.engagement||"No active engagement");
+      const target=targets.length?targets.join(", "):"No target configured";
+      const state=scope.enabled===false?"ENFORCEMENT DISABLED":targets.length?"RULE CONFIGURED":"NO TARGET RULE";
+      status.textContent="Target: "+target+" · "+state;
+      status.title=status.textContent;
+    }catch(error){
+      if(engagement)engagement.textContent="Unavailable";
+      status.textContent="Scope status unavailable";
+      status.title="Live scope could not be loaded: "+error.message;
+    }
+  }
+  loadScope();
+})();
+
+
+
   const headerButtons=[...document.querySelectorAll("header button")];
   const logs=headerButtons.find(button=>/LOGS|Terminal Log/i.test(button.textContent||""));
   if(logs)logs.addEventListener("click",event=>{event.preventDefault();window.location.href="/ui-v2/run";});
