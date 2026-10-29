@@ -766,10 +766,37 @@
     if (timerId !== null) window.clearInterval(timerId);
     source?.close();
   });
-  // The AI planner endpoint does not enforce the same scope boundary as /api/run;
-  // keep AI execution controls hidden until its authorization flow is hardened.
+  // The AI planner endpoint does not enforce the same scope boundary as /api/run.
+  // Disable the visual toggle and replace its unsupported enforcement claims.
+  const plannerToggle = $("ai-planner-toggle");
+  if (plannerToggle) {
+    plannerToggle.checked = false;
+    plannerToggle.disabled = true;
+    plannerToggle.title = "Unavailable: the AI planner endpoint does not enforce the same scope boundary as the live runner.";
+    plannerToggle.setAttribute("aria-label", "AI planner disabled because scope enforcement is not verified");
+    const toggleLabel = plannerToggle.closest("label");
+    if (toggleLabel) {
+      toggleLabel.classList.remove("cursor-pointer");
+      toggleLabel.classList.add("cursor-not-allowed");
+    }
+    const plannerCard = plannerToggle.closest(".bg-surface-container-low.rounded-lg");
+    if (plannerCard) {
+      const description = plannerCard.querySelector("p");
+      if (description) description.textContent = "AI planner execution is disabled in this web runner because its endpoint does not enforce the same server-side scope boundary as /api/run.";
+      plannerCard.querySelectorAll("span").forEach(span => {
+        const value = span.textContent.trim();
+        if (value === "Kiln / Ollama") span.textContent = "Model not reported";
+        if (value === "Manual Approval Required Before Tool Execution") span.textContent = "AI planner execution disabled";
+        if (value === "GATE: ENFORCED") span.textContent = "GATE: NOT VERIFIED";
+      });
+    }
+  }
   document.querySelectorAll("button").forEach(button => {
-    if (/Approval Gate: Active/.test(button.textContent)) button.style.display="none";
+    if (/Approval Gate: Active/.test(button.textContent)) {
+      button.style.display = "none";
+      button.disabled = true;
+      button.setAttribute("aria-hidden", "true");
+    }
   });
   disableFakeControls();
   clearLog();
