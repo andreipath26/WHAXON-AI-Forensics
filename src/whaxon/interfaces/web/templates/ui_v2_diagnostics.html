@@ -1014,9 +1014,9 @@
  }
  loadScope();
  const run=document.getElementById("btn-run-diag");
- if(run){run.disabled=false;run.removeAttribute("aria-disabled");run.addEventListener("click",event=>{event.preventDefault();document.getElementById("diagnostics-refresh")?.click();document.getElementById("diagnostics-checks")?.scrollIntoView({behavior:"smooth",block:"start"});});}
+ if(run){run.removeAttribute("onclick");run.disabled=false;run.removeAttribute("aria-disabled");run.addEventListener("click",event=>{event.preventDefault();document.getElementById("diagnostics-refresh")?.click();document.getElementById("diagnostics-checks")?.scrollIntoView({behavior:"smooth",block:"start"});});}
  const exportButton=document.getElementById("btn-export-json");
- if(exportButton){exportButton.disabled=false;exportButton.removeAttribute("aria-disabled");exportButton.addEventListener("click",async event=>{
+ if(exportButton){exportButton.removeAttribute("onclick");exportButton.disabled=false;exportButton.removeAttribute("aria-disabled");exportButton.addEventListener("click",async event=>{
   event.preventDefault();const previous=exportButton.textContent;exportButton.disabled=true;exportButton.textContent="Exporting live health…";
   try{
    const [healthResponse,toolsResponse,scopeResponse]=await Promise.all([fetch("/api/health"),fetch("/api/tools"),fetch("/api/scope")]);
