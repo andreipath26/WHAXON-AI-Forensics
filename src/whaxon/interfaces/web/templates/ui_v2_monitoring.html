@@ -742,4 +742,74 @@
 <script>(function(){const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-20\d{2}-\d{4,}|uid=0\(root\)|184,209|7f83b165|99\.4%|0 Boundary Violations|142 of 142 Assets Active|40\.2 MB\/s Streamed|Rogue Port Exposed|DAEMON: HOURLY SYNCHRONOUS SCAN ACTIVE|ROOT \/\/ internal\.corp|Port 8080\/tcp opened|Critical Root Risk Path Active|Amass v4\.2|Subfinder Passive|Katana Crawl Daemon|142 reaffirmed|CNAME record created|WAF SAFEGUARD: ENFORCED/i;
  document.querySelectorAll("#asset-ledger-container .asset-card").forEach(card=>{if(sample.test(card.textContent||""))card.remove();});
  const pageHeader=document.querySelector("header");document.body.querySelectorAll("h1,h2,h3,h4,p,pre,code,span,svg text").forEach(n=>{if(!sample.test(n.textContent||""))return;const card=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(pageHeader&&(pageHeader.contains(n)||(card&&card.contains(pageHeader)))){n.textContent="NOT REPORTED";return;}if(card&&card.id!=="whaxon-live-monitoring"&&!card.contains(document.querySelector("#monitoring-summary-status"))){card.hidden=true;card.style.display="none";}else{n.textContent="Live data unavailable";}});
- })();</script></body></html>
+ })();</script>
+<script id="whaxon-monitoring-header-wiring">
+(function(){
+  "use strict";
+  const headerButtons=[...document.querySelectorAll("header button")];
+  const label=b=>{const c=b.cloneNode(true);c.querySelectorAll(".material-symbols-outlined").forEach(n=>n.remove());return (c.textContent||"").replace(/\s+/g," ").trim();};
+  const go=(b,path)=>{if(!b)return;b.disabled=false;b.hidden=false;b.style.display="";b.removeAttribute("aria-hidden");b.addEventListener("click",e=>{e.preventDefault();window.location.href=path;});};
+  const engagement=headerButtons.find(b=>/ENG-|No active engagement|Active scope|Scope unavailable/i.test(b.textContent||""));
+  go(engagement,"/ui-v2/scope");
+  const newButton=headerButtons.find(b=>/^New$/i.test(label(b)));
+  go(newButton,"/ui-v2/scope");
+  const terminal=headerButtons.find(b=>/Terminal Log|LOGS/i.test(label(b)));
+  go(terminal,"/ui-v2/run");
+  const status=document.querySelector("#monitoring-summary-status");
+  const report=message=>{if(status)status.textContent=message;};
+  const halt=headerButtons.find(b=>/Emergency Halt Scan|HALT SCAN/i.test(label(b)));
+  if(halt){
+    halt.disabled=false;halt.hidden=false;halt.style.display="";halt.removeAttribute("aria-hidden");
+    halt.addEventListener("click",async e=>{
+      e.preventDefault();
+      try{
+        const response=await fetch("/api/history");if(!response.ok)throw new Error("History HTTP "+response.status);
+        const data=await response.json(),jobs=Array.isArray(data)?data:(Array.isArray(data.jobs)?data.jobs:[]);
+        const active=jobs.filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
+        if(!active.length){report("No running or queued jobs were found. Nothing was cancelled.");return;}
+        if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
+        const results=await Promise.all(active.map(async job=>{const id=job.id||job.job_id;if(!id)return false;try{const r=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!r.ok)return false;const body=await r.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}}));
+        report("Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).");
+      }catch(error){report("Emergency halt failed: "+error.message);}
+    });
+  }
+  async function reflectScope(){
+    const spans=engagement?engagement.querySelectorAll("span"):[];
+    const targetLabel=[...document.querySelectorAll("header span")].find(n=>(n.textContent||"").trim().startsWith("Target:"));
+    const stateLabel=[...document.querySelectorAll("header span")].find(n=>["(IN SCOPE)","(RULE CONFIGURED)","(NO TARGET RULE)","(STATUS UNAVAILABLE)","(ENFORCEMENT DISABLED)"].includes((n.textContent||"").trim()));
+    const boundary=[...document.querySelectorAll("header span")].find(n=>/STRICT BOUNDARY ENFORCED|SCOPE CONFIGURATION LOADED|SCOPE ENFORCEMENT DISABLED|SCOPE STATUS UNAVAILABLE/.test((n.textContent||"").trim()));
+    try{
+      const r=await fetch("/api/scope");if(!r.ok)throw new Error("Scope HTTP "+r.status);
+      const scope=await r.json(),targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
+      const target=targets.length?targets[0]:"No target configured";
+      if(spans.length>1){spans[0].textContent=scope.engagement&&scope.engagement!=="default"?scope.engagement:"Active scope";spans[1].textContent="("+target+")";}
+      if(targetLabel)targetLabel.textContent="Target: "+target;
+      if(stateLabel)stateLabel.textContent=scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+      if(boundary)boundary.textContent=scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE CONFIGURATION LOADED";
+    }catch(_){
+      if(spans.length>1){spans[0].textContent="Scope unavailable";spans[1].textContent="(status unavailable)";}
+      if(targetLabel)targetLabel.textContent="Target: unavailable";
+      if(stateLabel)stateLabel.textContent="(STATUS UNAVAILABLE)";
+      if(boundary)boundary.textContent="SCOPE STATUS UNAVAILABLE";
+    }
+  }
+  reflectScope();
+  // Provider, drift and severity categories are not exposed by the current live monitoring APIs.
+  document.querySelectorAll("main button").forEach(b=>{
+    if(b.closest("#monitoring-live-summary"))return;
+    const t=label(b);
+    if(/Stream Full Cryptographic Audit Logs/i.test(t)){
+      b.disabled=false;b.hidden=false;b.style.display="";b.removeAttribute("aria-hidden");
+      b.addEventListener("click",e=>{e.preventDefault();window.location.href="/ui-v2/audit";});
+      return;
+    }
+    b.disabled=true;b.title="Unavailable: the current monitoring API does not provide this action or classification.";b.setAttribute("aria-disabled","true");
+  });
+  const summary=document.getElementById("monitoring-live-summary");
+  if(summary){
+    const note=document.createElement("p");note.className="mt-2 text-sm text-slate-400";note.textContent="This view reports recorded WHAXON jobs, findings, history and scope. Cloud-provider inventory, drift classification, TLS posture and remediation actions are not exposed by the current backend; those legacy controls are disabled.";
+    const heading=summary.querySelector("h2");if(heading)heading.insertAdjacentElement("afterend",note);
+  }
+})();
+</script>
+</body></html>
