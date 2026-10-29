@@ -8,6 +8,11 @@ def test_adapter_manager_uses_live_tool_catalog(page, live_server):
     page.wait_for_function("() => !document.querySelector('#adapter-status')?.textContent.includes('Loading live')")
     assert page.locator("#whaxon-live-adapters").is_visible()
     assert page.locator("#adapter-filter").is_visible()
+    refresh = page.get_by_role("button", name="Refresh catalog")
+    assert refresh.is_visible()
+    await refresh.click()
+    page.wait_for_function("() => !document.querySelector('#adapter-status')?.textContent.includes('Loading live')")
+    assert page.locator("#adapter-status").get_attribute("aria-live") == "polite"
 
 
 def test_dashboard_links_to_adapter_manager(page, live_server):
