@@ -127,6 +127,52 @@ def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
     assert calls == ["POST"]
 
 
+def test_ai_strategy_gate_reject_records_reason(page, live_server):
+    calls = []
+
+    def pending(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"ai-reject-ui-test","goal":"test rejected phase transition","phase":"recon","pending_question":{"rationale":"Confirm the next phase","target":"127.0.0.1","confidence":0.9,"proposed_phase":"enum"}}]',
+        )
+
+    def runs(route):
+        route.fulfill(status=200, content_type="application/json", body="[]")
+
+    def answer(route):
+        calls.append(route.request.post_data_json)
+        route.fulfill(status=200, content_type="application/json", body='{"ok":true,"run_id":"ai-reject-ui-test","seq":1}')
+
+    page.route("**/api/ai/pending", pending)
+    page.route("**/api/ai/runs", runs)
+    page.route("**/api/ai/runs/ai-reject-ui-test/answer", answer)
+    page.on("dialog", lambda dialog: dialog.accept("Not authorized for this phase"))
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.querySelector('#ai-pending-list')?.textContent.includes('Confirm the next phase')",
+        timeout=8000,
+    )
+    page.locator("#btn-reject").click()
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('Operator response recorded')",
+        timeout=8000,
+    )
+    assert len(calls) == 1
+    assert calls[0]["answer"] == "no: Not authorized for this phase"
+    assert calls[0]["note"] == "Not authorized for this phase"
+
+
+def test_ai_strategy_gate_engagement_button_opens_scope_page(page, live_server):
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    page.locator("header button").first.click()
+    page.wait_for_url("**/ui-v2/scope", timeout=8000)
+
+
 def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_pending_run(page, live_server):
     page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
