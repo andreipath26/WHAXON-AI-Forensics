@@ -10,7 +10,7 @@ def test_adapter_manager_uses_live_tool_catalog(page, live_server):
     assert page.locator("#adapter-filter").is_visible()
     refresh = page.get_by_role("button", name="Refresh catalog")
     assert refresh.is_visible()
-    await refresh.click()
+    refresh.click()
     page.wait_for_function("() => !document.querySelector('#adapter-status')?.textContent.includes('Loading live')")
     assert page.locator("#adapter-status").get_attribute("aria-live") == "polite"
 
