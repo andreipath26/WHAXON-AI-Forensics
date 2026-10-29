@@ -149,3 +149,44 @@ def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw
     assert "22/tcp open ssh OpenSSH 9.6" in proof.inner_text()
     assert "Retest Outcomes" in page.locator("body").evaluate("(el) => el.textContent")
     assert "Refuted" in page.locator("#whaxon-kpi-fixed").evaluate("(el) => el.parentElement.textContent")
+
+
+def test_findings_header_uses_live_scope_without_claiming_unverified_enforcement(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"ENG-LIVE-42","in_scope":["example.test"],"enabled":false}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelector('#findings-scope-status')?.textContent.includes('ENG-LIVE-42')",
+        timeout=5000,
+    )
+    status = page.locator("#findings-scope-status")
+    assert "example.test" in status.inner_text()
+    assert "enforcement disabled" in status.inner_text().lower()
+    assert "Scope is checked by the backend for each action" not in page.locator("body").inner_text()
+
+
+def test_findings_kpi_bars_match_live_report_counts(page, live_server):
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
+        timeout=8000,
+    )
+    total_text = page.locator("#whaxon-findings-count").inner_text()
+    total = int(total_text.rsplit(" ", 1)[-1])
+    assert total >= 0
+    verified = int(page.locator("#whaxon-kpi-verified").inner_text())
+    candidate = int(page.locator("#whaxon-kpi-candidate").inner_text())
+    verified_width = page.locator("#whaxon-kpi-verified-bar").evaluate("(el) => parseFloat(el.style.width)")
+    candidate_width = page.locator("#whaxon-kpi-candidate-bar").evaluate("(el) => parseFloat(el.style.width)")
+    expected_verified = verified / total * 100 if total else 0
+    expected_candidate = candidate / total * 100 if total else 0
+    assert abs(verified_width - expected_verified) < 0.1
+    assert abs(candidate_width - expected_candidate) < 0.1
+    assert page.locator("#whaxon-kpi-fixed-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
+    assert page.locator("#whaxon-kpi-vulnerable-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
