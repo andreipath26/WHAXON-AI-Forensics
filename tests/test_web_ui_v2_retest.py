@@ -40,3 +40,51 @@ def test_retest_page_never_displays_static_fixture_evidence_or_commands(page, li
         assert marker not in visible, f"Fictional retest fixture must not be shown: {marker}"
     assert page.locator("#whaxon-live-retest").is_visible()
 
+
+def test_retest_page_only_posts_for_verified_findings_with_valid_sequence(page, live_server):
+    calls = []
+    report_calls = {"count": 0}
+
+    def report(route):
+        report_calls["count"] += 1
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[{"job_id":"job-live-1","findings":['
+                 '{"seq":7,"kind":"verified finding","severity":"low","verification_status":"verified"},'
+                 '{"seq":8,"kind":"unverified finding","severity":"high","verification_status":"pending"},'
+                 '{"seq":null,"kind":"missing sequence","verification_status":"verified"}]}]}',
+        )
+
+    def retest(route):
+        calls.append({"method": route.request.method, "url": route.request.url})
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"status":"INCONCLUSIVE","reason":"test replay completed without a decisive signal"}',
+        )
+
+    page.route("**/api/report?format=json", report)
+    page.route("**/api/retest/**", retest)
+    page.goto(f"{live_server}/ui-v2/retest")
+    page.wait_for_function(
+        "() => document.querySelector('#retest-status')?.textContent.includes('3 finding record(s)')",
+        timeout=8000,
+    )
+
+    verified = page.get_by_role("button", name="Retest verified finding").nth(0)
+    unverified = page.get_by_role("button", name="Retest verified finding").nth(1)
+    missing_sequence = page.get_by_role("button", name="Retest verified finding").nth(2)
+    assert verified.is_enabled()
+    assert unverified.is_disabled()
+    assert missing_sequence.is_disabled()
+
+    verified.click()
+    page.wait_for_function(
+        "() => document.querySelector('#retest-status')?.textContent.includes('Retest result: INCONCLUSIVE')",
+        timeout=8000,
+    )
+    assert calls == [{
+        "method": "POST",
+        "url": f"{live_server}/api/retest/job-live-1/7",
+    }]
