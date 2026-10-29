@@ -602,11 +602,17 @@
       fetch("/api/scope").then(r=>{if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
     ]);
     const data=rr.status==="fulfilled"?rr.value:{};
-    const scope=sr.status==="fulfilled"?sr.value:{};
+    const scopeAvailable=sr.status==="fulfilled";
+    const scope=scopeAvailable?sr.value:{};
+    const targets=Array.isArray(scope.in_scope)?scope.in_scope:[];
     document.querySelectorAll("header span,header div").forEach(n=>{
-      if(textOf(n)==="Target: No target selected")n.textContent=sr.status==="fulfilled"?"Target: "+(scope.in_scope?.[0]||"No target configured"):"Target: unavailable";
-      if(textOf(n)==="(IN SCOPE)")n.textContent=sr.status!=="fulfilled"?"(STATUS UNAVAILABLE)":scope.enabled===false?"(ENFORCEMENT DISABLED)":"(CONFIGURED RULE)";
-      if(textOf(n)==="SCOPE STATUS FROM LIVE CONFIGURATION")n.textContent=sr.status!=="fulfilled"?"SCOPE STATUS UNAVAILABLE":scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":"SCOPE STATUS FROM LIVE CONFIGURATION";
+      if(textOf(n)==="Target: No target selected")n.textContent=scopeAvailable?"Target: "+(targets[0]||"No target configured"):"Target: unavailable";
+      if(["(IN SCOPE)","(CONFIGURED RULE)","(NO TARGET RULE)","(ENFORCEMENT DISABLED)","(STATUS UNAVAILABLE)"].includes(textOf(n))){
+        n.textContent=!scopeAvailable?"(STATUS UNAVAILABLE)":scope.enabled===false?"(ENFORCEMENT DISABLED)":targets.length?"(RULE CONFIGURED)":"(NO TARGET RULE)";
+      }
+      if(["STRICT BOUNDARY ENFORCED","SCOPE STATUS FROM LIVE CONFIGURATION","SCOPE ENFORCEMENT DISABLED","NO TARGET RULE CONFIGURED","SCOPE STATUS UNAVAILABLE"].includes(textOf(n))){
+        n.textContent=!scopeAvailable?"SCOPE STATUS UNAVAILABLE":scope.enabled===false?"SCOPE ENFORCEMENT DISABLED":targets.length?"SCOPE STATUS FROM LIVE CONFIGURATION":"NO TARGET RULE CONFIGURED";
+      }
     });
     const total=Number(data.finding_count||0), jobs=Number(data.job_count||0);
     document.querySelectorAll("span").forEach(n=>{
