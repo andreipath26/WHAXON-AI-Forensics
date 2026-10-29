@@ -107,3 +107,39 @@ def test_audit_header_halt_button_uses_live_job_history(page, live_server):
         "() => document.querySelector('#audit-status')?.textContent.includes('No running or queued jobs were found')",
         timeout=5000,
     )
+
+
+
+def test_audit_header_reflects_live_engagement_and_scope(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"audit-scope-test","enabled":true,"in_scope":["192.0.2.61"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/audit")
+    page.wait_for_function(
+        "() => document.querySelector('#audit-live-scope-status')?.textContent.includes('192.0.2.61')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "audit-scope-test" in header
+    assert "Target: 192.0.2.61" in header
+    assert "RULE CONFIGURED" in header
+    assert "ENG-2026-X892" not in header
+    assert "STRICT BOUNDARY ENFORCED" not in header
+
+
+def test_audit_header_reports_scope_unavailable_truthfully(page, live_server):
+    page.route("**/api/scope", lambda route: route.abort())
+    page.goto(f"{live_server}/ui-v2/audit")
+    page.wait_for_function(
+        "() => document.querySelector('#audit-live-scope-status')?.textContent.includes('Scope status unavailable')",
+        timeout=8000,
+    )
+    header = page.locator("header").inner_text()
+    assert "Scope status unavailable" in header
+    assert "ENG-2026-X892" not in header
+    assert "STRICT BOUNDARY ENFORCED" not in header
