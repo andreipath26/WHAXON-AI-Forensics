@@ -83,9 +83,6 @@ def test_settings_api_redacts_values_for_get_and_post(tmp_path, monkeypatch):
 def test_settings_reference_controls_are_not_mistaken_for_live_writes(page, live_server):
     page.goto(f"{live_server}/ui-v2/settings")
     page.wait_for_function("() => document.querySelector('#settings-status') && !document.querySelector('#settings-status').textContent.includes('Loading settings')")
-    reference_controls = page.locator("main input, main select, main textarea, main button").filter(
-        has_not=page.locator("#settings-refresh")
-    )
     # Static design-reference controls remain visible for layout continuity but cannot submit writes.
     assert page.locator("main input, main select, main textarea").count() > 0
     assert page.locator("main input:disabled, main select:disabled, main textarea:disabled").count() == page.locator("main input, main select, main textarea").count()
