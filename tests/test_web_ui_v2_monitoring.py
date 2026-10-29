@@ -31,7 +31,7 @@ def test_monitoring_page_uses_live_apis_and_hides_unsupported_controls(page, liv
     response = page.goto(f"{live_server}/ui-v2/monitoring")
     assert response is not None and response.status == 200
     assert page.locator("#asset-search-input").count() == 1
-    assert page.get_by_role("button", name="Emergency Halt Scan").count() == 0
+    assert page.get_by_role("button", name="Emergency Halt Scan").is_visible()
     assert page.get_by_role("button", name="Trigger Delta Recon Now").count() == 0
 
 def test_monitoring_summary_uses_live_jobs_history_and_scope_and_refreshes(page, live_server):
@@ -75,3 +75,61 @@ def test_monitoring_summary_uses_live_jobs_history_and_scope_and_refreshes(page,
         page.get_by_role("button", name="Refresh data").click()
     page.wait_for_function("() => document.querySelector('#monitoring-summary-status')?.textContent.includes('Recorded findings: 2')")
     assert all(value >= 2 for value in calls.values())
+
+def test_monitoring_header_reflects_live_scope_and_routes_to_scope_run_and_audit(page, live_server):
+    page.goto(f"{live_server}/ui-v2/monitoring")
+    page.wait_for_function(
+        "() => document.querySelector('#monitoring-summary-status')?.textContent.includes('Scope enforcement:')"
+        " || document.querySelector('#monitoring-summary-status')?.textContent.includes('summary unavailable')",
+        timeout=8000,
+    )
+    page.wait_for_function(
+        "() => !document.querySelector('header')?.innerText.includes('api.internal.corp')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
+    target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
+    header = page.locator("header").inner_text()
+    assert target in header
+    assert "SCOPE CONFIGURATION LOADED" in header or "SCOPE ENFORCEMENT DISABLED" in header
+
+    page.locator("header button").filter(has_text="New").click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert page.url.endswith("/ui-v2/scope")
+
+    page.goto(f"{live_server}/ui-v2/monitoring")
+    page.locator("header button").filter(has_text="Terminal Log").click()
+    page.wait_for_url("**/ui-v2/run")
+    assert page.url.endswith("/ui-v2/run")
+
+    page.goto(f"{live_server}/ui-v2/monitoring")
+    page.get_by_role("button", name="Stream Full Cryptographic Audit Logs").click()
+    page.wait_for_url("**/ui-v2/audit")
+    assert page.url.endswith("/ui-v2/audit")
+
+
+def test_monitoring_halt_uses_live_history_and_unsupported_controls_are_disabled(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.goto(f"{live_server}/ui-v2/monitoring")
+    page.wait_for_function(
+        "() => document.querySelector('#monitoring-summary-status')?.textContent.includes('Scope enforcement:')"
+        " || document.querySelector('#monitoring-summary-status')?.textContent.includes('summary unavailable')",
+        timeout=8000,
+    )
+    page.get_by_role("button", name="Emergency Halt Scan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#monitoring-summary-status')?.textContent.includes('No running or queued jobs were found')",
+        timeout=5000,
+    )
+    for button in page.locator("main button:visible").all():
+        if button.locator("#monitoring-refresh").count():
+            assert button.is_enabled()
+        elif "Stream Full Cryptographic Audit Logs" in button.inner_text():
+            assert button.is_enabled()
+        else:
+            assert button.is_disabled(), f"Unsupported monitoring action remains enabled: {button.inner_text()}"
+    assert "not exposed by the current backend" in page.locator("#monitoring-live-summary").inner_text()
+
