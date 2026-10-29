@@ -506,7 +506,8 @@
     const jobs = historyResult.status === "fulfilled" && Array.isArray(historyResult.value) ? historyResult.value : [];
     const report = reportResult.status === "fulfilled" ? reportResult.value : {};
     const tools = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value) ? toolsResult.value : [];
-    const scope = scopeResult.status === "fulfilled" ? scopeResult.value : {};
+    const scopeAvailable = scopeResult.status === "fulfilled";
+    const scope = scopeAvailable ? scopeResult.value : {};
     const liveStatus = statusResult.status === "fulfilled" ? statusResult.value : {};
     const health = healthResult.status === "fulfilled" ? healthResult.value : {};
     const active = jobs.filter(j => ["running","queued","pending"].includes(String(j.status || "").toLowerCase())).length;
@@ -518,14 +519,20 @@
     setCardValue("Verified Findings", verified, falsePositives + " FALSE POSITIVES");
     setCardValue("Active Adapters", availableTools, "TOOLS AVAILABLE");
     setCardValue("PTES Coverage", "—", "NOT RECORDED");
-    const target = scope.in_scope?.[0] || "No target configured";
+    const target = scopeAvailable ? (scope.in_scope?.[0] || "No target configured") : "unavailable";
     document.querySelectorAll("header span, header div").forEach(n => {
       if (textOf(n) === "Target: No target selected") n.textContent = "Target: " + target;
-      if (textOf(n) === "(IN SCOPE)") n.textContent = scope.enabled === false ? "(ENFORCEMENT DISABLED)" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "(RULE CONFIGURED)" : "(NO TARGET RULE)");
-      if (textOf(n) === "STRICT BOUNDARY ENFORCED") n.textContent = scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "SCOPE ENFORCEMENT ENABLED" : "NO TARGET RULE CONFIGURED");
+      if (["(IN SCOPE)", "(CONFIGURED RULE)", "(NO TARGET RULE)", "(ENFORCEMENT DISABLED)", "(STATUS UNAVAILABLE)"].includes(textOf(n))) {
+        n.textContent = !scopeAvailable ? "(STATUS UNAVAILABLE)" : scope.enabled === false ? "(ENFORCEMENT DISABLED)" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "(RULE CONFIGURED)" : "(NO TARGET RULE)");
+      }
+      if (["STRICT BOUNDARY ENFORCED", "CHECK SCOPE BEFORE RUNNING", "SCOPE ENFORCEMENT ENABLED", "NO TARGET RULE CONFIGURED", "SCOPE STATUS UNAVAILABLE"].includes(textOf(n))) {
+        n.textContent = !scopeAvailable ? "SCOPE STATUS UNAVAILABLE" : scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "SCOPE ENFORCEMENT ENABLED" : "NO TARGET RULE CONFIGURED");
+      }
     });
     const engagementButton = [...document.querySelectorAll("header button")].find(button =>
-      button.textContent.includes("No active engagement") || button.textContent.includes("Active scope")
+      button.id === "dashboard-engagement-selector" ||
+      button.textContent.includes("No active engagement") ||
+      button.textContent.includes("Active scope")
     );
     if (engagementButton) {
       engagementButton.id = "dashboard-engagement-selector";
