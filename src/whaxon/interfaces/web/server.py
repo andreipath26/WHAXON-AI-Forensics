@@ -9,6 +9,7 @@ import subprocess
 import threading
 import uuid
 from pathlib import Path
+from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 from flask_limiter import Limiter
@@ -24,7 +25,7 @@ from whaxon.core.events import (
 )
 
 
-def _redact_sensitive_settings(value):
+def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
     if isinstance(value, dict):
         redacted = {}
