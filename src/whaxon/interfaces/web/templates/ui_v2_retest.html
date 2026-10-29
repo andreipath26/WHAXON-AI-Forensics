@@ -60,7 +60,7 @@
  // The supplied visual below this point contains a fixed, fictional exploit story,
  // credentials, timing results and a hard-coded replay command. Keep the canonical
  // shell/navigation, but never present fixture data as a live assessment.
- Array.from(main.children).forEach(child=>{if(child!==panel)child.hidden=true;});
+ Array.from(main.children).forEach(child=>{if(child!==panel)child.style.display="none";});
 
  const status=panel.querySelector("#retest-status"),list=panel.querySelector("#retest-list");
  const node=(tag,value,cls)=>{const n=document.createElement(tag);n.textContent=value==null||value===""?"—":String(value);if(cls)n.className=cls;return n;};
