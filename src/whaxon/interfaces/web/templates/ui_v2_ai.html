@@ -614,8 +614,10 @@
      const response=await fetch("/api/ai/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target,goal})});
      const data=await response.json();
      if(!response.ok)throw new Error(data.error||("HTTP "+response.status));
-     status.textContent="AI run submitted: "+(data.run_id||"ID unavailable");
-     form.reset();await load();
+     const submittedRunId=data.run_id||"ID unavailable";
+     form.reset();
+     try{await load();}catch(_refreshError){}
+     status.textContent="AI run submitted: "+submittedRunId;
    }catch(error){status.textContent="AI run not submitted: "+error.message;}
    finally{submit.disabled=false;}
  });
