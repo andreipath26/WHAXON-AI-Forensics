@@ -488,17 +488,38 @@
  };
  document.querySelectorAll("a[data-path]").forEach(a=>{const p=routes[a.dataset.path];if(p){a.href=p;a.style.display="";}else{a.hidden=true;a.setAttribute("aria-hidden","true");}});
  const main=document.querySelector("main");if(!main)return;
- const panel=document.createElement("section");panel.id="whaxon-live-chains";panel.className="mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
+ const layout=main.querySelector(":scope > div");
+ const sections=layout?Array.from(layout.querySelectorAll(":scope > section")):[];
+ const headerSection=sections[0]||null,graphSection=sections[1]||null,narrativeSection=sections[2]||null;
+ // Keep the supplied page shell and KPI card styling, but replace fixture values.
+ if(headerSection){
+  const h1=headerSection.querySelector("h1");
+  if(h1)Array.from(h1.querySelectorAll("span")).forEach(span=>{if(span.textContent.includes("Lethal Paths"))span.textContent="LIVE GRAPH";});
+  Array.from(headerSection.querySelectorAll("span")).forEach(span=>{if(span.textContent.trim()==="ENG-2026-X892")span.textContent="ENGAGEMENT NOT SET";});
+  const metricGrid=Array.from(headerSection.querySelectorAll("div.grid")).find(el=>el.className.includes("grid-cols-2")&&el.className.includes("lg:grid-cols-4"));
+  if(metricGrid){
+   const labels=["Recorded graph edges","Correlated findings","Average path depth","Inference confidence"];
+   Array.from(metricGrid.children).forEach((card,index)=>{const label=card.querySelector(".font-label-sm");const value=card.querySelector(".font-headline-md");if(label)label.textContent=labels[index]||"Live graph metric";if(value)value.textContent="Not available";});
+  }
+ }
+ const panel=document.createElement("section");panel.id="whaxon-live-chains";panel.className="mt-space-md p-space-md rounded-lg bg-surface-container border border-outline-variant/30";
  panel.innerHTML='<div class="flex flex-wrap items-center justify-between gap-3"><h2 class="font-headline-lg text-headline-lg">Recorded attack-chain relationships</h2><button id="chains-refresh" type="button" class="rounded bg-surface-container-high px-3 py-2">Refresh</button></div><div class="mt-3 flex flex-wrap gap-2"><input id="chains-search" type="search" aria-label="Filter attack-chain relationships" placeholder="Filter source, target, relation or evidence" class="min-w-0 flex-1 rounded bg-surface-container-lowest px-3 py-2"><button id="chains-export" type="button" class="rounded bg-surface-container-high px-3 py-2">Export graph JSON</button></div><p id="chains-status" role="status" aria-live="polite" class="mt-2 text-on-surface-variant">Loading stored graph relationships…</p><div id="chains-list" class="mt-3 grid gap-2"></div>';
- main.prepend(panel);
- // The canonical mockup includes a fabricated compromise narrative, credential
- // strings and exploit output. Do not present those fixtures as live graph evidence.
- Array.from(main.children).forEach(child=>{if(child!==panel)child.style.display="none";});
+ // Put live relationships inside the original graph canvas, retaining the page shell.
+ const canvas=graphSection?.querySelector("div.rounded-xl");
+ if(canvas){Array.from(canvas.children).forEach(child=>{child.hidden=true;});canvas.append(panel);}
+ else main.prepend(panel);
+ // The final narrative section contains fabricated exploit details and is not live evidence.
+ if(narrativeSection)narrativeSection.hidden=true;
+ // Keep the original header actions functional instead of leaving decorative controls.
+ const recomputeButton=headerSection?.querySelector("#btn-recompute");
+ if(recomputeButton)recomputeButton.title="Refresh recorded relationships from the WHAXON graph API.";
+ const headerExport=Array.from(headerSection?.querySelectorAll("button")||[]).find(b=>b.textContent.includes("Export Graph"));
+ if(headerExport)headerExport.title="Export the currently recorded graph as JSON.";
 const status=panel.querySelector("#chains-status"),list=panel.querySelector("#chains-list"),search=panel.querySelector("#chains-search"),exportButton=panel.querySelector("#chains-export");let edges=[];
  const add=(parent,value,cls)=>{const n=document.createElement("div");n.textContent=value==null||value===""?"—":String(value);if(cls)n.className=cls;parent.append(n);};
  function render(){list.replaceChildren();const q=search.value.toLowerCase().trim();const shown=edges.filter(edge=>JSON.stringify(edge).toLowerCase().includes(q));status.textContent=shown.length+" of "+edges.length+" recorded relationship(s) match the filter.";if(!shown.length){add(list,q?"No graph relationships match this filter.":"No attack-chain relationships have been recorded.","text-on-surface-variant");return;}for(const edge of shown){const card=document.createElement("article");card.className="rounded-lg bg-surface-container p-space-md";const parent=edge.parent&&typeof edge.parent==="object"?((edge.parent.kind||"node")+":"+String(edge.parent.id??"not recorded")):(edge.source||edge.from||edge.parent||"Source not recorded");const child=edge.child&&typeof edge.child==="object"?((edge.child.kind||"node")+":"+String(edge.child.id??"not recorded")):(edge.target||edge.to||edge.child||"Target not recorded");add(card,parent,"font-code-sm text-primary");add(card,"→ "+child,"mt-1 font-code-sm");add(card,edge.relation||edge.kind||edge.type||edge.relationship||"Relationship type not recorded","mt-1 text-on-surface-variant");if(edge.evidence)add(card,"Recorded evidence: "+edge.evidence,"mt-2 whitespace-pre-wrap text-on-surface-variant");if(edge.created_at){const time=Number(edge.created_at);add(card,Number.isFinite(time)?new Date(time>1e12?time:time*1000).toISOString():"Recorded timestamp unavailable","mt-2 font-code-sm text-outline");}list.append(card);}}
  async function refresh(){const button=panel.querySelector("#chains-refresh");button.disabled=true;button.textContent="Loading…";status.textContent="Loading stored graph relationships…";try{const response=await fetch("/api/pivot/graph");const data=await response.json();if(!response.ok)throw new Error(data.error||("HTTP "+response.status));edges=Array.isArray(data)?data:(Array.isArray(data.edges)?data.edges:[]);render();}catch(e){status.textContent="Graph data could not be loaded: "+e.message;list.replaceChildren();}finally{button.disabled=false;button.textContent="Refresh";}}
- search.addEventListener("input",render);exportButton.addEventListener("click",()=>{const blob=new Blob([JSON.stringify({source:"WHAXON recorded graph API",exported_at:new Date().toISOString(),edges},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="whaxon-attack-chain-graph.json";a.click();URL.revokeObjectURL(url);status.textContent="Exported "+edges.length+" recorded relationship(s) as JSON.";});panel.querySelector("#chains-refresh").addEventListener("click",refresh);refresh();
+ search.addEventListener("input",render);function exportGraph(){const blob=new Blob([JSON.stringify({source:"WHAXON recorded graph API",exported_at:new Date().toISOString(),edges},null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="whaxon-attack-chain-graph.json";a.click();URL.revokeObjectURL(url);status.textContent="Exported "+edges.length+" recorded relationship(s) as JSON.";}exportButton.addEventListener("click",exportGraph);const recompute=headerSection?.querySelector("#btn-recompute");if(recompute)recompute.addEventListener("click",refresh);if(headerExport)headerExport.addEventListener("click",exportGraph);panel.querySelector("#chains-refresh").addEventListener("click",refresh);refresh();
 })();
 </script>
 </body></html>
