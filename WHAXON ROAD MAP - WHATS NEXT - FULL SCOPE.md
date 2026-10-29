@@ -1521,6 +1521,34 @@ Against measured throughput (roadmap estimates run 3–5× high; §19 was 8×), 
 6. 26.3 — AI gating, last because it depends on everything above.
 7. 26.8 — legal boundary docs and tests, closes the section.
 
+## 26.12 Program URL ingestion and policy extraction — NEW
+
+**Status:** Proposed roadmap addition; queued for implementation. Reuse the existing policy schema, YesWeHack clipboard parser, program validation, scope gate, AI gate and report templates rather than creating a parallel bounty subsystem.
+
+**Goal:** The operator can provide a public bounty-program URL (for example, a YesWeHack program page). WHAXON ingests accessible program information, extracts policy rules into a structured draft, presents source evidence and uncertainty, and prepares a scope-constrained plan for human approval.
+
+**Required workflow:**
+1. Accept a URL or pasted/exported program text. Record source URL, retrieval timestamp, parser/version and content hash where practical. Respect authentication and platform access restrictions; provide a manual paste/import fallback when content cannot be accessed.
+2. Parse assets and asset types, explicit in-scope entries, exclusions, testing permissions/prohibitions, rate limits, authentication requirements, disallowed vulnerability classes, disclosure rules, bounty eligibility and report-submission requirements.
+3. Produce a structured policy draft using the existing §26.1 schema. Preserve source excerpts/locations for every material extracted rule. Label missing, inferred, contradictory, stale or ambiguous rules; do not silently invent policy values.
+4. Require operator review/confirmation before saving the policy or running any tests. Refresh/review policy before a session when the source may have changed.
+5. Enforce the program policy gate and existing host scope gate together. Deny by default when scope is missing, conflicting, stale, ambiguous or cannot be resolved uniquely. No AI-generated interpretation may weaken deterministic enforcement.
+6. Generate a proposed test plan from only confirmed in-scope assets and permitted test classes. Require human approval before execution; no unattended bounty runs.
+7. Keep provenance from source page → extracted rule → approved policy → test/action → evidence/finding → platform-specific report draft. Report drafts must satisfy §26.4 and must never be submitted without explicit human approval.
+
+**Security requirements:** Treat page contents and linked documents as untrusted data, not instructions. Defend against prompt injection, SSRF and unsafe redirects during URL ingestion; restrict schemes and destinations, block loopback/private/link-local/metadata destinations as appropriate, revalidate redirects and DNS resolution, limit response size/time/content types, and avoid executing downloaded content. Do not bypass authentication, paywalls, platform controls or access restrictions. A URL alone is not proof of authorization.
+
+**Acceptance tests:**
+- Fixtures for valid, malformed, contradictory, incomplete, stale and changed program pages.
+- Source-backed extraction with uncertainty and no fabricated scope entries.
+- URL-fetch tests for redirects, private-address/SSRF attempts, oversized responses, timeouts, unsupported schemes and hostile prompt-injection text.
+- Scope-gate tests proving excluded or ambiguous targets cannot run even when the AI recommends them.
+- Human approval required before policy activation, testing and submission.
+- End-to-end tests from fixture/page import through approved policy, plan, evidence and report draft.
+- Platform-specific fixtures and report validation for YesWeHack first, with other platforms added only after their terms/access methods are reviewed.
+
+**Sequencing:** Extend the existing §26.1 policy layer and §26.2.4 capture/report workflow. Build ingestion and policy extraction only after confirming the current clipboard parser and existing YesWeHack terms/permissions. Treat third-party platform access as a capability that must be reviewed, not assumed.
+
 ## 26.11 Not in scope
 
 ---
@@ -2097,3 +2125,51 @@ Before the next tool-adoption batch:
 9. Implement Tier 3 only after the session contract and explicit high-impact policy pass tests.
 
 **Success metric:** verified, reproducible coverage across supported asset and finding classes, with documented gaps and low false-positive rates—not the number of tool names in the catalog.
+
+---
+
+# 40. DEPENDENCY READINESS AND GUIDED INSTALLATION (NEW)
+
+**Status:** Proposed roadmap addition; queued for implementation. Cross-cutting product capability for first install, upgrades and runtime health checks. This does not replace §39's per-tool install metadata or §38's clean-install release gate.
+
+## 40.1 Goal
+
+WHAXON should identify whether its runtime requirements and selected external tools are present and usable on the user's machine. When something is missing or incompatible, it should explain the impact and offer a safe, user-approved installation or repair path.
+
+## 40.2 Required capabilities
+
+1. **Dependency inventory:** Maintain a versioned, machine-readable manifest that distinguishes required runtime/package dependencies, optional integrations and external executables. Record version constraints, supported OS/platforms, detection method, install options, privilege requirements, license/source and smoke-test command.
+2. **Preflight checks:** Run at install/upgrade and on demand or first use. Check interpreter/runtime compatibility, Python packages, executable presence and version, configured paths, required data/resources and tool health. Distinguish missing, incompatible, misconfigured, installed-but-broken, unsupported and not-yet-checked states.
+3. **Feature impact:** Map each dependency to the WHAXON capabilities that require it. Do not block unrelated features because an optional tool is absent; clearly disclose when a feature cannot run.
+4. **Guided remediation:** Offer platform-appropriate instructions and supported install methods for Windows, Linux and macOS, with distro-specific handling where necessary. Prefer virtual environments/user-local installs and package-manager-native methods where safe. Provide manual/offline instructions when automated installation is unavailable.
+5. **Explicit consent:** Show the proposed command, source, package/version, privileges, likely changes and any costs/network access before executing an installation. Never silently elevate privileges, alter security controls, install unrelated software or execute commands copied from tool output.
+6. **Safe execution and recovery:** Use allowlisted installers/commands and trusted package sources; validate inputs; apply timeouts and cancellation; capture exit status/output; avoid shell-string construction where argument arrays are available. Make partial failures recoverable and report exactly what changed.
+7. **Post-install verification:** Re-detect version and path, run a safe non-target smoke test, and only mark a tool as installed or smoke-tested when that state is supported by observed evidence. Installation success alone does not mean production-ready.
+8. **Audit and privacy:** Record check results and user-approved actions with timestamps and dependency versions. Do not collect unrelated machine inventory or upload local environment details without clear consent.
+9. **Offline and restricted environments:** Support diagnostic-only mode and documented manual installation when internet, package managers, permissions or repositories are unavailable.
+10. **Documentation and diagnostics:** Provide human-readable and machine-readable reports, actionable remediation, and copyable diagnostics that redact secrets and sensitive paths where appropriate.
+
+## 40.3 Acceptance criteria
+
+- Test on clean and partially provisioned environments for each supported OS/platform.
+- Correctly classify missing, wrong-version, broken, optional and healthy dependencies.
+- Verify no installation or privileged action occurs without explicit approval.
+- Verify cancellation, timeouts, offline operation, failed package managers, malicious/malformed tool output and interrupted installs.
+- Confirm installed executables are found reliably without relying on a developer's local PATH or hardcoded personal paths.
+- Confirm each dependency's smoke test is safe and does not send requests to third-party targets.
+- Confirm absent optional dependencies disable only dependent capabilities and are clearly reported.
+- Confirm preflight and post-install results agree with the actual executable/version and the §39 tool-readiness states.
+- Add CI tests for manifest validation, dependency detection and mocked installation flows; use isolated clean-environment integration tests for actual installer behavior.
+- Update packaging, install documentation and §38 release acceptance checklist once implemented.
+
+## 40.4 Recommended implementation order
+
+1. Inventory current runtime, package, catalog/resource and external-tool dependencies; reconcile with §7, §38 and §39.
+2. Define the manifest schema and deterministic detection interfaces.
+3. Implement read-only preflight and a clear diagnostic report first.
+4. Add OS-specific remediation plans and explicit approval UX; keep command execution allowlisted.
+5. Add post-install smoke tests and auditable readiness states.
+6. Integrate checks into packaging/first-run/upgrade flows and the existing UI without redesigning it.
+7. Validate on clean Windows, Linux and macOS environments and document unsupported cases.
+
+**Relationship to other roadmap items:** §7 tool adoption supplies per-tool install metadata; §9 distro portability defines platform coverage; §18 deployment/installer/upgrade work consumes this capability; §38 packaging and clean-install acceptance verifies it; §39.8 inventory reconciliation is a prerequisite for a trustworthy manifest.
