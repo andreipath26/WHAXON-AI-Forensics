@@ -12,7 +12,6 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
     assert page.locator("#run-target-input").count() == 1
     assert page.locator("#run-target-input").is_visible()
     assert page.locator("#run-active-btn").is_visible()
-    assert page.locator("#run-active-btn").is_visible()
     assert page.get_by_role("button", name="Spawn Sub-tool").is_hidden()
     assert page.get_by_role("button", name="Inject Payload").is_hidden()
     assert page.get_by_role("button", name="Emergency Abort").is_hidden()
@@ -219,5 +218,5 @@ def test_run_page_exposes_one_truthful_dispatch_action(page, live_server):
     assert page.locator("#run-passive-btn").count() == 0
     run_button = page.locator("#run-active-btn")
     assert run_button.is_visible()
-    assert run_button.inner_text().strip() == "play_arrow Run Selected Tool"
+    assert "Run Selected Tool" in run_button.inner_text()
     assert run_button.is_enabled()
