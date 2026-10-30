@@ -96,9 +96,9 @@
 <span class="font-code-md text-code-md text-on-surface font-semibold truncate">WHAXON SCOPE MANAGER</span>
 <span id="scopeStatusLabel" class="font-label-sm text-label-sm text-outline tracking-wide uppercase font-semibold">Waiting for scope configuration</span>
 </div>
-<div class="flex items-center justify-between font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
+<div class="flex items-center justify-between gap-space-sm font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
 <span>Scope API</span>
-<span class="text-primary font-mono">No latency claim</span>
+<button id="toggleScopeEnforcementBtn" type="button" class="px-2 py-1 rounded border border-outline-variant/50 bg-surface-container-high text-on-surface font-code-sm text-code-sm hover:bg-surface-variant disabled:opacity-50" disabled aria-pressed="false">Waiting for scope</button>
 </div>
 </div>
 </div>
@@ -359,7 +359,8 @@
   let preflightRequestId = 0;
   const scopeActionIds = [
     "openTargetModalBtn", "openImportDrawerBtn", "saveTargetBtn",
-    "addDenyRuleBtn", "runScopeCheckBtn", "copyCliBtn", "executeImportBtn"
+    "addDenyRuleBtn", "runScopeCheckBtn", "copyCliBtn", "executeImportBtn",
+    "toggleScopeEnforcementBtn"
   ];
   function setScopeActionsEnabled(enabled) {
     scopeActionIds.forEach(id => {
@@ -509,6 +510,17 @@
     setMetric(0, String(ruleList("in_scope").length), "Configured rules", "Engagement: " + (scope.engagement || "Unnamed"), "From active config");
     setMetric(1, String(cidrs), "CIDR rules", "Host rules: " + (ruleList("in_scope").length - cidrs), "No route claims");
     setMetric(2, String(ruleList("out_of_scope").length), "Explicit deny rules", "Out-of-scope rules", "Evaluated first");
+    const enforcementToggle = $("toggleScopeEnforcementBtn");
+    if (enforcementToggle) {
+      enforcementToggle.disabled = saveInFlight;
+      enforcementToggle.textContent = enforcementEnabled ? "Disable enforcement" : "Enable enforcement";
+      enforcementToggle.setAttribute("aria-pressed", enforcementEnabled ? "true" : "false");
+      enforcementToggle.setAttribute("aria-label", enforcementEnabled
+        ? "Disable scope enforcement" : "Enable scope enforcement");
+      enforcementToggle.title = enforcementEnabled
+        ? "Disabling scope enforcement requires explicit confirmation"
+        : "Re-enable scope enforcement for subsequent runner actions";
+    }
     const statusLabel = $("scopeStatusLabel");
     if (statusLabel) {
       statusLabel.textContent = !enforcementEnabled
@@ -732,6 +744,14 @@
       const saved = await save({in_scope: rules});
       if (saved) { $("modalTargetInput").value = ""; $("authConfirmCheckbox").checked = false; close(); }
     } catch (error) { say(error.message, false); }
+  });
+  $("toggleScopeEnforcementBtn")?.addEventListener("click", async () => {
+    if (!scope || saveInFlight) return;
+    try {
+      await save({enabled: scope.enabled === false});
+    } catch (error) {
+      say(error.message, false);
+    }
   });
   $("addDenyRuleBtn")?.addEventListener("click", async () => {
     const rule = window.prompt("Enter a hostname, wildcard, IP address, or CIDR to explicitly exclude:");

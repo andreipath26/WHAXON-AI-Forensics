@@ -463,3 +463,70 @@ def test_scope_import_rejects_incomplete_scope_json_without_clearing_exclusions(
     page.locator("#executeImportBtn").click()
     assert "both in_scope and out_of_scope lists" in page.locator("#scope-ui-notice").inner_text()
     assert _read_scope(page) == before
+
+
+def test_scope_enforcement_toggle_requires_confirmation_to_disable_and_can_reenable(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    assert before["enabled"] is True
+    toggle = page.locator("#toggleScopeEnforcementBtn")
+    assert toggle.is_enabled()
+    assert toggle.inner_text() == "Disable enforcement"
+    assert toggle.get_attribute("aria-pressed") == "true"
+
+    try:
+        page.once("dialog", lambda dialog: dialog.dismiss())
+        toggle.click()
+        assert _read_scope(page)["enabled"] is True
+        assert toggle.inner_text() == "Disable enforcement"
+
+        page.once("dialog", lambda dialog: dialog.accept())
+        toggle.click()
+        page.wait_for_function(
+            "() => document.querySelector('#scopeStatusLabel')?.textContent === 'Enforcement disabled'",
+            timeout=5000,
+        )
+        assert _read_scope(page)["enabled"] is False
+        assert toggle.inner_text() == "Enable enforcement"
+        assert toggle.get_attribute("aria-pressed") == "false"
+
+        toggle.click()
+        page.wait_for_function(
+            "() => document.querySelector('#scopeStatusLabel')?.textContent === 'Enforcement enabled'",
+            timeout=5000,
+        )
+        assert _read_scope(page)["enabled"] is True
+        assert toggle.inner_text() == "Disable enforcement"
+    finally:
+        _save_scope(page, before)
+
+
+def test_scope_enforcement_toggle_is_locked_during_save(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    page.evaluate("""() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (url, options = {}) => {
+        if (url === "/api/scope" && options.method === "POST") {
+          const payload = JSON.parse(options.body);
+          return new Promise(resolve => {
+            window.__resolveScopeToggle = () => resolve(new Response(JSON.stringify(payload), {
+              status: 200,
+              headers: {"Content-Type": "application/json"}
+            }));
+          });
+        }
+        return originalFetch(url, options);
+      };
+    }""")
+    page.locator("#toggleScopeEnforcementBtn").click()
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.wait_for_function("() => typeof window.__resolveScopeToggle === 'function'", timeout=5000)
+    assert page.locator("#toggleScopeEnforcementBtn").is_disabled()
+    page.evaluate("() => window.__resolveScopeToggle()")
+    page.wait_for_function(
+        "() => document.querySelector('#scopeStatusLabel')?.textContent === 'Enforcement disabled'",
+        timeout=5000,
+    )
+    assert page.locator("#toggleScopeEnforcementBtn").is_enabled()
