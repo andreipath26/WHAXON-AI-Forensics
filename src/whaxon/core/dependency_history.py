@@ -105,7 +105,10 @@ def record_snapshot(report: dict[str, Any], data_dir: Path) -> dict[str, Any]:
             prefix=".dependency-readiness-", suffix=".tmp", dir=path.parent
         )
         try:
-            os.fchmod(descriptor, 0o600)
+            if hasattr(os, "fchmod"):
+                os.fchmod(descriptor, 0o600)
+            else:
+                os.chmod(temporary_name, 0o600)
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                 json.dump(payload, stream, sort_keys=True, indent=2)
                 stream.write("\n")
