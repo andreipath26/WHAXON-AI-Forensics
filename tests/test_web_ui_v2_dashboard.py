@@ -220,7 +220,7 @@ def test_dashboard_does_not_claim_scope_rule_when_target_list_is_empty(page, liv
 
 
 def test_dashboard_shows_api_failures_as_unavailable_not_zero_or_empty(page, live_server):
-    for endpoint in ("/api/history", "/api/report?format=json", "/api/tools"):
+    for endpoint in ("/api/history", "/api/jobs/active", "/api/report?format=json", "/api/tools"):
         page.route(
             f"**{endpoint}",
             lambda route: route.fulfill(
@@ -237,9 +237,9 @@ def test_dashboard_shows_api_failures_as_unavailable_not_zero_or_empty(page, liv
     )
 
     cards = page.locator(".rounded-lg.bg-surface-container-low.p-space-md")
-    assert cards.filter(has_text="Active Scans").get_by_text("—").is_visible()
-    assert cards.filter(has_text="Verified Findings").get_by_text("—").is_visible()
-    assert cards.filter(has_text="Active Adapters").get_by_text("—").is_visible()
+    assert "—" in cards.filter(has_text="Active Scans").inner_text()
+    assert "—" in cards.filter(has_text="Verified Findings").inner_text()
+    assert "—" in cards.filter(has_text="Active Adapters").inner_text()
     assert page.locator("table tbody").get_by_text("No job history has been recorded yet.").count() == 0
 
 
@@ -254,7 +254,7 @@ def test_dashboard_recent_job_rows_use_real_api_fields(page, live_server):
     assert "nmap" in rows.filter(has_text="seed-job-1").inner_text().lower()
     assert "not recorded" in rows.filter(has_text="seed-job-1").inner_text().lower()
     assert rows.filter(has_text="seed-job-1").get_by_role("link", name="View History").get_attribute("href") == "/ui-v2/history"
-    assert page.get_by_text("NO ACTIVE JOBS").is_visible()
+    assert page.locator("#dashboard-runtime-state").inner_text() == "No active jobs"
     assert page.locator("#dashboard-history-count").inner_text() == "2"
 
 
