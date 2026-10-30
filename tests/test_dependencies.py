@@ -108,3 +108,32 @@ def test_unsupported_python_runtime_blocks_core(monkeypatch):
     runtime = next(item for item in report["dependencies"] if item["id"] == "python")
     assert runtime["status"] == "INCOMPATIBLE"
     assert report["overall_status"] == "BLOCKED"
+
+
+def test_invalid_manifest_disables_external_version_probes(tmp_path, monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
+    }))
+    monkeypatch.setattr(dependencies, "load_dependency_manifest", lambda: (_ for _ in ()).throw(ValueError("invalid")))
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/usr/bin/nmap")
+    monkeypatch.setattr(
+        dependencies.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("probe must not run")),
+    )
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=True
+    )
+    assert next(item for item in report["dependencies"] if item["id"] == "dependency-manifest")["status"] == "BROKEN"
+    assert next(item for item in report["dependencies"] if item["id"] == "nmap")["status"] == "DETECTED"
+
+
+def test_malformed_tool_catalog_is_reported_as_broken(tmp_path):
+    (tmp_path / "tools.json").write_text("[]")
+    report = collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=False
+    )
+    catalog = next(item for item in report["dependencies"] if item["id"] == "tool-catalog")
+    assert catalog["status"] == "BROKEN"
