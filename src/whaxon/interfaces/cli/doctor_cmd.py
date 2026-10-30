@@ -1,12 +1,12 @@
-"""whaxon doctor — read-only dependency and environment diagnostics."""
+"""whaxon doctor --plan: print a read-only remediation preview."""
 from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from whaxon.core.dependencies import collect_dependency_report
+from whaxon.core.remediation import build_remediation_plan
 
 
 def main(args: list[str] | None = None) -> int:
@@ -18,11 +18,20 @@ def main(args: list[str] | None = None) -> int:
                         help="Print the versioned machine-readable report.")
     parser.add_argument("--check", metavar="DEPENDENCY_ID",
                         help="Show one dependency only (read-only).")
+    parser.add_argument("--plan", action="store_true",
+                        help="Generate a remediation preview; never executes commands.")
     parser.add_argument("--data", type=Path, default=Path("data"),
                         help="WHAXON data directory (default: ./data).")
     parser.add_argument("--core-only", action="store_true",
                         help="Skip optional Python extras and external tool checks.")
     ns = parser.parse_args(args)
+    if ns.plan:
+        plan = build_remediation_plan(
+            dependency_ids=[ns.check] if ns.check else None,
+            data_dir=ns.data,
+        )
+        print(json.dumps(plan, indent=2, sort_keys=True))
+        return 2 if plan["unknown_dependency_ids"] else 0
     report = collect_dependency_report(
         data_dir=ns.data,
         include_optional=not ns.core_only,
@@ -31,10 +40,13 @@ def main(args: list[str] | None = None) -> int:
     if ns.check:
         matches = [d for d in report["dependencies"] if d["id"] == ns.check]
         if not matches:
-            print(f"Unknown dependency id: {ns.check}", file=sys.stderr)
+            print(f"Unknown dependency id: {ns.check}")
             return 2
         report["dependencies"] = matches
         report["summary"] = {"total": 1, "ready": sum(d["status"] == "READY" for d in matches)}
+        report["overall_status"] = (
+            "READY" if all(d["status"] == "READY" for d in matches) else "DEGRADED"
+        )
     if ns.as_json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
@@ -50,7 +62,7 @@ def main(args: list[str] | None = None) -> int:
             print(f"{dep['status']:14} {dep['id'][:20]:20} {observed[:34]:34} {dep['reason']}")
         print()
         print("This command is read-only. No packages were installed and no network was used.")
-        print("Use the official installation instructions for missing dependencies; guided plans are not yet enabled.")
+        print("Use --plan for a remediation preview; it also does not execute commands.")
     return 1 if report["overall_status"] == "BLOCKED" else 0
 
 
