@@ -762,3 +762,23 @@ def test_dependency_install_endpoint_calls_approved_installer_only(
     )
     assert response.status_code == 200
     assert calls == [("textual", "plan-0123456789abcdef")]
+
+
+def test_dependency_snapshot_history_and_drift_endpoints(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    before = client.get("/api/dependencies/drift")
+    assert before.status_code == 200
+    assert before.get_json()["baseline_available"] is False
+
+    saved = client.post("/api/dependencies/snapshots")
+    assert saved.status_code == 201
+    assert saved.get_json()["fingerprint"]
+
+    history = client.get("/api/dependencies/history?limit=5")
+    assert history.status_code == 200
+    assert len(history.get_json()["snapshots"]) == 1
+
+    after = client.get("/api/dependencies/drift")
+    assert after.status_code == 200
+    assert after.get_json()["baseline_available"] is True
