@@ -10,8 +10,8 @@ import importlib.metadata
 import json
 import os
 import re
-import subprocess
 import stat
+import subprocess
 import sys
 import time
 import uuid
