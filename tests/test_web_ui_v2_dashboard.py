@@ -161,6 +161,37 @@ def test_dashboard_artifact_card_supports_drop_and_rejects_unwired_formats(page,
         timeout=5000,
     )
 
+
+def test_dashboard_upload_artifact_button_opens_file_picker_and_imports_xml(page, live_server):
+    calls = []
+
+    def fulfill_import(route):
+        calls.append(route.request.method)
+        route.fulfill(status=200, content_type="application/json", body='{"count": 2}')
+
+    page.route("**/api/import/burp", fulfill_import)
+    page.goto(f"{live_server}/ui-v2")
+    with page.expect_file_chooser() as chooser_info:
+        page.get_by_role("button", name=re.compile(r"Upload Artifact")).click()
+    chooser_info.value.set_files({
+        "name": "dashboard-upload.xml",
+        "mimeType": "application/xml",
+        "buffer": b'<?xml version="1.0"?><issues></issues>',
+    })
+    page.wait_for_url("**/ui-v2/findings", timeout=10000)
+    assert calls == ["POST"]
+
+
+def test_dashboard_configure_filters_focuses_the_live_history_filter(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    filter_input = page.get_by_role(
+        "textbox", name="Filter recent job history by ID, target, or tool"
+    )
+    page.get_by_role("button", name=re.compile(r"Configure Filters")).click()
+    assert filter_input.evaluate("element => document.activeElement === element")
+    assert "Type in the job-history filter" in page.locator("#dashboard-action-status").inner_text()
+
+
 def test_dashboard_posts_burp_xml_and_opens_findings(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     page.wait_for_function(
