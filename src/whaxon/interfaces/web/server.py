@@ -1585,6 +1585,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify({"error": f"dependency verification failed ({type(exc).__name__})"}), 500
         return jsonify(report)
 
+    @app.get("/api/dependencies/audit")
+    def api_dependencies_audit_get():
+        """Verify the local dependency-install audit chain without exposing event contents."""
+        from whaxon.core.installer import verify_dependency_audit
+
+        try:
+            result = verify_dependency_audit()
+        except OSError as exc:
+            return jsonify({"valid": False, "reason": type(exc).__name__}), 500
+        return jsonify(result), (200 if result.get("valid") else 409)
     @app.get("/api/dependencies/history")
     def api_dependencies_history_get():
         """Return recent locally persisted dependency readiness snapshots."""
