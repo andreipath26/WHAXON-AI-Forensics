@@ -92,7 +92,7 @@ def _package_result(dist: str, import_name: str, minimum: str, *, required: bool
             reason = "Minimum version is satisfied and package import succeeded."
     return DependencyResult(
         dist, dist, "python-package", required, status, version,
-        required_version=f">={minimum}", capabilities=(capability,),
+        required_version=f">={minimum}", capabilities=capabilities,
         reason=reason,
         remediation="" if status == "READY" else f"Upgrade {dist} in the active environment.",
     )
