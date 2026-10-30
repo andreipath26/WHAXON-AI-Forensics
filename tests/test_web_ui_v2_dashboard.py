@@ -376,6 +376,40 @@ def test_dashboard_mobile_navigation_closes_after_route_selection(page, live_ser
     )
 
 
+
+def test_dashboard_all_visible_enabled_buttons_have_real_actions_and_names(page, live_server):
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    result = page.locator("button:visible:not(:disabled)").evaluate_all(
+        """buttons => ({
+          unwired: buttons.filter(button =>
+            button.dataset.dashboardWired !== 'true' &&
+            !button.classList.contains('dashboard-mobile-menu')
+          ).map(button => button.innerText.trim()),
+          unnamed: buttons.filter(button =>
+            !(button.getAttribute('aria-label') || button.innerText || '').trim()
+          ).map(button => button.outerHTML.slice(0, 160))
+        })"""
+    )
+    assert result["unwired"] == []
+    assert result["unnamed"] == []
+    assert page.get_by_role("heading", name="Recent Job History").is_visible()
+    assert page.get_by_role("table", name="Recent recorded WHAXON jobs").is_visible()
+
+
+def test_dashboard_mobile_layout_has_no_horizontal_page_overflow(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector(".dashboard-mobile-menu")
+    assert page.evaluate(
+        "() => document.documentElement.scrollWidth <= window.innerWidth"
+    )
+
+
 def test_dashboard_mobile_menu_is_not_shown_on_desktop(page, live_server):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{live_server}/ui-v2")
