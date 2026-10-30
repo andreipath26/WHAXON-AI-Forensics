@@ -393,6 +393,16 @@
       ...ruleList("in_scope").map(rule => ({rule, type:"IN SCOPE"})),
       ...ruleList("out_of_scope").map(rule => ({rule, type:"EXCLUDED"}))
     ];
+    if (!rows.length) {
+      const empty = document.createElement("tr");
+      empty.id = "scope-empty-state";
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.className = "px-space-md py-space-lg text-center text-on-surface-variant";
+      cell.textContent = "No scope rules configured. Add an authorized target or import a scope.json definition.";
+      empty.append(cell);
+      tbody.append(empty);
+    }
     for (const entry of rows) {
       const tr = document.createElement("tr");
       tr.className = "hover:bg-surface-container/60 transition-colors";
@@ -413,10 +423,24 @@
       auth.textContent = entry.type === "EXCLUDED" ? "Excluded by scope" : "No evidence stored by scope API";
       const action = document.createElement("td");
       action.className = "py-2.5 px-space-md text-right";
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "px-2 py-1 mr-1 rounded bg-surface-container hover:bg-surface-variant text-on-surface text-[11px] font-code-sm border border-outline-variant/40";
+      edit.textContent = "Edit";
+      edit.setAttribute("aria-label", "Edit " + entry.type.toLowerCase() + " rule " + entry.rule);
+      edit.addEventListener("click", async () => {
+        const replacement = window.prompt("Edit " + entry.type.toLowerCase() + " rule:", entry.rule);
+        if (replacement === null || !replacement.trim() || replacement.trim() === entry.rule) return;
+        const field = entry.type === "EXCLUDED" ? "out_of_scope" : "in_scope";
+        const next = ruleList(field).map(item => item === entry.rule ? replacement.trim() : item);
+        try { await save({[field]: next}); }
+        catch (error) { say(error.message, false); }
+      });
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "px-2 py-1 rounded bg-error-container/20 hover:bg-error-container/40 text-error text-[11px] font-code-sm border border-error/40";
       remove.textContent = "Remove";
+      remove.setAttribute("aria-label", "Remove " + entry.type.toLowerCase() + " rule " + entry.rule);
       remove.addEventListener("click", async () => {
         if (!window.confirm("Remove scope rule " + entry.rule + "?")) return;
         const field = entry.type === "EXCLUDED" ? "out_of_scope" : "in_scope";
@@ -424,7 +448,7 @@
         try { await save({[field]: next}); }
         catch (error) { say(error.message, false); }
       });
-      action.append(remove);
+      action.append(edit, remove);
       tr.append(target, type, ports, rate, auth, action);
       tbody.append(tr);
     }
@@ -608,7 +632,30 @@
   });
   $("targetFilterInput")?.addEventListener("input", event => {
     const q = event.target.value.toLowerCase();
-    tbody?.querySelectorAll("tr").forEach(row => row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none");
+    const rows = [...(tbody?.querySelectorAll("tr:not(#scope-empty-state)") || [])];
+    let visible = 0;
+    rows.forEach(row => {
+      const match = row.textContent.toLowerCase().includes(q);
+      row.style.display = match ? "" : "none";
+      if (match) visible += 1;
+    });
+    const empty = $("scope-empty-state");
+    if (empty) {
+      empty.style.display = !rows.length || visible === 0 ? "" : "none";
+      const cell = empty.querySelector("td");
+      if (cell) cell.textContent = rows.length && q
+        ? "No scope rules match this filter."
+        : "No scope rules configured. Add an authorized target or import a scope.json definition.";
+    } else if (visible === 0 && q) {
+      const row = document.createElement("tr");
+      row.id = "scope-empty-state";
+      const cell = document.createElement("td");
+      cell.colSpan = 6;
+      cell.className = "px-space-md py-space-lg text-center text-on-surface-variant";
+      cell.textContent = "No scope rules match this filter.";
+      row.append(cell);
+      tbody?.append(row);
+    }
   });
   $("saveTargetBtn")?.addEventListener("click", async () => {
     const target = $("modalTargetInput")?.value.trim();
