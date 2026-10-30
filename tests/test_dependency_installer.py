@@ -68,6 +68,9 @@ def test_approved_install_uses_fixed_pypi_wheel_command(monkeypatch, tmp_path):
     class FakeProcess:
         returncode = 0
 
+        def poll(self):
+            return self.returncode
+
         def communicate(self, timeout=None):
             return "installed", ""
 
@@ -104,13 +107,16 @@ def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
     focused = build_remediation_plan(dependency_ids=[dependency_id])
 
     class TimeoutProcess:
-        returncode = -15
+        returncode = None
+
+        def poll(self):
+            return None if self.returncode is None else self.returncode
 
         def communicate(self, timeout=None):
             return "", ""
 
         def terminate(self):
-            pass
+            self.returncode = -15
 
         def kill(self):
             pass
@@ -151,7 +157,7 @@ def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch)
         lambda *_args, **_kwargs: type(
             "FakeProcess",
             (),
-            {"returncode": 0, "communicate": lambda self, timeout=None: ("", "")},
+            {"returncode": 0, "poll": lambda self: 0, "communicate": lambda self, timeout=None: ("", "")},
         )(),
     )
     monkeypatch.setattr(installer.importlib.metadata, "version", lambda _name: "99.0")
