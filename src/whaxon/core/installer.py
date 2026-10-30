@@ -11,6 +11,7 @@ import json
 import os
 import re
 import stat
+import threading
 import subprocess
 import sys
 import time
@@ -24,6 +25,8 @@ from whaxon.core.dependencies import _version_tuple, load_dependency_manifest
 from whaxon.core.remediation import build_python_package_argv, build_remediation_plan
 
 INSTALL_TIMEOUT_SECONDS = 900
+_AUDIT_LOCK = threading.RLock()
+_AUDIT_GENESIS = "0" * 64
 _SECRET_PATTERNS = (
     re.compile(r"(?i)(token|password|secret|api[_-]?key)(\s*[:=]\s*)[^\s,;]+"),
     re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+"),
@@ -52,25 +55,76 @@ def _audit_path() -> Path:
     return path
 
 
+def _canonical_audit_record(record: dict[str, Any]) -> bytes:
+    return json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
 def _append_audit(record: dict[str, Any]) -> None:
+    """Append SHA-256-linked events. A local chain is tamper-evident, not immutable."""
+    import hashlib
+
     path = _audit_path()
-    flags = os.O_APPEND | os.O_CREAT | os.O_WRONLY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = os.open(path, flags, 0o600)
+    with _AUDIT_LOCK:
+        previous = _AUDIT_GENESIS
+        sequence = 1
+        if path.exists():
+            if path.is_symlink():
+                raise OSError("WHAXON audit log must not be a symlink")
+            with path.open("r", encoding="utf-8") as existing:
+                for line in existing:
+                    if line.strip():
+                        previous_record = json.loads(line)
+                        previous = str(previous_record.get("event_hash", ""))
+                        sequence += 1
+        event = {**record, "sequence": sequence, "previous_hash": previous}
+        event["event_hash"] = hashlib.sha256(
+            bytes.fromhex(previous) + _canonical_audit_record(event)
+        ).hexdigest()
+        flags = os.O_APPEND | os.O_CREAT | os.O_WRONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(path, flags, 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise OSError("dependency audit target is not a regular file")
+            if hasattr(os, "fchmod"):
+                os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
+                descriptor = -1
+                stream.write(json.dumps(event, sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+
+
+def verify_dependency_audit(path: Path | None = None) -> dict[str, Any]:
+    """Verify sequence and links; cannot detect an attacker rewriting the whole chain."""
+    import hashlib
+
+    target = path or _audit_path()
+    previous = _AUDIT_GENESIS
+    count = 0
     try:
-        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
-            raise OSError("dependency audit target is not a regular file")
-        if hasattr(os, "fchmod"):
-            os.fchmod(descriptor, 0o600)
-        with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
-            descriptor = -1
-            stream.write(json.dumps(record, sort_keys=True) + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-    finally:
-        if descriptor >= 0:
-            os.close(descriptor)
+        with target.open("r", encoding="utf-8") as stream:
+            for expected_sequence, line in enumerate(stream, start=1):
+                if not line.strip():
+                    continue
+                event = json.loads(line)
+                supplied_hash = event.pop("event_hash")
+                if event.get("sequence") != expected_sequence or event.get("previous_hash") != previous:
+                    return {"valid": False, "events_checked": count, "reason": "sequence_or_link_mismatch"}
+                calculated = hashlib.sha256(
+                    bytes.fromhex(previous) + _canonical_audit_record(event)
+                ).hexdigest()
+                if supplied_hash != calculated:
+                    return {"valid": False, "events_checked": count, "reason": "hash_mismatch"}
+                previous = supplied_hash
+                count += 1
+    except (OSError, ValueError, KeyError, json.JSONDecodeError):
+        return {"valid": False, "events_checked": count, "reason": "unreadable_or_malformed"}
+    return {"valid": True, "events_checked": count, "head_hash": previous}
 
 
 def _finish_audit(result: dict[str, Any]) -> dict[str, Any]:
@@ -142,7 +196,26 @@ def apply_approved_dependency_plan(
         "privilege_escalation": False,
         "shell": False,
     }
-    _append_audit({**base, "status": "STARTED"})
+    # Persist the plan and approval decision before starting a consequential action.
+    # The current interface does not provide a verified human identity.
+    _append_audit({
+        "event_type": "PLAN_CREATED",
+        "plan_id": approved_plan_id,
+        "dependency_id": dependency_id,
+        "plan_digest": approved_plan_id.removeprefix("plan-"),
+        "manifest_schema_version": manifest["schema_version"],
+        "action": actions[0],
+        "created_at": datetime.now(UTC).isoformat(),
+    })
+    _append_audit({
+        "event_type": "APPROVAL_ACCEPTED",
+        "plan_id": approved_plan_id,
+        "dependency_id": dependency_id,
+        "approval_mechanism": "explicit_current_plan_id_submission",
+        "actor_identity": "not_available_from_current_interface",
+        "approved_at": datetime.now(UTC).isoformat(),
+    })
+    _append_audit({**base, "event_type": "ACTION_STARTED", "status": "STARTED"})
     if cancel_requested and cancel_requested():
         result = {
             **base,
