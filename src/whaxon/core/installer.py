@@ -136,7 +136,7 @@ def verify_dependency_audit(path: Path | None = None) -> dict[str, Any]:
 def _finish_audit(result: dict[str, Any]) -> dict[str, Any]:
     """Never misreport an executed install if its final audit write fails."""
     try:
-        _append_audit(result)
+        _append_audit({**result, "event_type": result.get("event_type", "ACTION_FINISHED")})
     except OSError as exc:
         return {
             **result,
