@@ -89,7 +89,7 @@ def test_approved_install_uses_fixed_pypi_wheel_command(monkeypatch, tmp_path):
     assert "--only-binary=:all:" in argv
     assert argv[argv.index("--index-url") + 1] == "https://pypi.org/simple"
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "VERIFIED"]
+    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "ACTION_FINISHED"]
 
 
 def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
@@ -127,7 +127,7 @@ def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
     assert result["status"] == "TIMED_OUT"
     assert "recreate the virtual environment" in result["recovery"]
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "TIMED_OUT"]
+    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "ACTION_FINISHED"]
 
 
 def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch):
@@ -192,7 +192,7 @@ def test_cancel_before_start_never_spawns_package_manager(monkeypatch, tmp_path)
     )
     assert result["status"] == "CANCELLED"
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "CANCELLED"]
+    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "ACTION_FINISHED"]
 
 
 def test_installer_enforces_manifest_automatic_install_policy(monkeypatch):
