@@ -783,6 +783,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def list_history():
         return jsonify(registry.history())
 
+    @app.get("/api/jobs/active")
+    def list_active_jobs():
+        """Return currently running jobs for operational status and cancellation."""
+        return jsonify(registry.core.store.active_jobs())
+
     @app.get("/api/jobs/<job_id>/evidence")
     def list_evidence(job_id: str):
         if not registry.core.store.get(job_id):
