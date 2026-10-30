@@ -110,6 +110,12 @@ def test_approvals_workspace_submits_operator_answer_to_waiting_run(page, live_s
     )
     assert panel.get_by_role("textbox", name="Answer for run seed-ai-approval-ui").count() == 0
     assert panel.get_by_role("textbox", name="Answer for run seed-ai-approval-ui").count() == 0
+    pending = page.evaluate("() => fetch('/api/ai/pending').then(response => response.json())")
+    pending_items = pending if isinstance(pending, list) else pending.get("items", pending.get("pending", []))
+    assert not any(
+        str(item.get("run_id") or item.get("id")) == "seed-ai-approval-ui"
+        for item in pending_items
+    )
     approvals = page.evaluate(
         "() => fetch('/api/ai/runs/seed-ai-approval-ui').then(response => response.json())"
     )
