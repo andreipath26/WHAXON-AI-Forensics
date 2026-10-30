@@ -445,6 +445,8 @@
     menu.className = "dashboard-mobile-menu";
     menu.setAttribute("aria-label", "Open navigation");
     menu.setAttribute("aria-expanded", "false");
+    if (!sidebar.id) sidebar.id = "dashboard-primary-navigation";
+    menu.setAttribute("aria-controls", sidebar.id);
     menu.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">menu</span>';
     if (headerContent) headerContent.prepend(menu);
     const backdrop = document.createElement("button");
@@ -453,11 +455,12 @@
     backdrop.setAttribute("aria-label", "Close navigation");
     backdrop.hidden = true;
     document.body.insertBefore(backdrop, sidebar.nextSibling);
-    const closeMenu = () => {
+    const closeMenu = (restoreFocus = true) => {
       document.body.classList.remove("dashboard-mobile-nav-open");
       backdrop.hidden = true;
       menu.setAttribute("aria-expanded", "false");
       menu.setAttribute("aria-label", "Open navigation");
+      if (restoreFocus && window.innerWidth < 768) menu.focus();
     };
     const openMenu = () => {
       document.body.classList.add("dashboard-mobile-nav-open");
@@ -479,7 +482,7 @@
       }
     });
     window.addEventListener("resize", () => {
-      if (window.innerWidth >= 768) closeMenu();
+      if (window.innerWidth >= 768) closeMenu(false);
     });
   }
   const routes = {
