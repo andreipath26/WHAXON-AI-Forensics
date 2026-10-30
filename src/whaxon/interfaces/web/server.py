@@ -1551,6 +1551,82 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         fwd = _pf.Forward(session_id=session_id, lport=local_port, rhost="", rport=0)
         return jsonify(_pf.remove_forward(registry.core.msf, fwd))
 
+    @app.get("/api/dependencies")
+    def api_dependencies_get():
+        """Read-only dependency/environment diagnostics for the approved UI."""
+        from whaxon.core.dependencies import collect_dependency_report
+
+        try:
+            report = collect_dependency_report(
+                data_dir=Path(core.data_dir),
+                include_optional=True,
+                include_external=True,
+            )
+        except Exception as exc:
+            app.logger.exception("Dependency diagnostics failed")
+            return jsonify({"error": f"dependency diagnostics failed ({type(exc).__name__})"}), 500
+        return jsonify(report)
+
+    @app.post("/api/dependencies/plan")
+    @limiter.limit("20 per minute")
+    def api_dependencies_plan():
+        """Create a read-only remediation preview; never executes its commands."""
+        from whaxon.core.remediation import build_remediation_plan
+
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "request body must be a JSON object"}), 400
+        dependency_ids = data.get("dependency_ids")
+        if dependency_ids is not None and (
+            not isinstance(dependency_ids, list)
+            or len(dependency_ids) > 100
+            or any(not isinstance(item, str) or not item or len(item) > 128
+                   for item in dependency_ids)
+        ):
+            return jsonify({"error": "dependency_ids must be a list of valid dependency IDs"}), 400
+        try:
+            plan = build_remediation_plan(
+                dependency_ids=dependency_ids,
+                data_dir=Path(core.data_dir),
+            )
+        except Exception as exc:
+            app.logger.exception("Dependency remediation planning failed")
+            return jsonify({"error": f"dependency planning failed ({type(exc).__name__})"}), 500
+        if plan["unknown_dependency_ids"]:
+            return jsonify(plan), 400
+        return jsonify(plan)
+
+    @app.post("/api/dependencies/install")
+    @limiter.limit("5 per minute")
+    def api_dependencies_install():
+        """Execute one manifest-allowlisted install only after exact plan approval."""
+        from whaxon.core.installer import apply_approved_dependency_plan
+
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "request body must be a JSON object"}), 400
+        dependency_id = data.get("dependency_id")
+        approved_plan_id = data.get("approved_plan_id")
+        if (
+            not isinstance(dependency_id, str)
+            or not dependency_id
+            or len(dependency_id) > 128
+            or not isinstance(approved_plan_id, str)
+            or not re.fullmatch(r"plan-[a-f0-9]{16}", approved_plan_id)
+        ):
+            return jsonify({"error": "dependency_id and a valid approved_plan_id are required"}), 400
+        try:
+            result = apply_approved_dependency_plan(dependency_id, approved_plan_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "installation_started": False}), 409
+        except OSError as exc:
+            app.logger.exception("Dependency installation could not be started")
+            return jsonify({
+                "error": f"installation could not be started ({type(exc).__name__})",
+                "installation_started": False,
+            }), 500
+        return jsonify(result), (200 if result["status"] == "VERIFIED" else 500)
+
     @app.get("/api/settings")
     def api_settings_get():
         try:
