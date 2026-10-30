@@ -48,6 +48,11 @@ def _append_audit(record: dict[str, Any]) -> None:
 
 def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) -> dict[str, Any]:
     """Install exactly one manifest-declared Python package after plan-ID approval."""
+    if sys.prefix == getattr(sys, "base_prefix", sys.prefix):
+        raise ValueError(
+            "Automatic Python-package installation requires an active virtual environment. "
+            "Create and activate a venv, then run doctor and review a fresh plan."
+        )
     plan = build_remediation_plan(dependency_ids=[dependency_id])
     if plan["unknown_dependency_ids"]:
         raise ValueError(f"Unknown dependency: {dependency_id}")
@@ -67,7 +72,8 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
     requirement = f"{entry['id']}>={entry['minimum_version']}"
     argv = [
         sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
-        "--no-input", "--only-binary=:all:", "--index-url",
+        "--no-input", "--quiet", "--progress-bar", "off",
+        "--only-binary=:all:", "--index-url",
         "https://pypi.org/simple", requirement,
     ]
     operation_id = str(uuid.uuid4())
@@ -94,17 +100,18 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
         output = _redact((completed.stdout or "") + "\n" + (completed.stderr or ""))
         if exit_code != 0:
             result = {**base, "status": "INSTALL_FAILED", "exit_code": exit_code,
-                      "output": output, "finished_at": datetime.now(timezone.utc).isoformat()}
+                      "output": output, "recovery": "No automatic rollback was attempted. Re-run whaxon doctor; if the environment is inconsistent, recreate the virtual environment and reinstall from the approved lock/profile.", "finished_at": datetime.now(timezone.utc).isoformat()}
             _append_audit(result)
             return result
     except subprocess.TimeoutExpired as exc:
         result = {**base, "status": "TIMED_OUT", "exit_code": None,
-                  "output": _redact(str(exc)), "finished_at": datetime.now(timezone.utc).isoformat()}
+                  "output": _redact(str(exc)), "recovery": "The pip process was terminated after timeout. Re-run whaxon doctor; recreate the virtual environment if package state is uncertain.", "finished_at": datetime.now(timezone.utc).isoformat()}
         _append_audit(result)
         return result
     except KeyboardInterrupt:
         result = {**base, "status": "INTERRUPTED", "exit_code": None,
                   "output": "Installation interrupted by user.",
+                  "recovery": "The package manager may have partially changed the virtual environment. Re-run whaxon doctor and recreate the venv if state is inconsistent.",
                   "finished_at": datetime.now(timezone.utc).isoformat()}
         _append_audit(result)
         raise
