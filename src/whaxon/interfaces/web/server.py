@@ -2089,7 +2089,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/")
     def index():
         from flask import redirect
-        return redirect("/ui")
+        return redirect("/ui-v2")
 
     return app
 
