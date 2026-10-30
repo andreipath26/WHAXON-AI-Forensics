@@ -96,7 +96,8 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     if not match:
         raise ValueError(f"unsupported version format: {value!r}")
     release = [int(part) for part in match.group(2).split(".")]
-    release = (release + [0] * 8)[:8]
+    while len(release) > 1 and release[-1] == 0:
+        release.pop()
     label = (match.group(3) or "").lower()
     number = int(match.group(4) or 0)
     stage = {
