@@ -62,7 +62,7 @@ def _append_audit(record: dict[str, Any]) -> None:
             os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
             descriptor = -1
-            stream.write(json.dumps(record, sort_keys=True) + "\\n")
+            stream.write(json.dumps(record, sort_keys=True) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
     finally:
