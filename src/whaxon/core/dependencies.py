@@ -56,7 +56,10 @@ def load_dependency_manifest() -> dict[str, Any]:
             or not isinstance(entry.get("version_regex"), str)
         ):
             raise ValueError("dependency manifest contains an invalid external-tool probe")
-        re.compile(entry["version_regex"])
+        try:
+            re.compile(entry["version_regex"])
+        except re.error as exc:
+            raise ValueError("dependency manifest contains an invalid version regex") from exc
         external_ids.add(entry["id"])
     return raw
 
