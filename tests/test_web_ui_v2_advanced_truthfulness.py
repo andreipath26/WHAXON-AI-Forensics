@@ -31,7 +31,7 @@ def test_compliance_workspace_filters_and_exports_only_recorded_findings(page, l
     search = panel.get_by_role("searchbox", name="Filter framework crosswalk")
     assert search.is_visible()
     search.fill("no-such-record-should-match")
-    assert (\n        "No findings match this filter" in panel.inner_text()\n        or "No recorded findings are available" in panel.inner_text()\n    )
+    assert any(message in panel.inner_text() for message in ("No findings match this filter", "No recorded findings are available"))
     export = panel.get_by_role("button", name="Export crosswalk JSON")
     assert export.is_enabled()
     with page.expect_download() as download_info:
