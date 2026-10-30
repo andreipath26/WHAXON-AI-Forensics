@@ -79,7 +79,7 @@ class DependencyResult:
     remediation: str = ""
 
 
-def _version_tuple(value: str) -> tuple[int, ...]:
+def _version_tuple(value: str) -> tuple[int, tuple[int, ...], int, int]:
     """Compare common PEP 440 release/prerelease forms without string coercion.
 
     Local build labels do not affect the minimum-version decision. Unknown
@@ -108,7 +108,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
         "": 1,
         "post": 2,
     }[label]
-    return (int(match.group(1) or 0), *release, stage, number)
+    return (int(match.group(1) or 0), tuple(release), stage, number)
 
 
 def _package_result(dist: str, import_name: str, minimum: str, *, required: bool,
