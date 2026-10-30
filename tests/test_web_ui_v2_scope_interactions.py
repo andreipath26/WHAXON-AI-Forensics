@@ -350,3 +350,35 @@ def test_scope_preflight_verdict_is_cleared_when_checked_target_changes(page, li
     assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
     assert "bg-outline" in page.locator("#scopePreflightIndicator").get_attribute("class")
     assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
+
+
+def test_scope_preflight_ignores_response_after_target_changes(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    page.evaluate("""() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (url, options) => {
+        if (url === "/api/scope/check") {
+          return new Promise(resolve => {
+            window.__resolvePendingScopeCheck = () => resolve(new Response(
+              JSON.stringify({allowed: true, reason: "matched configured rule"}),
+              {status: 200, headers: {"Content-Type": "application/json"}}
+            ));
+          });
+        }
+        return originalFetch(url, options);
+      };
+    }""")
+    target = page.locator("#scopeCheckTarget")
+    target.fill("127.0.0.1")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'CHECKING…'",
+        timeout=5000,
+    )
+    target.fill("127.0.0.2")
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    page.evaluate("() => window.__resolvePendingScopeCheck()")
+    page.wait_for_timeout(50)
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
