@@ -137,21 +137,21 @@
 <!-- Tool Filter -->
 <div class="flex items-center bg-surface-container-lowest px-2 py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline uppercase mr-1.5">TOOL:</span>
-<select id="history-tool-filter" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-pointer">
+<select id="history-tool-filter" aria-label="Filter history by tool" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-pointer">
 <option value="all">All recorded tools</option>
 </select>
 </div>
 <!-- Date Filter -->
 <div class="flex items-center bg-surface-container-lowest px-2 py-1 rounded">
 <span class="material-symbols-outlined text-xs text-outline mr-1">calendar_today</span>
-<select id="history-date-filter" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-not-allowed" disabled title="Date filtering is unavailable because the history API does not record timestamps">
+<select id="history-date-filter" aria-label="Date filter unavailable because timestamps are not recorded" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-not-allowed" disabled title="Date filtering is unavailable because the history API does not record timestamps">
 <option value="unavailable">Date filter unavailable (timestamps not recorded)</option>
 </select>
 </div>
 <!-- Mode Selector -->
 <div class="flex items-center bg-surface-container-lowest px-2 py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline uppercase mr-1.5">RUNNER:</span>
-<select id="history-runner-filter" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-not-allowed" disabled title="Runner mode filtering is unavailable because the history API does not record runner mode">
+<select id="history-runner-filter" aria-label="Runner filter unavailable because runner mode is not recorded" class="bg-transparent font-code-sm text-code-sm text-on-surface focus:outline-none cursor-not-allowed" disabled title="Runner mode filtering is unavailable because the history API does not record runner mode">
 <option value="unavailable">Runner mode unavailable (not recorded)</option>
 </select>
 </div>
