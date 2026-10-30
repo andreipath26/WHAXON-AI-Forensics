@@ -411,6 +411,8 @@ def test_scope_save_locks_mutation_controls_until_api_response(page, live_server
     assert page.locator("#openImportDrawerBtn").is_disabled()
     assert page.locator("#runScopeCheckBtn").is_disabled()
     assert page.locator("#openTargetModalBtn").is_disabled()
+    assert page.locator("#targetTableBody button[data-scope-mutation]").count() >= 1
+    assert page.locator("#targetTableBody button[data-scope-mutation]").first.is_disabled()
 
     page.evaluate("() => window.__resolveScopeSave()")
     page.wait_for_function(
@@ -420,3 +422,44 @@ def test_scope_save_locks_mutation_controls_until_api_response(page, live_server
     assert page.locator("#saveTargetBtn").is_enabled()
     assert page.locator("#openImportDrawerBtn").is_enabled()
     assert page.locator("#runScopeCheckBtn").is_enabled()
+
+
+def test_scope_failed_save_restores_mutation_controls_and_keeps_live_config(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"scope persistence unavailable"}',
+        ) if route.request.method == "POST" else route.continue_(),
+    )
+    page.locator("#openTargetModalBtn").click()
+    page.locator("#modalTargetInput").fill("scope-save-failure.example.invalid")
+    page.locator("#authConfirmCheckbox").check()
+    page.locator("#saveTargetBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('scope persistence unavailable')",
+        timeout=5000,
+    )
+    assert page.locator("#saveTargetBtn").is_enabled()
+    assert page.locator("#openImportDrawerBtn").is_enabled()
+    assert page.locator("#runScopeCheckBtn").is_enabled()
+    assert _read_scope(page) == before
+    assert "scope-save-failure.example.invalid" not in _read_scope(page)["in_scope"]
+
+
+def test_scope_import_rejects_incomplete_scope_json_without_clearing_exclusions(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    page.locator("#openImportDrawerBtn").click()
+    page.locator("#importDrawer textarea").fill(json.dumps({
+        "engagement": "incomplete import",
+        "in_scope": ["scope-import-incomplete.example.invalid"],
+    }))
+    page.locator("#executeImportBtn").click()
+    assert "both in_scope and out_of_scope lists" in page.locator("#scope-ui-notice").inner_text()
+    assert _read_scope(page) == before
