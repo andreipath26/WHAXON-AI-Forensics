@@ -145,6 +145,8 @@ def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch
         def __init__(self, data_dir):
             self.bus = EventBus()
             self.store = JobStore(Path(data_dir) / "whaxon.db")
+            # A one-shot run must not silently drain work left by an older run.
+            self.store.create_pending("older-pending-job", "nikto", "older.example.com:443")
             self.catalog = FakeCatalog()
             self.scope = None
             self.runner = FakeRunner(self.bus, self.store)
@@ -177,11 +179,12 @@ def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch
 
     core = cores[0]
     history = core.store.history(limit=10)
-    by_tool = {job["tool"]: job for job in history}
-    assert set(by_tool) == {"nmap", "nikto"}
-    assert by_tool["nmap"]["status"] == "finished"
-    assert by_tool["nikto"]["status"] == "finished"
-    assert by_tool["nikto"]["target"] == "burpbountylab.com:80"
+    by_target = {job["target"]: job for job in history}
+    assert by_target["burpbountylab.com"]["tool"] == "nmap"
+    assert by_target["burpbountylab.com"]["status"] == "finished"
+    assert by_target["burpbountylab.com:80"]["tool"] == "nikto"
+    assert by_target["burpbountylab.com:80"]["status"] == "finished"
+    assert by_target["older.example.com:443"]["status"] == "pending"
     assert [item[0] for item in core.runner.executed] == ["nmap", "nikto"]
     output = capsys.readouterr().out
     assert "job: initial-nmap-job" in output
