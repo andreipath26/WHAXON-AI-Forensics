@@ -182,6 +182,12 @@ def _harden_draft(draft: dict, source_url: str) -> None:
     hunting = draft.setdefault("hunting_requirements", {})
     if hunting.get("automated_scanners") == "limited":
         hunting["automated_scanners"] = "unknown"
+    # Do not infer permission, disclosure rights, or eligibility from silence.
+    hunting["disclosure_allowed"] = False
+    hunting["first_reporter_wins"] = False
+    account = draft.setdefault("account_access", {})
+    account["mode"] = "unknown"
+    account["vpn_required"] = True
     tools = draft.setdefault("tools", {})
     tools["mode"] = "allowlist"
     tools["allowlist"] = []
@@ -194,6 +200,24 @@ def _harden_draft(draft: dict, source_url: str) -> None:
         "require_human_confirm": True,
     })
 
+
+def _review_status(draft: dict) -> dict[str, str]:
+    scope = draft.get("scope") or {}
+    reward = draft.get("reward_model") or {}
+    identity = draft.get("identity") or {}
+    hunting = draft.get("hunting_requirements") or {}
+    return {
+        "scope.in_scope": "extracted_requires_confirmation" if scope.get("in_scope") else "missing",
+        "scope.out_of_scope": "manual_review_required_not_extracted",
+        "rate_limits": "manual_review_required_not_extracted",
+        "account_access_and_vpn": "manual_review_required_not_extracted",
+        "automated_scanner_permissions": "extracted_requires_confirmation" if hunting.get("automated_scanners") == "forbidden" else "manual_review_required",
+        "disclosure_permission": "manual_review_required_not_assumed",
+        "qualifying_vulnerability_classes": "manual_review_required_not_extracted",
+        "non_qualifying_vulnerability_classes": "manual_review_required_not_extracted",
+        "reward_grid": "extracted_requires_confirmation" if reward.get("grid") else "missing",
+        "required_user_agent": "extracted_requires_confirmation" if identity.get("user_agent_suffix") else "manual_review_required",
+    }
 
 def ingest_yeswehack_url(url: str) -> dict:
     """Fetch a public program page and return an unapproved, provenance-rich draft."""
@@ -221,6 +245,7 @@ def ingest_yeswehack_url(url: str) -> dict:
         "status": "draft_requires_review",
         "policy_draft": draft,
         "evidence": evidence,
+        "review": _review_status(draft),
         "source": {
             "url": final_url,
             "retrieved_at": datetime.now(UTC).isoformat(),
