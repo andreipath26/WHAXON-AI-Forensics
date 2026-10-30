@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from whaxon.core.dependencies import load_dependency_manifest
+from whaxon.core.dependencies import load_dependency_manifest, _version_tuple
 from whaxon.core.remediation import build_remediation_plan
 
 INSTALL_TIMEOUT_SECONDS = 900
@@ -67,7 +67,8 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
         raise ValueError("Dependency is not an allowlisted Python package.")
     requirement = f"{entry['id']}>={entry['minimum_version']}"
     argv = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
-            "--no-input", requirement]
+            "--no-input", "--only-binary=:all:", "--index-url",
+            "https://pypi.org/simple", requirement]
     operation_id = str(uuid.uuid4())
     started = datetime.now(timezone.utc).isoformat()
     base = {
@@ -82,6 +83,7 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
         "privilege_escalation": False,
         "shell": False,
     }
+    _append_audit({**base, "status": "STARTED"})
     try:
         completed = subprocess.run(
             argv, shell=False, check=False, capture_output=True, text=True,
@@ -109,8 +111,11 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
     try:
         version = importlib.metadata.version(entry["id"])
         importlib.import_module(entry.get("import_name", entry["id"]))
-        verified = True
-        verification_reason = "Installed distribution metadata and import check succeeded."
+        verified = _version_tuple(version) >= _version_tuple(entry["minimum_version"])
+        verification_reason = (
+            "Installed distribution meets the minimum version and import check succeeded."
+            if verified else "Installed version is below the declared minimum."
+        )
     except Exception as exc:
         version = None
         verified = False
