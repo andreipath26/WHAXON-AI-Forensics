@@ -26,6 +26,7 @@ def main(args: list[str] | None = None) -> int:
     report = collect_dependency_report(
         data_dir=ns.data,
         include_optional=not ns.core_only,
+        include_external=not ns.core_only,
     )
     if ns.check:
         matches = [d for d in report["dependencies"] if d["id"] == ns.check]
