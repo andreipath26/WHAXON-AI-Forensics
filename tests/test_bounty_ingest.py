@@ -65,6 +65,9 @@ High
     assert result["policy_draft"]["tools"]["mode"] == "allowlist"
     assert result["policy_draft"]["tools"]["allowlist"] == []
     assert result["policy_draft"]["ai_policy"]["allow_live_requests"] is False
+    assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
+    assert result["policy_draft"]["account_access"]["vpn_required"] is True
+    assert result["review"]["scope.out_of_scope"] == "manual_review_required_not_extracted"
     assert result["policy_draft"]["slug"] == "example-program"
     assert any("not proof of authorization" in item for item in result["warnings"])
     assert "saved" in result["warnings"][-1]
