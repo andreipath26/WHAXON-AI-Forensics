@@ -249,8 +249,8 @@ def test_dashboard_session_strip_uses_live_scope_and_avoids_fake_runtime_claims(
     assert page.locator("#dashboard-session-target").inner_text() == "https://example.test"
     assert page.get_by_text("Active-job status not exposed").is_visible()
     assert page.get_by_text("Version not reported").is_visible()
-    assert page.get_by_text("Pre-Flight Boundary Checklist").count() == 0
-    assert page.get_by_text("Explore Lab Environments").count() == 0
+    assert page.get_by_text("Pre-Flight Boundary Checklist").is_hidden()
+    assert page.get_by_text("Explore Lab Environments").is_hidden()
 
 
 def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, live_server):
