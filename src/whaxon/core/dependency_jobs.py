@@ -77,6 +77,20 @@ def get_install_operation(data_dir: Path, operation_id: str) -> dict[str, Any] |
         raise RuntimeError("dependency operation state is unreadable") from exc
     if state.get("operation_id") != operation_id:
         raise RuntimeError("dependency operation state identity mismatch")
+    if state.get("status") in {"QUEUED", "INSTALLING", "VERIFYING"}:
+        try:
+            updated = datetime.fromisoformat(state["updated_at"])
+            stale = (datetime.now(UTC) - updated).total_seconds() > 90
+        except (KeyError, TypeError, ValueError):
+            stale = True
+        if stale:
+            state.update({
+                "status": "INTERRUPTED",
+                "step": "INTERRUPTED",
+                "message": "No worker heartbeat was received; run doctor to verify the environment before retrying.",
+                "updated_at": _now(),
+            })
+            _write_state(path, state)
     return state
 
 
@@ -85,6 +99,8 @@ def _claim_dependency_lock(operations: Path, dependency_id: str, operation_id: s
     if lock_path.exists():
         try:
             previous_id = lock_path.read_text(encoding="utf-8").strip()
+            if not _OPERATION_ID.fullmatch(previous_id):
+                raise ValueError("invalid operation ID in lock file")
             previous_path = operations / f"{previous_id}.json"
             previous = json.loads(previous_path.read_text(encoding="utf-8"))
             updated = datetime.fromisoformat(previous["updated_at"])
@@ -154,6 +170,7 @@ def start_install_operation(
         "created_at": _now(),
         "updated_at": _now(),
         "cancel_requested": False,
+        "worker_pid": os.getpid(),
     }
     try:
         _write_state(state_path, state)
