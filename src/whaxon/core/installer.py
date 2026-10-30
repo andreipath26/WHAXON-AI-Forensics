@@ -48,11 +48,6 @@ def _append_audit(record: dict[str, Any]) -> None:
 
 def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) -> dict[str, Any]:
     """Install exactly one manifest-declared Python package after plan-ID approval."""
-    if sys.prefix == getattr(sys, "base_prefix", sys.prefix):
-        raise ValueError(
-            "Automatic Python-package installation requires an active virtual environment. "
-            "Create and activate a venv, then run doctor and review a fresh plan."
-        )
     plan = build_remediation_plan(dependency_ids=[dependency_id])
     if plan["unknown_dependency_ids"]:
         raise ValueError(f"Unknown dependency: {dependency_id}")
@@ -64,6 +59,11 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
     options = actions[0]["options"]
     if len(options) != 1 or options[0]["kind"] != "python-package":
         raise ValueError("No supported automated installation is available for this dependency.")
+    if sys.prefix == getattr(sys, "base_prefix", sys.prefix):
+        raise ValueError(
+            "Automatic Python-package installation requires an active virtual environment. "
+            "Create and activate a venv, then run doctor and review a fresh plan."
+        )
 
     manifest = load_dependency_manifest()
     entry = next((item for item in manifest["dependencies"] if item["id"] == dependency_id), None)
