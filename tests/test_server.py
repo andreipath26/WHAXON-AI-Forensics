@@ -782,3 +782,23 @@ def test_dependency_snapshot_history_and_drift_endpoints(tmp_path, monkeypatch):
     after = client.get("/api/dependencies/drift")
     assert after.status_code == 200
     assert after.get_json()["baseline_available"] is True
+
+
+def test_dependency_verify_endpoint_is_explicit_and_non_installing(
+    tmp_path, monkeypatch
+):
+    import whaxon.core.dependencies as dependencies
+
+    calls = []
+    original = dependencies.collect_dependency_report
+
+    def collect(**kwargs):
+        calls.append(kwargs)
+        return original(**kwargs)
+
+    monkeypatch.setattr(dependencies, "collect_dependency_report", collect)
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post("/api/dependencies/verify")
+    assert response.status_code == 200
+    assert calls[-1]["verify_external"] is True
+    assert response.get_json()["safety"]["installation_attempted"] is False
