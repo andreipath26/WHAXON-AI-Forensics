@@ -256,6 +256,7 @@ def test_scope_preflight_status_distinguishes_blocked_target(page, live_server):
         timeout=5000,
     )
     assert "BLOCKED" in page.locator("#scopeCheckResult").inner_text()
+    assert "bg-error" in page.locator("#scopePreflightIndicator").get_attribute("class")
 
 
 def test_scope_preflight_status_reports_api_error(page, live_server):
