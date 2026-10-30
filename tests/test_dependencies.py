@@ -95,3 +95,16 @@ def test_external_version_probe_failure_is_not_ready(tmp_path, monkeypatch):
     )
     nmap = next(d for d in report["dependencies"] if d["id"] == "nmap")
     assert nmap["status"] == "BROKEN"
+
+
+def test_unsupported_python_runtime_blocks_core(monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    monkeypatch.setattr(dependencies.platform, "python_version", lambda: "3.10.14")
+    report = dependencies.collect_dependency_report(
+        include_optional=False,
+        include_external=False,
+    )
+    runtime = next(item for item in report["dependencies"] if item["id"] == "python")
+    assert runtime["status"] == "INCOMPATIBLE"
+    assert report["overall_status"] == "BLOCKED"
