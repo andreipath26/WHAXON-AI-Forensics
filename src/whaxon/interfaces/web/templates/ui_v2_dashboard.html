@@ -787,7 +787,7 @@
     document.querySelectorAll("h2").forEach(h => {
       const title = textOf(h);
       if (title === "Explore Lab Environments") {
-        const card = h.closest(".rounded-lg.bg-surface-container-low") || h.parentElement?.parentElement?.parentElement;
+        const card = h.closest(".group.relative.flex.flex-col.justify-between") || h.closest(".rounded-xl.bg-surface-container-low");
         if (card) card.style.display = "none";
       }
     });
