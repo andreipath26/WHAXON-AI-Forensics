@@ -65,3 +65,21 @@ def test_drift_without_baseline_is_explicit(tmp_path):
 def test_history_limit_is_bounded(tmp_path):
     with pytest.raises(ValueError, match="limit"):
         read_snapshots(tmp_path, limit=101)
+
+
+def test_history_rejects_malformed_json_shape(tmp_path):
+    state_dir = tmp_path / ".whaxon"
+    state_dir.mkdir()
+    (state_dir / "dependency-readiness.json").write_text("[]")
+    with pytest.raises(RuntimeError, match="unsupported schema"):
+        read_snapshots(tmp_path)
+
+
+def test_history_rejects_symlinked_state_file(tmp_path):
+    state_dir = tmp_path / ".whaxon"
+    state_dir.mkdir()
+    outside = tmp_path / "outside.json"
+    outside.write_text('{"schema_version": 1, "snapshots": []}')
+    (state_dir / "dependency-readiness.json").symlink_to(outside)
+    with pytest.raises(ValueError, match="must not be a symlink"):
+        read_snapshots(tmp_path)
