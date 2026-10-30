@@ -203,3 +203,7 @@ def test_untrusted_catalog_cannot_redirect_curated_probe(tmp_path, monkeypatch):
     assert item["status"] == "DETECTED"
     assert "no trusted version probe" in item["reason"].lower()
     assert calls == []
+
+def test_version_comparison_honours_epochs():
+    from whaxon.core.dependencies import _version_tuple
+    assert _version_tuple("2!1.0") > _version_tuple("1!99.0")
