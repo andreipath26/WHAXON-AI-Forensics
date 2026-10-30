@@ -181,3 +181,17 @@ def test_scope_dialogs_support_escape_and_restore_focus(page, live_server):
     page.keyboard.press("Escape")
     assert page.locator("#importDrawer").is_hidden()
     assert import_trigger.evaluate("(el) => el === document.activeElement")
+
+
+def test_scope_text_inputs_have_accessible_names(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    assert page.get_by_role("textbox", name="Filter configured scope rules").is_visible()
+    assert page.get_by_role("textbox", name="Check a target against the active scope").is_visible()
+    page.locator("#openTargetModalBtn").click()
+    assert page.get_by_role(
+        "textbox", name="Authorized target hostname, IP address, or CIDR"
+    ).is_visible()
+    page.keyboard.press("Escape")
+    page.locator("#openImportDrawerBtn").click()
+    assert page.get_by_role("textbox", name="Paste scope JSON definition").is_visible()

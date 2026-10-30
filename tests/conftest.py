@@ -127,6 +127,17 @@ def _seed(data_dir: Path) -> None:
         "ai_source": "rules",
     }))
 
+    # Dedicated UI acceptance run: legacy approval tests may answer seed-ai-run.
+    # This isolated identifier keeps the UI test independent of test ordering.
+    store.create_ai_run("seed-ai-approval-ui", "UI acceptance: operator approval",
+                        provider="rules", phase="recon", owner="local")
+    store.set_ai_run_waiting("seed-ai-approval-ui", _json.dumps({
+        "rationale": "UI acceptance requires an operator decision.",
+        "confidence": 0.9,
+        "proposed_phase": "enumeration",
+        "ai_source": "rules",
+    }))
+
 
 @pytest.fixture(scope="session")
 def live_server(tmp_path_factory):
