@@ -5,8 +5,8 @@ changes PATH, elevates privileges, or executes commands from manifests.
 """
 from __future__ import annotations
 
-import importlib.util
 import importlib.metadata
+import importlib.util
 import json
 import os
 import platform
@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
+
+
 def load_dependency_manifest() -> dict[str, Any]:
     """Load and minimally validate the packaged dependency manifest."""
     path = Path(__file__).resolve().parents[1] / "data" / "dependencies.json"
@@ -72,7 +74,7 @@ def _package_result(dist: str, import_name: str, minimum: str, *, required: bool
     except Exception as exc:  # metadata providers can fail in broken environments
         return DependencyResult(
             dist, dist, "python-package", required, "BROKEN",
-            required_version=f">={minimum}", capabilities=(capability,),
+            required_version=f">={minimum}", capabilities=capabilities,
             reason=f"Package metadata could not be read ({type(exc).__name__}).",
         )
     if _version_tuple(version) < _version_tuple(minimum):
