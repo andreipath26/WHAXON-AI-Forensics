@@ -148,13 +148,9 @@
 <div class="flex items-center gap-space-xs">
 <select id="run-tool-select" aria-label="WHAXON tool" class="max-w-[13rem] bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40"><option value="">Loading available tools…</option></select>
 <input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-secondary font-mono" placeholder="Authorized target host or URL" type="text" id="run-target-input" value=""/>
-<button id="run-passive-btn" class="flex items-center gap-1 px-space-sm py-1 bg-secondary hover:bg-secondary-container text-on-secondary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
-<span class="material-symbols-outlined text-sm">bolt</span>
-<span>Run Selected Tool</span>
-</button>
 <button id="run-active-btn" class="flex items-center gap-1 px-space-sm py-1 bg-primary-container hover:bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
 <span class="material-symbols-outlined text-sm">play_arrow</span>
-<span>Start Selected Tool</span>
+<span>Run Selected Tool</span>
 </button>
 </div>
 <div class="flex items-center justify-between text-code-sm text-on-surface-variant font-mono bg-surface-container-lowest px-space-sm py-1 rounded">
@@ -702,6 +698,33 @@
     } catch (error) { say("Cancellation failed: " + error.message, false); }
   }
   function clearLog() { stdout?.replaceChildren(); }
+  function removeStaticDemoState() {
+    // Reference-screen sample telemetry is illustrative, not a live WHAXON session.
+    const byText = (selector, value) => [...document.querySelectorAll(selector)]
+      .find(node => node.textContent.trim() === value);
+    byText("span", "Session Token")?.parentElement?.remove();
+    byText("span", "Workers")?.parentElement?.remove();
+    byText("span", "PTES: ENUM_ACTIVE")?.remove();
+    const passiveChecks = [...document.querySelectorAll('input[type="checkbox"]')]
+      .filter(input => /DNS \(A\/AAAA\/MX\/NS\/SOA\)|SSL Cert & SAN Discovery/.test(input.parentElement?.textContent || ""));
+    passiveChecks[0]?.closest("div.grid.grid-cols-2")?.parentElement?.remove();
+    byText("span", "ThreadPoolExecutor")?.closest(".bg-surface-container-lowest")?.remove();
+    for (const sample of ["Nmap 7.94", "Nuclei v3.2.0"]) {
+      byText("span", sample)?.closest("div.bg-surface-container-low.rounded-lg")?.remove();
+    }
+    const phase = byText("h3", "Phase 0: Passive Reconnaissance Stage");
+    if (phase) phase.textContent = "Live Tool Dispatch";
+    const engine = [...document.querySelectorAll("span")]
+      .find(node => node.textContent.includes("CLI:") && node.textContent.includes("core.recon"));
+    engine?.parentElement?.remove();
+    document.querySelectorAll("input[type=checkbox]").forEach(input => {
+      if (!input.disabled && input.id !== "ai-planner-toggle") {
+        input.disabled = true;
+        input.title = "This illustrative pipeline control is not connected to a live dispatcher.";
+      }
+    });
+  }
+
   function disableFakeControls() {
     // These template controls imply unsupported multi-tool orchestration or payload injection.
     document.querySelectorAll("[onclick]").forEach(element => element.removeAttribute("onclick"));
@@ -752,7 +775,6 @@
       }
     });
   }
-  $("run-passive-btn")?.addEventListener("click", startJob);
   $("run-active-btn")?.addEventListener("click", startJob);
   $("btn-pause")?.addEventListener("click", cancelJob);
   $("cli-input")?.addEventListener("keydown", event => {
@@ -818,6 +840,7 @@
     }
   }
   reflectLiveScopeHeader();
+  removeStaticDemoState();
   disableFakeControls();
   clearLog();
   line("No job output yet. This panel will show events returned by the live WHAXON runner.", "whaxon.web");
