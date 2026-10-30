@@ -1,7 +1,8 @@
 """Read-only dependency detection and capability readiness for WHAXON.
 
-This first implementation deliberately diagnoses only. It never installs,
-changes PATH, elevates privileges, or executes commands from manifests.
+This module only inspects the active runtime, installed distributions and
+external-tool catalog. Installation is handled by a separate consent-gated
+module; diagnostics never mutate the environment or invoke package managers.
 """
 from __future__ import annotations
 
