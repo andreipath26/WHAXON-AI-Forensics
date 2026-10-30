@@ -70,8 +70,10 @@ High
     assert ai["allow_live_requests"] is False
     assert "scope_expansion_or_ambiguous_scope" in ai["human_approval_required_for"]
     assert "draft_report_preparation" in ai["post_approval_autonomous_actions"]
-    assert result["policy_draft"]["authorization_status"] == "pending_review"
-    assert result["policy_draft"]["execution_enabled"] is False
+    assert ai["activation"] == "pending_review"
+    assert ai["execution_enabled"] is False
+    from whaxon.core.program_policy import validate_policy
+    validate_policy(result["policy_draft"])
     assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
     assert result["policy_draft"]["account_access"]["vpn_required"] is True
     assert result["review"]["scope.out_of_scope"] == "manual_review_required_not_extracted"
