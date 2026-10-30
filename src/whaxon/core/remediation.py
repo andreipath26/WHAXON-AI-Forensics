@@ -15,13 +15,8 @@ PLAN_SCHEMA_VERSION = 1
 
 
 def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
-    extra = entry.get("extra")
-    if extra:
-        requirement = f"whaxon[{extra}]"
-        description = f"Install the documented WHAXON {extra} extra in the active interpreter."
-    else:
-        requirement = f"{entry['id']}>={entry['minimum_version']}"
-        description = f"Install or upgrade {entry['id']} in the active interpreter."
+    requirement = f"{entry['id']}>={entry['minimum_version']}"
+    description = f"Install or upgrade {entry['id']} in the active interpreter."
     argv = [sys.executable, "-m", "pip", "install", requirement]
     return {
         "id": f"pip:{entry['id']}",
