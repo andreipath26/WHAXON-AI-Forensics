@@ -194,3 +194,23 @@ def test_findings_kpi_bars_match_live_report_counts(page, live_server):
     assert abs(candidate_width - expected_candidate) < 0.1
     assert page.locator("#whaxon-kpi-fixed-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
     assert page.locator("#whaxon-kpi-vulnerable-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
+
+
+def test_findings_list_uses_only_records_from_live_report(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/findings")
+    assert response is not None
+    html = response.text()
+    assert "SQLi: Time-based Blind" not in html
+    assert "Stored Cross-Site Scripting" not in html
+    assert "BOLA Authorization Bypass" not in html
+    assert "DB_PASSWORD=" not in html
+    assert "OP//7749-ALPHA" not in html
+    assert "KERNEL-SEC" not in html
+    template = page.locator("#finding-card-template")
+    assert template.count() == 1
+    assert template.is_hidden()
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
+        timeout=5000,
+    )
+    assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
