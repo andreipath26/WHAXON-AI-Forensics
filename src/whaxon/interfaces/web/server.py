@@ -1567,6 +1567,24 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify({"error": f"dependency diagnostics failed ({type(exc).__name__})"}), 500
         return jsonify(report)
 
+    @app.post("/api/dependencies/verify")
+    @limiter.limit("10 per minute")
+    def api_dependencies_verify_post():
+        """Run curated, bounded external-tool version probes without installing anything."""
+        from whaxon.core.dependencies import collect_dependency_report
+
+        try:
+            report = collect_dependency_report(
+                data_dir=Path(core.data_dir),
+                include_optional=True,
+                include_external=True,
+                verify_external=True,
+            )
+        except Exception as exc:
+            app.logger.exception("Dependency verification failed")
+            return jsonify({"error": f"dependency verification failed ({type(exc).__name__})"}), 500
+        return jsonify(report)
+
     @app.get("/api/dependencies/history")
     def api_dependencies_history_get():
         """Return recent locally persisted dependency readiness snapshots."""
