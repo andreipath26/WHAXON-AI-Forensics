@@ -90,6 +90,7 @@ def test_scope_check_button_calls_live_scope_api(page, live_server):
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=5000,
     )
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
     page.locator("#scopeCheckTarget").fill("127.0.0.1")
     with page.expect_response(
         lambda response: response.request.method == "POST" and response.url.endswith("/api/scope/check")
@@ -100,6 +101,7 @@ def test_scope_check_button_calls_live_scope_api(page, live_server):
         "() => document.querySelector('#scopeCheckResult')?.textContent.includes('ALLOWED')",
         timeout=5000,
     )
+    assert page.locator("#scopePreflightStatus").inner_text() == "LAST CHECK: ALLOWED"
 
 def test_scope_rules_remain_editable_after_enforcement_is_disabled(page, live_server):
     page.goto(f"{live_server}/ui-v2/scope")
