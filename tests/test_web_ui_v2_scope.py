@@ -303,16 +303,16 @@ def test_scope_registry_labels_do_not_overstate_assets_ports_or_authorization(pa
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=8000,
     )
-    body = page.locator("body").text_content()
-    assert "In-Scope Rules" in body
-    assert "CIDR Rules" in body
-    assert "Total In-Scope Assets" not in body
-    assert "Discovery Mode" not in body
-    assert "Allowed Ports" not in body
-    assert "Authorization Record" in body
-    assert "No evidence stored by scope API" in body
-    assert "Explicit Exclusions" in body
-    assert "Strict Deny Rules" not in body
+    body = page.locator("body").inner_text()
+    assert "IN-SCOPE RULES" in body
+    assert "CIDR RULES" in body
+    assert "TOTAL IN-SCOPE ASSETS" not in body
+    assert "DISCOVERY MODE" not in body
+    assert "ALLOWED PORTS" not in body
+    assert "AUTHORIZATION RECORD" in body
+    assert "NO EVIDENCE STORED BY SCOPE API" in body
+    assert "EXPLICIT EXCLUSIONS" in body
+    assert "STRICT DENY RULES" not in body
 
 def test_scope_registry_edits_and_persists_existing_rules(page, live_server):
     page.goto(f"{live_server}/ui-v2/scope")
