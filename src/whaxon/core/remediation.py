@@ -15,17 +15,23 @@ from whaxon.core.dependencies import collect_dependency_report, load_dependency_
 PLAN_SCHEMA_VERSION = 1
 
 
-def _python_package_option(
-    entry: dict[str, Any], *, automatic_installation_enabled: bool
-) -> dict[str, Any]:
+def build_python_package_argv(entry: dict[str, Any]) -> list[str]:
+    """Return the exact fixed pip argument vector shown in plans and executed."""
     requirement = f"{entry['id']}>={entry['minimum_version']}"
-    description = f"Install or upgrade {entry['id']} in the active interpreter."
-    argv = [
+    return [
         sys.executable, "-m", "pip", "--isolated", "install",
         "--disable-pip-version-check", "--no-input", "--quiet",
         "--progress-bar", "off", "--only-binary=:all:",
         "--index-url", "https://pypi.org/simple", requirement,
     ]
+
+
+def _python_package_option(
+    entry: dict[str, Any], *, automatic_installation_enabled: bool
+) -> dict[str, Any]:
+    requirement = f"{entry['id']}>={entry['minimum_version']}"
+    description = f"Install or upgrade {entry['id']} in the active interpreter."
+    argv = build_python_package_argv(entry)
     return {
         "id": f"pip:{entry['id']}",
         "kind": "python-package",
