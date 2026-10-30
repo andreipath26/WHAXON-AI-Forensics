@@ -28,6 +28,12 @@ def _history_path(data_dir: Path) -> Path:
     return resolved / "dependency-readiness.json"
 
 
+def _path_fingerprint(value: str | None) -> str | None:
+    if not value:
+        return None
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def _snapshot(report: dict[str, Any]) -> dict[str, Any]:
     if report.get("schema_version") != 1 or not isinstance(report.get("dependencies"), list):
         raise ValueError("unsupported dependency report schema")
@@ -37,7 +43,7 @@ def _snapshot(report: dict[str, Any]) -> dict[str, Any]:
             "id": item["id"],
             "status": item["status"],
             "version": item.get("detected_version"),
-            "path": item.get("detected_path"),
+            "path_fingerprint": _path_fingerprint(item.get("detected_path")),
             "required": bool(item.get("required")),
             "capabilities": list(item.get("capabilities") or []),
         })
@@ -49,7 +55,7 @@ def _snapshot(report: dict[str, Any]) -> dict[str, Any]:
             "os_release": environment.get("os_release"),
             "architecture": environment.get("architecture"),
             "python": environment.get("python"),
-            "python_executable": environment.get("python_executable"),
+            "python_executable_fingerprint": _path_fingerprint(environment.get("python_executable")),
         },
         "dependencies": dependencies,
     }
