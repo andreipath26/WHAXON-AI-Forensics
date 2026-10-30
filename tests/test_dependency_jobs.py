@@ -154,3 +154,11 @@ def test_queue_requires_virtual_environment_before_locking(tmp_path, monkeypatch
         dependency_jobs.start_install_operation("sample", "plan-0123456789abcdef", tmp_path)
     operations = dependency_jobs._operations_dir(tmp_path)
     assert list(operations.iterdir()) == []
+
+
+def test_operation_rejects_malformed_json_shape(tmp_path):
+    operations = dependency_jobs._operations_dir(tmp_path)
+    operation_id = "fedcba9876543210fedcba9876543210"
+    (operations / f"{operation_id}.json").write_text("[]")
+    with pytest.raises(RuntimeError, match="unsupported schema"):
+        dependency_jobs.get_install_operation(tmp_path, operation_id)
