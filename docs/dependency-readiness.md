@@ -11,9 +11,12 @@ whaxon doctor
 whaxon doctor --json
 whaxon doctor --core-only
 whaxon doctor --check python
+whaxon doctor --verify
+whaxon doctor --snapshot
+whaxon doctor --drift
 ```
 
-The JSON report uses schema version 1 and includes the runtime, active interpreter, virtual-environment state, required Python package metadata/import checks, optional Python extras and external executable discovery from the packaged tool catalog.
+The JSON report uses schema version 1 and includes the runtime, active interpreter, virtual-environment state, required Python package metadata/import-resolvability checks, optional Python extras and external executable discovery from the packaged tool catalog. `--verify` runs only the small set of version probes explicitly curated in `src/whaxon/data/dependencies.json`; it does not run arbitrary tool commands or target scans.
 
 ## How to interpret statuses
 
@@ -40,7 +43,19 @@ The packaged source of truth is `src/whaxon/data/dependencies.json`. It currentl
 
 ## Not implemented yet
 
-Remediation planning, OS-specific installation options, explicit per-operation approval, installer execution, transaction recovery, executable version probes, safe smoke tests, persisted readiness history, web API endpoints and the four approved-UI screens are still queued. Do not treat a diagnostic report as an installation plan or as proof that an external tool works.
+The deterministic remediation planner is available with `whaxon doctor --plan`; it produces a plan ID and never executes commands. One manifest-listed Python package can be installed only with `whaxon doctor --install --check ID --approve PLAN_ID`, after a fresh plan has been reviewed. This operation requires an active virtual environment, uses a fixed PyPI index and binary wheels, and records an operation audit.
+
+The CLI also supports `--snapshot` and `--drift`. The local history is bounded to 100 snapshots and stored under `<data-dir>/.whaxon/dependency-readiness.json` with restrictive file permissions where supported. Snapshots omit the current working directory and record only the dependency/environment fields needed for drift detection.
+
+The authenticated web API exposes:
+- `GET /api/dependencies` — read-only diagnostics.
+- `POST /api/dependencies/verify` — explicit curated version probes.
+- `POST /api/dependencies/plan` — read-only plan preview.
+- `POST /api/dependencies/install` — exact plan-ID approved package installation.
+- `POST /api/dependencies/snapshots` and `GET /api/dependencies/history` — local history.
+- `GET /api/dependencies/drift` — compare against the latest snapshot.
+
+External-tool version probes currently cover only entries explicitly configured in the manifest. A version probe is not a full functional smoke test. Other external tools remain DETECTED rather than READY. OS-native installers, offline bundles, complete recovery/rollback, broader external-tool smoke tests and the four approved-UI screens are still outstanding. The UI must not be implemented until the active checked-in UI source is inspected and the exact components/navigation are identified. Do not treat a diagnostic report or version probe as proof that every tool feature works.
 
 
 ## Remediation preview and explicitly approved Python package installs
