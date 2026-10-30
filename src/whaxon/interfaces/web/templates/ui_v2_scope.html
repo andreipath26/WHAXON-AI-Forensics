@@ -41,7 +41,7 @@
 <!-- Card 1: In Scope Assets -->
 <div class="p-space-lg rounded bg-surface-container-low border border-outline-variant/30 flex flex-col justify-between relative overflow-hidden">
 <div class="flex items-center justify-between">
-<span class="font-label-sm text-label-sm uppercase text-outline">Total In-Scope Assets</span>
+<span class="font-label-sm text-label-sm uppercase text-outline">In-Scope Rules</span>
 <span class="material-symbols-outlined text-primary text-lg">domain</span>
 </div>
 <div class="my-space-sm flex items-baseline gap-space-sm">
@@ -56,7 +56,7 @@
 <!-- Card 2: Active Subnets -->
 <div class="p-space-lg rounded bg-surface-container-low border border-outline-variant/30 flex flex-col justify-between">
 <div class="flex items-center justify-between">
-<span class="font-label-sm text-label-sm uppercase text-outline">Active Subnets</span>
+<span class="font-label-sm text-label-sm uppercase text-outline">CIDR Rules</span>
 <span class="material-symbols-outlined text-secondary text-lg">lan</span>
 </div>
 <div class="my-space-sm flex items-baseline gap-space-sm">
@@ -71,7 +71,7 @@
 <!-- Card 3: Exclusions / Dropped -->
 <div class="p-space-lg rounded bg-surface-container-low border border-outline-variant/30 flex flex-col justify-between">
 <div class="flex items-center justify-between">
-<span class="font-label-sm text-label-sm uppercase text-outline">Strict Exclusions</span>
+<span class="font-label-sm text-label-sm uppercase text-outline">Explicit Exclusions</span>
 <span class="material-symbols-outlined text-tertiary text-lg">block</span>
 </div>
 <div class="my-space-sm flex items-baseline gap-space-sm">
@@ -86,7 +86,7 @@
 <!-- Card 4: Scope Enforcement Status -->
 <div class="p-space-lg rounded bg-surface-container-low border border-outline-variant/30 flex flex-col justify-between">
 <div class="flex items-center justify-between">
-<span class="font-label-sm text-label-sm uppercase text-outline">Enforcement Engine</span>
+<span class="font-label-sm text-label-sm uppercase text-outline">Scope Status</span>
 <span class="flex h-2 w-2 relative">
 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
 <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
@@ -125,10 +125,10 @@
 <thead>
 <tr class="bg-surface-container-lowest/80 border-b border-outline-variant/20 font-label-sm text-label-sm uppercase text-outline">
 <th class="py-2.5 px-space-md">Target Domain / CIDR</th>
-<th class="py-2.5 px-space-md">Discovery Mode</th>
-<th class="py-2.5 px-space-md">Allowed Ports</th>
-<th class="py-2.5 px-space-md">Rate Limit</th>
-<th class="py-2.5 px-space-md">Authorization</th>
+<th class="py-2.5 px-space-md">Rule Type</th>
+<th class="py-2.5 px-space-md">Port Policy</th>
+<th class="py-2.5 px-space-md">Rate Policy</th>
+<th class="py-2.5 px-space-md">Authorization Record</th>
 <th class="py-2.5 px-space-md text-right">State</th>
 </tr>
 </thead>
@@ -175,7 +175,7 @@
 <div class="flex items-start justify-between">
 <div class="flex items-center gap-space-xs">
 <span class="material-symbols-outlined text-tertiary text-lg">gavel</span>
-<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Strict Deny Rules</h3>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Explicit Exclusions</h3>
 </div>
 <span class="px-1.5 py-0.5 rounded bg-tertiary/15 text-tertiary border border-tertiary/30 font-label-sm text-label-sm uppercase">Active (8 Rules)</span>
 </div>
@@ -410,7 +410,7 @@
       rate.textContent = "Runner defaults";
       const auth = document.createElement("td");
       auth.className = "py-2.5 px-space-md " + (entry.type === "EXCLUDED" ? "text-error" : "text-on-surface-variant");
-      auth.textContent = entry.type === "EXCLUDED" ? "Denied by scope" : "Operator-configured rule";
+      auth.textContent = entry.type === "EXCLUDED" ? "Excluded by scope" : "No evidence stored by scope API";
       const action = document.createElement("td");
       action.className = "py-2.5 px-space-md text-right";
       const remove = document.createElement("button");
@@ -466,7 +466,7 @@
     if (boundaryStatus) boundaryStatus.textContent = !enforcementEnabled
       ? "SCOPE ENFORCEMENT DISABLED"
       : inScopeCount ? "SCOPE ENFORCEMENT ENABLED" : "NO TARGET RULE CONFIGURED";
-    const denyHeading = [...document.querySelectorAll("h3")].find(el => el.textContent.includes("Strict Deny Rules"));
+    const denyHeading = [...document.querySelectorAll("h3")].find(el => el.textContent.includes("Explicit Exclusions"));
     const denyCard = denyHeading?.closest(".bg-surface-container-low");
     if (denyCard) {
       denyCard.hidden = false;
