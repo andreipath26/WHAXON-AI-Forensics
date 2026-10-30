@@ -697,3 +697,68 @@ def test_network_auth_requires_non_default_bcrypt_credentials(monkeypatch):
         b"password", web_server._bcrypt.gensalt(rounds=11)
     ).decode("utf-8")
     assert not web_server._remote_auth_ready("admin", "", weak_hash)
+
+
+# ------------------------------------------------------- dependency readiness
+
+def test_dependency_diagnostics_endpoint_is_read_only(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/dependencies")
+    assert response.status_code == 200
+    report = response.get_json()
+    assert report["schema_version"] == 1
+    assert report["safety"]["read_only"] is True
+    assert report["safety"]["installation_attempted"] is False
+
+
+def test_dependency_plan_endpoint_validates_input_and_does_not_install(
+    tmp_path, monkeypatch
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    invalid = client.post("/api/dependencies/plan", json={"dependency_ids": "nmap"})
+    assert invalid.status_code == 400
+    response = client.post(
+        "/api/dependencies/plan", json={"dependency_ids": ["python"]}
+    )
+    assert response.status_code == 200
+    plan = response.get_json()
+    assert plan["safety"]["read_only"] is True
+    assert plan["safety"]["commands_executed"] is False
+
+
+def test_dependency_install_endpoint_requires_exact_approval(
+    tmp_path, monkeypatch
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/dependencies/install",
+        json={"dependency_id": "textual", "approved_plan_id": "not-a-plan"},
+    )
+    assert response.status_code == 400
+
+
+def test_dependency_install_endpoint_calls_approved_installer_only(
+    tmp_path, monkeypatch
+):
+    import whaxon.core.installer as installer
+
+    calls = []
+    monkeypatch.setattr(
+        installer,
+        "apply_approved_dependency_plan",
+        lambda dependency_id, approved_plan_id: (
+            calls.append((dependency_id, approved_plan_id))
+            or {"status": "VERIFIED", "operation_id": "test-operation"}
+        ),
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/dependencies/install",
+        json={
+            "dependency_id": "textual",
+            "approved_plan_id": "plan-0123456789abcdef",
+        },
+    )
+    assert response.status_code == 200
+    assert calls == [("textual", "plan-0123456789abcdef")]
