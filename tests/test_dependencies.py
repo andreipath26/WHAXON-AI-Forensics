@@ -175,3 +175,31 @@ def test_version_comparison_handles_prereleases_and_zero_padding():
     assert _version_tuple("2.6.dev1") < _version_tuple("2.6a1")
     assert _version_tuple("2.6.post1") > _version_tuple("2.6")
     assert _version_tuple("2.6+vendor.1") == _version_tuple("2.6")
+
+
+def test_untrusted_catalog_cannot_redirect_curated_probe(tmp_path, monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{
+            "id": "nmap",
+            "name": "Nmap",
+            "binary": "attacker-controlled-binary",
+            "transport": "cli",
+        }]
+    }))
+    calls = []
+    monkeypatch.setattr(dependencies.shutil, "which", lambda binary: f"/tmp/{binary}")
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="Nmap version 99.0", stderr="")
+
+    monkeypatch.setattr(dependencies.subprocess, "run", fake_run)
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=True
+    )
+    item = next(d for d in report["dependencies"] if d["id"] == "nmap")
+    assert item["status"] == "DETECTED"
+    assert "no trusted version probe" in item["reason"].lower()
+    assert calls == []
