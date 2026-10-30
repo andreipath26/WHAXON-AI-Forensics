@@ -19,7 +19,7 @@ The package metadata in `pyproject.toml` currently declares version `1.0.0` and 
 
 Some capabilities remain partial or environment-dependent. In particular, not every web-interface page is backed by a live service: the interaction audit marks individual controls as passing, wired-but-not-yet-browser-verified, mockups, or hidden. See [Web UI interaction audit](docs/WEB_UI_INTERACTION_AUDIT.md) before treating the browser interface as feature-complete.
 
-The dependency-readiness guided installer and URL-based bug-bounty program ingestion are active development workstreams. Their design and/or implementation review should not be mistaken for functionality already shipped on `main`; check the [open pull requests](https://github.com/andreipath26/WHAXON-AI-Forensics/pulls) for their integration status.
+`main` now also includes the dependency-readiness and guided-installation workflow, plus the first safe bug-bounty ingestion slice. The dependency workflow provides read-only diagnostics, environment-bound remediation plans, explicit plan approval, and a restricted installer for manifest-listed Python packages. Bug-bounty ingestion creates review-only program drafts from supported public YesWeHack URLs or pasted text; it does not activate scope, authorize testing, or launch scans. These are bounded first implementations, not claims of complete cross-platform dependency remediation or a fully automated bug-bounty workflow.
 
 ## What WHAXON does
 
@@ -30,6 +30,8 @@ The dependency-readiness guided installer and URL-based bug-bounty program inges
 - **Validates selected findings conservatively.** Deterministic checks cover only defined finding types and request shapes. Unsupported or inconclusive findings remain candidates for analyst review.
 - **Preserves evidence and produces reports.** Stores engagement/job data locally and generates Markdown, HTML, PDF, JSON, and WHAXON-format engagement outputs where supported.
 - **Supports optional AI planning.** Configurable providers can propose actions and next steps. Execution remains bounded by the platform's scope and approval controls; AI output is not itself proof of a vulnerability.
+- **Diagnoses dependency readiness.** Reports required and optional Python packages, selected external-tool availability, environment drift, and reviewable remediation plans. Package installation is restricted to manifest-approved Python packages in an active virtual environment and requires explicit approval of a fresh plan.
+- **Imports bug-bounty program rules for review.** Accepts supported public YesWeHack program URLs or pasted/exported text and extracts draft scope/rule information with source provenance. Imports are not activated policies and do not grant authorization.
 
 ## Finding validation: what the verdicts mean
 
@@ -72,6 +74,8 @@ See [Scope documentation](docs/scope.md) and [Security Policy](SECURITY.md).
 | Desktop UI | `whaxon gui` | PySide6 interface; install the `gui` extra |
 | Web UI | `whaxon web` | Browser interface for local use |
 | Web service | `whaxon serve` | Service launch path; review deployment guidance before network exposure |
+| Diagnostics | `/ui-v2/diagnostics` | Dependency readiness, verification, remediation-plan review and guided install |
+| Bug bounty | Existing Bug Bounty page | Review-only program ingestion; imported data is not automatically activated |
 
 The browser interface is not yet feature-complete across every page. The interaction audit documents which controls are live, wired, mockups, or hidden. The CLI and documented APIs may expose workflows that are not yet represented by a complete browser experience.
 
