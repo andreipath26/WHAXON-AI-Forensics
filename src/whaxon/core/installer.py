@@ -186,7 +186,7 @@ def apply_approved_dependency_plan(
         result = {**base, "status": "INTERRUPTED", "exit_code": None,
                   "output": "Installation interrupted by user.",
                   "recovery": "The package manager may have partially changed the virtual environment. Re-run whaxon doctor and recreate the venv if state is inconsistent.",
-                  "finished_at": datetime.now(timezone.utc).isoformat()}
+                  "finished_at": datetime.now(UTC).isoformat()}
         _finish_audit(result)
         raise
 
