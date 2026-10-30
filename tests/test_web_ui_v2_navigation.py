@@ -39,7 +39,8 @@ def test_dashboard_job_history_filter_has_an_accessible_name(page, live_server):
     )
     assert filter_input.is_visible()
     filter_input.fill("no-such-job")
-    assert page.locator("table tbody").is_visible()
+    assert page.get_by_role("table", name="Recent recorded WHAXON jobs").is_visible()
+    assert page.get_by_text("No job history has been recorded yet.").count() == 0
 
 
 
