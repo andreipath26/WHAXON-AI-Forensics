@@ -10,6 +10,9 @@ def test_scope_page_loads_live_configuration(page, live_server):
         timeout=5000,
     )
     assert page.locator("#targetTableBody tr").count() >= 1
+    assert page.locator("button", has_text="Terminal Log").is_hidden()
+    assert page.locator("button", has_text="Emergency Halt Scan").is_hidden()
+    assert page.get_by_text("Supported Ingestion Formats").is_hidden()
     table_footer = page.locator("#targetTableBody").locator("xpath=ancestor::div[contains(@class, 'overflow-x-auto')]/..").locator("div.p-space-md[class*='bg-surface-container-lowest']")
     assert "LIVE CONFIGURATION" in table_footer.inner_text()
     assert page.locator("#scopeTableStatus").get_attribute("aria-live") == "polite"
