@@ -32,7 +32,7 @@ The versioned JSON report includes runtime details, active interpreter and virtu
 
 ### Status meanings
 
-- `READY`: the declared Python minimum is met and package import succeeds, or the runtime meets the Python minimum.
+- `READY`: the declared Python minimum is met and the package import specification is resolvable, or the runtime meets the Python minimum.
 - `MISSING`: a distribution or executable could not be found.
 - `INCOMPATIBLE`: an installed package or Python runtime is below the declared minimum.
 - `BROKEN`: package metadata/import or a required packaged resource could not be read.
