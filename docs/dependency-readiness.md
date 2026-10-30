@@ -45,7 +45,7 @@ The packaged source of truth is `src/whaxon/data/dependencies.json`. It currentl
 
 The deterministic remediation planner is available with `whaxon doctor --plan`; it produces a plan ID and never executes commands. One manifest-listed Python package can be installed only with `whaxon doctor --install --check ID --approve PLAN_ID`, after a fresh plan has been reviewed. This operation requires an active virtual environment, uses a fixed PyPI index and binary wheels, and records an operation audit.
 
-The CLI also supports `--snapshot` and `--drift`. The local history is bounded to 100 snapshots and stored under `<data-dir>/.whaxon/dependency-readiness.json` with restrictive file permissions where supported. Snapshots omit the current working directory and record only the dependency/environment fields needed for drift detection.
+The CLI also supports `--snapshot` and `--drift`. The local history is bounded to 100 snapshots and stored under `<data-dir>/.whaxon/dependency-readiness.json` with restrictive file permissions where supported. Snapshots omit the current working directory and raw executable paths; paths are represented by one-way fingerprints so drift can be detected without persisting personal directory names.
 
 The authenticated web API exposes:
 - `GET /api/dependencies` — read-only diagnostics.
