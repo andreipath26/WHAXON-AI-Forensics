@@ -454,6 +454,8 @@
     }
     const metricCards = [...document.querySelectorAll("main .grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4 > div")];
     const cidrs = ruleList("in_scope").filter(rule => rule.includes("/")).length;
+    const inScopeCount = ruleList("in_scope").length;
+    const enforcementEnabled = scope.enabled !== false;
     const setMetric = (cardIndex, value, secondary, footerLeft, footerRight) => {
       const card = metricCards[cardIndex];
       if (!card) return;
@@ -494,8 +496,6 @@
         : "WHAXON checks configured scope before runner actions. Use host firewall or network egress controls as an additional boundary.";
     const badge = [...document.querySelectorAll("h2")].find(el => el.textContent.includes("In-Scope Target Registry"))?.parentElement?.querySelector("span");
     if (badge) badge.textContent = rows.length + " rules loaded";
-    const inScopeCount = ruleList("in_scope").length;
-    const enforcementEnabled = scope.enabled !== false;
     const headerTarget = $("scope-header-target");
     if (headerTarget) headerTarget.textContent = "Target: " + (ruleList("in_scope")[0] || "No target configured");
     const membership = $("scope-header-membership");
