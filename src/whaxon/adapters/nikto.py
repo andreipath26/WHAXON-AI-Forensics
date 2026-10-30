@@ -232,6 +232,8 @@ class NiktoAdapter(Adapter):
                 refs.append(see_url)
 
             finding_data = {"path": path, "message": body}
+            if url_match:
+                finding_data["url"] = url_text
             if nikto_id:
                 finding_data["nikto_id"] = nikto_id
             if see_url:
