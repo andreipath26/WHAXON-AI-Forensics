@@ -1088,6 +1088,7 @@
   let latestReport = null;
   let activeOperation = null;
   let activePlan = null;
+  let planRequestSequence = 0;
   const busy = (button, yes, label) => {
     button.disabled = yes;
     if (label) button.textContent = label;
@@ -1173,6 +1174,7 @@
   }
 
   async function createPlan(dependencyId) {
+    const requestSequence = ++planRequestSequence;
     activePlan = null;
     $("dep-plan").hidden = false;
     $("dep-approve-check").checked = false;
@@ -1186,6 +1188,7 @@
         method: "POST",
         body: JSON.stringify({dependency_ids: [dependencyId]})
       });
+      if (requestSequence !== planRequestSequence) return;
       const action = (plan.actions || []).find(item => item.dependency_id === dependencyId);
       if (!action || !action.options?.length) {
         setText("dep-plan-description", "No remediation action is available for this dependency.");
@@ -1213,14 +1216,20 @@
         setText("dep-plan-warning", (option.warning || "") + " No automated install action is enabled.");
       }
     } catch (error) {
-      setText("dep-plan-description", "Could not prepare plan: " + error.message);
+      if (requestSequence === planRequestSequence) {
+        setText("dep-plan-description", "Could not prepare plan: " + error.message);
+      }
     }
   }
 
   $("dep-approve-check").addEventListener("change", () => {
     $("dep-install").disabled = !activePlan || !activePlan.option.automated_execution_supported || !$("dep-approve-check").checked;
   });
-  $("dep-plan-close").addEventListener("click", () => { $("dep-plan").hidden = true; activePlan = null; });
+  $("dep-plan-close").addEventListener("click", () => {
+    planRequestSequence += 1;
+    $("dep-plan").hidden = true;
+    activePlan = null;
+  });
   $("dep-install").addEventListener("click", async () => {
     if (!activePlan || !$("dep-approve-check").checked) return;
     busy($("dep-install"), true, "Queueing…");
@@ -1302,7 +1311,10 @@
       ]);
       const latest = history.snapshots?.[history.snapshots.length - 1];
       setText("dep-history-status", latest
-        ? history.snapshots.length + " snapshot(s). Latest: " + latest.recorded_at + ". Drift from baseline: " + (drift.changed ? "CHANGED" : "NO CHANGE") + "."
+        ? history.snapshots.length + " snapshot(s). Latest: " + latest.recorded_at + ". " +
+          (drift.baseline_available
+            ? "Drift from baseline: " + (drift.changed ? "CHANGED" : "NO CHANGE") + "."
+            : "No comparison baseline was available.")
         : "No saved baseline yet. Save a snapshot to enable drift tracking.");
     } catch (error) {
       setText("dep-history-status", "History unavailable: " + error.message);
