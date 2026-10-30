@@ -728,4 +728,137 @@
  }
 })();
 </script>
+<script id="whaxon-bounty-program-import">
+(function () {
+  "use strict";
+  const panel = document.getElementById("whaxon-live-bug-bounty");
+  if (!panel || document.getElementById("bounty-import-card")) return;
+  const card = document.createElement("section");
+  card.id = "bounty-import-card";
+  card.className = "mt-4 rounded-lg border border-outline-variant/30 bg-surface-container p-space-md";
+  const title = document.createElement("h3");
+  title.className = "font-headline-sm text-on-surface";
+  title.textContent = "Import a public bug-bounty program";
+  const intro = document.createElement("p");
+  intro.className = "mt-1 text-sm text-on-surface-variant";
+  intro.textContent = "Use a public YesWeHack program URL or paste the program rules. After programme approval, the AI can autonomously handle permitted low-impact work; major decisions still require your approval. Import never authorizes or launches testing.";
+  const url = document.createElement("input");
+  url.id = "bounty-import-url";
+  url.type = "url";
+  url.placeholder = "https://yeswehack.com/programs/example";
+  url.setAttribute("aria-label", "Public YesWeHack program URL");
+  url.className = "mt-3 w-full rounded bg-surface-container-lowest px-3 py-2 text-sm";
+  const source = document.createElement("input");
+  source.id = "bounty-import-source-url";
+  source.type = "url";
+  source.placeholder = "Optional source URL for pasted text";
+  source.setAttribute("aria-label", "Source URL for pasted program text");
+  source.className = "mt-2 w-full rounded bg-surface-container-lowest px-3 py-2 text-sm";
+  const text = document.createElement("textarea");
+  text.id = "bounty-import-text";
+  text.rows = 7;
+  text.maxLength = 2097152;
+  text.placeholder = "Or paste/export the program description and policy text here…";
+  text.setAttribute("aria-label", "Pasted program text");
+  text.className = "mt-2 w-full rounded bg-surface-container-lowest px-3 py-2 text-sm font-mono";
+  const submit = document.createElement("button");
+  submit.id = "bounty-import-submit";
+  submit.type = "button";
+  submit.className = "mt-3 rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary";
+  submit.textContent = "Import for review";
+  const status = document.createElement("p");
+  status.id = "bounty-import-status";
+  status.className = "mt-3 text-sm text-on-surface-variant";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  const result = document.createElement("div");
+  result.id = "bounty-import-result";
+  result.className = "mt-3 grid gap-3";
+  card.append(title, intro, url, source, text, submit, status, result);
+  panel.append(card);
+
+  function section(heading, lines) {
+    const wrap = document.createElement("div");
+    wrap.className = "rounded border border-outline-variant/30 p-3";
+    const h = document.createElement("h4");
+    h.className = "text-sm font-semibold text-on-surface";
+    h.textContent = heading;
+    wrap.append(h);
+    const list = document.createElement("ul");
+    list.className = "mt-2 grid gap-1 text-sm text-on-surface-variant";
+    lines.forEach(line => {
+      const li = document.createElement("li");
+      li.textContent = line;
+      list.append(li);
+    });
+    wrap.append(list);
+    return wrap;
+  }
+
+  submit.addEventListener("click", async () => {
+    const programUrl = url.value.trim();
+    const pasted = text.value.trim();
+    const sourceUrl = source.value.trim();
+    result.replaceChildren();
+    if (Boolean(programUrl) === Boolean(pasted)) {
+      status.textContent = "Provide exactly one program URL or pasted program text.";
+      return;
+    }
+    submit.disabled = true;
+    submit.textContent = "Importing…";
+    status.textContent = "Retrieving and parsing the public program information…";
+    try {
+      const payload = programUrl ? {url: programUrl} : {text: pasted, source_url: sourceUrl};
+      const response = await fetch("/api/bounty/import", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Import failed");
+      const policy = data.policy_draft || {};
+      const scope = (policy.scope || {}).in_scope || [];
+      const evidence = data.evidence || [];
+      status.textContent = "Draft extracted. It is NOT saved, approved, or proof of authorization.";
+      result.append(section("Program", [
+        String(policy.title || policy.slug || "Title not extracted"),
+        String(policy.platform || "Platform not identified"),
+        String(scope.length) + " extracted in-scope entries"
+      ]));
+      result.append(section("Extracted scope", scope.map(item =>
+        (item.scope || item) + " · " + (item.type || "type unknown") +
+        " · " + (item.asset_value || "value unknown")
+      ).concat(scope.length ? [] : ["No scope was extracted; policy activation must remain blocked."])));
+      result.append(section("Source evidence (" + evidence.length + " excerpts)", evidence.map(item =>
+        "Line " + item.line + " · " + item.field + " · " + item.excerpt
+      ).concat(evidence.length ? [] : ["No source excerpts were extracted."])));
+      result.append(section("Fields requiring review", Object.entries(data.review || {}).map(([field, state]) =>
+        field + " · " + state
+      )));
+      const aiPolicy = policy.ai_policy || {};
+      result.append(section("AI operating policy", [
+        "Mode: " + (aiPolicy.mode || "not defined"),
+        "Autonomous after approval: " + (aiPolicy.post_approval_autonomous_actions || []).join(", "),
+        "Your approval required for: " + (aiPolicy.human_approval_required_for || []).join(", "),
+        "Activation: " + (policy.authorization_status || "unknown"),
+        "Execution enabled: " + String(policy.execution_enabled === true)
+      ]));
+      result.append(section("Review warnings", (data.warnings || []).concat([
+        "Missing, contradictory, stale or ambiguous rules must be resolved manually."
+      ])));
+      result.append(section("Provenance", [
+        "Source: " + (data.source.url || "pasted text without a source URL"),
+        "Retrieved: " + data.source.retrieved_at,
+        "SHA-256: " + data.source.content_sha256,
+        "Parser: " + data.source.parser + " " + data.source.parser_version
+      ]));
+    } catch (error) {
+      status.textContent = "Import failed: " + error.message;
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "Import for review";
+    }
+  });
+})();
+</script>
 </body></html>

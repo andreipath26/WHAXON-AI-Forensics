@@ -1134,6 +1134,40 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def get_scope():
         return jsonify(registry.core.scope.summary())
 
+    @app.post("/api/bounty/import")
+    @limiter.limit("10 per minute")
+    def import_bounty_program():
+        """Return an unapproved YesWeHack policy draft; never persist or execute it."""
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "JSON object required"}, 400
+        url = data.get("url")
+        pasted_text = data.get("text")
+        source_url = data.get("source_url", "")
+        if url is not None and pasted_text is not None:
+            return {"error": "provide either url or text, not both"}, 400
+        if url is None and pasted_text is None:
+            return {"error": "provide a public YesWeHack url or pasted program text"}, 400
+        if url is not None and (not isinstance(url, str) or not url.strip()):
+            return {"error": "url must be a non-empty string"}, 400
+        if pasted_text is not None and not isinstance(pasted_text, str):
+            return {"error": "text must be a string"}, 400
+        if not isinstance(source_url, str):
+            return {"error": "source_url must be a string"}, 400
+        from whaxon.core.bounty_ingest import (
+            IngestionError,
+            ingest_yeswehack_text,
+            ingest_yeswehack_url,
+        )
+        try:
+            if url is not None:
+                result = ingest_yeswehack_url(url.strip())
+            else:
+                result = ingest_yeswehack_text(pasted_text, source_url=source_url.strip())
+        except IngestionError as exc:
+            return {"error": str(exc)}, 400
+        return jsonify(result), 200
+
     @app.post("/api/scope")
     def save_scope():
         """Validate and persist an operator-edited scope definition."""
