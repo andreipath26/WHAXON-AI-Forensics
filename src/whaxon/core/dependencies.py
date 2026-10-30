@@ -118,7 +118,7 @@ def _package_result(dist: str, import_name: str, minimum: str, *, required: bool
             reason = f"Package metadata exists but import failed ({type(exc).__name__})."
         else:
             status = "READY"
-            reason = "Minimum version is satisfied and package import succeeded."
+            reason = "Minimum version is satisfied and the package import specification is resolvable."
     return DependencyResult(
         dist, dist, "python-package", required, status, version,
         required_version=f">={minimum}", capabilities=capabilities,
@@ -164,6 +164,7 @@ def collect_dependency_report(*, data_dir: Path | None = None,
         "Install Python 3.11 or newer and run WHAXON with that interpreter."
         if py_status != "READY" else "",
     ))
+    manifest: dict[str, Any] | None = None
     try:
         manifest = load_dependency_manifest()
         for entry in manifest["dependencies"]:
@@ -185,7 +186,7 @@ def collect_dependency_report(*, data_dir: Path | None = None,
 
     external_probe_specs = {
         item["id"]: item for item in manifest.get("external_tools", [])
-    } if "manifest" in locals() else {}
+    } if manifest is not None else {}
     catalog_path = (Path(data_dir) / "tools.json") if data_dir else (
         Path(__file__).resolve().parents[1] / "data" / "tools.json"
     )
@@ -196,7 +197,12 @@ def collect_dependency_report(*, data_dir: Path | None = None,
     if include_external and catalog_path.is_file():
         try:
             raw = json.loads(catalog_path.read_text(encoding="utf-8"))
-            for tool in raw.get("tools", []):
+            tools = raw.get("tools") if isinstance(raw, dict) else None
+            if not isinstance(tools, list):
+                raise ValueError("tool catalog must contain a tools list")
+            for tool in tools:
+                if not isinstance(tool, dict):
+                    raise ValueError("tool catalog contains a non-object tool entry")
                 binary = str(tool.get("binary") or "")
                 transport = str(tool.get("transport") or "cli")
                 if not binary or transport != "cli":
