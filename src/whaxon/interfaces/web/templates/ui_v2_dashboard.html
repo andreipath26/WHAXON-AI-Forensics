@@ -633,7 +633,7 @@
     const route = path => { window.location.href = path; };
     const filterInput = [...document.querySelectorAll("input")].find(input => (input.placeholder || "").includes("Filter by ID"));
     if (filterInput) {
-      filterInput.setAttribute("aria-label", "Filter recent job history");
+      filterInput.setAttribute("aria-label", "Filter recent job history by ID, target, or operator");
       filterInput.addEventListener("input", () => {
         const term = filterInput.value.trim().toLowerCase();
         const body = document.querySelector("table tbody");
