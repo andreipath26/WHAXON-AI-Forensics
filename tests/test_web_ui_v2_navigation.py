@@ -31,6 +31,17 @@ def test_ui_v2_entry_route_opens_integrated_interface(page, live_server):
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
 
 
+
+def test_dashboard_job_history_filter_has_an_accessible_name(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    filter_input = page.get_by_role(
+        "textbox", name="Filter job history by ID, target, or operator"
+    )
+    assert filter_input.is_visible()
+    filter_input.fill("no-such-job")
+    assert page.locator("table tbody").is_visible()
+
+
 def test_dashboard_uses_live_state_and_hides_fake_engagements(page, live_server):
     response = page.goto(f"{live_server}/ui-v2")
     assert response is not None and response.status == 200
