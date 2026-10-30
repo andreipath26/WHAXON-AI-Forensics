@@ -184,7 +184,7 @@ def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch
     assert by_target["burpbountylab.com"]["status"] == "finished"
     assert by_target["burpbountylab.com:80"]["tool"] == "nikto"
     assert by_target["burpbountylab.com:80"]["status"] == "finished"
-    assert by_target["older.example.com:443"]["status"] == "pending"
+    assert core.store.get("older-pending-job")["status"] == "pending"
     assert [item[0] for item in core.runner.executed] == ["nmap", "nikto"]
     output = capsys.readouterr().out
     assert "job: initial-nmap-job" in output
