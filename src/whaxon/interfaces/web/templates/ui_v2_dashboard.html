@@ -736,7 +736,7 @@
       filterInput.setAttribute("aria-label", "Filter recent job history by ID, target, or tool");
       filterInput.addEventListener("input", () => {
         const term = filterInput.value.trim().toLowerCase();
-        const body = document.querySelector("table tbody");
+        const body = document.querySelector('table[aria-label="Recent recorded WHAXON jobs"] tbody');
         if (!body) return;
         body.querySelectorAll("tr").forEach(row => {
           const isEmptyMessage = row.textContent.includes("No job history has been recorded");
@@ -839,7 +839,7 @@
     document.querySelectorAll("button").forEach(button => {
       const label = buttonLabel(button);
       if (button.dataset.dashboardWired === "true") return;
-      if (button.classList.contains("dashboard-mobile-menu")) {
+      if (button.classList.contains("dashboard-mobile-menu") || button.classList.contains("dashboard-mobile-nav-backdrop")) {
         // The mobile menu has its own keyboard/focus-aware controller above.
         button.dataset.dashboardWired = "true";
         return;
@@ -922,6 +922,11 @@
 (function () {
   "use strict";
   const canonicalRoutes = {
+    "dashboard-zero-state": "/ui-v2",
+    "scope-and-targets": "/ui-v2/scope",
+    "run-and-orchestration": "/ui-v2/run",
+    "trust-layer-and-findings": "/ui-v2/findings",
+    "ptes-coverage-and-reports": "/ui-v2/reports",
     "ai-strategy-gate": "/ui-v2/ai",
     "remediation-retest-studio": "/ui-v2/retest",
     "correlated-attack-chains": "/ui-v2/chains",
@@ -931,10 +936,16 @@
     "system-diagnostics-and-health": "/ui-v2/diagnostics",
     "adapter-and-plugin-manager": "/ui-v2/adapters",
     "settings-and-api-explorer": "/ui-v2/settings",
+    "attack-surface-and-continuous-monitoring": "/ui-v2/monitoring",
+    "bug-bounty-and-live-browser-studio": "/ui-v2/bug-bounty",
+    "ptaas-client-portal": "/ui-v2/ptaas",
+    "threat-intel-and-exploit-arsenal": "/ui-v2/threat-intel",
+    "bas-and-detection-validation": "/ui-v2/bas",
+    "compliance-and-framework-crosswalk": "/ui-v2/compliance",
+    "trust-layer-approvals-queue-modal": "/ui-v2/approvals",
     "settings-and-secrets-vault": "/ui-v2/settings",
     "system-diagnostics-health": "/ui-v2/diagnostics",
-    "adapter-plugin-manager": "/ui-v2/adapters",
-    "ptaas-client-portal": "/ui-v2/ptaas"
+    "adapter-plugin-manager": "/ui-v2/adapters"
   };
   document.querySelectorAll("a[data-path]").forEach(function (link) {
     const route = canonicalRoutes[link.dataset.path];
