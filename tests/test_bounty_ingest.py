@@ -6,6 +6,7 @@ import socket
 import pytest
 
 from whaxon.core import bounty_ingest
+from whaxon.core.program_policy import validate_policy
 
 
 def test_only_https_yeswehack_program_urls_are_accepted():
@@ -72,7 +73,6 @@ High
     assert "draft_report_preparation" in ai["post_approval_autonomous_actions"]
     assert ai["activation"] == "pending_review"
     assert ai["execution_enabled"] is False
-    from whaxon.core.program_policy import validate_policy
     validate_policy(result["policy_draft"])
     assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
     assert result["policy_draft"]["account_access"]["vpn_required"] is True
