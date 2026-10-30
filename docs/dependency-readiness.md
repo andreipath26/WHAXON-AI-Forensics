@@ -1,8 +1,18 @@
 # Dependency readiness and guided installation
 
-## Current implementation status
+## Scope and status
 
-The first dependency-readiness slice provides **read-only diagnostics**. It does not install, upgrade, remove or configure software.
+This implementation adds dependency diagnostics, deterministic remediation planning, a tightly allowlisted Python-package installer, durable operation tracking, readiness history, authenticated web APIs, and the first UI integration in the existing Diagnostics page.
+
+The Diagnostics page is the canonical entry point. Its four states are:
+1. Environment overview.
+2. Dependency inventory.
+3. Guided fix / plan review.
+4. Installation progress and post-install verification.
+
+The implementation reuses the existing `/ui-v2/diagnostics` page shell and design tokens. It does not add navigation or a replacement design system.
+
+## Diagnostics
 
 Run:
 
@@ -16,51 +26,29 @@ whaxon doctor --snapshot
 whaxon doctor --drift
 ```
 
-The JSON report uses schema version 1 and includes the runtime, active interpreter, virtual-environment state, required Python package metadata/import-resolvability checks, optional Python extras and external executable discovery from the packaged tool catalog. `--verify` runs only the small set of version probes explicitly curated in `src/whaxon/data/dependencies.json`; it does not run arbitrary tool commands or target scans.
+The versioned JSON report includes runtime details, active interpreter and virtual-environment state, required Python package metadata/import checks, optional extras, and external executable discovery from the packaged tool catalog.
 
-## How to interpret statuses
+`--verify` runs only manifest-curated, bounded external-tool version probes. It does not run arbitrary tool commands or target scans.
 
-- `READY`: the declared Python minimum is met and the package import succeeded, or the Python runtime meets the declared minimum.
-- `MISSING`: the distribution or executable could not be found.
-- `INCOMPATIBLE`: an installed Python distribution is below the declared minimum.
+### Status meanings
+
+- `READY`: the declared Python minimum is met and package import succeeds, or the runtime meets the Python minimum.
+- `MISSING`: a distribution or executable could not be found.
+- `INCOMPATIBLE`: an installed package or Python runtime is below the declared minimum.
 - `BROKEN`: package metadata/import or a required packaged resource could not be read.
-- `DETECTED`: an external executable resolves on PATH. This is deliberately **not** equivalent to verified readiness; version and safe smoke-test checks are not yet implemented.
+- `DETECTED`: an external executable resolves on PATH but has not passed a trusted version probe.
 
-An overall `BLOCKED` result means a required runtime/package/resource is not READY. `DEGRADED` means optional integrations or external tools are unavailable or have not yet been verified. Missing optional tools must not block unrelated core functionality.
+An overall `BLOCKED` result means a required runtime/package/resource is not READY. `DEGRADED` means optional integrations or external tools are missing or unverified. Optional tools do not block unrelated core functionality.
 
-## Safety guarantees in this slice
+Diagnostics themselves do not install software, invoke package managers, access the network, use privilege escalation, or change PATH. Explicit external verification is a separate action.
 
-- The command is read-only.
-- It does not access the network.
-- It does not invoke package managers or external security tools.
-- It does not use sudo/admin elevation.
-- It does not change PATH or other machine configuration.
-- It reports external executables as DETECTED, not READY, until their version and smoke-test contracts exist.
+## Manifest and policy
 
-## Manifest
+The packaged source of truth is `src/whaxon/data/dependencies.json`. It records the Python runtime, core packages, optional extras, profiles, curated external-tool probes and installation policy.
 
-The packaged source of truth is `src/whaxon/data/dependencies.json`. It currently records the Python runtime, core packages, optional extras and installation profiles. The manifest is schema-versioned and rejects duplicate or incomplete dependency records.
+Automatic installation is enabled only for manifest-listed `python-package` dependencies. External security tools remain manual-only until their platform-specific installation sources and functional verification contracts are curated. The installer independently enforces the manifest policy; the UI cannot override it.
 
-## Not implemented yet
-
-The deterministic remediation planner is available with `whaxon doctor --plan`; it produces a plan ID and never executes commands. One manifest-listed Python package can be installed only with `whaxon doctor --install --check ID --approve PLAN_ID`, after a fresh plan has been reviewed. This CLI operation requires an active virtual environment, uses a fixed PyPI index and binary wheels, and records an operation audit. The web UI queues the same approved operation in a background worker, exposes progress polling and a cancellation request, and records a durable local operation state.
-
-The CLI also supports `--snapshot` and `--drift`. The local history is bounded to 100 snapshots and stored under `<data-dir>/.whaxon/dependency-readiness.json` with restrictive file permissions where supported. Snapshots omit the current working directory and raw executable paths; paths are represented by one-way fingerprints so drift can be detected without persisting personal directory names.
-
-The canonical `/ui-v2/diagnostics` page now contains the dependency overview, inventory, plan-review and installation-progress states. It reuses the current page shell, palette, typography, spacing, tables and button treatments; no new navigation or design system was added. The UI uses the following authenticated web API:
-- `GET /api/dependencies` — read-only diagnostics.
-- `POST /api/dependencies/verify` — explicit curated version probes.
-- `POST /api/dependencies/plan` — read-only plan preview.
-- `POST /api/dependencies/install` — queues an exact plan-ID approved package installation and returns an operation ID.
-- `GET /api/dependencies/install/<operation-id>` — poll operation state, progress and verification result.
-- `POST /api/dependencies/install/<operation-id>/cancel` — request cancellation; the worker terminates the package-manager process and reports possible partial state.
-- `POST /api/dependencies/snapshots` and `GET /api/dependencies/history` — local history.
-- `GET /api/dependencies/drift` — compare against the latest snapshot.
-
-External-tool version probes currently cover only entries explicitly configured in the manifest. A version probe is not a full functional smoke test. Other external tools remain DETECTED rather than READY. OS-native installers, offline bundles, complete recovery/rollback, broader external-tool smoke tests and the four approved-UI screens are still outstanding. The UI must not be implemented until the active checked-in UI source is inspected and the exact components/navigation are identified. Do not treat a diagnostic report or version probe as proof that every tool feature works.
-
-
-## Remediation preview and explicitly approved Python package installs
+## Remediation preview
 
 Generate a read-only plan:
 
@@ -69,25 +57,67 @@ whaxon doctor --plan
 whaxon doctor --plan --check textual
 ```
 
-The plan includes a deterministic plan ID, affected dependency, proposed argument array, display command, source, network/privilege impact and whether automation is supported. Review the complete plan before proceeding. A plan ID is bound to the current environment, manifest and exact action details; if those change, the old approval is rejected.
+A plan includes a deterministic plan ID, selected dependency, exact proposed argument array and display command, package source, network/privilege impact, virtual-environment requirement, and whether automation is enabled. A plan is not authorization. No command is run while preparing it.
 
-For an eligible Python package, the explicit installation invocation is:
+The plan ID is bound to the current environment, manifest and action details. If those change, the previous approval is rejected.
+
+## Explicitly approved Python-package installation
+
+For an eligible package, first review the complete plan, then run:
 
 ```bash
 whaxon doctor --install --check textual --approve PLAN_ID
 ```
 
-Replace `PLAN_ID` with the exact ID from the reviewed plan. The installer is deliberately restricted:
+Replace `PLAN_ID` with the exact ID from the reviewed plan.
 
+The installer:
 - Requires an activated Python virtual environment; it will not modify a system Python installation.
-- Installs only a Python distribution explicitly declared in the packaged dependency manifest.
-- Uses the active interpreter's pip, a fixed official PyPI index URL, binary wheels only, no shell, no sudo/admin, no user-supplied command, and a 15-minute timeout.
-- Requires a fresh plan ID at execution time; changed manifest/action/environment invalidates the approval.
-- Writes a local JSONL audit trail under `~/.whaxon/audit/dependency-install.jsonl` with restrictive file permissions where supported.
-- Re-checks the installed distribution version and import after installation. Installer exit code zero is not sufficient.
+- Installs only a Python distribution declared in the packaged dependency manifest.
+- Enforces the manifest's `automatic_installation_enabled` and allowed-kind policy.
+- Uses the active interpreter's pip with isolated pip configuration and a fixed official PyPI index.
+- Accepts binary wheels only; it does not execute source build scripts.
+- Does not use a shell, sudo/admin elevation, or user-supplied executable/arguments.
+- Has a 15-minute timeout and supports cancellation.
+- Re-checks the installed distribution version and import after installation. A pip exit code of zero is not sufficient.
+- Writes a local JSONL audit record under `~/.whaxon/audit/dependency-install.jsonl` with restrictive file permissions where supported.
 
-External security tools are **not** automatically installed in this release slice. Their platform-specific installation sources and verification contracts have not yet been curated. The planner supplies manual guidance rather than inventing package-manager commands.
+**Important package impact:** pip may install or update transitive dependencies required by the approved package. The plan identifies this behavior, the configured PyPI source, and the exact command before approval. The operation is not a fully hash-pinned, offline-reproducible deployment. Do not use it where a locked, hash-verified software supply chain is mandatory.
 
-### Failure recovery
+## Web API and operation lifecycle
 
-A failed, timed-out or interrupted pip operation may have partially changed the active virtual environment. WHAXON does not claim rollback. Re-run `whaxon doctor`; if the environment is inconsistent, recreate the virtual environment and reinstall the approved dependency set. The audit record includes the operation outcome and recovery guidance.
+The authenticated API exposes:
+- `GET /api/dependencies` — read-only diagnostics.
+- `POST /api/dependencies/verify` — explicit curated version probes.
+- `POST /api/dependencies/plan` — read-only plan preview.
+- `POST /api/dependencies/install` — queues an exact plan-ID-approved package operation and returns an operation ID.
+- `GET /api/dependencies/install/<operation-id>` — operation state, progress and verification result.
+- `POST /api/dependencies/install/<operation-id>/cancel` — request cancellation.
+- `POST /api/dependencies/snapshots` and `GET /api/dependencies/history` — local readiness history.
+- `GET /api/dependencies/drift` — compare current readiness with the latest snapshot.
+
+Operation state is stored under `<data-dir>/.whaxon/dependency-operations/` with restrictive permissions where supported. Per-dependency locks prevent concurrent installs; periodic progress updates support stale-worker detection. Cancellation terminates the package-manager process where possible.
+
+The worker currently runs as a background thread in the web process. A process crash can interrupt an install; the persisted operation will be marked interrupted after its heartbeat expires. This is not a distributed job queue and does not guarantee survival across process restarts.
+
+## Readiness snapshots and drift
+
+The CLI supports `--snapshot` and `--drift`. History is bounded to 100 snapshots and stored under `<data-dir>/.whaxon/dependency-readiness.json`. Snapshots omit the current working directory and raw executable paths; paths are represented by one-way fingerprints so drift can be detected without persisting personal directory names.
+
+## Failure recovery
+
+A failed, timed-out or interrupted pip operation may have partially changed the active virtual environment. WHAXON does not claim rollback. Re-run `whaxon doctor`; if the environment is inconsistent, recreate the virtual environment and reinstall the approved dependency set. Audit and operation records include outcome and recovery guidance.
+
+## Remaining deployment gates
+
+This feature is not considered production-deployable until all of the following are verified:
+- Full CI passes on Python 3.11, 3.12 and 3.13: Ruff, mypy, full pytest, browser tests, distribution build, metadata validation and clean-wheel smoke test.
+- The manifest, tool catalog and required payload resources are present in both wheel and sdist.
+- Clean installation and operation are tested on Windows, macOS and supported Linux distributions, including no-root and offline cases.
+- Every external-tool readiness claim is backed by a curated version and functional smoke-test contract.
+- Resource paths, conflicting binaries, writable locations and package-manager availability are checked without weakening read-only diagnostics.
+- Installation artifacts and transitive dependencies have a documented integrity/pinning strategy before any claim of reproducible or high-assurance installation.
+- Responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows pass browser regression tests.
+- Worker restart behavior, concurrent operations, lock recovery, cancellation and partial-install recovery are validated under realistic deployment process models.
+
+Until these gates pass, keep the pull request in draft and do not publish this feature as a finished product update.
