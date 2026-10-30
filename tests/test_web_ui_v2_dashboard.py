@@ -201,7 +201,7 @@ def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, 
 @pytest.mark.parametrize(
     ("button_name", "expected_path"),
     [
-        (re.compile(r"Launch Wizard"), "/ui-v2/scope"),
+        (re.compile(r"Open Scope Setup"), "/ui-v2/scope"),
         (re.compile(r"Start New Engagement"), "/ui-v2/scope"),
         (re.compile(r"Switch Target Session"), "/ui-v2/scope"),
         (re.compile(r"Terminal Log"), "/ui-v2/run"),
