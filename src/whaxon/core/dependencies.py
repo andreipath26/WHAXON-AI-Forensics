@@ -57,7 +57,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def _package_result(dist: str, import_name: str, minimum: str, *, required: bool,
+def _package_result(dist: str, minimum: str, *, required: bool,
                     capability: str) -> DependencyResult:
     try:
         version = importlib.metadata.version(dist)
@@ -117,7 +117,6 @@ def collect_dependency_report(*, data_dir: Path | None = None,
         "Install Python 3.11 or newer and run WHAXON with that interpreter."
         if py_status != "READY" else "",
     ))
-    manifest_error = ""
     try:
         manifest = load_dependency_manifest()
         for entry in manifest["dependencies"]:
@@ -127,12 +126,10 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 continue
             capability = (entry.get("capabilities") or ["core"])[0]
             results.append(_package_result(
-                entry["id"], entry.get("import_name", entry["id"]),
-                entry["minimum_version"], required=bool(entry.get("required")),
+                entry["id"], entry["minimum_version"], required=bool(entry.get("required")),
                 capability=capability,
             ))
     except (OSError, ValueError, TypeError, KeyError) as exc:
-        manifest_error = f"Dependency manifest unavailable or invalid ({type(exc).__name__})."
         results.append(DependencyResult(
             "dependency-manifest", "Dependency manifest", "resource", True, "BROKEN",
             reason=manifest_error,
@@ -142,6 +139,10 @@ def collect_dependency_report(*, data_dir: Path | None = None,
     catalog_path = (Path(data_dir) / "tools.json") if data_dir else (
         Path(__file__).resolve().parents[1] / "data" / "tools.json"
     )
+    if not catalog_path.is_file():
+        packaged_catalog = Path(__file__).resolve().parents[1] / "data" / "tools.json"
+        if packaged_catalog.is_file():
+            catalog_path = packaged_catalog
     if catalog_path.is_file():
         try:
             raw = json.loads(catalog_path.read_text(encoding="utf-8"))
