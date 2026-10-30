@@ -11,9 +11,9 @@ import json
 import os
 import re
 import stat
-import threading
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from collections.abc import Callable
