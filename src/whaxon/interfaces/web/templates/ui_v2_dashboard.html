@@ -394,7 +394,7 @@
 <div class="flex items-center gap-space-sm">
 <div class="relative">
 <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-outline">search</span>
-<input class="h-8 w-64 rounded bg-surface-container-lowest pl-8 pr-3 font-code-sm text-code-sm text-on-surface placeholder:text-outline focus:outline-none" aria-label="Filter recent job history by ID, target, or operator" placeholder="Filter by ID, target, operator..." type="text"/>
+<input class="h-8 w-64 rounded bg-surface-container-lowest pl-8 pr-3 font-code-sm text-code-sm text-on-surface placeholder:text-outline focus:outline-none" aria-label="Filter recent job history by ID, target, or tool" placeholder="Filter by ID, target, or tool..." type="text"/>
 </div>
 <button class="flex items-center gap-space-xs rounded bg-surface-container px-space-md py-1 font-code-sm text-code-sm text-on-surface hover:bg-surface-container-high transition-colors" type="button">
 <span class="material-symbols-outlined text-xs">download</span>
@@ -409,9 +409,9 @@
 <tr class="bg-surface-container-lowest font-label-sm text-label-sm uppercase text-outline">
 <th class="px-space-xl py-space-sm">Engagement ID</th>
 <th class="px-space-md py-space-sm">Target Scope</th>
-<th class="px-space-md py-space-sm">Lead Operator</th>
+<th class="px-space-md py-space-sm">Tool</th>
 <th class="px-space-md py-space-sm">Timeline</th>
-<th class="px-space-md py-space-sm">Verified Findings</th>
+<th class="px-space-md py-space-sm">Recorded Findings</th>
 <th class="px-space-md py-space-sm">Engine Status</th>
 <th class="px-space-xl py-space-sm text-right">Operational Actions</th>
 </tr>
@@ -422,8 +422,8 @@
 <!-- Table Footer Metadata Strip -->
 <div class="flex flex-wrap items-center justify-between gap-space-md px-space-xl py-space-sm bg-surface-container-lowest font-code-sm text-code-sm text-outline">
 <div class="flex items-center gap-space-md">
-<span>Loading live job history</span>
-<span>Storage: <strong class="text-on-surface font-medium">—</strong> across live records only</span>
+<span id="dashboard-history-summary">Loading live job history</span>
+<span>Storage: <strong id="dashboard-history-count" class="text-on-surface font-medium">—</strong> recorded jobs</span>
 </div>
 <div class="flex items-center gap-space-sm">
 <span class="font-label-sm text-label-sm text-outline">CRYPTO LOG INTEGRITY:</span>
@@ -547,7 +547,7 @@
     const sub = card.querySelector(".font-label-sm:not(.uppercase)");
     if (sub && suffix) sub.textContent = suffix;
   };
-  const fmt = value => value ? new Date(value).toLocaleString() : "Timestamp not recorded";
+  const fmt = value => value ? new Date(value).toLocaleString() : "Not recorded";
   const statusLabel = value => String(value || "unknown").replace(/_/g, " ").toUpperCase();
   const td = (row, value, classes) => {
     const cell = document.createElement("td");
@@ -575,12 +575,11 @@
     const scope = scopeAvailable ? scopeResult.value : {};
     const liveStatus = statusResult.status === "fulfilled" ? statusResult.value : {};
     const health = healthResult.status === "fulfilled" ? healthResult.value : {};
-    const active = jobs.filter(j => ["running","queued","pending"].includes(String(j.status || "").toLowerCase())).length;
     const findings = (report.jobs || []).flatMap(item => item.findings || []);
     const verified = findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length;
     const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
     const availableTools = tools.filter(t => t.available && t.adapter_available && t.binary_available).length;
-    setCardValue("Active Scans", historyAvailable ? active : "—", historyAvailable ? (active ? "RUNNING" : "NO ACTIVE JOBS") : "STATUS UNAVAILABLE");
+    setCardValue("Active Scans", "—", "LIVE STATUS NOT EXPOSED");
     setCardValue("Verified Findings", reportAvailable ? verified : "—", reportAvailable ? (falsePositives + " FALSE POSITIVES") : "STATUS UNAVAILABLE");
     setCardValue("Active Adapters", toolsAvailable ? availableTools : "—", toolsAvailable ? "TOOLS AVAILABLE" : "STATUS UNAVAILABLE");
     setCardValue("PTES Coverage", "—", "NOT RECORDED");
@@ -638,6 +637,14 @@
       pythonValue.textContent = "not reported";
       pythonValue.title = "Python version is not exposed by the current status API.";
     }
+    const historySummary = document.getElementById("dashboard-history-summary");
+    const historyCount = document.getElementById("dashboard-history-count");
+    if (historySummary) {
+      historySummary.textContent = !historyAvailable
+        ? "Live job history unavailable"
+        : (jobs.length ? "Showing " + Math.min(jobs.length, 10) + " of " + jobs.length + " recorded jobs" : "No recorded jobs");
+    }
+    if (historyCount) historyCount.textContent = historyAvailable ? String(jobs.length) : "—";
     const table = document.querySelector("table");
     const body = table?.querySelector("tbody");
     if (body) {
@@ -654,16 +661,16 @@
           row.className = "border-t border-outline-variant/10";
           td(row, job.id || job.job_id);
           td(row, job.target || "Target not recorded");
-          td(row, "Local operator");
+          td(row, job.tool || "Tool not recorded");
           td(row, fmt(job.created_at || job.started_at));
-          const count = Array.isArray(job.findings) ? job.findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length : "—";
+          const count = Number.isFinite(job.findings_count) ? job.findings_count : (Array.isArray(job.findings) ? job.findings.length : "—");
           td(row, count);
           td(row, statusLabel(job.status));
           const actions = td(row, "");
           const button = document.createElement("a");
-          button.href = "/ui-v2/run";
+          button.href = "/ui-v2/history";
           button.className = "rounded bg-surface-container-high px-space-sm py-1 font-code-sm text-secondary";
-          button.textContent = "Open Run";
+          button.textContent = "View History";
           actions.appendChild(button);
           body.appendChild(row);
         });
@@ -699,7 +706,7 @@
     const route = path => { window.location.href = path; };
     const filterInput = [...document.querySelectorAll("input")].find(input => (input.placeholder || "").includes("Filter by ID"));
     if (filterInput) {
-      filterInput.setAttribute("aria-label", "Filter recent job history by ID, target, or operator");
+      filterInput.setAttribute("aria-label", "Filter recent job history by ID, target, or tool");
       filterInput.addEventListener("input", () => {
         const term = filterInput.value.trim().toLowerCase();
         const body = document.querySelector("table tbody");
