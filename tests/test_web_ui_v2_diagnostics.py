@@ -78,7 +78,10 @@ def test_diagnostics_reference_buttons_cannot_run_simulated_operations(page, liv
     assert page.locator("#btn-run-diag").is_enabled(), "Run Full Diagnostic must refresh live diagnostics"
     assert page.locator("#btn-export-json").is_enabled(), "Export Health Report must export live API data"
     for button in page.locator("main button:visible").all():
-        if button.get_attribute("id") in ("diagnostics-refresh", "btn-run-diag", "btn-export-json"):
+        if button.get_attribute("id") in (
+            "diagnostics-refresh", "btn-run-diag", "btn-export-json",
+            "dep-check", "dep-verify", "dep-snapshot", "dep-history", "dep-plan-close",
+        ):
             assert button.is_enabled()
         else:
             assert button.is_disabled(), f"Unwired diagnostic control is enabled: {button.inner_text()}"
@@ -153,3 +156,41 @@ def test_diagnostics_run_and_export_use_live_api_data(page, live_server):
     assert page.locator("#btn-run-diag").is_enabled()
     assert page.locator("#btn-export-json").is_enabled()
 
+
+
+def test_dependency_readiness_panel_uses_live_backend_and_existing_diagnostics_shell(
+    page, live_server
+):
+    response = page.goto(f"{live_server}/ui-v2/diagnostics")
+    assert response is not None and response.status == 200
+    panel = page.locator("#whaxon-dependency-readiness")
+    assert panel.is_visible()
+    assert page.get_by_role("heading", name="Dependency Readiness").is_visible()
+    page.wait_for_function(
+        "() => document.querySelector('#dep-status')?.textContent.includes('Environment report loaded')"
+        " || document.querySelector('#dep-status')?.textContent.includes('Dependency check failed')",
+        timeout=10000,
+    )
+    assert page.locator("#dep-summary > div").count() == 6
+    assert page.locator("#dep-rows tr").count() > 0
+    assert page.locator("#dep-check").is_enabled()
+    assert page.locator("#dep-verify").is_enabled()
+    assert page.locator("#dep-install").is_disabled()
+
+
+def test_dependency_readiness_plan_requires_explicit_ui_approval(page, live_server):
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.wait_for_function(
+        "() => document.querySelector('#dep-rows button') !== null",
+        timeout=10000,
+    )
+    page.locator("#dep-rows button").first.click()
+    page.wait_for_function(
+        "() => !document.querySelector('#dep-plan').hidden"
+        " && !document.querySelector('#dep-plan-description').textContent.includes('Preparing')",
+        timeout=10000,
+    )
+    assert page.locator("#dep-plan-id").inner_text().startswith("PLAN ID:")
+    assert page.locator("#dep-install").is_disabled()
+    assert page.locator("#dep-approve-check").is_visible()
+    assert page.locator("#dep-operation").is_hidden()
