@@ -77,7 +77,7 @@ See [Scope documentation](docs/scope.md) and [Security Policy](SECURITY.md).
 | Diagnostics | `/ui-v2/diagnostics` | Dependency readiness, verification, remediation-plan review and guided install |
 | Bug bounty | Existing Bug Bounty page | Review-only program ingestion; imported data is not automatically activated |
 
-The browser interface is not yet feature-complete across every page. The interaction audit documents which controls are live, wired, mockups, or hidden. The CLI and documented APIs may expose workflows that are not yet represented by a complete browser experience.
+The default browser interface is the supplied Obsidian Kinetic UI. Opening the web service at `/` now redirects to `/ui-v2`; `/ui-v2` is the canonical dashboard, and the previous `/ui` interface remains available as a deprecated compatibility/reference route. The new UI interaction audit records the route map, live workflows, disabled reference-only controls, automated browser coverage, and remaining acceptance gaps. The historical [legacy web UI interaction audit](docs/WEB_UI_INTERACTION_AUDIT.md) is preserved and does not describe the new default interface.
 
 ## Tools and adapters
 
