@@ -196,3 +196,189 @@ def test_scope_text_inputs_have_accessible_names(page, live_server):
     page.keyboard.press("Escape")
     page.locator("#openImportDrawerBtn").click()
     assert page.get_by_role("textbox", name="Paste scope JSON definition").is_visible()
+
+
+def test_scope_import_rejects_json_null_without_mutating_configuration(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    page.locator("#openImportDrawerBtn").click()
+    page.locator("#importDrawer textarea").fill("null")
+    page.locator("#executeImportBtn").click()
+    assert "Import must be a JSON object." in page.locator("#scope-ui-notice").inner_text()
+    assert _read_scope(page) == before
+
+
+def test_scope_import_without_enabled_field_preserves_disabled_enforcement(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    disabled = _save_scope(page, {**before, "enabled": False, "confirm_disable": True})
+    assert disabled["status"] == 200
+    try:
+        page.reload()
+        _wait_loaded(page)
+        page.locator("#openImportDrawerBtn").click()
+        page.locator("#importDrawer textarea").fill(json.dumps({
+            "engagement": "Preserve disabled enforcement",
+            "in_scope": ["127.0.0.1"],
+            "out_of_scope": [],
+            "notes": "import must not silently re-enable enforcement",
+        }))
+        page.locator("#executeImportBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+            timeout=5000,
+        )
+        after = _read_scope(page)
+        assert after["enabled"] is False
+        assert after["engagement"] == "Preserve disabled enforcement"
+    finally:
+        _save_scope(page, before)
+
+
+def test_scope_preflight_status_distinguishes_blocked_target(page, live_server):
+    page.route(
+        "**/api/scope/check",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"allowed":false,"reason":"explicit exclusion","matched_rule":"blocked.example.invalid"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    page.locator("#scopeCheckTarget").fill("blocked.example.invalid")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'LAST CHECK: BLOCKED'",
+        timeout=5000,
+    )
+    assert "BLOCKED" in page.locator("#scopeCheckResult").inner_text()
+    assert "bg-error" in page.locator("#scopePreflightIndicator").get_attribute("class")
+
+
+def test_scope_preflight_status_reports_api_error(page, live_server):
+    page.route(
+        "**/api/scope/check",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"scope evaluation unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    page.locator("#scopeCheckTarget").fill("target.example.invalid")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'CHECK ERROR'",
+        timeout=5000,
+    )
+    assert "scope evaluation unavailable" in page.locator("#scopeCheckResult").inner_text()
+    assert "bg-error" in page.locator("#scopePreflightIndicator").get_attribute("class")
+
+
+def test_scope_edit_invalidates_previous_preflight_result(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    try:
+        page.locator("#scopeCheckTarget").fill("127.0.0.1")
+        page.locator("#runScopeCheckBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scopePreflightStatus')?.textContent === 'LAST CHECK: ALLOWED'",
+            timeout=5000,
+        )
+        page.locator("#openTargetModalBtn").click()
+        page.locator("#modalTargetInput").fill("scope-preflight-reset.example.invalid")
+        page.locator("#authConfirmCheckbox").check()
+        page.locator("#saveTargetBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+            timeout=5000,
+        )
+        assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+        assert "bg-outline" in page.locator("#scopePreflightIndicator").get_attribute("class")
+        assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
+    finally:
+        _save_scope(page, before)
+
+
+def test_scope_import_requires_confirmation_before_disabling_enforcement(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    assert before["enabled"] is True
+    imported = {
+        **before,
+        "enabled": False,
+        "engagement": "Confirmed enforcement disable",
+    }
+    try:
+        page.locator("#openImportDrawerBtn").click()
+        page.locator("#importDrawer textarea").fill(json.dumps(imported))
+        page.once("dialog", lambda dialog: dialog.dismiss())
+        page.locator("#executeImportBtn").click()
+        assert _read_scope(page)["enabled"] is True
+        assert page.locator("#importDrawer").is_visible()
+
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#executeImportBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+            timeout=5000,
+        )
+        assert _read_scope(page)["enabled"] is False
+    finally:
+        _save_scope(page, before)
+
+
+def test_scope_preflight_verdict_is_cleared_when_checked_target_changes(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    target = page.locator("#scopeCheckTarget")
+    target.fill("127.0.0.1")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'LAST CHECK: ALLOWED'",
+        timeout=5000,
+    )
+    assert "127.0.0.1" in page.locator("#scopeCheckResult").inner_text()
+    target.fill("127.0.0.2")
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    assert "bg-outline" in page.locator("#scopePreflightIndicator").get_attribute("class")
+    assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
+
+
+def test_scope_preflight_ignores_response_after_target_changes(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    page.evaluate("""() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (url, options) => {
+        if (url === "/api/scope/check") {
+          return new Promise(resolve => {
+            window.__resolvePendingScopeCheck = () => resolve(new Response(
+              JSON.stringify({allowed: true, reason: "matched configured rule"}),
+              {status: 200, headers: {"Content-Type": "application/json"}}
+            ));
+          });
+        }
+        return originalFetch(url, options);
+      };
+    }""")
+    target = page.locator("#scopeCheckTarget")
+    target.fill("127.0.0.1")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'CHECKING…'",
+        timeout=5000,
+    )
+    target.fill("127.0.0.2")
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    page.evaluate("() => window.__resolvePendingScopeCheck()")
+    page.wait_for_timeout(50)
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()

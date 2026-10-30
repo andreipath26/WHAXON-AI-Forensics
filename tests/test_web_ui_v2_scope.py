@@ -10,6 +10,9 @@ def test_scope_page_loads_live_configuration(page, live_server):
         timeout=5000,
     )
     assert page.locator("#targetTableBody tr").count() >= 1
+    assert page.locator("button", has_text="Terminal Log").is_hidden()
+    assert page.locator("button", has_text="Emergency Halt Scan").is_hidden()
+    assert page.get_by_text("Supported Ingestion Formats").is_hidden()
     table_footer = page.locator("#targetTableBody").locator("xpath=ancestor::div[contains(@class, 'overflow-x-auto')]/..").locator("div.p-space-md[class*='bg-surface-container-lowest']")
     assert "LIVE CONFIGURATION" in table_footer.inner_text()
     assert page.locator("#scopeTableStatus").get_attribute("aria-live") == "polite"
@@ -90,6 +93,7 @@ def test_scope_check_button_calls_live_scope_api(page, live_server):
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=5000,
     )
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
     page.locator("#scopeCheckTarget").fill("127.0.0.1")
     with page.expect_response(
         lambda response: response.request.method == "POST" and response.url.endswith("/api/scope/check")
@@ -100,6 +104,8 @@ def test_scope_check_button_calls_live_scope_api(page, live_server):
         "() => document.querySelector('#scopeCheckResult')?.textContent.includes('ALLOWED')",
         timeout=5000,
     )
+    assert page.locator("#scopePreflightStatus").inner_text() == "LAST CHECK: ALLOWED"
+    assert "bg-primary" in page.locator("#scopePreflightIndicator").get_attribute("class")
 
 def test_scope_rules_remain_editable_after_enforcement_is_disabled(page, live_server):
     page.goto(f"{live_server}/ui-v2/scope")
@@ -230,7 +236,10 @@ def test_scope_header_does_not_claim_a_target_when_scope_is_empty(page, live_ser
     )
     assert page.locator("#scope-header-target").text_content().strip() == "Target: No target configured"
     assert page.locator("#scope-header-membership").inner_text() == "(NO TARGET RULE)"
-    assert page.locator("#scope-main-status").inner_text() == "Enabled; no target rules"
+    assert page.locator("#scopeStatusLabel").inner_text() == "Enabled; no target rules"
+    assert "bg-tertiary" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "bg-tertiary" in page.locator("#scopeHeaderPulse").get_attribute("class")
+    assert "no in-scope targets are configured" in page.locator("main").inner_text()
     assert "(IN SCOPE)" not in page.locator("header").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
 
@@ -250,7 +259,10 @@ def test_scope_header_reflects_disabled_enforcement(page, live_server):
         timeout=8000,
     )
     assert page.locator("#scope-header-membership").inner_text() == "(ENFORCEMENT DISABLED)"
-    assert page.locator("#scope-main-status").inner_text() == "Enforcement disabled"
+    assert page.locator("#scopeStatusLabel").inner_text() == "Enforcement disabled"
+    assert "bg-error" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "bg-error" in page.locator("#scopeHeaderPulse").get_attribute("class")
+    assert "Scope enforcement is disabled" in page.locator("main").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
 
 
@@ -419,7 +431,7 @@ def test_scope_copy_cli_generates_a_valid_whaxon_scope_command(page, live_server
     assert "--target" not in command
 
 
-def test_scope_api_failure_shows_unknown_status_inside_main(page, live_server):
+def test_scope_api_failure_does_not_claim_configuration_is_loaded(page, live_server):
     page.route(
         "**/api/scope",
         lambda route: route.fulfill(
@@ -433,6 +445,34 @@ def test_scope_api_failure_shows_unknown_status_inside_main(page, live_server):
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Could not load live scope')",
         timeout=8000,
     )
-    assert page.locator("#scope-main-status").inner_text() == "Waiting for scope configuration"
-    assert page.locator("#scope-header-membership").inner_text() == "(SCOPE STATUS UNKNOWN)"
-    assert page.locator("#scope-header-boundary").inner_text() == "SCOPE CONFIGURATION UNAVAILABLE"
+    assert page.locator("#scopeStatusLabel").inner_text() == "Waiting for scope configuration"
+    assert page.locator("#openTargetModalBtn").is_disabled()
+    assert page.locator("#openImportDrawerBtn").is_disabled()
+    assert page.locator("#runScopeCheckBtn").is_disabled()
+    assert "bg-outline" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "Scope configuration is loading" in page.locator("main").inner_text()
+
+
+def test_scope_copy_cli_quotes_wildcard_target_for_shell(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"wildcard-copy-test","enabled":true,"in_scope":["*.example.com"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.evaluate("""() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {writeText: async value => { window.__copiedScopeCommand = value; }}
+      });
+    }""")
+    page.locator("#copyCliBtn").click()
+    page.wait_for_function("() => Boolean(window.__copiedScopeCommand)")
+    assert page.evaluate('() => window.__copiedScopeCommand') == 'whaxon scope --check "*.example.com"'
