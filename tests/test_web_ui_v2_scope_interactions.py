@@ -235,3 +235,24 @@ def test_scope_import_without_enabled_field_preserves_disabled_enforcement(page,
         assert after["engagement"] == "Preserve disabled enforcement"
     finally:
         _save_scope(page, before)
+
+
+def test_scope_preflight_status_distinguishes_blocked_target(page, live_server):
+    page.route(
+        "**/api/scope/check",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"allowed":false,"reason":"explicit exclusion","matched_rule":"blocked.example.invalid"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    page.locator("#scopeCheckTarget").fill("blocked.example.invalid")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'LAST CHECK: BLOCKED'",
+        timeout=5000,
+    )
+    assert "BLOCKED" in page.locator("#scopeCheckResult").inner_text()
