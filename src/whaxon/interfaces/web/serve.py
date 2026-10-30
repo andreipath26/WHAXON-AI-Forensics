@@ -134,7 +134,7 @@ def main(args=None):
     if not daemon:
         print()
         print("  WHAXON production server (waitress)")
-        print(f"  -> http://{host}:{port}/ui")
+        print(f"  -> http://{host}:{port}/ui-v2")
         print(f"  -> threads: {threads}")
         print(f"  -> data:    {os.environ.get('WHAXON_DATA', 'data')}")
         if pid_path.exists():
