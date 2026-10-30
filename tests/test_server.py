@@ -832,3 +832,32 @@ def test_dependency_readiness_is_integrated_into_existing_diagnostics_page(
     assert 'id="dep-plan"' in page
     assert 'id="dep-operation"' in page
     assert "bg-surface-container-low" in page
+
+
+def test_dependency_audit_integrity_endpoint(tmp_path, monkeypatch):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(
+        installer,
+        "verify_dependency_audit",
+        lambda: {"valid": True, "events_checked": 3, "head_hash": "a" * 64},
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/dependencies/audit")
+    assert response.status_code == 200
+    assert response.get_json()["valid"] is True
+    assert response.get_json()["events_checked"] == 3
+
+
+def test_dependency_audit_integrity_endpoint_fails_on_corruption(tmp_path, monkeypatch):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(
+        installer,
+        "verify_dependency_audit",
+        lambda: {"valid": False, "events_checked": 1, "reason": "hash_mismatch"},
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/dependencies/audit")
+    assert response.status_code == 409
+    assert response.get_json()["valid"] is False
