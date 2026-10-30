@@ -94,18 +94,19 @@ def _public_ip(host: str) -> str:
             raise IngestionError("Hostname resolves to a non-public address")
     # Pin the TCP connection to one of the validated addresses. TLS still
     # verifies the certificate against the original hostname.
-    return addresses[0]
+    return str(addresses[0])
 
 
 class _PinnedHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, host: str, address: str):
+        self._tls_context = ssl.create_default_context()
         super().__init__(host, 443, timeout=_TIMEOUT_SECONDS,
-                         context=ssl.create_default_context())
+                         context=self._tls_context)
         self._address = address
 
     def connect(self) -> None:
         raw = socket.create_connection((self._address, self.port), self.timeout)
-        self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+        self.sock = self._tls_context.wrap_socket(raw, server_hostname=self.host)
 
 
 def _request(url: str) -> tuple[bytes, str, str]:
