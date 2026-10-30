@@ -18,7 +18,12 @@ PLAN_SCHEMA_VERSION = 1
 def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
     requirement = f"{entry['id']}>={entry['minimum_version']}"
     description = f"Install or upgrade {entry['id']} in the active interpreter."
-    argv = [sys.executable, "-m", "pip", "install", requirement]
+    argv = [
+        sys.executable, "-m", "pip", "--isolated", "install",
+        "--disable-pip-version-check", "--no-input", "--quiet",
+        "--progress-bar", "off", "--only-binary=:all:",
+        "--index-url", "https://pypi.org/simple", requirement,
+    ]
     return {
         "id": f"pip:{entry['id']}",
         "kind": "python-package",
@@ -29,13 +34,16 @@ def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
             if platform.system() == "Windows"
             else shlex.join(argv)
         ),
+        "package_source": "https://pypi.org/simple",
+        "package_specifier": requirement,
+        "may_install_transitive_dependencies": True,
         "requires_network": True,
         "requires_privilege": False,
         "system_wide": False,
         "requires_virtual_environment": True,
         "automated_execution_supported": True,
         "approval_required": True,
-        "warning": "Preview only. This plan does not execute pip or resolve/install packages.",
+        "warning": "Preview only. This plan does not execute pip or resolve/install packages. After approval, pip may install or update transitive dependencies from the configured PyPI index; binary wheels only, no source builds.",
     }
 
 
