@@ -2285,7 +2285,7 @@ Implementation is being delivered in independently reviewable stages. The status
 4. Complete external-tool verification with reviewed per-tool version and harmless local smoke-test contracts; do not promote version-only checks to full READY when a capability requires more evidence.
 5. Complete installation profiles, supported platform-specific options, official-source provenance, offline/manual paths, integrity checks where upstream supports them, and no-root/restricted-host behavior.
 6. Strengthen installer transaction behavior: cancellation, process termination, partial state reporting, audit failure handling, interrupted process recovery and safe retry. Do not claim rollback unless guaranteed.
-7. Integrate all four UI states only after inspecting the exact active UI files under `web ui files and rendering/` and its current live implementation. Reuse existing tokens, shell, navigation, tables, drawers, progress and notification components. No UI redesign.
+7. Complete end-to-end UI hardening for the four states now embedded in `/ui-v2/diagnostics`: validate responsive layouts, keyboard/screen-reader behavior, error/empty/loading states, install polling/cancellation, manual-only plans and all backend error responses. Keep the current checked-in design language; no UI redesign.
 8. Run the §40.3/§40.5 clean-environment matrix and measure false-readiness; record tested vs untested platforms explicitly.
 9. Update §38 release gates and release notes; merge only after review and green CI.
 
