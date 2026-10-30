@@ -7,6 +7,7 @@ from pathlib import Path
 
 from whaxon.core.dependencies import collect_dependency_report
 from whaxon.core.remediation import build_remediation_plan
+from whaxon.core.installer import apply_approved_dependency_plan
 
 
 def main(args: list[str] | None = None) -> int:
@@ -20,11 +21,27 @@ def main(args: list[str] | None = None) -> int:
                         help="Show one dependency only (read-only).")
     parser.add_argument("--plan", action="store_true",
                         help="Generate a remediation preview; never executes commands.")
+    parser.add_argument("--install", action="store_true",
+                        help="Install one dependency after explicit plan-ID approval.")
+    parser.add_argument("--approve", metavar="PLAN_ID",
+                        help="Exact plan ID reviewed before installation.")
     parser.add_argument("--data", type=Path, default=Path("data"),
                         help="WHAXON data directory (default: ./data).")
     parser.add_argument("--core-only", action="store_true",
                         help="Skip optional Python extras and external tool checks.")
     ns = parser.parse_args(args)
+    if ns.install:
+        if not ns.check or not ns.approve:
+            parser.error("--install requires both --check DEPENDENCY_ID and --approve PLAN_ID")
+        try:
+            result = apply_approved_dependency_plan(ns.check, ns.approve)
+        except (ValueError, OSError) as exc:
+            print(f"Installation not started: {exc}", file=sys.stderr)
+            return 2
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return 0 if result["status"] == "VERIFIED" else 1
+    if ns.approve:
+        parser.error("--approve can only be used with --install")
     if ns.plan:
         plan = build_remediation_plan(
             dependency_ids=[ns.check] if ns.check else None,
