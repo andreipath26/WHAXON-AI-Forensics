@@ -839,6 +839,11 @@
     document.querySelectorAll("button").forEach(button => {
       const label = buttonLabel(button);
       if (button.dataset.dashboardWired === "true") return;
+      if (button.classList.contains("dashboard-mobile-menu")) {
+        // The mobile menu has its own keyboard/focus-aware controller above.
+        button.dataset.dashboardWired = "true";
+        return;
+      }
       let handler = null;
       if (button.dataset.dashboardAction === "scope" || label.startsWith("No active engagement") || /^(New|add New|Switch Target Session|Start New Engagement|Open Scope Setup|Continue Setup)$/.test(label)) {
         handler = () => route("/ui-v2/scope");
