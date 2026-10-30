@@ -17,6 +17,7 @@ import sys
 import time
 import uuid
 from collections.abc import Callable
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -59,14 +60,42 @@ def _canonical_audit_record(record: dict[str, Any]) -> bytes:
     return json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+@contextmanager
+def _audit_process_lock(path: Path):
+    """Serialize writers across processes on POSIX and Windows."""
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        if os.name == "nt":
+            import msvcrt
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b"0")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
+
+
 def _append_audit(record: dict[str, Any]) -> None:
     """Append SHA-256-linked events. A local chain is tamper-evident, not immutable."""
     import hashlib
 
     path = _audit_path()
-    with _AUDIT_LOCK:
+    with _AUDIT_LOCK, _audit_process_lock(path):
         if path.exists():
-            integrity = verify_dependency_audit(path)
+            integrity = _verify_dependency_audit_unlocked(path)
             if integrity.get("valid") is not True:
                 raise OSError("dependency audit chain integrity check failed; refusing to append")
         previous = _AUDIT_GENESIS
@@ -103,7 +132,7 @@ def _append_audit(record: dict[str, Any]) -> None:
                 os.close(descriptor)
 
 
-def verify_dependency_audit(path: Path | None = None) -> dict[str, Any]:
+def _verify_dependency_audit_unlocked(path: Path | None = None) -> dict[str, Any]:
     """Verify sequence and links; cannot detect an attacker rewriting the whole chain."""
     import hashlib
 
@@ -131,6 +160,16 @@ def verify_dependency_audit(path: Path | None = None) -> dict[str, Any]:
     except (OSError, ValueError, KeyError, json.JSONDecodeError):
         return {"valid": False, "events_checked": count, "reason": "unreadable_or_malformed"}
     return {"valid": True, "events_checked": count, "head_hash": previous}
+
+
+def verify_dependency_audit(path: Path | None = None) -> dict[str, Any]:
+    """Verify the audit chain under the same cross-process lock used by writers."""
+    target = path or _audit_path()
+    try:
+        with _AUDIT_LOCK, _audit_process_lock(target):
+            return _verify_dependency_audit_unlocked(target)
+    except OSError:
+        return {"valid": False, "events_checked": 0, "reason": "lock_or_file_error"}
 
 
 def _finish_audit(result: dict[str, Any]) -> dict[str, Any]:
