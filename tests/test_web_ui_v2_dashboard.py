@@ -486,3 +486,28 @@ def test_dashboard_lab_deployment_is_not_present_as_a_live_action(page, live_ser
     page.goto(f"{live_server}/ui-v2")
     assert page.get_by_role("button", name=re.compile(r"Deploy Mock")).count() == 0
     assert page.get_by_text("Explore Lab Environments").is_hidden()
+
+def test_dashboard_engine_state_is_driven_by_live_health_endpoint(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-engine-state')?.textContent === 'ENGINE ONLINE'",
+        timeout=8000,
+    )
+    assert page.get_by_text("WHAXON PLATFORM", exact=True).is_visible()
+    assert page.get_by_text("WHAXON OS 3.12-ALPHA", exact=True).count() == 0
+
+
+def test_dashboard_engine_state_reports_health_failure(page, live_server):
+    page.route(
+        "**/api/health/simple",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"ok":false}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-engine-state')?.textContent === 'ENGINE UNAVAILABLE'",
+        timeout=8000,
+    )
