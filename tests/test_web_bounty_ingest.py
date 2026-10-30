@@ -29,8 +29,8 @@ def test_pasted_program_import_returns_reviewable_draft(page, live_server):
     assert ai["mode"] == "bounded_autonomous_after_approval"
     assert ai["require_human_confirm"] is False
     assert ai["allow_live_requests"] is False
-    assert result["policy_draft"]["execution_enabled"] is False
-    assert result["policy_draft"]["authorization_status"] == "pending_review"
+    assert result["policy_draft"]["ai_policy"]["execution_enabled"] is False
+    assert result["policy_draft"]["ai_policy"]["activation"] == "pending_review"
     assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
     assert result["review"]["scope.out_of_scope"] == "manual_review_required_not_extracted"
     assert any("not proof of authorization" in warning for warning in result["warnings"])
