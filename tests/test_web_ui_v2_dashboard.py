@@ -55,6 +55,42 @@ def test_dashboard_exports_live_history_as_json(page, live_server):
     assert exported_ids == {"seed-job-1", "seed-job-2"}
 
 
+
+def test_dashboard_emergency_halt_uses_live_active_jobs_endpoint(page, live_server):
+    calls = []
+
+    def active_jobs(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"id":"running-job-1","tool":"nmap","target":"127.0.0.1","status":"running"}]',
+        )
+
+    def cancel_job(route):
+        calls.append({"method": route.request.method, "url": route.request.url})
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"ok":true,"job_id":"running-job-1"}',
+        )
+
+    page.route("**/api/jobs/active", active_jobs)
+    page.route("**/api/jobs/running-job-1/cancel", cancel_job)
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 1 of 1')",
+        timeout=5000,
+    )
+    assert len(calls) == 1
+    assert calls[0]["method"] == "POST"
+
+
 def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     page.wait_for_function(
@@ -218,7 +254,7 @@ def test_dashboard_recent_job_rows_use_real_api_fields(page, live_server):
     assert "nmap" in rows.filter(has_text="seed-job-1").inner_text().lower()
     assert "not recorded" in rows.filter(has_text="seed-job-1").inner_text().lower()
     assert rows.filter(has_text="seed-job-1").get_by_role("link", name="View History").get_attribute("href") == "/ui-v2/history"
-    assert page.get_by_text("LIVE STATUS NOT EXPOSED").is_visible()
+    assert page.get_by_text("NO ACTIVE JOBS").is_visible()
     assert page.locator("#dashboard-history-count").inner_text() == "2"
 
 
@@ -247,7 +283,7 @@ def test_dashboard_session_strip_uses_live_scope_and_avoids_fake_runtime_claims(
         timeout=8000,
     )
     assert page.locator("#dashboard-session-target").inner_text() == "https://example.test"
-    assert page.get_by_text("Active-job status not exposed").is_visible()
+    assert page.get_by_text("Active-job status unavailable").is_visible()
     assert page.get_by_text("Version not reported").is_visible()
     assert page.get_by_text("Pre-Flight Boundary Checklist").is_hidden()
     assert page.get_by_text("Explore Lab Environments").is_hidden()
