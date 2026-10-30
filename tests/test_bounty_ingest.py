@@ -87,3 +87,15 @@ def test_html_extractor_ignores_script_and_style_content():
     assert "Program" in result
     assert "In scope" in result
     assert "ignore me" not in result
+
+
+def test_html_table_cells_remain_separate_for_scope_parser():
+    parser = bounty_ingest._VisibleText()
+    parser.feed(
+        "<table><tr><td>https://api.example.org</td>"
+        "<td>API</td><td>High</td></tr></table>"
+    )
+    lines = parser.text().splitlines()
+    assert "https://api.example.org" in lines
+    assert "API" in lines
+    assert "High" in lines
