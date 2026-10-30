@@ -270,7 +270,7 @@ def start_install_operation(
         _ACTIVE_THREADS[operation_id] = thread
     try:
         thread.start()
-    except Exception:
+    except Exception as exc:
         state.update({
             "status": "FAILED",
             "step": "FAILED",
@@ -284,7 +284,7 @@ def start_install_operation(
             lock_path.unlink(missing_ok=True)
             with _LOCK:
                 _ACTIVE_THREADS.pop(operation_id, None)
-        raise RuntimeError("dependency installation worker could not be started")
+        raise RuntimeError("dependency installation worker could not be started") from exc
     return state
 
 
