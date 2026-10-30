@@ -85,14 +85,35 @@ The packaged tool catalog currently includes entries for tools such as Nmap, Nik
 
 Catalog presence does not mean the executable is installed, configured, licensed, or available on every operating system. Adapter support also varies: some tools have dedicated parsers, while other catalog entries may provide execution support without the same level of normalized finding enrichment. Consult [Tools](docs/tools.md) and [Adapters](docs/adapters.md) for details.
 
-## Installation
+## Installation and dependency setup
 
-WHAXON requires Python 3.11 or newer.
+WHAXON requires **Python 3.11 or newer**. The installation workflow is designed to make the environment visible before changing it: install the package, run diagnostics, review missing dependencies, then explicitly approve any supported automated package installation.
 
-### Install the core package and terminal/web extras
+### 1. Prepare an isolated Python environment
+
+Use a virtual environment so WHAXON and its optional packages do not modify your system Python.
+
+Linux / macOS:
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip
+```
+
+Windows PowerShell:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+```
+
+### 2. Install the WHAXON profile you need
+
+Install the core package with the terminal and web interfaces:
+
+```bash
 python -m pip install "whaxon[tui,web]"
 ```
 
@@ -102,15 +123,103 @@ For the desktop interface:
 python -m pip install "whaxon[gui]"
 ```
 
-For development and tests, clone the repository and install the development extras:
+You can combine extras when you want multiple interfaces:
+
+```bash
+python -m pip install "whaxon[tui,web,gui]"
+```
+
+For development and tests, clone the repository and install it in editable mode:
 
 ```bash
 git clone https://github.com/andreipath26/WHAXON-AI-Forensics.git
 cd WHAXON-AI-Forensics
+python -m venv .venv
+# Activate .venv using the command for your operating system
+python -m pip install --upgrade pip
 python -m pip install -e ".[tui,web,dev]"
 ```
 
-External security tools are separate system dependencies. Install only the tools required for your authorized assessment and verify their versions and configuration independently.
+### 3. Run the dependency diagnostics
+
+After installation, use the built-in doctor before starting an assessment:
+
+```bash
+whaxon doctor
+whaxon doctor --json
+whaxon doctor --core-only
+```
+
+The diagnostics inventory checks:
+- Python runtime version and the active interpreter / virtual-environment state.
+- Required core Python distributions, minimum versions, and import availability.
+- Optional Python packages associated with the TUI, desktop, web, and other declared capabilities.
+- External security-tool executables discovered through the packaged tool catalog.
+
+The report classifies dependencies as:
+
+| Status | Meaning |
+| --- | --- |
+| `READY` | Required version and availability checks passed. |
+| `MISSING` | The package or executable was not found. |
+| `INCOMPATIBLE` | An installed version is below the declared minimum. |
+| `BROKEN` | Package metadata, import, or a required packaged resource could not be read. |
+| `DETECTED` | An external executable was found, but has not passed its curated version probe. |
+
+Overall status is `BLOCKED` when a required runtime, package, or resource is not ready. `DEGRADED` indicates optional integrations or external tools are missing or unverified; optional tools do not block unrelated core functionality.
+
+Diagnostics are read-only: they do not install packages, invoke package managers, access the network, elevate privileges, or modify PATH.
+
+### 4. Verify external security tools
+
+To run the bounded version checks for the external tools explicitly listed in the dependency manifest:
+
+```bash
+whaxon doctor --verify
+```
+
+This checks curated version commands for supported tools such as Nmap, Gobuster, SQLmap, Nuclei, ffuf, NetExec, and Arjun. It is a version/readiness check, not a functional scan and not proof that every adapter or tool feature works. External security tools are **not installed by WHAXON's automatic installer**; install and configure them through their trusted platform-specific sources.
+
+### 5. Review a guided remediation plan
+
+If a Python dependency is missing or incompatible, ask WHAXON to prepare a plan:
+
+```bash
+whaxon doctor --plan
+whaxon doctor --plan --check textual
+```
+
+The plan is a preview only. It identifies the dependency, exact proposed command/arguments, package source, environment requirements, network and privilege impact, and whether the manifest permits automated installation. Its plan ID is bound to the current environment, manifest, and action details; changes invalidate the previous approval.
+
+### 6. Approve and run an eligible installation
+
+Only manifest-listed Python packages whose installation is explicitly enabled by policy are eligible. Review the plan first, then submit its exact plan ID:
+
+```bash
+whaxon doctor --install --check textual --approve PLAN_ID
+```
+
+Replace `PLAN_ID` with the ID from the plan you just reviewed. The installer requires an activated virtual environment, uses that environment's Python interpreter and pip, accepts binary wheels only, avoids shell execution and privilege escalation, applies a timeout, and checks the installed version and import afterward. It also records operation and audit events locally.
+
+The approval applies to that exact plan; it is not a blanket permission to install arbitrary packages. If the environment or plan changes, generate and review a fresh plan.
+
+**Important:** pip can install or update transitive dependencies. The plan discloses this impact, but this workflow is not a hash-pinned, offline-reproducible deployment and does not provide automatic rollback. A failed or interrupted install may leave the virtual environment partially changed. Re-run diagnostics and recreate the virtual environment if its state is uncertain.
+
+### 7. Track installation state and environment drift
+
+The web Diagnostics page (`/ui-v2/diagnostics`) presents the environment overview, dependency inventory, guided plan review, and installation progress/post-install verification. Its API supports queued operations, progress retrieval, cancellation, readiness snapshots, drift comparison, and audit-chain verification.
+
+The CLI can also save and compare readiness snapshots:
+
+```bash
+whaxon doctor --snapshot
+whaxon doctor --drift
+```
+
+Snapshots help identify dependency changes over time. They do not install or repair anything.
+
+For the complete implementation contract, API routes, audit behavior, recovery guidance, and remaining deployment gates, see [Dependency readiness and guided installation](docs/dependency-readiness.md).
+
 
 ## First run
 
