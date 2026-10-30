@@ -741,7 +741,7 @@
   title.textContent = "Import a public bug-bounty program";
   const intro = document.createElement("p");
   intro.className = "mt-1 text-sm text-on-surface-variant";
-  intro.textContent = "Use a public YesWeHack program URL or paste the program rules. WHAXON creates a review-only draft; import does not authorize or launch testing.";
+  intro.textContent = "Use a public YesWeHack program URL or paste the program rules. After programme approval, the AI can autonomously handle permitted low-impact work; major decisions still require your approval. Import never authorizes or launches testing.";
   const url = document.createElement("input");
   url.id = "bounty-import-url";
   url.type = "url";
@@ -835,6 +835,14 @@
       result.append(section("Fields requiring review", Object.entries(data.review || {}).map(([field, state]) =>
         field + " · " + state
       )));
+      const aiPolicy = policy.ai_policy || {};
+      result.append(section("AI operating policy", [
+        "Mode: " + (aiPolicy.mode || "not defined"),
+        "Autonomous after approval: " + (aiPolicy.post_approval_autonomous_actions || []).join(", "),
+        "Your approval required for: " + (aiPolicy.human_approval_required_for || []).join(", "),
+        "Activation: " + (policy.authorization_status || "unknown"),
+        "Execution enabled: " + String(policy.execution_enabled === true)
+      ]));
       result.append(section("Review warnings", (data.warnings || []).concat([
         "Missing, contradictory, stale or ambiguous rules must be resolved manually."
       ])));
