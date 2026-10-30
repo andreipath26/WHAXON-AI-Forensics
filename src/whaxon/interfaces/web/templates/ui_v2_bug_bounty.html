@@ -832,6 +832,9 @@
       result.append(section("Source evidence (" + evidence.length + " excerpts)", evidence.map(item =>
         "Line " + item.line + " · " + item.field + " · " + item.excerpt
       ).concat(evidence.length ? [] : ["No source excerpts were extracted."])));
+      result.append(section("Fields requiring review", Object.entries(data.review || {}).map(([field, state]) =>
+        field + " · " + state
+      )));
       result.append(section("Review warnings", (data.warnings || []).concat([
         "Missing, contradictory, stale or ambiguous rules must be resolved manually."
       ])));
