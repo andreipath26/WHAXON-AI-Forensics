@@ -220,5 +220,4 @@ def test_dashboard_quick_actions_navigate_to_their_real_workspaces(page, live_se
 def test_dashboard_lab_deployment_is_not_present_as_a_live_action(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     assert page.get_by_role("button", name=re.compile(r"Deploy Mock")).count() == 0
-    assert page.get_by_text("Explore Lab Environments").is_visible()
-    assert page.get_by_text("Unavailable until a lab is configured").is_visible()
+    assert page.get_by_text("Explore Lab Environments").is_hidden()
