@@ -128,7 +128,7 @@ def apply_approved_dependency_plan(
             return result
     except subprocess.TimeoutExpired as exc:
         result = {**base, "status": "TIMED_OUT", "exit_code": None,
-                  "output": _redact(str(exc)), "recovery": "The pip process was terminated after timeout. Re-run whaxon doctor; recreate the virtual environment if package state is uncertain.", "finished_at": datetime.now(timezone.utc).isoformat()}
+                  "output": _redact(str(exc)), "recovery": "The pip process was terminated after timeout. Re-run whaxon doctor; recreate the virtual environment if package state is uncertain.", "finished_at": datetime.now(UTC).isoformat()}
         result = _finish_audit(result)
         return result
     except KeyboardInterrupt:
