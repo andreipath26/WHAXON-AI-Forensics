@@ -1,6 +1,7 @@
 """Deterministic, read-only remediation planning for dependency diagnostics."""
 from __future__ import annotations
 
+import hashlib
 import json
 import platform
 import shlex
@@ -90,13 +91,18 @@ def build_remediation_plan(*, dependency_ids: list[str] | None = None,
                     "warning": "No trusted platform-specific installer is configured for this dependency.",
                 }],
             })
+    plan_basis = {
+        "selected": sorted(selected),
+        "environment": report["environment"],
+        "manifest": manifest,
+        "actions": actions,
+    }
+    plan_id = "plan-" + hashlib.sha256(
+        json.dumps(plan_basis, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:16]
     return {
         "schema_version": PLAN_SCHEMA_VERSION,
-        "plan_id": "plan-" + __import__("hashlib").sha256(
-            json.dumps({"selected": sorted(selected), "environment": report["environment"],
-                        "manifest_schema": manifest["schema_version"]},
-                       sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()[:16],
+        "plan_id": plan_id,
         "platform": {
             "system": platform.system(),
             "machine": platform.machine(),
