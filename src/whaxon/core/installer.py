@@ -75,9 +75,12 @@ def _audit_process_lock(path: Path):
             os.fchmod(descriptor, 0o600)
         if os.name == "nt":
             import msvcrt
-            locking = getattr(msvcrt, "locking")
-            lock_mode = getattr(msvcrt, "LK_LOCK")
-            unlock_mode = getattr(msvcrt, "LK_UNLCK")
+            locking_name = "locking"
+            lock_mode_name = "LK_LOCK"
+            unlock_mode_name = "LK_UNLCK"
+            locking = getattr(msvcrt, locking_name)
+            lock_mode = getattr(msvcrt, lock_mode_name)
+            unlock_mode = getattr(msvcrt, unlock_mode_name)
             if os.fstat(descriptor).st_size == 0:
                 os.write(descriptor, b"0")
             os.lseek(descriptor, 0, os.SEEK_SET)
