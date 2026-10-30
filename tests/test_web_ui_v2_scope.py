@@ -214,4 +214,85 @@ def test_scope_page_does_not_claim_strict_boundary_enforcement(page, live_server
     assert "SCOPE ENFORCEMENT ENABLED" in header
     assert "STRICT BOUNDARY ENFORCED" not in header
 
+def test_scope_header_does_not_claim_a_target_when_scope_is_empty(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"empty-scope-test","enabled":true,"in_scope":[],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-header-boundary')?.textContent === 'NO TARGET RULE CONFIGURED'",
+        timeout=8000,
+    )
+    assert page.locator("#scope-header-target").inner_text() == "Target: No target configured"
+    assert page.locator("#scope-header-membership").inner_text() == "(NO TARGET RULE)"
+    assert "(IN SCOPE)" not in page.locator("header").inner_text()
+    assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
 
+
+def test_scope_header_reflects_disabled_enforcement(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"disabled-scope-test","enabled":false,"in_scope":["example.test"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-header-boundary')?.textContent === 'SCOPE ENFORCEMENT DISABLED'",
+        timeout=8000,
+    )
+    assert page.locator("#scope-header-membership").inner_text() == "(ENFORCEMENT DISABLED)"
+    assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
+
+
+def test_scope_runtime_header_uses_live_host_port_and_health(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-engine-state')?.textContent === 'API online'",
+        timeout=8000,
+    )
+    location = page.evaluate("() => ({host: location.hostname, port: location.port || (location.protocol === 'https:' ? '443' : '80')})")
+    assert page.locator("#scope-server-host").inner_text() == location["host"]
+    assert page.locator("#scope-server-port").inner_text() == location["port"]
+    assert page.locator("#scope-python-version").inner_text() == "Not reported"
+    assert page.locator("#scope-sidebar-api-state").inner_text() == "API AVAILABLE"
+    assert "OP//7749-ALPHA" not in page.locator("body").inner_text()
+    assert "Lead Security Engineer" not in page.locator("body").inner_text()
+
+
+def test_scope_runtime_header_reports_health_failure(page, live_server):
+    page.route(
+        "**/api/health/simple",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"ok":false}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-engine-state')?.textContent === 'API unavailable'",
+        timeout=8000,
+    )
+    assert page.locator("#scope-sidebar-api-state").inner_text() == "API UNAVAILABLE"
+
+
+def test_scope_demo_hosts_and_deny_rules_are_hidden_until_live_configuration(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    assert page.get_by_text("Discovered Hosts & SSL SAN Intake Queue").is_hidden()
+    assert page.get_by_text("/auth/admin/*", exact=True).is_hidden()
+    assert page.get_by_text("10.0.12.0/24 (Prod DBs)", exact=True).is_hidden()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    assert page.get_by_text("Discovered Hosts & SSL SAN Intake Queue").is_hidden()
+    assert page.get_by_text("/auth/admin/*", exact=True).count() == 0
+    assert page.get_by_text("10.0.12.0/24 (Prod DBs)", exact=True).count() == 0
