@@ -11,13 +11,21 @@ def test_install_job_rejects_stale_plan_before_queueing(tmp_path, monkeypatch):
     monkeypatch.setattr(
         dependency_jobs,
         "load_dependency_manifest",
-        lambda: {"dependencies": [{"id": "sample", "kind": "python-package"}]},
+        lambda: {
+            "dependencies": [{"id": "sample", "kind": "python-package"}],
+            "policy": {
+                "automatic_installation_enabled": True,
+                "automatic_installation_kinds": ["python-package"],
+            },
+        },
     )
     monkeypatch.setattr(
         dependency_jobs,
         "build_remediation_plan",
         lambda **kwargs: {"plan_id": "plan-current", "actions": [], "unknown_dependency_ids": []},
     )
+    monkeypatch.setattr(dependency_jobs.sys, "prefix", "/tmp/whaxon-test-venv")
+    monkeypatch.setattr(dependency_jobs.sys, "base_prefix", "/usr")
     with pytest.raises(ValueError, match="approval does not match"):
         dependency_jobs.start_install_operation("sample", "plan-stale", tmp_path)
     assert list((tmp_path / ".whaxon" / "dependency-operations").glob("*.json")) == []
@@ -40,6 +48,8 @@ def test_install_job_lifecycle_persists_progress_and_result(tmp_path, monkeypatc
             }],
         },
     )
+    monkeypatch.setattr(dependency_jobs.sys, "prefix", "/tmp/whaxon-test-venv")
+    monkeypatch.setattr(dependency_jobs.sys, "base_prefix", "/usr")
     finished = threading.Event()
 
     def fake_install(dependency_id, plan_id, **kwargs):
