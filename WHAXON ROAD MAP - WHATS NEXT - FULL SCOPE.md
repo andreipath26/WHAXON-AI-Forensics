@@ -9,6 +9,21 @@
 - **URGENT** — do before other queued work
 - **OUT** — explicitly excluded, never built
 
+## Foundational operating principles — five, all mandatory
+
+These principles apply to every WHAXON subsystem that plans or performs consequential work, including dependency readiness, tool execution, validation, autonomous agents, evidence handling and reporting. They are architectural invariants, not optional UX guidance.
+
+1. **Deterministic plans.** The executable plan is produced and checked by deterministic code against versioned policy, manifest, environment and capability constraints. AI may explain or recommend, but cannot silently rewrite the executable plan.
+2. **Explicit, informed consent.** Consequential actions require approval bound to the exact plan, scope, parameters, impact and expiry. A profile, prior approval, UI state or model response is not blanket authorization.
+3. **Bounded execution.** Execution is allowlisted, least-privilege, resource-limited, cancellable and constrained by the approved plan. Any material change invalidates approval and requires a new review.
+4. **Independent verification.** Success is established by a separate verification step and evidence, not by an installer exit code, tool assertion, UI state or agent claim. Unverified outcomes remain explicitly unverified.
+5. **Leave evidence.** Every plan, approval decision, action, verification and recovery must produce an attributable, timestamped, tamper-evident and reviewable audit event. The record must connect what was proposed, what was approved, what actually executed, what was observed, and how the final state was determined. It must record denials, cancellations, failures, exceptions and recovery—not only successful outcomes. Missing or failed audit writes must never be represented as a fully compliant success. Auditability is what makes principles 1–4 enforceable after the fact.
+
+**Evidence-chain requirements:** use stable event/operation/plan identifiers; record actor and approval basis; bind approval to a canonical plan digest and policy/manifest version; capture exact bounded action identity and parameters; record start/end/outcome, timestamps and relevant environment; link verification inputs/results and evidence digests; record recovery decisions and final state. Protect records against silent alteration/deletion, restrict access, redact secrets and minimize personal data. Provide export and integrity-check mechanisms. Do not claim tamper-evidence merely because a file is append-only: use a verifiable hash chain or equivalent integrity mechanism, with an explicit trust anchor and documented limitations.
+
+A capability is DONE only when tests prove the evidence chain is complete across success, rejection, cancellation, timeout, crash/interruption, audit-write failure and recovery paths. A missing event, unverifiable chain, or approval/action mismatch is a release blocker for consequential workflows.
+
+
 ## Repository reality check — 2026-10-25 (reconciled against source tree)
 
 This section supersedes stale progress estimates and any older status statements below where they conflict. It is a repository inspection, not a claim that every capability has passed end-to-end acceptance testing.
@@ -44,6 +59,47 @@ The framework has advanced substantially beyond the older `docs/STATE.md` snapsh
 **Status vocabulary for this reconciliation:** “Implemented in source” means code/tests exist; “verified” means the relevant automated or end-to-end check was actually observed passing; “released” means a release artifact/tag/publication was independently confirmed. These statuses are not interchangeable.
 
 ---
+
+---
+
+## MAIN ENGINEERING RULE — PARALLEL, DEPENDENCY-DRIVEN DEVELOPMENT
+
+**NON-NEGOTIABLE. Applies to every WHAXON phase, subsystem, interface, and release.**
+
+Develop WHAXON through coordinated parallel workstreams wherever work can safely proceed independently. Roadmap phases define scope, dependencies, and acceptance criteria; they do not require needless serial execution. Optimise for the shortest verified end-to-end delivery time without sacrificing architecture, security, evidence, or release quality.
+
+### Required rules
+
+1. **One source of truth:** the roadmap, repository state, dependency graph, decisions, PRs, and acceptance evidence must stay aligned.
+2. **Map dependencies first:** identify prerequisites and stable interfaces. Parallelise independent work; sequence only genuine dependencies and safety gates.
+3. **Prioritise the critical path:** work first on blockers that prevent the most downstream progress. Recalculate when conditions change.
+4. **Agree contracts before parallel work:** define shared schemas, APIs, state machines, error semantics, security boundaries, evidence formats, and compatibility requirements.
+5. **Bounded ownership:** assign each workstream explicit scope, owner, files/interfaces, dependencies, deliverables, and tests. Avoid concurrent edits to the same files; coordinate shared-file changes through one integration owner.
+6. **Integrate continuously:** merge small increments against shared contracts; run focused tests immediately and broader regression at integration boundaries. Do not wait for an entire phase.
+7. **Independent adversarial review:** security, authorization, scope enforcement, evidence integrity, and recovery require review separate from implementation wherever practical.
+8. **Verification is part of the task:** code presence or an agent's assertion is not completion. Require relevant unit, integration, security, browser/E2E, packaging, and compatibility checks; record actual results.
+9. **Preserve the five principles:** know the environment; understand impact; recommend before acting; act only with consent; leave durable, attributable, tamper-evident evidence. Parallelism never bypasses them.
+10. **Bound concurrency:** use isolated branches/worktrees where available, sensible worker limits, small changesets, explicit merge order, and one integration authority. Avoid duplicated effort and uncontrolled agent spawning.
+11. **Record failure and recovery:** blocked work, failed checks, partial effects, cancellation, uncertain outcomes, conflicts, and recovery must be visible. Never claim success when outcome or evidence is unknown.
+12. **Release on integrated evidence:** phase/release completion requires all components to work together and acceptance gates to pass. Individually completed components do not equal a working platform.
+
+### Standard workstream lifecycle
+
+Define outcome and acceptance tests → map dependencies and interfaces → assign bounded ownership → implement independent tasks concurrently → test against contracts → integrate continuously → conduct independent review → run cross-component regression → record evidence and update status.
+
+### Required coordination records
+
+Maintain an active dependency graph and critical path; a workstream register (scope, ownership, status, blockers, affected paths, acceptance); shared contract/version decisions; integration queue and merge order; and verification records linking completion claims to commands, CI runs, reviews, and limitations.
+
+### Concurrency decision
+
+Parallelise only when interfaces are stable, ownership is isolated, and outcomes are independently testable. Sequence work when another task changes its contract, data model, security boundary, migration, or precondition. If safe ownership is unclear, resolve or split the work first. Do not parallelise merely to increase agent count.
+
+### Success measures
+
+Optimise verified end-to-end lead time, early blocker discovery, low integration conflict, reduced rework, and reliable release acceptance—not agent count, branch count, lines of code, or reported completion percentages.
+
+**This rule supersedes older roadmap wording that implies unnecessary serial execution.** Existing phase order remains binding wherever a real dependency, safety gate, or acceptance prerequisite requires it.
 
 ---
 
@@ -2156,6 +2212,70 @@ WHAXON should identify whether its runtime requirements and selected external to
 9. **Offline and restricted environments:** Support diagnostic-only mode and documented manual installation when internet, package managers, permissions or repositories are unavailable.
 10. **Documentation and diagnostics:** Provide human-readable and machine-readable reports, actionable remediation, and copyable diagnostics that redact secrets and sensitive paths where appropriate.
 
+## 40.2A Architecture decisions — authoritative dependency intelligence
+
+The implementation must be a deterministic subsystem shared by CLI, web UI and first-run workflows. The UI must never reimplement dependency detection or make readiness decisions.
+
+### Architecture and trust boundaries
+
+- **Manifest:** one versioned, schema-validated source of truth for Python/runtime requirements, optional Python extras, external executables, data assets, service integrations and platform prerequisites. Each record has a stable ID, type, required/optional status, version constraints, platform/architecture rules, detection strategy, capability dependencies, trusted installation alternatives, privilege/network/cost impact, source provenance, integrity requirements, smoke-test definition and recovery guidance.
+- **Environment detector:** read-only inspection of OS/distribution/version, architecture, Python implementation/version, active interpreter/venv, installed distributions, executable resolution and version, configured resource paths, permissions, writable directories, package-manager availability, network/offline state and relevant runtime libraries. Collect only what is necessary; redact secrets and avoid transmitting inventory.
+- **Readiness evaluator and capability graph:** map dependency → adapter/integration → capability → UI workflow. A missing optional tool degrades only dependent capabilities. A dependency can be present yet incompatible, misconfigured or broken. Readiness is evidence-based, timestamped and platform-aware.
+- **Remediation planner:** produce structured, deterministic plans before execution. Rank supported options by trust, compatibility, least privilege, user-local installability, offline support, blast radius, reproducibility and recoverability. Include official manual instructions where automation is unsupported.
+- **Consent/policy gate:** installation is a separate explicit operation. Show exact source, package/version, command/arguments, privileges, system changes, network/bandwidth and potential cost. No silent installs, privilege elevation, arbitrary shell commands, or commands copied from AI/tool output.
+- **Executor and transaction journal:** allowlisted operations only; argument arrays rather than shell strings; bounded timeout/output; cancellation; operation IDs; before/after state; exit status; sanitized logs; partial-failure and rollback/recovery metadata. Do not claim atomic rollback for package managers that cannot guarantee it.
+- **Verifier and readiness registry:** re-detect executable/version/path after installation and run safe local smoke tests. Exit code zero or installer success alone never establishes readiness. Track detection, install and verification evidence separately; require restart/re-check when PATH or process state changes.
+- **AI boundary:** AI may explain diagnostics and summarize approved plans, but cannot author executable commands, approve actions, change manifest trust, bypass consent, or mark dependencies ready.
+
+### Canonical readiness lifecycle
+
+Use explicit states: `UNKNOWN`, `UNCHECKED`, `MISSING`, `INCOMPATIBLE`, `MISCONFIGURED`, `BROKEN`, `READY`, `DEGRADED`, `UNSUPPORTED`, `INSTALL_PLANNED`, `AWAITING_APPROVAL`, `INSTALLING`, `VERIFYING`, `FAILED`, and `RESTART_REQUIRED`. Store reason, observed version/path, required constraint, detection time, verification method/result, affected capabilities and next safe action. Never infer READY from presence alone.
+
+### Installation profiles and operating modes
+
+Provide profiles such as **Core**, **Web assessment**, **Network assessment**, **Full toolkit** and **Custom**. Profiles are selections, not permission to install: each package still requires a reviewable plan and explicit approval. Support read-only diagnostics, plan-only mode, approved online installation, offline/manual guidance and restricted/no-root operation. Detect conflicting binaries and multiple versions rather than silently selecting an unsafe executable.
+
+### CLI contract
+
+- `whaxon doctor` — read-only environment and dependency report.
+- `whaxon doctor --json` — stable machine-readable report with schema version.
+- `whaxon doctor --check <dependency-id>` — focused read-only check.
+- `whaxon doctor --plan [profile|dependency-id]` — generate a remediation plan without executing it.
+- `whaxon doctor --verify` — re-detect and run safe verification checks.
+- Installation must use a distinct explicit command/workflow with a plan identifier and approval; `doctor` and `--plan` must never install.
+
+### Audit, privacy and resilience
+
+Record who/what initiated a check or install, manifest version/hash, plan and approval, exact selected source/arguments, timestamps, outcome and verification evidence. Redact credentials, tokens, environment secrets and unnecessary personal paths. Support offline operation, package-manager failure, interruption, cancellation, timeout, corrupt downloads, untrusted/malformed installer output and retry without duplicating unsafe side effects. Verify package integrity/signatures where upstream provides a trustworthy mechanism; do not invent signature guarantees.
+
+### Four-screen UX scope (design-locked)
+
+The dependency feature is delivered through four screens/states that extend the **currently active approved WHAXON UI**. The checked-in UI package under `web ui files and rendering/`, its design tokens, components, navigation, typography, spacing, colors, responsive behavior and interaction patterns are the only visual source of truth. Before coding the screens, inspect the exact current UI assets and active implementation; reuse their existing components and layout primitives. Do not create a new design system, alternate dashboard, new navigation metaphor, or generic installer wizard.
+
+1. **Environment Overview** — embedded in the existing Diagnostics/Health destination. Reuse the existing page shell, cards, status chips, KPI/list patterns and notification conventions. Summarize overall readiness, last check, platform/runtime, core health and degraded capabilities. Primary action is read-only **Check environment**.
+2. **Dependency Inventory** — same established page family and table/list treatment. Group runtime/core, optional Python extras, external tools and resources. Rows show detected/required version, path where safe, status, dependent capabilities and concise reason. Filters/search must use existing UI patterns.
+3. **Guided Fix / Plan Review** — a detail panel or slide-over using the existing UI's established drawer/modal pattern, not a novel full-screen wizard. Show impact, supported options, offline/manual fallback, exact proposed command/source, privilege/network/cost/system-change disclosure and explicit approve/cancel actions. Approval is required for each install operation.
+4. **Installation Progress & Verification** — reuse existing job/progress/log/result components. Show operation ID, current step, bounded progress, cancellation, sanitized output, failure/recovery guidance and post-install verification evidence. Only verified success receives the existing success treatment; installer exit code alone is insufficient.
+
+All four must be responsive and keyboard accessible using the current UI conventions. If the current design lacks a component, extend its existing design tokens/component language minimally and document the addition before use. Preserve supplied reference assets and existing routes. No decorative/mock controls: every action calls a real backend contract or is disabled with an explanation.
+
+## 40.2B Implementation module boundaries (provisional; reconcile with actual source layout)
+
+Prefer existing package conventions after repository inspection. The conceptual separation is:
+- dependency models/schema and manifest loader/validator;
+- platform/environment detector;
+- executable/package/resource probes;
+- capability graph and readiness evaluator;
+- deterministic remediation planner;
+- consent/policy service;
+- allowlisted installer executor and transaction journal;
+- safe smoke-test verifier and readiness registry;
+- audit/redaction utilities;
+- CLI doctor/plan/verify commands;
+- web API routes and UI integration.
+
+Do not create parallel abstractions if equivalent services already exist. Keep detection and planning usable without Flask, GUI extras or an AI provider.
+
 ## 40.3 Acceptance criteria
 
 - Test on clean and partially provisioned environments for each supported OS/platform.
@@ -2168,6 +2288,16 @@ WHAXON should identify whether its runtime requirements and selected external to
 - Confirm preflight and post-install results agree with the actual executable/version and the §39 tool-readiness states.
 - Add CI tests for manifest validation, dependency detection and mocked installation flows; use isolated clean-environment integration tests for actual installer behavior.
 - Update packaging, install documentation and §38 release acceptance checklist once implemented.
+
+## 40.5 Expanded release gates and measurement
+
+- **False-readiness rate is the primary safety metric:** no dependency may be reported READY when its version, executable identity, configured path or required smoke test fails. Track false-ready cases separately from false-missing cases.
+- Maintain a supported platform matrix with explicit tested/untested labels: Windows 11, Ubuntu/Debian, Kali, Fedora and macOS where supported; include restricted/no-root Linux and offline operation. Test Python 3.11, 3.12 and 3.13 where applicable.
+- Exercise wrong versions, conflicting binaries, broken symlinks, PATH changes, missing resources, unavailable package managers, permission denial, network loss, corrupt packages, interrupted/cancelled installs, timeouts, malformed or hostile installer output, failed smoke tests and required process restart.
+- Test manifest schema compatibility, deterministic JSON output, dependency-to-capability impact, no-install behavior of diagnostics/planning, explicit consent enforcement, redaction, audit completeness and idempotent retry.
+- Add reproducible environment snapshots and drift detection without collecting unrelated host inventory. Support verified offline bundles where feasible.
+- Installation profiles must be reproducible and version-aware; lock/package constraints must not silently upgrade unrelated dependencies.
+- §38 release gate must include clean install for core and each optional extra, wheel/sdist parity, dependency diagnostics on clean/partial environments, and proof that optional missing dependencies do not break core workflows.
 
 ## 40.4 Recommended implementation order
 
@@ -2187,6 +2317,38 @@ WHAXON should identify whether its runtime requirements and selected external to
 
 **Status:** Queued. UI work must be implemented after the corresponding backend contracts are defined, and must use the existing approved WHAXON UI design and navigation. This is an extension of existing screens, not a redesign.
 
+## 40.6 Implementation tracker — dependency readiness (2026-10-30)
+
+Implementation is being delivered in independently reviewable stages. The status below describes code present on the dependency-readiness feature branch; it is **not** a declaration that the feature is deployment-ready or merged to `main`.
+
+### Implemented foundation
+
+- **Manifest and diagnostics:** versioned `src/whaxon/data/dependencies.json`; required/optional Python dependencies and profiles; read-only runtime/package/import-resolvability checks; external executable discovery; machine-readable report; `whaxon doctor`.
+- **Remediation planning:** deterministic plan preview, explicit dependency selection, plan ID bound to the current environment, manifest and action details; no command execution during planning.
+- **Restricted package installer:** separate explicit approval operation; manifest allowlist; active-virtual-environment requirement; fixed PyPI index; binary wheels only; no shell or privilege escalation; bounded timeout; post-install version/import check; local operation audit.
+- **External version probes:** explicit, manifest-curated probes only for selected tools; subprocess argument arrays, no shell, bounded timeout/output, no target activity. Presence alone remains `DETECTED`; probe success is only version verification, not full functional smoke-test evidence.
+- **Readiness history:** bounded local snapshots, restrictive file permissions where supported, atomic file replacement, drift comparison, and omission of the current working directory from saved snapshots.
+- **Backend API:** authenticated Flask endpoints for diagnostics, explicit verification, plan preview, queued approved installation, operation polling/cancellation, snapshot/history and drift. Routes inherit the server's request-origin/host/authentication boundary.
+- **Installation operation lifecycle:** durable per-operation state files, cross-worker polling, per-dependency lock files, progress heartbeats, bounded subprocess execution, cancellation markers, stale-worker interruption detection and post-install verification.
+- **Canonical UI integration:** the four dependency states are embedded in the existing `/ui-v2/diagnostics` page, reusing its checked-in shell, tokens, typography, spacing and table/button patterns. No new navigation or design system was introduced. Browser regression tests cover the panel and explicit plan-approval gate.
+- **Initial tests and docs:** detection, plan, approval, installer, version-probe, history/drift and API tests have been added; operator documentation describes supported commands and safety limits.
+
+### Remaining before deployment
+
+1. Resolve every lint/type/test/build failure and pass the complete CI matrix on Python 3.11, 3.12 and 3.13.
+2. Validate packaging: wheel and sdist must include the manifest and tool catalog; test `whaxon doctor` from a clean installed wheel.
+3. Expand dependency detection to configured resource paths, conflicting binaries, executable identity, platform support and OS-specific runtime requirements.
+4. Complete external-tool verification with reviewed per-tool version and harmless local smoke-test contracts; do not promote version-only checks to full READY when a capability requires more evidence.
+5. Complete installation profiles, supported platform-specific options, official-source provenance, offline/manual paths, integrity checks where upstream supports them, and no-root/restricted-host behavior.
+6. Strengthen installer transaction behavior: cancellation, process termination, partial state reporting, audit failure handling, interrupted process recovery and safe retry. Do not claim rollback unless guaranteed.
+7. Complete end-to-end UI hardening for the four states now embedded in `/ui-v2/diagnostics`: validate responsive layouts, keyboard/screen-reader behavior, error/empty/loading states, install polling/cancellation, manual-only plans and all backend error responses. Keep the current checked-in design language; no UI redesign.
+8. Run the §40.3/§40.5 clean-environment matrix and measure false-readiness; record tested vs untested platforms explicitly.
+9. Update §38 release gates and release notes; merge only after review and green CI.
+
+### Deployment gate
+
+The current branch/PR remains a draft while these gates are outstanding. No dependency screen should be exposed as a finished user workflow until its backend contract, active-UI integration, accessibility and end-to-end tests are complete. A missing optional integration must degrade only its dependent capabilities; a false READY classification is a release-blocking defect.
+
 ## 41.1 Non-negotiable UI rules
 
 - Preserve the supplied/approved UI design, existing navigation patterns, typography, colors, spacing and interaction conventions. Do not introduce an alternative visual design.
@@ -2194,6 +2356,10 @@ WHAXON should identify whether its runtime requirements and selected external to
 - Do not present mock controls as functional. Every visible action must be connected to a real backend operation, or be clearly disabled with an explanation until the backend capability exists.
 - Preserve existing behavior and routes. Add regression coverage for existing controls affected by these changes.
 - Use accessible labels, keyboard navigation, clear loading/error/empty/success states and responsive layouts.
+
+### 41.1A Four-screen design lock
+
+The four dependency screens are exactly: (1) Environment Overview, (2) Dependency Inventory, (3) Guided Fix / Plan Review, and (4) Installation Progress & Verification. They must visually and behaviorally belong to the UI currently being actively implemented, not the deprecated Flask UI or a fresh redesign. Use the exact checked-in `web ui files and rendering/` references and the active UI implementation as the authority. Reuse its navigation, page shell, components, tokens, typography, spacing, color semantics, drawers/modals, tables, progress indicators and notification patterns. Do not add a fifth screen or a new top-level navigation item unless the active UI information architecture demonstrably requires it. Keep the four screens within the existing Diagnostics/Health and Settings workflow.
 
 ## 41.2 Dependency Readiness UI
 
