@@ -167,3 +167,29 @@ def test_burp_rejects_external_entities(tmp_path):
         encoding="utf-8",
     )
     assert BurpAdapter().parse_file(xml_file) == []
+
+
+def test_nikto_261_parses_plugin_ids_full_urls_and_see_references():
+    lines = _stdout([
+        "+ [750001] http://localhost:8080/actuator/env: Spring Boot Actuator endpoint exposes environment properties. See: https://www.zaproxy.org/docs/alerts/10095/",
+        "+ [750004] http://localhost:8080/actuator/beans: Spring Boot Actuator endpoint exposes application beans.",
+        "+ [750500] /config/: Directory indexing found.",
+        "+ [013587] /: Suggested security header missing: x-content-type-options.",
+    ])
+    findings = NiktoAdapter().parse(lines)
+    assert len(findings) == 4
+
+    by_id = {finding.data.get("nikto_id"): finding for finding in findings}
+    assert by_id["750001"].data["path"] == "/actuator/env"
+    assert by_id["750001"].severity == "high"
+    assert by_id["750001"].cwe == "CWE-200"
+    assert "Nikto-750001" in by_id["750001"].references
+    assert by_id["750001"].data["see"] == "https://www.zaproxy.org/docs/alerts/10095/"
+    assert "https://www.zaproxy.org/docs/alerts/10095/" in by_id["750001"].references
+
+    assert by_id["750004"].data["path"] == "/actuator/beans"
+    assert by_id["750004"].severity == "high"
+    assert by_id["750500"].data["path"] == "/config/"
+    assert by_id["750500"].severity == "medium"
+    assert by_id["013587"].data["path"] == "/"
+    assert by_id["013587"].severity == "low"
