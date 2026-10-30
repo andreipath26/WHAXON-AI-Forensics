@@ -49,3 +49,24 @@ def test_focused_doctor_optional_degradation_does_not_block(monkeypatch, capsys,
     assert result == 0
     assert report["overall_status"] == "DEGRADED"
     assert report["summary"]["optional_degraded"] == 1
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--plan", "--verify"],
+        ["--plan", "--snapshot"],
+        ["--plan", "--drift"],
+        ["--plan", "--install", "--check", "textual", "--approve", "plan-0123456789abcdef"],
+        ["--verify", "--core-only"],
+        ["--install", "--snapshot", "--check", "textual", "--approve", "plan-0123456789abcdef"],
+    ],
+)
+def test_doctor_rejects_conflicting_modes(arguments, capsys):
+    with pytest.raises(SystemExit) as error:
+        doctor_cmd.main(arguments)
+    assert error.value.code == 2
+    assert "cannot be combined" in capsys.readouterr().err
