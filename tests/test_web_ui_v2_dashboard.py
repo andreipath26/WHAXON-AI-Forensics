@@ -23,11 +23,16 @@ def test_dashboard_filter_narrows_live_job_history(page, live_server):
         "() => [...document.querySelectorAll('table tbody tr')].some(row => row.textContent.includes('seed-job-1'))",
         timeout=8000,
     )
-    filter_input = page.get_by_role("textbox", name="Filter recent job history by ID, target, or operator")
+    filter_input = page.get_by_role("textbox", name="Filter recent job history by ID, target, or tool")
     filter_input.fill("seed-job-1")
     visible_rows = page.locator("table tbody tr:visible")
     assert visible_rows.count() == 1
     assert "seed-job-1" in visible_rows.first.inner_text()
+    filter_input.fill("nikto")
+    assert visible_rows.count() == 1
+    assert "seed-job-2" in visible_rows.first.inner_text()
+    filter_input.fill("")
+    assert visible_rows.count() == 2
 
 
 def test_dashboard_exports_live_history_as_json(page, live_server):
@@ -46,7 +51,8 @@ def test_dashboard_exports_live_history_as_json(page, live_server):
     with open(path, encoding="utf-8") as file:
         payload = json.load(file)
     assert isinstance(payload.get("jobs"), list)
-    assert any(job.get("id") == "seed-job-1" or job.get("job_id") == "seed-job-1" for job in payload["jobs"])
+    exported_ids = {job.get("id") or job.get("job_id") for job in payload["jobs"]}
+    assert exported_ids == {"seed-job-1", "seed-job-2"}
 
 
 def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_server):
@@ -199,6 +205,21 @@ def test_dashboard_shows_api_failures_as_unavailable_not_zero_or_empty(page, liv
     assert cards.filter(has_text="Verified Findings").get_by_text("—").is_visible()
     assert cards.filter(has_text="Active Adapters").get_by_text("—").is_visible()
     assert page.locator("table tbody").get_by_text("No job history has been recorded yet.").count() == 0
+
+
+ 
+def test_dashboard_recent_job_rows_use_real_api_fields(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('seed-job-1')",
+        timeout=8000,
+    )
+    rows = page.locator("table tbody tr")
+    assert "nmap" in rows.filter(has_text="seed-job-1").inner_text().lower()
+    assert "not recorded" in rows.filter(has_text="seed-job-1").inner_text().lower()
+    assert rows.filter(has_text="seed-job-1").get_by_role("link", name="View History").get_attribute("href") == "/ui-v2/history"
+    assert page.get_by_text("LIVE STATUS NOT EXPOSED").is_visible()
+    assert page.locator("#dashboard-history-count").inner_text() == "2"
 
 
 def test_dashboard_add_new_engagement_control_is_wired(page, live_server):
