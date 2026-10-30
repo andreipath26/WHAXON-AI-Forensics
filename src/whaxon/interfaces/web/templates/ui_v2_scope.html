@@ -709,13 +709,17 @@
     const area = $("importDrawer")?.querySelector("textarea");
     let parsed;
     try { parsed = JSON.parse(area?.value || ""); } catch (_) { say("Import must be valid JSON.", false); return; }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      say("Import must be a JSON object.", false);
+      return;
+    }
     let incoming;
     if (Array.isArray(parsed.in_scope) || Array.isArray(parsed.out_of_scope)) {
-      incoming = {engagement: parsed.engagement ?? scope.engagement, enabled: parsed.enabled ?? true,
+      incoming = {engagement: parsed.engagement ?? scope.engagement, enabled: parsed.enabled ?? (scope.enabled !== false),
         in_scope: parsed.in_scope ?? [], out_of_scope: parsed.out_of_scope ?? [], notes: parsed.notes ?? ""};
     } else if (typeof parsed.target === "string" && Array.isArray(parsed.include) && Array.isArray(parsed.exclude)) {
       if (parsed.exclude.some(v => String(v).startsWith("/"))) { say("URL path exclusions are not supported by WHAXON host scope rules.", false); return; }
-      incoming = {engagement: scope.engagement, enabled: true, in_scope: [parsed.target, ...parsed.include], out_of_scope: parsed.exclude, notes: scope.notes};
+      incoming = {engagement: scope.engagement, enabled: scope.enabled !== false, in_scope: [parsed.target, ...parsed.include], out_of_scope: parsed.exclude, notes: scope.notes};
     } else { say("Expected scope.json with in_scope/out_of_scope lists, or {target, include, exclude} host rules.", false); return; }
     try { if (await save(incoming, true)) close(); }
     catch (error) { say(error.message, false); }
