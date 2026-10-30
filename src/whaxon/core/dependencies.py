@@ -237,6 +237,10 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                     if path else f"Executable '{binary}' was not found on PATH."
                 )
                 probe = external_probe_specs.get(tool_id)
+                # The writable tool catalog may discover binaries, but it must
+                # never redirect a trusted probe to a different executable.
+                if probe and probe.get("binary") != binary:
+                    probe = None
                 if path and verify_external and probe:
                     try:
                         completed = subprocess.run(
