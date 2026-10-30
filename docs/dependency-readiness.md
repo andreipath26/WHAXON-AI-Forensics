@@ -43,15 +43,17 @@ The packaged source of truth is `src/whaxon/data/dependencies.json`. It currentl
 
 ## Not implemented yet
 
-The deterministic remediation planner is available with `whaxon doctor --plan`; it produces a plan ID and never executes commands. One manifest-listed Python package can be installed only with `whaxon doctor --install --check ID --approve PLAN_ID`, after a fresh plan has been reviewed. This operation requires an active virtual environment, uses a fixed PyPI index and binary wheels, and records an operation audit.
+The deterministic remediation planner is available with `whaxon doctor --plan`; it produces a plan ID and never executes commands. One manifest-listed Python package can be installed only with `whaxon doctor --install --check ID --approve PLAN_ID`, after a fresh plan has been reviewed. This CLI operation requires an active virtual environment, uses a fixed PyPI index and binary wheels, and records an operation audit. The web UI queues the same approved operation in a background worker, exposes progress polling and a cancellation request, and records a durable local operation state.
 
 The CLI also supports `--snapshot` and `--drift`. The local history is bounded to 100 snapshots and stored under `<data-dir>/.whaxon/dependency-readiness.json` with restrictive file permissions where supported. Snapshots omit the current working directory and raw executable paths; paths are represented by one-way fingerprints so drift can be detected without persisting personal directory names.
 
-The authenticated web API exposes:
+The canonical `/ui-v2/diagnostics` page now contains the dependency overview, inventory, plan-review and installation-progress states. It reuses the current page shell, palette, typography, spacing, tables and button treatments; no new navigation or design system was added. The UI uses the following authenticated web API:
 - `GET /api/dependencies` — read-only diagnostics.
 - `POST /api/dependencies/verify` — explicit curated version probes.
 - `POST /api/dependencies/plan` — read-only plan preview.
-- `POST /api/dependencies/install` — exact plan-ID approved package installation.
+- `POST /api/dependencies/install` — queues an exact plan-ID approved package installation and returns an operation ID.
+- `GET /api/dependencies/install/<operation-id>` — poll operation state, progress and verification result.
+- `POST /api/dependencies/install/<operation-id>/cancel` — request cancellation; the worker terminates the package-manager process and reports possible partial state.
 - `POST /api/dependencies/snapshots` and `GET /api/dependencies/history` — local history.
 - `GET /api/dependencies/drift` — compare against the latest snapshot.
 
