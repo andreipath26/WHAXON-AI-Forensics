@@ -22,6 +22,12 @@ def main(args: list[str] | None = None) -> int:
                         help="Show one dependency only (read-only).")
     parser.add_argument("--plan", action="store_true",
                         help="Generate a remediation preview; never executes commands.")
+    parser.add_argument("--verify", action="store_true",
+                        help="Run only manifest-curated, bounded external version probes.")
+    parser.add_argument("--snapshot", action="store_true",
+                        help="Save a local readiness snapshot after diagnostics.")
+    parser.add_argument("--drift", action="store_true",
+                        help="Compare current readiness with the latest saved snapshot.")
     parser.add_argument("--install", action="store_true",
                         help="Install one dependency after explicit plan-ID approval.")
     parser.add_argument("--approve", metavar="PLAN_ID",
@@ -31,6 +37,8 @@ def main(args: list[str] | None = None) -> int:
     parser.add_argument("--core-only", action="store_true",
                         help="Skip optional Python extras and external tool checks.")
     ns = parser.parse_args(args)
+    if ns.snapshot and ns.drift:
+        parser.error("--snapshot and --drift cannot be combined")
     if ns.install:
         if not ns.check or not ns.approve:
             parser.error("--install requires both --check DEPENDENCY_ID and --approve PLAN_ID")
@@ -54,6 +62,7 @@ def main(args: list[str] | None = None) -> int:
         data_dir=ns.data,
         include_optional=not ns.core_only,
         include_external=not ns.core_only,
+        verify_external=ns.verify,
     )
     if ns.check:
         matches = [d for d in report["dependencies"] if d["id"] == ns.check]
@@ -65,6 +74,18 @@ def main(args: list[str] | None = None) -> int:
         report["overall_status"] = (
             "READY" if all(d["status"] == "READY" for d in matches) else "DEGRADED"
         )
+    if ns.snapshot:
+        from whaxon.core.dependency_history import record_snapshot
+
+        snapshot = record_snapshot(report, ns.data)
+        print(json.dumps(snapshot, indent=2, sort_keys=True))
+        return 0
+    if ns.drift:
+        from whaxon.core.dependency_history import compare_with_latest
+
+        drift = compare_with_latest(report, ns.data)
+        print(json.dumps(drift, indent=2, sort_keys=True))
+        return 0
     if ns.as_json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
