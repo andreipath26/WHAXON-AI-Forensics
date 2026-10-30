@@ -70,9 +70,32 @@ def main(args: list[str] | None = None) -> int:
             print(f"Unknown dependency id: {ns.check}")
             return 2
         report["dependencies"] = matches
-        report["summary"] = {"total": 1, "ready": sum(d["status"] == "READY" for d in matches)}
+        ready = sum(item["status"] == "READY" for item in matches)
+        missing = sum(item["status"] == "MISSING" for item in matches)
+        incompatible = sum(item["status"] == "INCOMPATIBLE" for item in matches)
+        broken = sum(item["status"] == "BROKEN" for item in matches)
+        required_blockers = sum(
+            bool(item.get("required")) and item["status"] != "READY"
+            for item in matches
+        )
+        optional_degraded = sum(
+            not item.get("required") and item["status"] != "READY"
+            for item in matches
+        )
+        report["summary"] = {
+            "total": len(matches),
+            "ready": ready,
+            "missing": missing,
+            "detected_unverified": sum(item["status"] == "DETECTED" for item in matches),
+            "incompatible": incompatible,
+            "broken": broken,
+            "required_blockers": required_blockers,
+            "optional_degraded": optional_degraded,
+        }
         report["overall_status"] = (
-            "READY" if all(d["status"] == "READY" for d in matches) else "DEGRADED"
+            "BLOCKED" if required_blockers
+            else "DEGRADED" if optional_degraded or missing or incompatible or broken
+            else "READY"
         )
     if ns.snapshot:
         from whaxon.core.dependency_history import record_snapshot
