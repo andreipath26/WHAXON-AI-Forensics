@@ -164,3 +164,14 @@ def test_manifest_covers_all_declared_runtime_dependencies():
         if item["kind"] == "python-package"
     }
     assert declared <= manifest_ids
+
+
+def test_version_comparison_handles_prereleases_and_zero_padding():
+    from whaxon.core.dependencies import _version_tuple
+
+    assert _version_tuple("2.6.0") == _version_tuple("2.6")
+    assert _version_tuple("2.6rc1") < _version_tuple("2.6")
+    assert _version_tuple("2.6b2") < _version_tuple("2.6rc1")
+    assert _version_tuple("2.6.dev1") < _version_tuple("2.6a1")
+    assert _version_tuple("2.6.post1") > _version_tuple("2.6")
+    assert _version_tuple("2.6+vendor.1") == _version_tuple("2.6")
