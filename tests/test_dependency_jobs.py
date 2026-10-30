@@ -35,7 +35,13 @@ def test_install_job_lifecycle_persists_progress_and_result(tmp_path, monkeypatc
     monkeypatch.setattr(
         dependency_jobs,
         "load_dependency_manifest",
-        lambda: {"dependencies": [{"id": "sample", "kind": "python-package"}]},
+        lambda: {
+            "dependencies": [{"id": "sample", "kind": "python-package"}],
+            "policy": {
+                "automatic_installation_enabled": True,
+                "automatic_installation_kinds": ["python-package"],
+            },
+        },
     )
     monkeypatch.setattr(
         dependency_jobs,
@@ -44,7 +50,10 @@ def test_install_job_lifecycle_persists_progress_and_result(tmp_path, monkeypatc
             "plan_id": "plan-0123456789abcdef",
             "actions": [{
                 "dependency_id": "sample",
-                "options": [{"kind": "python-package"}],
+                "options": [{
+                    "kind": "python-package",
+                    "automated_execution_supported": True,
+                }],
             }],
         },
     )
