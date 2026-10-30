@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
+
 
 def test_dashboard_new_engagement_control_opens_scope(page, live_server):
     page.goto(f"{live_server}/ui-v2")
@@ -194,9 +196,6 @@ def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, 
     assert "(NO TARGET RULE)" not in header
     assert "NO TARGET RULE CONFIGURED" not in header
     assert "SCOPE ENFORCEMENT ENABLED" not in header
-
-
-import pytest
 
 
 @pytest.mark.parametrize(
