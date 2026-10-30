@@ -252,7 +252,8 @@ def test_dashboard_recent_job_rows_use_real_api_fields(page, live_server):
     )
     rows = page.locator("table tbody tr")
     assert "nmap" in rows.filter(has_text="seed-job-1").inner_text().lower()
-    assert "not recorded" in rows.filter(has_text="seed-job-1").inner_text().lower()
+    timeline = rows.filter(has_text="seed-job-1").locator("td").nth(3).inner_text()
+    assert timeline not in {"Not recorded", "—"}
     assert rows.filter(has_text="seed-job-1").get_by_role("link", name="View History").get_attribute("href") == "/ui-v2/history"
     assert page.locator("#dashboard-runtime-state").inner_text() == "No active jobs"
     assert page.locator("#dashboard-history-count").inner_text() == "2"
