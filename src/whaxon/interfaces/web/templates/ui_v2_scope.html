@@ -740,7 +740,7 @@
     const target = ruleList("in_scope")[0];
     if (!target) { say("Add an in-scope rule before copying a scope-check command.", false); return; }
     try {
-      const shellTarget = "'" + target.replace(/'/g, "'\\''") + "'";
+      const shellTarget = '"' + target + '"';
       await navigator.clipboard.writeText("whaxon scope --check " + shellTarget);
       say("Copied a CLI scope-check command for " + target + ".");
     } catch (_) { say("Clipboard access was denied by the browser.", false); }
