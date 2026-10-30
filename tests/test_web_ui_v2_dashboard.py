@@ -176,6 +176,40 @@ def test_dashboard_does_not_claim_scope_rule_when_target_list_is_empty(page, liv
 
 
 
+
+def test_dashboard_shows_api_failures_as_unavailable_not_zero_or_empty(page, live_server):
+    for endpoint in ("/api/history", "/api/report?format=json", "/api/tools"):
+        page.route(
+            f"**{endpoint}",
+            lambda route: route.fulfill(
+                status=503,
+                content_type="application/json",
+                body='{"error":"service unavailable"}',
+            ),
+        )
+
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        """() => document.querySelector('table tbody')?.innerText.includes('Live job history is unavailable')""",
+        timeout=8000,
+    )
+
+    cards = page.locator(".rounded-lg.bg-surface-container-low.p-space-md")
+    assert cards.filter(has_text="Active Scans").get_by_text("—").is_visible()
+    assert cards.filter(has_text="Verified Findings").get_by_text("—").is_visible()
+    assert cards.filter(has_text="Active Adapters").get_by_text("—").is_visible()
+    assert page.locator("table tbody").get_by_text("No job history has been recorded yet.").count() == 0
+
+
+def test_dashboard_add_new_engagement_control_is_wired(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    page.get_by_role("button", name=re.compile(r"add New")).click()
+    assert page.url.endswith("/ui-v2/scope")
+
 def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, live_server):
     page.route(
         "**/api/scope",
