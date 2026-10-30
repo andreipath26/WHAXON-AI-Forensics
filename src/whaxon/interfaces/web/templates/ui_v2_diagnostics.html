@@ -1222,6 +1222,7 @@
   $("dep-install").addEventListener("click", async () => {
     if (!activePlan || !$("dep-approve-check").checked) return;
     busy($("dep-install"), true, "Queueing…");
+    $("dep-cancel").disabled = false;
     $("dep-operation").hidden = false;
     setText("dep-operation-status", "Submitting the explicitly approved operation…");
     try {
