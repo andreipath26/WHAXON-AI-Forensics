@@ -466,7 +466,7 @@ class JobStore:
     def history(self, limit=50):
         c = self._conn()
         try:
-            rows = c.execute("SELECT id, tool, target, status, exit_code, duration_s FROM jobs WHERE status IN ('finished','failed') ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
+            rows = c.execute("SELECT id, tool, target, status, exit_code, duration_s, started_at FROM jobs WHERE status IN ('finished','failed') ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
             out = []
             for r in rows:
                 line_count = c.execute(
@@ -482,6 +482,7 @@ class JobStore:
                     "status": r["status"],
                     "exit_code": r["exit_code"],
                     "duration_s": r["duration_s"],
+                    "started_at": r["started_at"],
                     "line_count": line_count,
                     "findings_count": findings_count,
                 })
