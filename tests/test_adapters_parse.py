@@ -181,6 +181,7 @@ def test_nikto_261_parses_plugin_ids_full_urls_and_see_references():
 
     by_id = {finding.data.get("nikto_id"): finding for finding in findings}
     assert by_id["750001"].data["path"] == "/actuator/env"
+    assert by_id["750001"].data["url"] == "http://localhost:8080/actuator/env"
     assert by_id["750001"].severity == "high"
     assert by_id["750001"].cwe == "CWE-200"
     assert "Nikto-750001" in by_id["750001"].references
