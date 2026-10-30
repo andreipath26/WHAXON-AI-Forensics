@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 import subprocess
 
 from whaxon.core.dependencies import collect_dependency_report
@@ -137,3 +138,29 @@ def test_malformed_tool_catalog_is_reported_as_broken(tmp_path):
     )
     catalog = next(item for item in report["dependencies"] if item["id"] == "tool-catalog")
     assert catalog["status"] == "BROKEN"
+
+
+def test_manifest_covers_all_declared_runtime_dependencies():
+    from pathlib import Path
+
+    manifest = load_dependency_manifest()
+    project = tomllib.loads(
+        (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    )["project"]
+    declared = {
+        requirement.split(">=", 1)[0].split("[", 1)[0].lower().replace("_", "-")
+        for requirement in project.get("dependencies", [])
+    }
+    for extra, requirements in project.get("optional-dependencies", {}).items():
+        if extra == "dev":
+            continue
+        declared.update(
+            requirement.split(">=", 1)[0].split("[", 1)[0].lower().replace("_", "-")
+            for requirement in requirements
+        )
+    manifest_ids = {
+        item["id"].lower().replace("_", "-")
+        for item in manifest["dependencies"]
+        if item["kind"] == "python-package"
+    }
+    assert declared <= manifest_ids
