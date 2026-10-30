@@ -65,6 +65,10 @@ def _append_audit(record: dict[str, Any]) -> None:
 
     path = _audit_path()
     with _AUDIT_LOCK:
+        if path.exists():
+            integrity = verify_dependency_audit(path)
+            if integrity.get("valid") is not True:
+                raise OSError("dependency audit chain integrity check failed; refusing to append")
         previous = _AUDIT_GENESIS
         sequence = 1
         if path.exists():
@@ -104,6 +108,8 @@ def verify_dependency_audit(path: Path | None = None) -> dict[str, Any]:
     import hashlib
 
     target = path or _audit_path()
+    if target.is_symlink():
+        return {"valid": False, "events_checked": 0, "reason": "symlink_rejected"}
     previous = _AUDIT_GENESIS
     count = 0
     try:
