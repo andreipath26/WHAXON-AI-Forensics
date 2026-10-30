@@ -1668,8 +1668,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/dependencies/install")
     @limiter.limit("5 per minute")
     def api_dependencies_install():
-        """Execute one manifest-allowlisted install only after exact plan approval."""
-        from whaxon.core.installer import apply_approved_dependency_plan
+        """Queue one allowlisted install after exact plan-ID approval."""
+        from whaxon.core.dependency_jobs import start_install_operation
 
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
@@ -1685,18 +1685,45 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         ):
             return jsonify({"error": "dependency_id and a valid approved_plan_id are required"}), 400
         try:
-            result = apply_approved_dependency_plan(
-                dependency_id, approved_plan_id, data_dir=Path(core.data_dir)
+            operation = start_install_operation(
+                dependency_id, approved_plan_id, Path(core.data_dir)
             )
         except ValueError as exc:
             return jsonify({"error": str(exc), "installation_started": False}), 409
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc), "installation_started": False}), 409
         except OSError as exc:
-            app.logger.exception("Dependency installation could not be started")
+            app.logger.exception("Dependency installation could not be queued")
             return jsonify({
-                "error": f"installation could not be started ({type(exc).__name__})",
+                "error": f"installation could not be queued ({type(exc).__name__})",
                 "installation_started": False,
             }), 500
-        return jsonify(result), (200 if result["status"] == "VERIFIED" else 500)
+        return jsonify(operation), 202
+
+    @app.get("/api/dependencies/install/<operation_id>")
+    def api_dependencies_install_status(operation_id: str):
+        from whaxon.core.dependency_jobs import get_install_operation
+
+        try:
+            operation = get_install_operation(Path(core.data_dir), operation_id)
+        except (ValueError, OSError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+        if operation is None:
+            return jsonify({"error": "dependency operation not found"}), 404
+        return jsonify(operation)
+
+    @app.post("/api/dependencies/install/<operation_id>/cancel")
+    @limiter.limit("10 per minute")
+    def api_dependencies_install_cancel(operation_id: str):
+        from whaxon.core.dependency_jobs import cancel_install_operation
+
+        try:
+            operation = cancel_install_operation(Path(core.data_dir), operation_id)
+        except (ValueError, OSError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+        if operation is None:
+            return jsonify({"error": "dependency operation not found"}), 404
+        return jsonify(operation), 202
 
     @app.get("/api/settings")
     def api_settings_get():
