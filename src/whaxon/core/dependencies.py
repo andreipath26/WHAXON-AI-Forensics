@@ -5,7 +5,7 @@ changes PATH, elevates privileges, or executes commands from manifests.
 """
 from __future__ import annotations
 
-import importlib
+import importlib.util
 import importlib.metadata
 import json
 import os
@@ -80,7 +80,8 @@ def _package_result(dist: str, import_name: str, minimum: str, *, required: bool
         reason = f"Installed version {version} is below required {minimum}."
     else:
         try:
-            importlib.import_module(import_name)
+            if importlib.util.find_spec(import_name) is None:
+                raise ModuleNotFoundError(import_name)
         except Exception as exc:
             status = "BROKEN"
             reason = f"Package metadata exists but import failed ({type(exc).__name__})."
@@ -193,6 +194,7 @@ def collect_dependency_report(*, data_dir: Path | None = None,
             "total": len(results),
             "ready": sum(r.status == "READY" for r in results),
             "missing": sum(r.status == "MISSING" for r in results),
+            "detected_unverified": sum(r.status == "DETECTED" for r in results),
             "incompatible": sum(r.status == "INCOMPATIBLE" for r in results),
             "broken": sum(r.status == "BROKEN" for r in results),
             "required_blockers": len(required_bad),
