@@ -193,11 +193,40 @@ def _harden_draft(draft: dict, source_url: str) -> None:
     tools["allowlist"] = []
     tools["denylist"] = []
     ai = draft.setdefault("ai_policy", {})
+    # Imported programme terms are not permission to begin testing.
+    # Once the operator approves the programme, routine in-scope work is
+    # delegated to the agent; only consequential decisions return to the user.
+    draft["authorization_status"] = "pending_review"
+    draft["execution_enabled"] = False
     ai.update({
+        "mode": "bounded_autonomous_after_approval",
+        "activation": "disabled_until_program_approval",
         "allow_action_selection": False,
         "allow_live_requests": False,
         "allow_auto_mode": False,
-        "require_human_confirm": True,
+        "require_human_confirm": False,
+        "post_approval_autonomous_actions": [
+            "programme_rule_analysis",
+            "scope_matching_within_approved_scope",
+            "passive_reconnaissance",
+            "low_impact_permitted_checks",
+            "tool_selection_from_approved_allowlist",
+            "finding_correlation_and_deduplication",
+            "evidence_reproduction_within_approved_limits",
+            "severity_and_impact_assessment",
+            "draft_report_preparation",
+        ],
+        "human_approval_required_for": [
+            "programme_activation_or_campaign_start",
+            "scope_expansion_or_ambiguous_scope",
+            "rate_or_concurrency_increase",
+            "intrusive_or_destructive_testing",
+            "sensitive_data_access",
+            "account_creation_or_external_identity_actions",
+            "third_party_testing",
+            "public_disclosure_or_report_submission",
+            "paid_actions_or_external_costs",
+        ],
     })
 
 
