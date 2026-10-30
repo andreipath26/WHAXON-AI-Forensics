@@ -355,6 +355,7 @@
   notice.hidden = true;
   document.querySelector("main")?.prepend(notice);
   let scope = null;
+  let preflightRequestId = 0;
   const esc = (v) => String(v ?? "");
   const say = (message, ok = true) => {
     notice.textContent = message;
@@ -364,6 +365,7 @@
   };
   const ruleList = (key) => Array.isArray(scope?.[key]) ? [...scope[key]] : [];
   function resetPreflightStatus() {
+    preflightRequestId += 1;
     const status = $("scopePreflightStatus");
     const indicator = $("scopePreflightIndicator");
     const result = $("scopeCheckResult");
@@ -708,6 +710,8 @@
     const target = $("scopeCheckTarget")?.value.trim();
     const result = $("scopeCheckResult");
     if (!target) { if (result) result.textContent = "Enter a target to check."; return; }
+    const requestId = ++preflightRequestId;
+    const checkedTarget = target;
     const preflight = $("scopePreflightStatus");
     const indicator = $("scopePreflightIndicator");
     if (result) result.textContent = "Checking target against live scope…";
@@ -715,6 +719,7 @@
     if (indicator) indicator.className = "h-2 w-2 rounded-full bg-secondary";
     try {
       const verdict = await api("/api/scope/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({target})});
+      if (requestId !== preflightRequestId || $("scopeCheckTarget")?.value.trim() !== checkedTarget) return;
       if (result) {
         result.textContent = (verdict.allowed ? "ALLOWED — " : "BLOCKED — ") + target + " — " +
           (verdict.reason || "No reason recorded") +
@@ -727,6 +732,7 @@
       }
       if (indicator) indicator.className = "h-2 w-2 rounded-full " + (verdict.allowed ? "bg-primary" : "bg-error");
     } catch (error) {
+      if (requestId !== preflightRequestId || $("scopeCheckTarget")?.value.trim() !== checkedTarget) return;
       if (result) { result.textContent = "Scope check failed: " + error.message; result.className = "text-error"; }
       if (preflight) { preflight.textContent = "CHECK ERROR"; preflight.className = "font-label-sm text-label-sm text-error uppercase font-bold"; }
       if (indicator) indicator.className = "h-2 w-2 rounded-full bg-error";
