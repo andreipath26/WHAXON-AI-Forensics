@@ -82,3 +82,61 @@ def test_approved_install_uses_fixed_pypi_wheel_command(monkeypatch, tmp_path):
     assert argv[argv.index("--index-url") + 1] == "https://pypi.org/simple"
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert [record["status"] for record in records] == ["STARTED", "VERIFIED"]
+
+
+def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(sys, "prefix", "/tmp/whaxon-test-venv")
+    monkeypatch.setattr(sys, "base_prefix", "/usr")
+    plan = build_remediation_plan()
+    candidates = [action for action in plan["actions"]
+                  if action["options"][0]["kind"] == "python-package"]
+    if not candidates:
+        pytest.skip("No missing Python package to install")
+    dependency_id = candidates[0]["dependency_id"]
+    focused = build_remediation_plan(dependency_ids=[dependency_id])
+
+    def timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired("pip", 900)
+
+    monkeypatch.setattr(installer.subprocess, "run", timeout)
+    monkeypatch.setattr(installer, "_audit_path", lambda: tmp_path / "audit.jsonl")
+    result = installer.apply_approved_dependency_plan(dependency_id, focused["plan_id"])
+    assert result["status"] == "TIMED_OUT"
+    assert "recreate the virtual environment" in result["recovery"]
+    records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert [record["status"] for record in records] == ["STARTED", "TIMED_OUT"]
+
+
+def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(sys, "prefix", "/tmp/whaxon-test-venv")
+    monkeypatch.setattr(sys, "base_prefix", "/usr")
+    plan = build_remediation_plan()
+    candidates = [action for action in plan["actions"]
+                  if action["options"][0]["kind"] == "python-package"]
+    if not candidates:
+        pytest.skip("No missing Python package to install")
+    dependency_id = candidates[0]["dependency_id"]
+    focused = build_remediation_plan(dependency_ids=[dependency_id])
+    writes = {"count": 0}
+
+    def audit(_record):
+        writes["count"] += 1
+        if writes["count"] == 2:
+            raise OSError("disk full")
+
+    monkeypatch.setattr(installer, "_append_audit", audit)
+    monkeypatch.setattr(
+        installer.subprocess,
+        "run",
+        lambda argv, **kwargs: subprocess.CompletedProcess(argv, 0, stdout="", stderr=""),
+    )
+    monkeypatch.setattr(installer.importlib.metadata, "version", lambda _name: "99.0")
+    monkeypatch.setattr(installer.importlib, "import_module", lambda _name: object())
+    result = installer.apply_approved_dependency_plan(dependency_id, focused["plan_id"])
+    assert result["status"] == "AUDIT_FAILED"
+    assert result["original_status"] == "VERIFIED"
+    assert "operation ran" in result["recovery"]
