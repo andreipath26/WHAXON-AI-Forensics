@@ -147,10 +147,18 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                                verify_external: bool = False) -> dict[str, Any]:
     """Return a deterministic, read-only report; no install or network actions."""
     results: list[DependencyResult] = []
-    py_status = "READY"
-    py_reason = "Python runtime satisfies the declared minimum."
+    python_version = platform.python_version()
+    py_status = (
+        "READY" if _version_tuple(python_version) >= _version_tuple("3.11")
+        else "INCOMPATIBLE"
+    )
+    py_reason = (
+        "Python runtime satisfies the declared minimum."
+        if py_status == "READY"
+        else f"Python {python_version} is below the required 3.11 runtime."
+    )
     results.append(DependencyResult(
-        "python", "Python", "runtime", True, py_status, platform.python_version(),
+        "python", "Python", "runtime", True, py_status, python_version,
         sys.executable, ">=3.11", ("core", "cli", "web", "tui", "gui"), py_reason,
         "Install Python 3.11 or newer and run WHAXON with that interpreter."
         if py_status != "READY" else "",
