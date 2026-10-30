@@ -104,3 +104,85 @@ def test_echo_run_creates_job_in_store(tmp_path):
     latest = history[0]
     assert latest["tool"] == "echo"
     assert latest["target"] == "127.0.0.1"
+
+def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch, capsys):
+    """A single CLI run executes durable follow-ups queued by its findings."""
+    import asyncio
+
+    from whaxon.core.automation import Automator
+    from whaxon.core.events import EventBus, JobFindings, JobFinished, JobStarted
+    from whaxon.core.store import JobStore
+
+    class FakeCatalog:
+        def get(self, tool_id):
+            return object() if tool_id in {"nmap", "nikto"} else None
+
+    class FakeRunner:
+        def __init__(self, bus, store):
+            self.bus = bus
+            self.store = store
+            self.executed = []
+
+        def has_tool(self, tool_id):
+            return tool_id == "nikto"
+
+        async def run_tool(self, tool_id, target, job_id=None, **kwargs):
+            job_id = job_id or "initial-nmap-job"
+            self.executed.append((tool_id, target, job_id))
+            self.bus.publish(JobStarted(job_id=job_id, tool_id=tool_id, target=target))
+            if tool_id == "nmap":
+                self.bus.publish(JobFindings(job_id=job_id, findings=({
+                    "kind": "open_port",
+                    "severity": "info",
+                    "source": "nmap",
+                    "data": {"port": 80, "service": "http"},
+                    "raw_line": "80/tcp open http",
+                },)))
+            self.bus.publish(JobFinished(job_id=job_id, exit_code=0, duration_s=0.01))
+            return job_id
+
+    class FakeCore:
+        def __init__(self, data_dir):
+            self.bus = EventBus()
+            self.store = JobStore(Path(data_dir) / "whaxon.db")
+            self.catalog = FakeCatalog()
+            self.scope = None
+            self.runner = FakeRunner(self.bus, self.store)
+            self.bus.subscribe(JobStarted, lambda e: (
+                self.store.create(e.job_id),
+                self.store.set_started(e.job_id, e.tool_id, e.target),
+            ))
+            self.bus.subscribe(JobFinished, lambda e: self.store.set_finished(
+                e.job_id, e.exit_code, e.duration_s
+            ))
+            self.bus.subscribe(JobFindings, lambda e: [
+                self.store.append_finding(e.job_id, finding, i)
+                for i, finding in enumerate(e.findings)
+            ])
+            self.automator = Automator(self.bus, self.store, self.runner)
+            self.automator.attach()
+
+        async def initialize(self, drain=False):
+            self.bus.bind_loop(asyncio.get_running_loop())
+
+    cores = []
+    def make_core(data_dir):
+        core = FakeCore(data_dir)
+        cores.append(core)
+        return core
+
+    monkeypatch.setattr(run_cmd, "Core", make_core)
+    run_cmd.main(["nmap", "burpbountylab.com", "--extra", "-sV -p 80,443",
+                  "--quiet", "--data", str(tmp_path)])
+
+    core = cores[0]
+    history = core.store.history(limit=10)
+    by_tool = {job["tool"]: job for job in history}
+    assert set(by_tool) == {"nmap", "nikto"}
+    assert by_tool["nmap"]["status"] == "finished"
+    assert by_tool["nikto"]["status"] == "finished"
+    assert by_tool["nikto"]["target"] == "burpbountylab.com:80"
+    assert [item[0] for item in core.runner.executed] == ["nmap", "nikto"]
+    output = capsys.readouterr().out
+    assert "job: initial-nmap-job" in output
+
