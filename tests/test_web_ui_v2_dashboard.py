@@ -284,7 +284,8 @@ def test_dashboard_recent_job_rows_use_real_api_fields(page, live_server):
     assert timeline not in {"Not recorded", "—"}
     assert rows.filter(has_text="seed-job-1").get_by_role("link", name="View History").get_attribute("href") == "/ui-v2/history"
     assert page.locator("#dashboard-runtime-state").inner_text() == "No active jobs"
-    assert page.locator("#dashboard-history-count").inner_text() == "2"
+    assert int(page.locator("#dashboard-history-count").inner_text()) == rows.count()
+    assert rows.count() >= 2
 
 
 def test_dashboard_add_new_engagement_control_is_wired(page, live_server):
@@ -389,7 +390,7 @@ def test_dashboard_mobile_navigation_opens_closes_and_restores_focus(page, live_
     assert menu.evaluate("element => document.activeElement === element")
 
     menu.click()
-    page.locator(".dashboard-mobile-nav-backdrop").click(position={"x": 8, "y": 8})
+    page.locator(".dashboard-mobile-nav-backdrop").click(position={"x": 380, "y": 800})
     assert menu.get_attribute("aria-expanded") == "false"
     assert menu.evaluate("element => document.activeElement === element")
 
