@@ -278,3 +278,29 @@ def test_scope_preflight_status_reports_api_error(page, live_server):
     )
     assert "scope evaluation unavailable" in page.locator("#scopeCheckResult").inner_text()
     assert "bg-error" in page.locator("#scopePreflightIndicator").get_attribute("class")
+
+
+def test_scope_edit_invalidates_previous_preflight_result(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    try:
+        page.locator("#scopeCheckTarget").fill("127.0.0.1")
+        page.locator("#runScopeCheckBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scopePreflightStatus')?.textContent === 'LAST CHECK: ALLOWED'",
+            timeout=5000,
+        )
+        page.locator("#openTargetModalBtn").click()
+        page.locator("#modalTargetInput").fill("scope-preflight-reset.example.invalid")
+        page.locator("#authConfirmCheckbox").check()
+        page.locator("#saveTargetBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+            timeout=5000,
+        )
+        assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+        assert "bg-outline" in page.locator("#scopePreflightIndicator").get_attribute("class")
+        assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
+    finally:
+        _save_scope(page, before)
