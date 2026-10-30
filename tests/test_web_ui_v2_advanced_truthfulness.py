@@ -45,7 +45,7 @@ def test_threat_intel_workspace_is_local_catalog_not_a_fake_live_feed(page, live
     panel = page.locator("#whaxon-live-threat-intel")
     assert panel.is_visible()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('locally recorded')"
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('No connected external threat-intelligence feed')"
         " || document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('Live catalog unavailable')",
         timeout=10000,
     )
@@ -79,6 +79,6 @@ def test_approvals_workspace_loads_real_queue_and_disables_demo_decisions(page, 
         " || document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Live data unavailable')",
         timeout=10000,
     )
-    assert page.get_by_role("button", name="Replay Test (Retest)").is_disabled()
-    assert page.get_by_role("button", name="Approve as Verified (Sign Proof)").is_disabled()
-    assert page.get_by_role("button", name="Export Proof to Issue Tracker").is_disabled()
+    for button in page.locator("main button:visible").all():
+        if not button.evaluate("(el) => el.closest('#whaxon-live-approvals') !== null"):
+            assert button.is_disabled(), f"Unwired approval control remains enabled: {button.inner_text()}"
