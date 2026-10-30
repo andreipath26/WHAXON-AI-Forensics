@@ -1685,7 +1685,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         ):
             return jsonify({"error": "dependency_id and a valid approved_plan_id are required"}), 400
         try:
-            result = apply_approved_dependency_plan(dependency_id, approved_plan_id)
+            result = apply_approved_dependency_plan(
+                dependency_id, approved_plan_id, data_dir=Path(core.data_dir)
+            )
         except ValueError as exc:
             return jsonify({"error": str(exc), "installation_started": False}), 409
         except OSError as exc:
