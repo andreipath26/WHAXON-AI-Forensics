@@ -487,7 +487,13 @@
     );
     if (status) status.textContent = scope.enabled ? "SCOPE ENFORCEMENT ENABLED" : "SCOPE ENFORCEMENT DISABLED";
     const footer = document.querySelector("#targetTableBody")?.closest(".overflow-x-auto")?.parentElement?.querySelector("div.p-space-md[class*='bg-surface-container-lowest']");
-    if (footer) footer.textContent = "LIVE CONFIGURATION · " + ruleList("in_scope").length + " in-scope · " + ruleList("out_of_scope").length + " excluded";
+    if (footer) {
+      const liveStatus = footer.querySelector("#scopeTableStatus");
+      if (liveStatus) liveStatus.textContent = "LIVE CONFIGURATION · " + ruleList("in_scope").length +
+        " in-scope · " + ruleList("out_of_scope").length + " excluded";
+      const label = footer.querySelector(":scope > span");
+      if (label) label.textContent = "Persisted scope rules";
+    }
     // Remove unsupported navigation and all demo-only panels that claim invented hosts or metrics.
     document.querySelectorAll("a[data-path]").forEach(a => {
       const routes = {"dashboard-zero-state":"/ui-v2","scope-and-targets":"/ui-v2/scope","run-and-orchestration":"/ui-v2/run","trust-layer-and-findings":"/ui-v2/findings","ptes-coverage-and-reports":"/ui-v2/report","ai-strategy-gate":"/ui-v2/ai","remediation-retest-studio":"/ui-v2/retest","correlated-attack-chains":"/ui-v2/chains","job-execution-history":"/ui-v2/history","evidence-file-inspector":"/ui-v2/evidence","cryptographic-audit-log":"/ui-v2/audit","system-diagnostics-and-health":"/ui-v2/diagnostics","adapter-and-plugin-manager":"/ui-v2/adapters","settings-and-api-explorer":"/ui-v2/settings"};
