@@ -63,7 +63,8 @@ def test_scope_target_filter_filters_live_rows(page, live_server):
     filter_input.fill(target)
     assert page.locator("#targetTableBody tr:visible").count() >= 1
     filter_input.fill("no-such-scope-rule-987654")
-    assert page.locator("#targetTableBody tr:visible").count() == 0
+    assert page.locator("#targetTableBody tr:visible").count() == 1
+    assert "No scope rules match this filter" in page.locator("#scope-empty-state").inner_text()
 
 
 def test_scope_import_drawer_imports_scope_json_and_closes(page, live_server):
