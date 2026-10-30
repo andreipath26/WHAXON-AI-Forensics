@@ -236,7 +236,7 @@ def test_scope_header_does_not_claim_a_target_when_scope_is_empty(page, live_ser
     )
     assert page.locator("#scope-header-target").text_content().strip() == "Target: No target configured"
     assert page.locator("#scope-header-membership").inner_text() == "(NO TARGET RULE)"
-    assert page.locator("#scopeStatusLabel").inner_text() == "Enabled; no target rules"
+    assert page.locator("#scopeStatusLabel").text_content().strip() == "Enabled; no target rules"
     assert "bg-tertiary" in page.locator("#scopeStatusDot").get_attribute("class")
     assert "bg-tertiary" in page.locator("#scopeHeaderPulse").get_attribute("class")
     assert "no in-scope targets are configured" in page.locator("main").inner_text()
@@ -259,7 +259,7 @@ def test_scope_header_reflects_disabled_enforcement(page, live_server):
         timeout=8000,
     )
     assert page.locator("#scope-header-membership").inner_text() == "(ENFORCEMENT DISABLED)"
-    assert page.locator("#scopeStatusLabel").inner_text() == "Enforcement disabled"
+    assert page.locator("#scopeStatusLabel").text_content().strip() == "Enforcement disabled"
     assert "bg-error" in page.locator("#scopeStatusDot").get_attribute("class")
     assert "bg-error" in page.locator("#scopeHeaderPulse").get_attribute("class")
     assert "Scope enforcement is disabled" in page.locator("main").inner_text()
@@ -445,7 +445,7 @@ def test_scope_api_failure_does_not_claim_configuration_is_loaded(page, live_ser
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Could not load live scope')",
         timeout=8000,
     )
-    assert page.locator("#scopeStatusLabel").inner_text() == "Waiting for scope configuration"
+    assert page.locator("#scopeStatusLabel").text_content().strip() == "Waiting for scope configuration"
     assert page.locator("#openTargetModalBtn").is_disabled()
     assert page.locator("#openImportDrawerBtn").is_disabled()
     assert page.locator("#runScopeCheckBtn").is_disabled()
