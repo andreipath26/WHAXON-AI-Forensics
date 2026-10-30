@@ -199,8 +199,11 @@ def test_run_page_never_presents_reference_sample_telemetry_as_live_state(page, 
     main = page.locator("main").inner_text()
     for sample in (
         "#WX-8492", "04 Active Replayers", "Nmap 7.94", "Nuclei v3.2.0",
-        "14 Candidates", "1,489 / 2,050", "142 req/s", "10/10 Enabled",
-        "12 services found", "PID: 28491",
+        "Nikto 2.5.0", "sqlmap 1.8.3", "14 Candidates", "1,489 / 2,050",
+        "142 req/s", "10/10 Enabled", "12 services found", "PID: 28491",
+        "Awaiting Nuclei completion boundary", "whaxon://cli-pipeline",
+        "VULN_CANDIDATE", "184,209", "31 Validated", "Recon: 100% | Enum: 72%",
+        "CVE-2023-38606", "production endpoint candidate",
     ):
         assert sample not in main
     for name in ("View stdout", "Re-run", "Pause", "Abort"):
