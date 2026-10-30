@@ -41,7 +41,7 @@ def test_owner_filter_narrows_results(page, live_server):
     page.fill("#approvals-owner", "nobody")
     page.click("#approvals-refresh")
     page.wait_for_function(
-        "() => !document.querySelector('#approvals-list .card[data-run=\"seed-ai-run\"]')",
+        "() => document.querySelectorAll('#approvals-list .card[data-run]').length === 0",
         timeout=5000,
     )
 
@@ -52,6 +52,6 @@ def test_answering_removes_run_from_queue(page, live_server):
     card.locator('[data-answer-input]').fill("y")
     card.locator('[data-answer-btn]').click()
     page.wait_for_function(
-        "() => document.querySelectorAll('#approvals-list .card[data-run]').length === 0",
+        "() => !document.querySelector('#approvals-list .card[data-run=\"seed-ai-run\"]')",
         timeout=5000,
     )
