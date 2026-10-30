@@ -64,8 +64,15 @@ def _canonical_audit_record(record: dict[str, Any]) -> bytes:
 def _audit_process_lock(path: Path):
     """Serialize writers across processes on POSIX and Windows."""
     lock_path = path.with_suffix(path.suffix + ".lock")
-    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(lock_path, flags, 0o600)
     try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError("dependency audit lock must be a regular file")
+        if hasattr(os, "fchmod"):
+            os.fchmod(descriptor, 0o600)
         if os.name == "nt":
             import msvcrt
             if os.fstat(descriptor).st_size == 0:
