@@ -3,7 +3,7 @@
 This deliberately tests the production routes, not the reference PNG assets.
 Detailed interaction tests remain in the page-specific test modules.
 """
-from __future__ import annotations
+
 
 
 UI_V2_ROUTES = (
