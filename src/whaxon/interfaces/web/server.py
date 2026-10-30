@@ -1154,7 +1154,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "text must be a string"}, 400
         if not isinstance(source_url, str):
             return {"error": "source_url must be a string"}, 400
-        from whaxon.core.bounty_ingest import IngestionError, ingest_yeswehack_text, ingest_yeswehack_url
+        from whaxon.core.bounty_ingest import (
+            IngestionError,
+            ingest_yeswehack_text,
+            ingest_yeswehack_url,
+        )
         try:
             if url is not None:
                 result = ingest_yeswehack_url(url.strip())
