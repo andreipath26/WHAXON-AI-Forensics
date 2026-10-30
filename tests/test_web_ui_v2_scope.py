@@ -313,3 +313,67 @@ def test_scope_registry_labels_do_not_overstate_assets_ports_or_authorization(pa
     assert "No evidence stored by scope API" in body
     assert "Explicit Exclusions" in body
     assert "Strict Deny Rules" not in body
+
+def test_scope_registry_edits_and_persists_existing_rules(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.once("dialog", lambda dialog: dialog.accept("127.0.0.2"))
+    page.get_by_role("button", name="Edit in scope rule 127.0.0.0/8").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
+    assert "127.0.0.2" in scope["in_scope"]
+    assert "127.0.0.0/8" not in scope["in_scope"]
+    assert "127.0.0.2" in page.locator("#targetTableBody").inner_text()
+
+
+def test_scope_registry_removes_rule_after_confirmation(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.get_by_role("button", name="Remove in scope rule 127.0.0.0/8").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=8000,
+    )
+    scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
+    assert "127.0.0.0/8" not in scope["in_scope"]
+    assert "127.0.0.0/8" not in page.locator("#targetTableBody").inner_text()
+
+
+def test_scope_registry_shows_empty_state_and_filter_no_match(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"empty-scope-test","enabled":true,"in_scope":[],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    assert page.locator("#scope-empty-state").is_visible()
+    assert "No scope rules configured" in page.locator("#scope-empty-state").inner_text()
+    page.locator("#targetFilterInput").fill("missing")
+    assert "No scope rules configured" in page.locator("#scope-empty-state").inner_text()
+
+
+def test_scope_registry_filter_reports_no_matching_rules(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.locator("#targetFilterInput").fill("this-rule-does-not-exist")
+    assert page.locator("#scope-empty-state").is_visible()
+    assert "No scope rules match this filter" in page.locator("#scope-empty-state").inner_text()
+    page.locator("#targetFilterInput").fill("")
+    assert page.locator("#scope-empty-state").count() == 0
+    assert page.locator("#targetTableBody tr").count() >= 1
