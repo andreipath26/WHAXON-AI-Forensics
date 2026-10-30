@@ -39,6 +39,17 @@ def test_history_ordering(store):
         time.sleep(0.01)
     assert store.history()[0]["id"] == "h2"
 
+def test_history_includes_recorded_start_timestamp(store):
+    store.create("history-timestamp")
+    store.set_started("history-timestamp", "nmap", "127.0.0.1")
+    store.set_finished("history-timestamp", 0, 0.1)
+
+    entry = store.history()[0]
+
+    assert isinstance(entry["started_at"], (int, float))
+    assert entry["started_at"] > 0
+
+
 def test_evidence_crud(store):
     store.create("e1")
     seq = store.add_evidence("e1", "note", "n", note="hi")
