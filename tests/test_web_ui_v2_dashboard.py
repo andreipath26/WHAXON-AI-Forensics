@@ -222,12 +222,14 @@ def test_dashboard_mobile_navigation_opens_closes_and_restores_focus(page, live_
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(f"{live_server}/ui-v2")
 
-    menu = page.get_by_role("button", name="Open navigation")
+    menu = page.locator(".dashboard-mobile-menu")
     assert menu.is_visible()
+    assert menu.get_attribute("aria-label") == "Open navigation"
     assert menu.get_attribute("aria-expanded") == "false"
     menu.click()
 
-    assert page.get_by_role("button", name="Close navigation").is_visible()
+    assert page.locator(".dashboard-mobile-nav-backdrop").is_visible()
+    assert menu.get_attribute("aria-label") == "Close navigation"
     assert menu.get_attribute("aria-expanded") == "true"
     assert page.locator("body").evaluate(
         "element => element.classList.contains('dashboard-mobile-nav-open')"
@@ -237,6 +239,7 @@ def test_dashboard_mobile_navigation_opens_closes_and_restores_focus(page, live_
     )
 
     page.keyboard.press("Escape")
+    assert menu.get_attribute("aria-label") == "Open navigation"
     assert menu.get_attribute("aria-expanded") == "false"
     assert not page.locator("body").evaluate(
         "element => element.classList.contains('dashboard-mobile-nav-open')"
