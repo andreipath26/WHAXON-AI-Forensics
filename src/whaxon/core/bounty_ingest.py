@@ -283,7 +283,7 @@ def ingest_yeswehack_text(text: str, source_url: str = "") -> dict:
         "review": _review_status(draft),
         "source": {
             "url": source_url,
-            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "retrieved_at": datetime.now(UTC).isoformat(),
             "content_sha256": hashlib.sha256(raw).hexdigest(),
             "content_type": "text/plain",
             "parser": "yeswehack",
