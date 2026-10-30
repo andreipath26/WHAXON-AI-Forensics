@@ -275,3 +275,16 @@ def test_dependency_audit_hash_chain_detects_tampering(tmp_path, monkeypatch):
     verified = installer.verify_dependency_audit(path)
     assert verified["valid"] is False
     assert verified["reason"] == "hash_mismatch"
+
+
+def test_dependency_audit_chain_serializes_concurrent_writers(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import whaxon.core.installer as installer
+
+    path = tmp_path / "audit.jsonl"
+    monkeypatch.setattr(installer, "_audit_path", lambda: path)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(lambda i: installer._append_audit({"event_type": "TEST", "index": i}), range(40)))
+    result = installer.verify_dependency_audit(path)
+    assert result["valid"] is True
+    assert result["events_checked"] == 40
