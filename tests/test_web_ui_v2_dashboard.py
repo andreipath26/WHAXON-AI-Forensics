@@ -217,6 +217,50 @@ def test_dashboard_quick_actions_navigate_to_their_real_workspaces(page, live_se
     assert page.url.endswith(expected_path)
 
 
+
+def test_dashboard_mobile_navigation_opens_closes_and_restores_focus(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+
+    menu = page.get_by_role("button", name="Open navigation")
+    assert menu.is_visible()
+    assert menu.get_attribute("aria-expanded") == "false"
+    menu.click()
+
+    assert page.get_by_role("button", name="Close navigation").is_visible()
+    assert menu.get_attribute("aria-expanded") == "true"
+    assert page.locator("body").evaluate(
+        "element => element.classList.contains('dashboard-mobile-nav-open')"
+    )
+    assert page.locator('aside a[data-path="dashboard-zero-state"]').evaluate(
+        "element => document.activeElement === element"
+    )
+
+    page.keyboard.press("Escape")
+    assert menu.get_attribute("aria-expanded") == "false"
+    assert not page.locator("body").evaluate(
+        "element => element.classList.contains('dashboard-mobile-nav-open')"
+    )
+    assert menu.evaluate("element => document.activeElement === element")
+
+
+def test_dashboard_mobile_navigation_closes_after_route_selection(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    page.get_by_role("button", name="Open navigation").click()
+    page.locator('aside a[data-path="scope-and-targets"]').click()
+    page.wait_for_url("**/ui-v2/scope")
+    assert not page.locator("body").evaluate(
+        "element => element.classList.contains('dashboard-mobile-nav-open')"
+    )
+
+
+def test_dashboard_mobile_menu_is_not_shown_on_desktop(page, live_server):
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server}/ui-v2")
+    assert page.get_by_role("button", name="Open navigation").count() == 1
+    assert not page.get_by_role("button", name="Open navigation").is_visible()
+
 def test_dashboard_lab_deployment_is_not_present_as_a_live_action(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     assert page.get_by_role("button", name=re.compile(r"Deploy Mock")).count() == 0
