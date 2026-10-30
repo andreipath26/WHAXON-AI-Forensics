@@ -197,7 +197,8 @@ class NiktoAdapter(Adapter):
             url_match = _URL_RE.search(body)
             if url_match:
                 try:
-                    path = urlsplit(url_match.group(0)).path or "/"
+                    url_text = url_match.group(0).rstrip(".,;:")
+                    path = urlsplit(url_text).path or "/"
                 except ValueError:
                     path = ""
             else:
