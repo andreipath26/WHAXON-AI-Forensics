@@ -593,6 +593,11 @@
   drawer?.querySelectorAll("button").forEach(button => {
     const label = button.textContent.trim();
     if (label === "Burp XML/JSON" || label === "CIDR List") button.style.display = "none";
+    else if (label.toLowerCase() === "scope.json") {
+      button.disabled = true;
+      button.setAttribute("aria-pressed", "true");
+      button.title = "scope.json is the currently supported import format";
+    }
   });
   drawer?.querySelectorAll("textarea").forEach(area => {
     area.placeholder = '{ "engagement": "Authorized assessment", "enabled": true, "in_scope": ["example.com"], "out_of_scope": [], "notes": "" }';

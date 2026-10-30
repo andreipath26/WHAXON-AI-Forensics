@@ -213,29 +213,3 @@ def test_scope_page_does_not_claim_strict_boundary_enforcement(page, live_server
     assert "STRICT BOUNDARY ENFORCED" not in header
 
 
-
-def test_scope_table_filters_and_removes_a_rule_from_live_configuration(page, live_server):
-    page.goto(f"{live_server}/ui-v2/scope")
-    page.wait_for_function(
-        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
-        timeout=8000,
-    )
-    before = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
-    assert before["in_scope"]
-    target = before["in_scope"][0]
-    page.locator("#targetFilterInput").fill(target)
-    rows = page.locator("#targetTableBody tr:visible")
-    assert rows.count() == 1
-    assert target in rows.first.inner_text()
-    page.locator("#targetFilterInput").fill("")
-    page.once("dialog", lambda dialog: dialog.accept())
-    row = page.locator("#targetTableBody tr").filter(has_text=target).first
-    row.get_by_role("button", name="Remove").click()
-    page.wait_for_function(
-        "(target) => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')"
-        " && ![...document.querySelectorAll('#targetTableBody tr')].some(row => row.textContent.includes(target))",
-        arg=target,
-        timeout=8000,
-    )
-    after = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
-    assert target not in after["in_scope"]

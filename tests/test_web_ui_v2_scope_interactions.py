@@ -80,6 +80,9 @@ def test_scope_import_drawer_imports_scope_json_and_closes(page, live_server):
     try:
         page.locator("#openImportDrawerBtn").click()
         assert page.locator("#importDrawer").is_visible()
+        assert page.locator("#importDrawer button", has_text="scope.json").is_disabled()
+        assert page.locator("#importDrawer button", has_text="Burp XML/JSON").is_hidden()
+        assert page.locator("#importDrawer button", has_text="CIDR List").is_hidden()
         page.locator("#importDrawer textarea").fill(json.dumps(imported))
         page.locator("#executeImportBtn").click()
         page.wait_for_function(
