@@ -96,9 +96,9 @@
 <span class="font-code-md text-code-md text-on-surface font-semibold truncate">WHAXON SCOPE MANAGER</span>
 <span id="scopeStatusLabel" class="font-label-sm text-label-sm text-outline tracking-wide uppercase font-semibold">Waiting for scope configuration</span>
 </div>
-<div class="flex items-center justify-between font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
+<div class="flex items-center justify-between gap-space-sm font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
 <span>Scope API</span>
-<span class="text-primary font-mono">No latency claim</span>
+<button id="toggleScopeEnforcementBtn" type="button" class="px-2 py-1 rounded border border-outline-variant/50 bg-surface-container-high text-on-surface font-code-sm text-code-sm hover:bg-surface-variant disabled:opacity-50" disabled aria-pressed="false">Waiting for scope</button>
 </div>
 </div>
 </div>
@@ -359,12 +359,16 @@
   let preflightRequestId = 0;
   const scopeActionIds = [
     "openTargetModalBtn", "openImportDrawerBtn", "saveTargetBtn",
-    "addDenyRuleBtn", "runScopeCheckBtn", "copyCliBtn", "executeImportBtn"
+    "addDenyRuleBtn", "runScopeCheckBtn", "copyCliBtn", "executeImportBtn",
+    "toggleScopeEnforcementBtn"
   ];
   function setScopeActionsEnabled(enabled) {
     scopeActionIds.forEach(id => {
       const control = $(id);
       if (control) control.disabled = !enabled;
+    });
+    tbody?.querySelectorAll("[data-scope-mutation]").forEach(control => {
+      control.disabled = !enabled;
     });
   }
   setScopeActionsEnabled(false);
@@ -458,6 +462,8 @@
       edit.type = "button";
       edit.className = "px-2 py-1 mr-1 rounded bg-surface-container hover:bg-surface-variant text-on-surface text-[11px] font-code-sm border border-outline-variant/40";
       edit.textContent = "Edit";
+      edit.dataset.scopeMutation = "true";
+      edit.disabled = saveInFlight;
       edit.setAttribute("aria-label", "Edit " + entry.type.toLowerCase() + " rule " + entry.rule);
       edit.addEventListener("click", async () => {
         const replacement = window.prompt("Edit " + entry.type.toLowerCase() + " rule:", entry.rule);
@@ -471,6 +477,8 @@
       remove.type = "button";
       remove.className = "px-2 py-1 rounded bg-error-container/20 hover:bg-error-container/40 text-error text-[11px] font-code-sm border border-error/40";
       remove.textContent = "Remove";
+      remove.dataset.scopeMutation = "true";
+      remove.disabled = saveInFlight;
       remove.setAttribute("aria-label", "Remove " + entry.type.toLowerCase() + " rule " + entry.rule);
       remove.addEventListener("click", async () => {
         if (!window.confirm("Remove scope rule " + entry.rule + "?")) return;
@@ -483,6 +491,7 @@
       tr.append(target, type, ports, rate, auth, action);
       tbody.append(tr);
     }
+    applyTargetFilter();
     const metricCards = [...document.querySelectorAll("main .grid.grid-cols-1.sm\\:grid-cols-2.lg\\:grid-cols-4 > div")];
     const cidrs = ruleList("in_scope").filter(rule => rule.includes("/")).length;
     const inScopeCount = ruleList("in_scope").length;
@@ -501,6 +510,17 @@
     setMetric(0, String(ruleList("in_scope").length), "Configured rules", "Engagement: " + (scope.engagement || "Unnamed"), "From active config");
     setMetric(1, String(cidrs), "CIDR rules", "Host rules: " + (ruleList("in_scope").length - cidrs), "No route claims");
     setMetric(2, String(ruleList("out_of_scope").length), "Explicit deny rules", "Out-of-scope rules", "Evaluated first");
+    const enforcementToggle = $("toggleScopeEnforcementBtn");
+    if (enforcementToggle) {
+      enforcementToggle.disabled = saveInFlight;
+      enforcementToggle.textContent = enforcementEnabled ? "Disable enforcement" : "Enable enforcement";
+      enforcementToggle.setAttribute("aria-pressed", enforcementEnabled ? "true" : "false");
+      enforcementToggle.setAttribute("aria-label", enforcementEnabled
+        ? "Disable scope enforcement" : "Enable scope enforcement");
+      enforcementToggle.title = enforcementEnabled
+        ? "Disabling scope enforcement requires explicit confirmation"
+        : "Re-enable scope enforcement for subsequent runner actions";
+    }
     const statusLabel = $("scopeStatusLabel");
     if (statusLabel) {
       statusLabel.textContent = !enforcementEnabled
@@ -680,33 +700,38 @@
       }
     }
   });
-  $("targetFilterInput")?.addEventListener("input", event => {
-    const q = event.target.value.toLowerCase();
-    const rows = [...(tbody?.querySelectorAll("tr:not(#scope-empty-state)") || [])];
-    let visible = 0;
-    rows.forEach(row => {
-      const match = row.textContent.toLowerCase().includes(q);
-      row.style.display = match ? "" : "none";
-      if (match) visible += 1;
-    });
-    const empty = $("scope-empty-state");
-    if (empty && rows.length && visible > 0) {
-      empty.remove();
-    } else if (empty) {
-      empty.style.display = "";
+  function applyTargetFilter() {
+    if (!tbody) return;
+    const query = $("targetFilterInput")?.value.trim().toLowerCase() || "";
+    const rows = [...tbody.querySelectorAll("tr:not(#scope-empty-state)")];
+    const visible = rows.filter(row => row.textContent.toLowerCase().includes(query));
+    rows.forEach(row => { row.hidden = !visible.includes(row); });
+
+    let empty = $("scope-empty-state");
+    if (!rows.length || (query && !visible.length)) {
+      if (!empty) {
+        empty = document.createElement("tr");
+        empty.id = "scope-empty-state";
+        const cell = document.createElement("td");
+        cell.colSpan = 6;
+        cell.className = "px-space-md py-space-lg text-center text-on-surface-variant";
+        empty.append(cell);
+        tbody.append(empty);
+      }
+      empty.hidden = false;
       const cell = empty.querySelector("td");
-      if (cell) cell.textContent = rows.length && q
+      if (cell) cell.textContent = rows.length
         ? "No scope rules match this filter."
         : "No scope rules configured. Add an authorized target or import a scope.json definition.";
-    } else if (visible === 0 && q) {
-      const row = document.createElement("tr");
-      row.id = "scope-empty-state";
-      const cell = document.createElement("td");
-      cell.colSpan = 6;
-      cell.className = "px-space-md py-space-lg text-center text-on-surface-variant";
-      cell.textContent = "No scope rules match this filter.";
-      row.append(cell);
-      tbody?.append(row);
+    } else if (empty) {
+      empty.remove();
+    }
+  }
+  $("targetFilterInput")?.addEventListener("input", applyTargetFilter);
+  $("modalTargetInput")?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      $("saveTargetBtn")?.click();
     }
   });
   $("saveTargetBtn")?.addEventListener("click", async () => {
@@ -719,6 +744,14 @@
       const saved = await save({in_scope: rules});
       if (saved) { $("modalTargetInput").value = ""; $("authConfirmCheckbox").checked = false; close(); }
     } catch (error) { say(error.message, false); }
+  });
+  $("toggleScopeEnforcementBtn")?.addEventListener("click", async () => {
+    if (!scope || saveInFlight) return;
+    try {
+      await save({enabled: scope.enabled === false});
+    } catch (error) {
+      say(error.message, false);
+    }
   });
   $("addDenyRuleBtn")?.addEventListener("click", async () => {
     const rule = window.prompt("Enter a hostname, wildcard, IP address, or CIDR to explicitly exclude:");
@@ -781,14 +814,14 @@
       return;
     }
     let incoming;
-    if (Array.isArray(parsed.in_scope) || Array.isArray(parsed.out_of_scope)) {
+    if (Array.isArray(parsed.in_scope) && Array.isArray(parsed.out_of_scope)) {
       incoming = {engagement: parsed.engagement ?? scope.engagement, enabled: parsed.enabled ?? (scope.enabled !== false),
-        in_scope: parsed.in_scope ?? [], out_of_scope: parsed.out_of_scope ?? [], notes: parsed.notes ?? ""};
+        in_scope: parsed.in_scope, out_of_scope: parsed.out_of_scope, notes: parsed.notes ?? ""};
     } else if (typeof parsed.target === "string" && Array.isArray(parsed.include) && Array.isArray(parsed.exclude)) {
       if (parsed.exclude.some(v => String(v).startsWith("/"))) { say("URL path exclusions are not supported by WHAXON host scope rules.", false); return; }
       incoming = {engagement: scope.engagement, enabled: scope.enabled !== false, in_scope: [parsed.target, ...parsed.include], out_of_scope: parsed.exclude, notes: scope.notes};
-    } else { say("Expected scope.json with in_scope/out_of_scope lists, or {target, include, exclude} host rules.", false); return; }
-    try { if (await save(incoming, true)) close(); }
+    } else { say("Expected scope.json with both in_scope and out_of_scope lists, or {target, include, exclude} host rules.", false); return; }
+    try { if (await save(incoming)) close(); }
     catch (error) { say(error.message, false); }
   });
   // Only scope.json is currently supported; hide the nonfunctional source picker entirely.
