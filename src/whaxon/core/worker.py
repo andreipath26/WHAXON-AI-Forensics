@@ -68,5 +68,8 @@ async def drain_async(store, runner, *, max_jobs: int = 50, exclude_ids=None) ->
                 store.set_failed(job_id, f"{type(e).__name__}: {e}")
             except Exception:
                 pass
+        # Allow EventBus subscribers (including Automator) to enqueue any
+        # follow-up work before the next pending-row claim.
+        await asyncio.sleep(0)
         ran += 1
     return ran
