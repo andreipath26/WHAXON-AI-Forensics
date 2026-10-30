@@ -17,7 +17,7 @@ import logging
 _log = logging.getLogger(__name__)
 
 
-def drain(store, runner, *, max_jobs: int = 50) -> int:
+def drain(store, runner, *, max_jobs: int = 50, exclude_ids=None) -> int:
     """Claim and run pending jobs until none remain. Returns count run.
 
     Runs synchronously — each job is awaited to completion before the
@@ -26,7 +26,7 @@ def drain(store, runner, *, max_jobs: int = 50) -> int:
     """
     ran = 0
     for _ in range(max_jobs):
-        row = store.claim_pending()
+        row = store.claim_pending(exclude_ids=exclude_ids)
         if row is None:
             break
         job_id = row["id"]
@@ -46,7 +46,7 @@ def drain(store, runner, *, max_jobs: int = 50) -> int:
     return ran
 
 
-async def drain_async(store, runner, *, max_jobs: int = 50) -> int:
+async def drain_async(store, runner, *, max_jobs: int = 50, exclude_ids=None) -> int:
     """Async drain for hosts that already own an event loop.
 
     Same semantics as drain(), but awaits run_tool on the caller's loop.
@@ -54,7 +54,7 @@ async def drain_async(store, runner, *, max_jobs: int = 50) -> int:
     """
     ran = 0
     for _ in range(max_jobs):
-        row = store.claim_pending()
+        row = store.claim_pending(exclude_ids=exclude_ids)
         if row is None:
             break
         job_id = row["id"]
