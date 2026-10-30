@@ -163,6 +163,9 @@ def main(args: list[str] | None = None) -> None:
 
     async def _go():
         await core.initialize(drain=False)
+        # Preserve queued work from earlier CLI invocations; this command only
+        # owns jobs newly enqueued by findings from its initial execution.
+        state["pending_before"] = {row["id"] for row in core.store.list_pending()}
         if verbose:
             try:
                 match = core.scope.check(target) if core.scope else None
@@ -229,7 +232,7 @@ def main(args: list[str] | None = None) -> None:
     findings = state.get("primary_findings", state.get("findings") or [])
     try:
         from whaxon.core.worker import drain
-        drained = drain(core.store, core.runner)
+        drained = drain(core.store, core.runner, exclude_ids=state.get("pending_before", set()))
         if drained and not quiet:
             print(f"[run] auto-chain: completed {drained} queued job(s)", file=sys.stderr)
     except Exception as e:
