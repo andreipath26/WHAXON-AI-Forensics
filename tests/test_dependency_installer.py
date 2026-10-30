@@ -65,11 +65,17 @@ def test_approved_install_uses_fixed_pypi_wheel_command(monkeypatch, tmp_path):
     focused = build_remediation_plan(dependency_ids=[dependency_id])
     calls = []
 
-    def fake_run(argv, **kwargs):
-        calls.append((argv, kwargs))
-        return subprocess.CompletedProcess(argv, 0, stdout="installed", stderr="")
+    class FakeProcess:
+        returncode = 0
 
-    monkeypatch.setattr(installer.subprocess, "run", fake_run)
+        def communicate(self, timeout=None):
+            return "installed", ""
+
+    def fake_popen(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return FakeProcess()
+
+    monkeypatch.setattr(installer.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(installer.importlib.metadata, "version", lambda _name: "99.0")
     monkeypatch.setattr(installer.importlib, "import_module", lambda _name: object())
     monkeypatch.setattr(installer, "_audit_path", lambda: tmp_path / "audit.jsonl")
@@ -97,10 +103,20 @@ def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
     dependency_id = candidates[0]["dependency_id"]
     focused = build_remediation_plan(dependency_ids=[dependency_id])
 
-    def timeout(*_args, **_kwargs):
-        raise subprocess.TimeoutExpired("pip", 900)
+    class TimeoutProcess:
+        returncode = -15
 
-    monkeypatch.setattr(installer.subprocess, "run", timeout)
+        def communicate(self, timeout=None):
+            return "", ""
+
+        def terminate(self):
+            pass
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(installer, "INSTALL_TIMEOUT_SECONDS", 0)
+    monkeypatch.setattr(installer.subprocess, "Popen", lambda *_args, **_kwargs: TimeoutProcess())
     monkeypatch.setattr(installer, "_audit_path", lambda: tmp_path / "audit.jsonl")
     result = installer.apply_approved_dependency_plan(dependency_id, focused["plan_id"])
     assert result["status"] == "TIMED_OUT"
@@ -131,8 +147,12 @@ def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch)
     monkeypatch.setattr(installer, "_append_audit", audit)
     monkeypatch.setattr(
         installer.subprocess,
-        "run",
-        lambda argv, **kwargs: subprocess.CompletedProcess(argv, 0, stdout="", stderr=""),
+        "Popen",
+        lambda *_args, **_kwargs: type(
+            "FakeProcess",
+            (),
+            {"returncode": 0, "communicate": lambda self, timeout=None: ("", "")},
+        )(),
     )
     monkeypatch.setattr(installer.importlib.metadata, "version", lambda _name: "99.0")
     monkeypatch.setattr(installer.importlib, "import_module", lambda _name: object())
