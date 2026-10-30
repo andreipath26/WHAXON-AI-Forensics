@@ -171,6 +171,7 @@ def _source_evidence(source_text: str, draft: dict) -> list[dict]:
                                  "line": number, "excerpt": excerpt})
     return evidence
 
+
 def _harden_draft(draft: dict, source_url: str) -> None:
     """Replace parser guesses with conservative values until a human confirms them."""
     draft["program_url"] = source_url
@@ -192,6 +193,7 @@ def _harden_draft(draft: dict, source_url: str) -> None:
         "allow_auto_mode": False,
         "require_human_confirm": True,
     })
+
 
 def ingest_yeswehack_url(url: str) -> dict:
     """Fetch a public program page and return an unapproved, provenance-rich draft."""
