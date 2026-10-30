@@ -89,6 +89,14 @@ def read_snapshots(data_dir: Path, limit: int = _DEFAULT_LIMIT) -> list[dict[str
         not isinstance(raw, dict)
         or raw.get("schema_version") != HISTORY_SCHEMA_VERSION
         or not isinstance(raw.get("snapshots"), list)
+        or len(raw["snapshots"]) > MAX_SNAPSHOTS
+        or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("fingerprint"), str)
+            or not isinstance(item.get("dependencies"), list)
+            or not isinstance(item.get("environment"), dict)
+            for item in raw["snapshots"]
+        )
     ):
         raise RuntimeError("dependency readiness history has an unsupported schema")
     return raw["snapshots"][-limit:]
@@ -106,6 +114,14 @@ def record_snapshot(report: dict[str, Any], data_dir: Path) -> dict[str, Any]:
                     not isinstance(raw, dict)
                     or raw.get("schema_version") != HISTORY_SCHEMA_VERSION
                     or not isinstance(raw.get("snapshots"), list)
+                    or len(raw["snapshots"]) > MAX_SNAPSHOTS
+                    or any(
+                        not isinstance(item, dict)
+                        or not isinstance(item.get("fingerprint"), str)
+                        or not isinstance(item.get("dependencies"), list)
+                        or not isinstance(item.get("environment"), dict)
+                        for item in raw["snapshots"]
+                    )
                 ):
                     raise RuntimeError("dependency readiness history has an unsupported schema")
                 snapshots = raw["snapshots"]
