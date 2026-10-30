@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 import pytest
 
@@ -76,9 +77,16 @@ def test_install_job_lifecycle_persists_progress_and_result(tmp_path, monkeypatc
     )
     assert queued["status"] == "QUEUED"
     assert finished.wait(timeout=3)
-    operation = dependency_jobs.get_install_operation(
-        tmp_path, queued["operation_id"]
-    )
+    deadline = time.monotonic() + 3
+    operation = None
+    while time.monotonic() < deadline:
+        operation = dependency_jobs.get_install_operation(
+            tmp_path, queued["operation_id"]
+        )
+        if operation and operation["status"] == "VERIFIED":
+            break
+        time.sleep(0.01)
+    assert operation is not None
     assert operation["status"] == "VERIFIED"
     assert operation["progress"] == 100
     assert operation["result"]["status"] == "VERIFIED"
