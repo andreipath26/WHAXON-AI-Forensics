@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from whaxon.core.dependencies import collect_dependency_report
-from whaxon.core.remediation import build_remediation_plan
 from whaxon.core.installer import apply_approved_dependency_plan
+from whaxon.core.remediation import build_remediation_plan
 
 
 def main(args: list[str] | None = None) -> int:
