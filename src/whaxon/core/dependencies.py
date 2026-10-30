@@ -5,6 +5,7 @@ changes PATH, elevates privileges, or executes commands from manifests.
 """
 from __future__ import annotations
 
+import importlib
 import importlib.metadata
 import json
 import os
@@ -57,7 +58,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
-def _package_result(dist: str, minimum: str, *, required: bool,
+def _package_result(dist: str, import_name: str, minimum: str, *, required: bool,
                     capability: str) -> DependencyResult:
     try:
         version = importlib.metadata.version(dist)
@@ -74,10 +75,18 @@ def _package_result(dist: str, minimum: str, *, required: bool,
             required_version=f">={minimum}", capabilities=(capability,),
             reason=f"Package metadata could not be read ({type(exc).__name__}).",
         )
-    status = "READY" if _version_tuple(version) >= _version_tuple(minimum) else "INCOMPATIBLE"
-    reason = "Installed version satisfies the minimum." if status == "READY" else (
-        f"Installed version {version} is below required {minimum}."
-    )
+    if _version_tuple(version) < _version_tuple(minimum):
+        status = "INCOMPATIBLE"
+        reason = f"Installed version {version} is below required {minimum}."
+    else:
+        try:
+            importlib.import_module(import_name)
+        except Exception as exc:
+            status = "BROKEN"
+            reason = f"Package metadata exists but import failed ({type(exc).__name__})."
+        else:
+            status = "READY"
+            reason = "Minimum version is satisfied and package import succeeded."
     return DependencyResult(
         dist, dist, "python-package", required, status, version,
         required_version=f">={minimum}", capabilities=(capability,),
@@ -127,7 +136,7 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 continue
             capability = (entry.get("capabilities") or ["core"])[0]
             results.append(_package_result(
-                entry["id"], entry["minimum_version"], required=bool(entry.get("required")),
+                entry["id"], entry.get("import_name", entry["id"]), entry["minimum_version"], required=bool(entry.get("required")),
                 capability=capability,
             ))
     except (OSError, ValueError, TypeError, KeyError) as exc:
@@ -156,10 +165,10 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 tool_id = str(tool.get("id") or binary)
                 results.append(DependencyResult(
                     tool_id, str(tool.get("name") or tool_id), "external-tool", False,
-                    "READY" if path else "MISSING",
+                    "DETECTED" if path else "MISSING",
                     detected_path=path,
                     capabilities=(f"tool:{tool_id}",),
-                    reason=("Executable resolved on PATH." if path else
+                    reason=("Executable resolved on PATH; version and smoke test are not yet verified." if path else
                             f"Executable '{binary}' was not found on PATH."),
                     remediation=("" if path else
                                  "Use the platform's trusted package source or the official project instructions; "
