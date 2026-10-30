@@ -146,7 +146,7 @@ def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch)
 
     def audit(_record):
         writes["count"] += 1
-        if writes["count"] == 2:
+        if writes["count"] == 4:
             raise OSError("disk full")
 
     monkeypatch.setattr(installer, "_append_audit", audit)
