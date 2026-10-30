@@ -747,7 +747,7 @@ def test_dependency_install_endpoint_calls_approved_installer_only(
     monkeypatch.setattr(
         installer,
         "apply_approved_dependency_plan",
-        lambda dependency_id, approved_plan_id: (
+        lambda dependency_id, approved_plan_id, **kwargs: (
             calls.append((dependency_id, approved_plan_id))
             or {"status": "VERIFIED", "operation_id": "test-operation"}
         ),
