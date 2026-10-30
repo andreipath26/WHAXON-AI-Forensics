@@ -94,7 +94,7 @@
 </div>
 <div class="my-space-xs flex flex-col">
 <span class="font-code-md text-code-md text-on-surface font-semibold truncate">WHAXON SCOPE MANAGER</span>
-<span class="font-label-sm text-label-sm text-outline tracking-wide uppercase font-semibold">Waiting for scope configuration</span>
+<span id="scopeStatusLabel" class="font-label-sm text-label-sm text-outline tracking-wide uppercase font-semibold">Waiting for scope configuration</span>
 </div>
 <div class="flex items-center justify-between font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
 <span>Scope API</span>
@@ -492,17 +492,13 @@
     setMetric(0, String(ruleList("in_scope").length), "Configured rules", "Engagement: " + (scope.engagement || "Unnamed"), "From active config");
     setMetric(1, String(cidrs), "CIDR rules", "Host rules: " + (ruleList("in_scope").length - cidrs), "No route claims");
     setMetric(2, String(ruleList("out_of_scope").length), "Explicit deny rules", "Out-of-scope rules", "Evaluated first");
-    const engineCard = metricCards[3];
-    if (engineCard) {
-      const values = engineCard.querySelectorAll(".my-space-xs span, .border-t.pt-space-xs span");
-      if (values[0]) values[0].textContent = "WHAXON SCOPE MANAGER";
-      if (values[1]) {
-        values[1].textContent = !enforcementEnabled ? "Enforcement disabled" : inScopeCount ? "Enforcement enabled" : "Enabled; no target rules";
-        values[1].className = "font-label-sm text-label-sm tracking-wide uppercase font-semibold " +
-          (!enforcementEnabled ? "text-error" : inScopeCount ? "text-primary" : "text-tertiary");
-      }
-      if (values[2]) values[2].textContent = "Backend scope checks";
-      if (values[3]) values[3].textContent = "No latency claim";
+    const statusLabel = $("scopeStatusLabel");
+    if (statusLabel) {
+      statusLabel.textContent = !enforcementEnabled
+        ? "Enforcement disabled"
+        : inScopeCount ? "Enforcement enabled" : "Enabled; no target rules";
+      statusLabel.className = "font-label-sm text-label-sm tracking-wide uppercase font-semibold " +
+        (!enforcementEnabled ? "text-error" : inScopeCount ? "text-primary" : "text-tertiary");
     }
     const statusTone = !enforcementEnabled ? "error" : inScopeCount ? "primary" : "tertiary";
     const statusPulse = $("scopeStatusPulse");
@@ -618,7 +614,11 @@
       resetPreflightStatus();
       render();
       say("Loaded the active scope configuration.");
-    } catch (error) { say("Could not load live scope: " + error.message, false); }
+    } catch (error) {
+      const statusLabel = $("scopeStatusLabel");
+      if (statusLabel) statusLabel.textContent = "Waiting for scope configuration";
+      say("Could not load live scope: " + error.message, false);
+    }
   }
   let lastDialogTrigger = null;
   const openDialog = (dialog, trigger, focusSelector) => {
