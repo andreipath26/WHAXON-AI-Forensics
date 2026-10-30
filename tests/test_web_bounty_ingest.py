@@ -46,3 +46,18 @@ def test_program_import_requires_exactly_one_source(page, live_server):
     )
     assert response.status == 400
     assert "either url or text" in response.json()["error"]
+
+def test_bug_bounty_page_can_import_and_review_pasted_program(page, live_server):
+    page.goto(f"{live_server}/ui-v2/bug-bounty")
+    page.wait_for_selector("#bounty-import-url", timeout=5000)
+    page.locator("#bounty-import-text").fill(_PROGRAM_TEXT)
+    page.locator("#bounty-import-submit").click()
+    page.wait_for_function(
+        "() => document.querySelector('#bounty-import-status')?.textContent.includes('NOT saved')",
+        timeout=5000,
+    )
+    result = page.locator("#bounty-import-result").inner_text()
+    assert "Example Program" in result
+    assert "Extracted scope" in result
+    assert "Source evidence" in result
+    assert "NOT saved" in page.locator("#bounty-import-status").inner_text()
