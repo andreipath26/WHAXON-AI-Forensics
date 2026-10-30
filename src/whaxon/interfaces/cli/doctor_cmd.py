@@ -39,6 +39,12 @@ def main(args: list[str] | None = None) -> int:
     ns = parser.parse_args(args)
     if ns.snapshot and ns.drift:
         parser.error("--snapshot and --drift cannot be combined")
+    if ns.verify and ns.core_only:
+        parser.error("--verify cannot be combined with --core-only")
+    if ns.plan and (ns.verify or ns.snapshot or ns.drift or ns.install):
+        parser.error("--plan cannot be combined with --verify, --snapshot, --drift or --install")
+    if ns.install and (ns.verify or ns.snapshot or ns.drift or ns.core_only):
+        parser.error("--install cannot be combined with --verify, --snapshot, --drift or --core-only")
     if ns.install:
         if not ns.check or not ns.approve:
             parser.error("--install requires both --check DEPENDENCY_ID and --approve PLAN_ID")
