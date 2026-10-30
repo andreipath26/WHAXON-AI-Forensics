@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from whaxon.core.dependencies import _version_tuple, load_dependency_manifest
-from whaxon.core.remediation import build_remediation_plan
+from whaxon.core.remediation import build_python_package_argv, build_remediation_plan
 
 INSTALL_TIMEOUT_SECONDS = 900
 _SECRET_PATTERNS = (
@@ -102,13 +102,7 @@ def apply_approved_dependency_plan(
     entry = next((item for item in manifest["dependencies"] if item["id"] == dependency_id), None)
     if not entry or entry.get("kind") != "python-package":
         raise ValueError("Dependency is not an allowlisted Python package.")
-    requirement = f"{entry['id']}>={entry['minimum_version']}"
-    argv = [
-        sys.executable, "-m", "pip", "--isolated", "install", "--disable-pip-version-check",
-        "--no-input", "--quiet", "--progress-bar", "off",
-        "--only-binary=:all:", "--index-url",
-        "https://pypi.org/simple", requirement,
-    ]
+    argv = build_python_package_argv(entry)
     operation_id = str(uuid.uuid4())
     started = datetime.now(UTC).isoformat()
     base = {
