@@ -431,9 +431,27 @@ def test_dashboard_mobile_layout_has_no_horizontal_page_overflow(page, live_serv
 def test_dashboard_mobile_menu_is_not_shown_on_desktop(page, live_server):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{live_server}/ui-v2")
-    page.wait_for_selector(".dashboard-mobile-menu")
+    page.wait_for_selector(".dashboard-mobile-menu", state="attached")
     assert page.locator(".dashboard-mobile-menu").count() == 1
     assert not page.locator(".dashboard-mobile-menu").is_visible()
+
+
+def test_dashboard_sidebar_links_resolve_to_real_ui_routes(page, live_server):
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('aside a[data-path]')].every(link => link.href && link.href !== location.href + '#')",
+        timeout=8000,
+    )
+
+    links = page.locator("aside a[data-path]")
+    assert links.count() >= 15
+    for link in links.all():
+        href = link.get_attribute("href")
+        assert href and href.startswith("/ui-v2"), link.inner_text()
+        response = page.request.get(f"{live_server}{href}")
+        assert response.status == 200, f"{link.inner_text()} -> {href}: {response.status}"
+
 
 def test_dashboard_lab_deployment_is_not_present_as_a_live_action(page, live_server):
     page.goto(f"{live_server}/ui-v2")
