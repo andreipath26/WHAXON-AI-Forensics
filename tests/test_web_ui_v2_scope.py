@@ -228,7 +228,7 @@ def test_scope_header_does_not_claim_a_target_when_scope_is_empty(page, live_ser
         "() => document.querySelector('#scope-header-boundary')?.textContent === 'NO TARGET RULE CONFIGURED'",
         timeout=8000,
     )
-    assert page.locator("#scope-header-target").inner_text() == "Target: No target configured"
+    assert page.locator("#scope-header-target").text_content().strip() == "Target: No target configured"
     assert page.locator("#scope-header-membership").inner_text() == "(NO TARGET RULE)"
     assert "(IN SCOPE)" not in page.locator("header").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
@@ -303,7 +303,7 @@ def test_scope_registry_labels_do_not_overstate_assets_ports_or_authorization(pa
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=8000,
     )
-    body = page.locator("body").inner_text()
+    body = page.locator("body").text_content()
     assert "In-Scope Rules" in body
     assert "CIDR Rules" in body
     assert "Total In-Scope Assets" not in body
