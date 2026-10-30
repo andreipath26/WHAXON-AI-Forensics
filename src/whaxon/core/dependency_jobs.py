@@ -80,14 +80,14 @@ def get_install_operation(data_dir: Path, operation_id: str) -> dict[str, Any] |
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("dependency operation state is unreadable") from exc
     if not isinstance(state, dict):
-        raise RuntimeError("dependency operation state has an unsupported schema")
+        raise RuntimeError("dependency operation state is malformed or has an unsupported schema")
     if (
         state.get("schema_version") != 1
         or state.get("operation_id") != operation_id
         or not isinstance(state.get("status"), str)
         or not isinstance(state.get("updated_at"), str)
     ):
-        raise RuntimeError("dependency operation state has an unsupported schema")
+        raise RuntimeError("dependency operation state is malformed or has an unsupported schema")
     if state.get("status") in {"QUEUED", "INSTALLING", "VERIFYING"}:
         try:
             updated = datetime.fromisoformat(state["updated_at"])
