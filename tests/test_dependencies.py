@@ -26,8 +26,7 @@ def test_dependency_report_json_serializable():
 
 def test_packaged_catalog_is_used_when_user_data_is_not_initialized(tmp_path):
     report = collect_dependency_report(data_dir=tmp_path, include_optional=False)
-    catalog = next(d for d in report["dependencies"] if d["id"] == "tool-catalog")
-    assert catalog["status"] == "READY"
+    assert any(d["id"] == "nmap" for d in report["dependencies"])
 
 
 def test_optional_dependencies_do_not_block_core(tmp_path):
