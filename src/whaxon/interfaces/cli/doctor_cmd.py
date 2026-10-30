@@ -43,7 +43,7 @@ def main(args: list[str] | None = None) -> int:
         if not ns.check or not ns.approve:
             parser.error("--install requires both --check DEPENDENCY_ID and --approve PLAN_ID")
         try:
-            result = apply_approved_dependency_plan(ns.check, ns.approve)
+            result = apply_approved_dependency_plan(ns.check, ns.approve, data_dir=ns.data)
         except (ValueError, OSError) as exc:
             print(f"Installation not started: {exc}", file=sys.stderr)
             return 2
