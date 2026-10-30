@@ -11,12 +11,13 @@ import json
 import os
 import re
 import subprocess
-import time
 import sys
+import time
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from whaxon.core.dependencies import _version_tuple, load_dependency_manifest
 from whaxon.core.remediation import build_remediation_plan
@@ -234,7 +235,7 @@ def apply_approved_dependency_plan(
         "installed_version": version,
         "verification": verification_reason,
         "output": output,
-        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": datetime.now(UTC).isoformat(),
     }
     result = _finish_audit(result)
     if progress_callback:
