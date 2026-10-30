@@ -82,3 +82,33 @@ def test_approvals_workspace_loads_real_queue_and_disables_demo_decisions(page, 
     for button in page.locator("main button:visible").all():
         if not button.evaluate("(el) => el.closest('#whaxon-live-approvals') !== null"):
             assert button.is_disabled(), f"Unwired approval control remains enabled: {button.inner_text()}"
+
+
+def test_approvals_workspace_submits_operator_answer_to_waiting_run(page, live_server):
+    page.goto(f"{live_server}/ui-v2/approvals")
+    panel = page.locator("#whaxon-live-approvals")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('pending item(s)')",
+        timeout=10000,
+    )
+    answer = panel.get_by_role("textbox", name="Answer for run seed-ai-run")
+    assert answer.is_visible()
+    answer.fill("Proceed with the next permitted phase.")
+    note = panel.get_by_role("textbox", name="Approval note for run seed-ai-run")
+    note.fill("Browser acceptance test")
+    with page.expect_response(
+        lambda response: response.request.method == "POST"
+        and response.url.endswith("/api/ai/runs/seed-ai-run/answer")
+    ) as response_info:
+        panel.get_by_role("button", name="Submit answer").click()
+    response = response_info.value
+    assert response.status == 200
+    assert response.json()["ok"] is True
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('0 pending item(s)')",
+        timeout=10000,
+    )
+    approvals = page.evaluate(
+        "() => fetch('/api/ai/runs/seed-ai-run').then(response => response.json())"
+    )
+    assert approvals["status"] in ("waiting", "running", "finished")
