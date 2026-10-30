@@ -296,3 +296,20 @@ def test_scope_demo_hosts_and_deny_rules_are_hidden_until_live_configuration(pag
     assert page.get_by_text("Discovered Hosts & SSL SAN Intake Queue").is_hidden()
     assert page.get_by_text("/auth/admin/*", exact=True).count() == 0
     assert page.get_by_text("10.0.12.0/24 (Prod DBs)", exact=True).count() == 0
+
+def test_scope_registry_labels_do_not_overstate_assets_ports_or_authorization(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    body = page.locator("body").inner_text()
+    assert "In-Scope Rules" in body
+    assert "CIDR Rules" in body
+    assert "Total In-Scope Assets" not in body
+    assert "Discovery Mode" not in body
+    assert "Allowed Ports" not in body
+    assert "Authorization Record" in body
+    assert "No evidence stored by scope API" in body
+    assert "Explicit Exclusions" in body
+    assert "Strict Deny Rules" not in body
