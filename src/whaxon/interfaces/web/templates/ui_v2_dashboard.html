@@ -562,7 +562,7 @@
     const sub = card.querySelector(".font-label-sm:not(.uppercase)");
     if (sub && suffix) sub.textContent = suffix;
   };
-  const fmt = value => value ? new Date(value).toLocaleString() : "Not recorded";
+  const fmt = value => value ? new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value).toLocaleString() : "Not recorded";
   const statusLabel = value => String(value || "unknown").replace(/_/g, " ").toUpperCase();
   const td = (row, value, classes) => {
     const cell = document.createElement("td");
