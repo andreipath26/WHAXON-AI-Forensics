@@ -520,8 +520,8 @@ def test_scope_enforcement_toggle_is_locked_during_save(page, live_server):
         return originalFetch(url, options);
       };
     }""")
-    page.locator("#toggleScopeEnforcementBtn").click()
     page.once("dialog", lambda dialog: dialog.accept())
+    page.locator("#toggleScopeEnforcementBtn").click()
     page.wait_for_function("() => typeof window.__resolveScopeToggle === 'function'", timeout=5000)
     assert page.locator("#toggleScopeEnforcementBtn").is_disabled()
     page.evaluate("() => window.__resolveScopeToggle()")
