@@ -70,8 +70,8 @@
 <span class="font-label-sm text-label-sm uppercase text-outline">State</span>
 <div class="flex items-center gap-space-xs">
 <span class="h-2 w-2 rounded-full bg-tertiary animate-pulse"></span>
-<span class="font-code-sm text-code-sm text-tertiary font-medium">Runtime status unavailable</span>
-<span class="font-label-sm text-label-sm text-outline">(Active-job status not exposed)</span>
+<span id="dashboard-runtime-state" class="font-code-sm text-code-sm text-tertiary font-medium">Checking active jobs…</span>
+<span id="dashboard-runtime-detail" class="font-label-sm text-label-sm text-outline">(Checking live status)</span>
 </div>
 </div>
 <div class="h-8 w-px bg-surface-container-highest"></div>
@@ -755,7 +755,7 @@
         const active = await response.json();
         if (!Array.isArray(active)) throw new Error("Active jobs API returned an invalid response.");
         if (!active.length) {
-          showActionStatus("No running or queued jobs were found. Nothing was cancelled.");
+          showActionStatus("No running jobs were found. Nothing was cancelled.");
           return;
         }
         if (!window.confirm("Cancel " + active.length + " active WHAXON job(s)? This cannot be undone.")) return;
