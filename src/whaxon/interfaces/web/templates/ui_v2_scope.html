@@ -255,13 +255,13 @@
 </div>
 </div>
 <!-- Modal / Drawer: Add In-Scope Target (Default Hidden) -->
-<div class="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center hidden p-margin" id="targetModal">
+<div class="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center hidden p-margin" id="targetModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="targetModalTitle" tabindex="-1">
 <div class="w-full max-w-xl bg-surface-container-low rounded border border-primary/40 shadow-[0_8px_30px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
 <!-- Modal Header -->
 <div class="p-space-md bg-surface-container border-b border-outline-variant/30 flex items-center justify-between">
 <div class="flex items-center gap-space-xs">
 <span class="material-symbols-outlined text-primary text-base">target</span>
-<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">Define Authorized In-Scope Target</h2>
+<h2 id="targetModalTitle" class="font-headline-sm text-headline-sm text-on-surface font-bold tracking-tight">Define Authorized In-Scope Target</h2>
 </div>
 <button class="text-outline hover:text-on-surface p-1" id="closeTargetModalBtn">
 <span class="material-symbols-outlined text-base">close</span>
@@ -302,12 +302,12 @@
 </div>
 </div>
 <!-- Modal / Drawer: Quick Import (Default Hidden) -->
-<div class="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center hidden p-margin" id="importDrawer">
+<div class="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center hidden p-margin" id="importDrawer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="importDrawerTitle" tabindex="-1">
 <div class="w-full max-w-lg bg-surface-container-low rounded border border-secondary/40 shadow-[0_8px_30px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col">
 <div class="p-space-md bg-surface-container border-b border-outline-variant/30 flex items-center justify-between">
 <div class="flex items-center gap-space-xs">
 <span class="material-symbols-outlined text-secondary text-base">cloud_download</span>
-<h2 class="font-headline-sm text-headline-sm text-on-surface font-bold">Import Scope Definition</h2>
+<h2 id="importDrawerTitle" class="font-headline-sm text-headline-sm text-on-surface font-bold">Import Scope Definition</h2>
 </div>
 <button class="text-outline hover:text-on-surface p-1" id="closeImportDrawerBtn">
 <span class="material-symbols-outlined text-base">close</span>
@@ -515,10 +515,36 @@
       say("Loaded the active scope configuration.");
     } catch (error) { say("Could not load live scope: " + error.message, false); }
   }
-  const close = () => { modal?.classList.add("hidden"); drawer?.classList.add("hidden"); };
-  $("openTargetModalBtn")?.addEventListener("click", () => modal?.classList.remove("hidden"));
+  let lastDialogTrigger = null;
+  const openDialog = (dialog, trigger, focusSelector) => {
+    if (!dialog) return;
+    lastDialogTrigger = trigger || document.activeElement;
+    dialog.classList.remove("hidden");
+    dialog.setAttribute("aria-hidden", "false");
+    (dialog.querySelector(focusSelector) || dialog).focus();
+  };
+  const close = () => {
+    const active = [modal, drawer].find(dialog => dialog && !dialog.classList.contains("hidden"));
+    [modal, drawer].forEach(dialog => {
+      if (!dialog) return;
+      dialog.classList.add("hidden");
+      dialog.setAttribute("aria-hidden", "true");
+    });
+    if (active && lastDialogTrigger?.isConnected) lastDialogTrigger.focus();
+    lastDialogTrigger = null;
+  };
+  $("openTargetModalBtn")?.addEventListener("click", event =>
+    openDialog(modal, event.currentTarget, "#modalTargetInput"));
   ["closeTargetModalBtn","cancelTargetModalBtn"].forEach(id => $(id)?.addEventListener("click", close));
   ["closeImportDrawerBtn","cancelImportDrawerBtn"].forEach(id => $(id)?.addEventListener("click", close));
+  $("openImportDrawerBtn")?.addEventListener("click", event =>
+    openDialog(drawer, event.currentTarget, "textarea"));
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && [modal, drawer].some(dialog => dialog && !dialog.classList.contains("hidden"))) {
+      event.preventDefault();
+      close();
+    }
+  });
   $("targetFilterInput")?.addEventListener("input", event => {
     const q = event.target.value.toLowerCase();
     tbody?.querySelectorAll("tr").forEach(row => row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none");
@@ -531,7 +557,7 @@
       const rules = ruleList("in_scope");
       if (!rules.includes(target)) rules.push(target);
       const saved = await save({in_scope: rules});
-      if (saved) { $("modalTargetInput").value = ""; $("authConfirmCheckbox").checked = false; modal?.classList.add("hidden"); }
+      if (saved) { $("modalTargetInput").value = ""; $("authConfirmCheckbox").checked = false; close(); }
     } catch (error) { say(error.message, false); }
   });
   $("addDenyRuleBtn")?.addEventListener("click", async () => {
@@ -581,7 +607,7 @@
       if (parsed.exclude.some(v => String(v).startsWith("/"))) { say("URL path exclusions are not supported by WHAXON host scope rules.", false); return; }
       incoming = {engagement: scope.engagement, enabled: true, in_scope: [parsed.target, ...parsed.include], out_of_scope: parsed.exclude, notes: scope.notes};
     } else { say("Expected scope.json with in_scope/out_of_scope lists, or {target, include, exclude} host rules.", false); return; }
-    try { if (await save(incoming, true)) drawer?.classList.add("hidden"); }
+    try { if (await save(incoming, true)) close(); }
     catch (error) { say(error.message, false); }
   });
   $("openImportDrawerBtn")?.addEventListener("click", () => drawer?.classList.remove("hidden"));

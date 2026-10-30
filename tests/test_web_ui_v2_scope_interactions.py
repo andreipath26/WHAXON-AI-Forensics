@@ -154,3 +154,24 @@ def test_scope_header_shows_the_actual_configured_target(page, live_server):
     scope = _read_scope(page)
     target = scope["in_scope"][0] if scope.get("in_scope") else "No target configured"
     assert target in page.locator("header").inner_text()
+
+
+def test_scope_dialogs_support_escape_and_restore_focus(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    target_trigger = page.locator("#openTargetModalBtn")
+    target_trigger.click()
+    assert page.locator("#targetModal").get_attribute("role") == "dialog"
+    assert page.locator("#targetModal").get_attribute("aria-modal") == "true"
+    assert page.locator("#modalTargetInput").evaluate("(el) => el === document.activeElement")
+    page.keyboard.press("Escape")
+    assert page.locator("#targetModal").is_hidden()
+    assert target_trigger.evaluate("(el) => el === document.activeElement")
+
+    import_trigger = page.locator("#openImportDrawerBtn")
+    import_trigger.click()
+    assert page.locator("#importDrawer").get_attribute("aria-hidden") == "false"
+    assert page.locator("#importDrawer textarea").evaluate("(el) => el === document.activeElement")
+    page.keyboard.press("Escape")
+    assert page.locator("#importDrawer").is_hidden()
+    assert import_trigger.evaluate("(el) => el === document.activeElement")
