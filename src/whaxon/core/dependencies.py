@@ -87,7 +87,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     digits as one numeric component.
     """
     match = re.fullmatch(
-        r"\s*(?:[0-9]+!)?(\d+(?:\.\d+)*)"
+        r"\s*(?:([0-9]+)!)?(\d+(?:\.\d+)*)"
         r"(?:[-_.]?(a|alpha|b|beta|rc|pre|preview|dev|post)[-_.]?(\d*)?)?"
         r"(?:\+[a-zA-Z0-9.-]+)?\s*",
         value,
@@ -95,10 +95,10 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     )
     if not match:
         raise ValueError(f"unsupported version format: {value!r}")
-    release = [int(part) for part in match.group(1).split(".")]
+    release = [int(part) for part in match.group(2).split(".")]
     release = (release + [0] * 8)[:8]
-    label = (match.group(2) or "").lower()
-    number = int(match.group(3) or 0)
+    label = (match.group(3) or "").lower()
+    number = int(match.group(4) or 0)
     stage = {
         "dev": -3,
         "a": -2, "alpha": -2,
@@ -107,7 +107,7 @@ def _version_tuple(value: str) -> tuple[int, ...]:
         "": 1,
         "post": 2,
     }[label]
-    return (*release, stage, number)
+    return (int(match.group(1) or 0), *release, stage, number)
 
 
 def _package_result(dist: str, import_name: str, minimum: str, *, required: bool,
@@ -241,6 +241,8 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 # never redirect a trusted probe to a different executable.
                 if probe and probe.get("binary") != binary:
                     probe = None
+                if path and verify_external and not probe:
+                    reason = "No trusted version probe is configured for this catalog entry; binary remains detected only."
                 if path and verify_external and probe:
                     try:
                         completed = subprocess.run(
