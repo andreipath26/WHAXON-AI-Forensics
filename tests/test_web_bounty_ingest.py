@@ -26,6 +26,8 @@ def test_pasted_program_import_returns_reviewable_draft(page, live_server):
     assert result["evidence"]
     assert result["policy_draft"]["tools"]["allowlist"] == []
     assert result["policy_draft"]["ai_policy"]["allow_live_requests"] is False
+    assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
+    assert result["review"]["scope.out_of_scope"] == "manual_review_required_not_extracted"
     assert any("not proof of authorization" in warning for warning in result["warnings"])
 
 
