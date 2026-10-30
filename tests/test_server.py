@@ -697,3 +697,167 @@ def test_network_auth_requires_non_default_bcrypt_credentials(monkeypatch):
         b"password", web_server._bcrypt.gensalt(rounds=11)
     ).decode("utf-8")
     assert not web_server._remote_auth_ready("admin", "", weak_hash)
+
+
+# ------------------------------------------------------- dependency readiness
+
+def test_dependency_diagnostics_endpoint_is_read_only(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/dependencies")
+    assert response.status_code == 200
+    report = response.get_json()
+    assert report["schema_version"] == 1
+    assert report["safety"]["read_only"] is True
+    assert report["safety"]["installation_attempted"] is False
+
+
+def test_dependency_plan_endpoint_validates_input_and_does_not_install(
+    tmp_path, monkeypatch
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    invalid = client.post("/api/dependencies/plan", json={"dependency_ids": "nmap"})
+    assert invalid.status_code == 400
+    response = client.post(
+        "/api/dependencies/plan", json={"dependency_ids": ["python"]}
+    )
+    assert response.status_code == 200
+    plan = response.get_json()
+    assert plan["safety"]["read_only"] is True
+    assert plan["safety"]["commands_executed"] is False
+
+
+def test_dependency_install_endpoint_requires_exact_approval(
+    tmp_path, monkeypatch
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/dependencies/install",
+        json={"dependency_id": "textual", "approved_plan_id": "not-a-plan"},
+    )
+    assert response.status_code == 400
+
+
+def test_dependency_install_endpoint_queues_approved_operation(
+    tmp_path, monkeypatch
+):
+    import whaxon.core.dependency_jobs as jobs
+
+    calls = []
+    monkeypatch.setattr(
+        jobs,
+        "start_install_operation",
+        lambda dependency_id, approved_plan_id, data_dir: (
+            calls.append((dependency_id, approved_plan_id, data_dir))
+            or {
+                "operation_id": "0123456789abcdef0123456789abcdef",
+                "status": "QUEUED",
+                "progress": 0,
+            }
+        ),
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        "/api/dependencies/install",
+        json={
+            "dependency_id": "textual",
+            "approved_plan_id": "plan-0123456789abcdef",
+        },
+    )
+    assert response.status_code == 202
+    assert response.get_json()["status"] == "QUEUED"
+    assert calls == [(
+        "textual",
+        "plan-0123456789abcdef",
+        tmp_path,
+    )]
+
+
+def test_dependency_install_status_endpoint_returns_operation(
+    tmp_path, monkeypatch
+):
+    import whaxon.core.dependency_jobs as jobs
+
+    operation_id = "0123456789abcdef0123456789abcdef"
+    monkeypatch.setattr(
+        jobs,
+        "get_install_operation",
+        lambda data_dir, requested_id: {
+            "operation_id": requested_id,
+            "status": "VERIFYING",
+            "progress": 80,
+        },
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get(
+        f"/api/dependencies/install/{operation_id}"
+    )
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "VERIFYING"
+
+
+def test_dependency_install_cancel_endpoint_sets_cancel_request(
+    tmp_path, monkeypatch
+):
+    import whaxon.core.dependency_jobs as jobs
+
+    operation_id = "0123456789abcdef0123456789abcdef"
+    monkeypatch.setattr(
+        jobs,
+        "cancel_install_operation",
+        lambda data_dir, requested_id: {
+            "operation_id": requested_id,
+            "status": "INSTALLING",
+            "cancel_requested": True,
+        },
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        f"/api/dependencies/install/{operation_id}/cancel"
+    )
+    assert response.status_code == 202
+    assert response.get_json()["cancel_requested"] is True
+
+
+def test_dependency_readiness_is_integrated_into_existing_diagnostics_page(
+    tmp_path, monkeypatch
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/ui-v2/diagnostics")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="whaxon-dependency-readiness-ui"' in page
+    assert 'id="dep-check"' in page
+    assert 'id="dep-rows"' in page
+    assert 'id="dep-plan"' in page
+    assert 'id="dep-operation"' in page
+    assert "bg-surface-container-low" in page
+
+
+def test_dependency_audit_integrity_endpoint(tmp_path, monkeypatch):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(
+        installer,
+        "verify_dependency_audit",
+        lambda: {"valid": True, "events_checked": 3, "head_hash": "a" * 64},
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/dependencies/audit")
+    assert response.status_code == 200
+    assert response.get_json()["valid"] is True
+    assert response.get_json()["events_checked"] == 3
+
+
+def test_dependency_audit_integrity_endpoint_fails_on_corruption(tmp_path, monkeypatch):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(
+        installer,
+        "verify_dependency_audit",
+        lambda: {"valid": False, "events_checked": 1, "reason": "hash_mismatch"},
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/api/dependencies/audit")
+    assert response.status_code == 409
+    assert response.get_json()["valid"] is False

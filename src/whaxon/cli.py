@@ -22,6 +22,9 @@ def main() -> None:
     elif mode == "serve":
         from .interfaces.web.serve import main as serve_main
         serve_main(args)
+    elif mode == "doctor":
+        from .interfaces.cli.doctor_cmd import main as doctor_main
+        raise SystemExit(doctor_main(args))
     elif mode == "init":
         from .interfaces.cli.init_cmd import main as init_main
         init_main(args)
@@ -95,7 +98,7 @@ def main() -> None:
         from .interfaces.tui.app import main as tui_main
         tui_main(args)
     elif mode in ("--help", "-h"):
-        print("Usage: whaxon [init|up|down|serve|web|tui|gui|msf|scope|install|suggest|burp-import|evidence|report|run|findings|lookup|cve|vulndb|validate|retest|coverage|bounty|state|jobs|ai]")
+        print("Usage: whaxon [doctor|init|up|down|serve|web|tui|gui|msf|scope|install|suggest|burp-import|evidence|report|run|findings|lookup|cve|vulndb|validate|retest|coverage|bounty|state|jobs|ai]")
     else:
         print(f"Unknown mode: {mode}. Use 'tui', 'gui', 'web', or 'serve'.")
         sys.exit(2)
