@@ -162,3 +162,11 @@ def test_operation_rejects_malformed_json_shape(tmp_path):
     (operations / f"{operation_id}.json").write_text("[]")
     with pytest.raises(RuntimeError, match="unsupported schema"):
         dependency_jobs.get_install_operation(tmp_path, operation_id)
+
+
+def test_operation_state_rejects_non_object_json(tmp_path):
+    operations = dependency_jobs._operations_dir(tmp_path)
+    operation_id = "0123456789abcdef0123456789abcdef"
+    (operations / f"{operation_id}.json").write_text("[]")
+    with pytest.raises(RuntimeError, match="malformed"):
+        dependency_jobs.get_install_operation(tmp_path, operation_id)
