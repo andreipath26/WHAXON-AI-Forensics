@@ -2261,6 +2261,36 @@ Do not create parallel abstractions if equivalent services already exist. Keep d
 
 **Status:** Queued. UI work must be implemented after the corresponding backend contracts are defined, and must use the existing approved WHAXON UI design and navigation. This is an extension of existing screens, not a redesign.
 
+## 40.6 Implementation tracker — dependency readiness (2026-10-30)
+
+Implementation is being delivered in independently reviewable stages. The status below describes code present on the dependency-readiness feature branch; it is **not** a declaration that the feature is deployment-ready or merged to `main`.
+
+### Implemented foundation
+
+- **Manifest and diagnostics:** versioned `src/whaxon/data/dependencies.json`; required/optional Python dependencies and profiles; read-only runtime/package/import-resolvability checks; external executable discovery; machine-readable report; `whaxon doctor`.
+- **Remediation planning:** deterministic plan preview, explicit dependency selection, plan ID bound to the current environment, manifest and action details; no command execution during planning.
+- **Restricted package installer:** separate explicit approval operation; manifest allowlist; active-virtual-environment requirement; fixed PyPI index; binary wheels only; no shell or privilege escalation; bounded timeout; post-install version/import check; local operation audit.
+- **External version probes:** explicit, manifest-curated probes only for selected tools; subprocess argument arrays, no shell, bounded timeout/output, no target activity. Presence alone remains `DETECTED`; probe success is only version verification, not full functional smoke-test evidence.
+- **Readiness history:** bounded local snapshots, restrictive file permissions where supported, atomic file replacement, drift comparison, and omission of the current working directory from saved snapshots.
+- **Backend API:** authenticated Flask endpoints for diagnostics, explicit verification, plan preview, approved installation, snapshot/history and drift. Routes inherit the server's request-origin/host/authentication boundary.
+- **Initial tests and docs:** detection, plan, approval, installer, version-probe, history/drift and API tests have been added; operator documentation describes supported commands and safety limits.
+
+### Remaining before deployment
+
+1. Resolve every lint/type/test/build failure and pass the complete CI matrix on Python 3.11, 3.12 and 3.13.
+2. Validate packaging: wheel and sdist must include the manifest and tool catalog; test `whaxon doctor` from a clean installed wheel.
+3. Expand dependency detection to configured resource paths, conflicting binaries, executable identity, platform support and OS-specific runtime requirements.
+4. Complete external-tool verification with reviewed per-tool version and harmless local smoke-test contracts; do not promote version-only checks to full READY when a capability requires more evidence.
+5. Complete installation profiles, supported platform-specific options, official-source provenance, offline/manual paths, integrity checks where upstream supports them, and no-root/restricted-host behavior.
+6. Strengthen installer transaction behavior: cancellation, process termination, partial state reporting, audit failure handling, interrupted process recovery and safe retry. Do not claim rollback unless guaranteed.
+7. Integrate all four UI states only after inspecting the exact active UI files under `web ui files and rendering/` and its current live implementation. Reuse existing tokens, shell, navigation, tables, drawers, progress and notification components. No UI redesign.
+8. Run the §40.3/§40.5 clean-environment matrix and measure false-readiness; record tested vs untested platforms explicitly.
+9. Update §38 release gates and release notes; merge only after review and green CI.
+
+### Deployment gate
+
+The current branch/PR remains a draft while these gates are outstanding. No dependency screen should be exposed as a finished user workflow until its backend contract, active-UI integration, accessibility and end-to-end tests are complete. A missing optional integration must degrade only its dependent capabilities; a false READY classification is a release-blocking defect.
+
 ## 41.1 Non-negotiable UI rules
 
 - Preserve the supplied/approved UI design, existing navigation patterns, typography, colors, spacing and interaction conventions. Do not introduce an alternative visual design.
