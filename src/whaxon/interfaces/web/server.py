@@ -1602,8 +1602,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/api/dependencies/drift")
     def api_dependencies_drift_get():
         """Compare current read-only diagnostics with the latest saved snapshot."""
-        from whaxon.core.dependency_history import compare_with_latest
         from whaxon.core.dependencies import collect_dependency_report
+        from whaxon.core.dependency_history import compare_with_latest
 
         try:
             report = collect_dependency_report(
@@ -1621,8 +1621,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @limiter.limit("10 per minute")
     def api_dependencies_snapshot_post():
         """Explicitly save a bounded local readiness snapshot."""
-        from whaxon.core.dependency_history import record_snapshot
         from whaxon.core.dependencies import collect_dependency_report
+        from whaxon.core.dependency_history import record_snapshot
 
         try:
             report = collect_dependency_report(
