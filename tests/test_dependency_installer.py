@@ -166,3 +166,31 @@ def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch)
     assert result["status"] == "AUDIT_FAILED"
     assert result["original_status"] == "VERIFIED"
     assert "operation ran" in result["recovery"]
+
+
+def test_cancel_before_start_never_spawns_package_manager(monkeypatch, tmp_path):
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(sys, "prefix", "/tmp/whaxon-test-venv")
+    monkeypatch.setattr(sys, "base_prefix", "/usr")
+    plan = build_remediation_plan()
+    candidates = [action for action in plan["actions"]
+                  if action["options"][0]["kind"] == "python-package"]
+    if not candidates:
+        pytest.skip("No missing Python package to install")
+    dependency_id = candidates[0]["dependency_id"]
+    focused = build_remediation_plan(dependency_ids=[dependency_id])
+    monkeypatch.setattr(
+        installer.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: pytest.fail("Popen must not be called"),
+    )
+    monkeypatch.setattr(installer, "_audit_path", lambda: tmp_path / "audit.jsonl")
+    result = installer.apply_approved_dependency_plan(
+        dependency_id,
+        focused["plan_id"],
+        cancel_requested=lambda: True,
+    )
+    assert result["status"] == "CANCELLED"
+    records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert [record["status"] for record in records] == ["STARTED", "CANCELLED"]
