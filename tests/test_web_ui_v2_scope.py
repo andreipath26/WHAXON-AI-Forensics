@@ -10,7 +10,7 @@ def test_scope_page_loads_live_configuration(page, live_server):
         timeout=5000,
     )
     assert page.locator("#targetTableBody tr").count() >= 1
-    table_footer = page.locator("#targetTableBody").locator("xpath=ancestor::div[contains(@class, 'overflow-x-auto')]/..").locator(".p-space-md.bg-surface-container-lowest")
+    table_footer = page.locator("#targetTableBody").locator("xpath=ancestor::div[contains(@class, 'overflow-x-auto')]/..").locator("div.p-space-md[class*='bg-surface-container-lowest']")
     assert "LIVE CONFIGURATION" in table_footer.inner_text()
     assert "Pagination:" not in page.locator("body").inner_text()
     assert page.get_by_role("button", name="Next").count() == 0
