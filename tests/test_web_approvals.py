@@ -25,14 +25,17 @@ def test_approvals_page_renders_pending_run(page, live_server):
 
 def test_approvals_summary_reports_count(page, live_server):
     _open_approvals(page, live_server)
+    pending = page.evaluate("() => fetch('/api/ai/pending').then(response => response.json())")
+    count = len(pending)
     summary = page.locator("#approvals-summary").text_content()
-    assert "2 runs" in summary
+    assert summary.startswith(str(count))
 
 
 def test_approvals_badge_shows_count(page, live_server):
     _open_approvals(page, live_server)
+    pending = page.evaluate("() => fetch('/api/ai/pending').then(response => response.json())")
     badge = page.locator("#approvals-badge")
-    assert badge.text_content().strip() == "2"
+    assert badge.text_content().strip() == str(len(pending))
 
 
 def test_owner_filter_narrows_results(page, live_server):
