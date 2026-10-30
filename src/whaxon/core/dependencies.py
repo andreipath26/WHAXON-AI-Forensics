@@ -59,13 +59,13 @@ def _version_tuple(value: str) -> tuple[int, ...]:
 
 
 def _package_result(dist: str, import_name: str, minimum: str, *, required: bool,
-                    capability: str) -> DependencyResult:
+                    capabilities: tuple[str, ...]) -> DependencyResult:
     try:
         version = importlib.metadata.version(dist)
     except importlib.metadata.PackageNotFoundError:
         return DependencyResult(
             dist, dist, "python-package", required, "MISSING",
-            required_version=f">={minimum}", capabilities=(capability,),
+            required_version=f">={minimum}", capabilities=capabilities,
             reason="Python distribution is not installed in the active interpreter.",
             remediation=f"Install the documented WHAXON extra or package containing {dist}.",
         )
@@ -131,10 +131,10 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 continue
             if not include_optional and not entry.get("required", False):
                 continue
-            capability = (entry.get("capabilities") or ["core"])[0]
+            capabilities = tuple(entry.get("capabilities") or ["core"])
             results.append(_package_result(
-                entry["id"], entry.get("import_name", entry["id"]), entry["minimum_version"], required=bool(entry.get("required")),
-                capability=capability,
+                entry["id"], entry.get("import_name", entry["id"]), entry["minimum_version"],
+                required=bool(entry.get("required")), capabilities=capabilities,
             ))
     except (OSError, ValueError, TypeError, KeyError) as exc:
         results.append(DependencyResult(
