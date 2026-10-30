@@ -709,8 +709,19 @@
       .filter(input => /DNS \(A\/AAAA\/MX\/NS\/SOA\)|SSL Cert & SAN Discovery/.test(input.parentElement?.textContent || ""));
     passiveChecks[0]?.closest("div.grid.grid-cols-2")?.parentElement?.remove();
     byText("span", "ThreadPoolExecutor")?.closest(".bg-surface-container-lowest")?.remove();
-    for (const sample of ["Nmap 7.94", "Nuclei v3.2.0"]) {
+    for (const sample of ["Nmap 7.94", "Nuclei v3.2.0", "Nikto 2.5.0", "sqlmap 1.8.3"]) {
       byText("span", sample)?.closest("div.bg-surface-container-low.rounded-lg")?.remove();
+    }
+    byText("span", "Quick Trigger Utility Bar")?.closest(".bg-surface-container-low.rounded-lg")?.remove();
+    byText("span", "Deterministic Boundary Enforced")?.closest(".bg-surface-container-low.rounded-lg")?.remove();
+    byText("span", "VULN_CANDIDATE")?.closest(".bg-surface-container-high.rounded")?.remove();
+    const telemetry = byText("span", "Network Packets");
+    telemetry?.closest(".bg-surface-container-low.rounded-lg")?.remove();
+    const terminal = $("terminal-stdout");
+    if (terminal?.parentElement) {
+      [...terminal.parentElement.children].forEach(child => {
+        if (child !== terminal) child.remove();
+      });
     }
     const phase = byText("h3", "Phase 0: Passive Reconnaissance Stage");
     if (phase) phase.textContent = "Live Tool Dispatch";
