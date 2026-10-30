@@ -1200,7 +1200,9 @@
         ["Network", option.requires_network === true ? "Required" : option.requires_network === false ? "No" : "Unknown"],
         ["Privilege", option.requires_privilege === false ? "No elevation" : String(option.requires_privilege)],
         ["System-wide", String(option.system_wide)],
-        ["Automation", option.automated_execution_supported ? "Supported" : "Manual only"]
+        ["Automation", option.automated_execution_supported ? "Supported" : "Manual only"],
+        ["Package source", option.package_source || "Manual / official source"],
+        ["Dependencies", option.may_install_transitive_dependencies ? "May install/update transitive packages" : "No transitive installs"]
       ].forEach(([label, value]) => addMetric(impact, label, value));
       setText("dep-command", option.display_command || (option.title || "Manual installation instructions only."));
       setText("dep-plan-warning", option.warning || "Review the source and impact before proceeding.");
