@@ -235,6 +235,7 @@ def test_scope_header_does_not_claim_a_target_when_scope_is_empty(page, live_ser
     assert page.locator("#scope-header-membership").inner_text() == "(NO TARGET RULE)"
     assert "Enabled; no target rules" in page.locator("main").inner_text()
     assert "bg-tertiary" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "bg-tertiary" in page.locator("#scopeHeaderPulse").get_attribute("class")
     assert "no in-scope targets are configured" in page.locator("main").inner_text()
     assert "(IN SCOPE)" not in page.locator("header").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
@@ -257,6 +258,7 @@ def test_scope_header_reflects_disabled_enforcement(page, live_server):
     assert page.locator("#scope-header-membership").inner_text() == "(ENFORCEMENT DISABLED)"
     assert "Enforcement disabled" in page.locator("main").inner_text()
     assert "bg-error" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "bg-error" in page.locator("#scopeHeaderPulse").get_attribute("class")
     assert "Scope enforcement is disabled" in page.locator("main").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
 
