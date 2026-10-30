@@ -318,11 +318,28 @@ def test_ui_renders(tmp_path, monkeypatch):
     assert b"WHAXON" in r.get_data()
 
 
-def test_root_redirects_to_ui(tmp_path, monkeypatch):
+def test_root_redirects_to_canonical_ui_v2(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
     client = app.test_client()
     r = client.get("/")
     assert r.status_code in (301, 302)
+    assert r.headers["Location"].endswith("/ui-v2")
+
+
+def test_legacy_ui_route_remains_available(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    r = client.get("/ui")
+    assert r.status_code == 200
+    assert b"page-findings" in r.data
+
+
+def test_canonical_ui_v2_route_is_available(tmp_path, monkeypatch):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    r = client.get("/ui-v2")
+    assert r.status_code == 200
+    assert b"WHAXON" in r.data
 
 
 # ---------------------------------------------------------------- scope wiring
