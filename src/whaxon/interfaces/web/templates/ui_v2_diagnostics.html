@@ -1236,6 +1236,7 @@
   $("dep-install").addEventListener("click", async () => {
     if (!activePlan || !$("dep-approve-check").checked) return;
     busy($("dep-install"), true, "Queueing…");
+    activeOperation = null;
     $("dep-cancel").disabled = true;
     $("dep-refresh-operation").disabled = true;
     $("dep-operation").hidden = false;
