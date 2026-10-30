@@ -177,22 +177,31 @@ def main(args: list[str] | None = None) -> None:
                 or target.startswith("smb:")):
             if not allow_out_of_scope:
                 print("[run] session target; scope is enforced by the session transport")
-            return await core.runner.run_in_session(
+            result = await core.runner.run_in_session(
                 tool_id, target, extra_args=extra_args,
                 timeout_s=timeout_s,
             )
-        if verbose:
-            try:
-                argv = core.runner.build_argv(tool_id, target, extra_args=extra_args)
-                print(f"[verbose] argv: {argv!r}", file=sys.stderr)
-            except Exception as e:
-                print(f"[verbose] build_argv raised: {e!r}", file=sys.stderr)
-        return await core.runner.run_tool(
-            tool_id, target,
-            extra_args=extra_args,
-            timeout_s=timeout_s,
-            allow_out_of_scope=allow_out_of_scope,
-        )
+        else:
+            if verbose:
+                try:
+                    argv = core.runner.build_argv(tool_id, target, extra_args=extra_args)
+                    print(f"[verbose] argv: {argv!r}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[verbose] build_argv raised: {e!r}", file=sys.stderr)
+            result = await core.runner.run_tool(
+                tool_id, target,
+                extra_args=extra_args,
+                timeout_s=timeout_s,
+                allow_out_of_scope=allow_out_of_scope,
+            )
+
+        # EventBus delivers findings subscribers (including Automator) on this
+        # loop. Give them a turn to persist any follow-up jobs before closing it.
+        await asyncio.sleep(0)
+        state["primary_job_id"] = state.get("job_id")
+        state["primary_findings"] = list(state.get("findings") or [])
+        return result
+
 
     try:
         asyncio.run(_go())
@@ -213,8 +222,23 @@ def main(args: list[str] | None = None) -> None:
         print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
         sys.exit(EXIT_TOOL_ERROR)
 
-    job_id = state.get("job_id")
-    findings = state.get("findings") or []
+    # Drain jobs queued by the initial run's findings (e.g. nmap -> nikto).
+    # The initial run's event callbacks have been flushed inside _go before its
+    # event loop closes; worker.drain then safely processes the durable queue.
+    job_id = state.get("primary_job_id", state.get("job_id"))
+    findings = state.get("primary_findings", state.get("findings") or [])
+    try:
+        from whaxon.core.worker import drain
+        drained = drain(core.store, core.runner)
+        if drained and not quiet:
+            print(f"[run] auto-chain: completed {drained} queued job(s)", file=sys.stderr)
+    except Exception as e:
+        print(f"[run] auto-chain drain failed: {type(e).__name__}: {e}", file=sys.stderr)
+        sys.exit(EXIT_TOOL_ERROR)
+    # Worker events may include other job IDs/findings; keep this command's
+    # report attached to the initial tool execution.
+    state["job_id"] = job_id
+    state["findings"] = findings
 
     # Load findings from the store if the event didn't fire (e.g. tool
     # produced no findings, or the adapter errored)
