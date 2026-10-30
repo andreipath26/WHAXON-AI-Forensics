@@ -599,7 +599,7 @@ def test_threat_intel_filter_and_refresh_use_live_catalog_apis(page, live_server
     before = calls["tools"], calls["report"]
     panel.get_by_role("button", name="Refresh catalog").click()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('1 of 3 local reference/catalog record(s) match the filter.')",
+        "() => document.querySelector('#whaxon-live-threat-intel')?.innerText.includes('1 of 3 locally recorded reference/catalog record(s) match the filter.')",
         timeout=10000,
     )
     assert calls["tools"] > before[0] and calls["report"] > before[1]
