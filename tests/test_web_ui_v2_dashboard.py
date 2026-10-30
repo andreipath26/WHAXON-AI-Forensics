@@ -123,6 +123,10 @@ def test_dashboard_does_not_claim_default_credentials_are_detected_without_check
     assert "Default Local Engine Credentials Detected" not in html
     assert "whaxon:whaxon" not in html
     assert "Credential Configuration Before Network Exposure" in html
+    assert "0.0%" not in html
+    assert "STAGE 0/7" not in html
+    assert "PLUGINS READY" not in html
+    assert "0 FALSE POSITIVES" not in html
 
 def test_dashboard_credential_notice_reflects_live_status_api(page, live_server):
     page.goto(f"{live_server}/ui-v2")
