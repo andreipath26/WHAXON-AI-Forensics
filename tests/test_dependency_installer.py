@@ -74,12 +74,19 @@ def test_approved_install_uses_fixed_pypi_wheel_command(monkeypatch, tmp_path):
         def communicate(self, timeout=None):
             return "installed", ""
 
+    installed = {"value": False}
+    original_version = installer.importlib.metadata.version
+
     def fake_popen(argv, **kwargs):
         calls.append((argv, kwargs))
+        installed["value"] = True
         return FakeProcess()
 
+    def fake_version(name):
+        return "99.0" if installed["value"] else original_version(name)
+
     monkeypatch.setattr(installer.subprocess, "Popen", fake_popen)
-    monkeypatch.setattr(installer.importlib.metadata, "version", lambda _name: "99.0")
+    monkeypatch.setattr(installer.importlib.metadata, "version", fake_version)
     monkeypatch.setattr(installer.importlib, "import_module", lambda _name: object())
     monkeypatch.setattr(installer, "_audit_path", lambda: tmp_path / "audit.jsonl")
 
@@ -151,16 +158,22 @@ def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch)
             raise OSError("disk full")
 
     monkeypatch.setattr(installer, "_append_audit", audit)
-    monkeypatch.setattr(
-        installer.subprocess,
-        "Popen",
-        lambda *_args, **_kwargs: type(
+    installed = {"value": False}
+    original_version = installer.importlib.metadata.version
+
+    def fake_popen(*_args, **_kwargs):
+        installed["value"] = True
+        return type(
             "FakeProcess",
             (),
             {"returncode": 0, "poll": lambda self: 0, "communicate": lambda self, timeout=None: ("", "")},
-        )(),
-    )
-    monkeypatch.setattr(installer.importlib.metadata, "version", lambda _name: "99.0")
+        )()
+
+    def fake_version(name):
+        return "99.0" if installed["value"] else original_version(name)
+
+    monkeypatch.setattr(installer.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(installer.importlib.metadata, "version", fake_version)
     monkeypatch.setattr(installer.importlib, "import_module", lambda _name: object())
     result = installer.apply_approved_dependency_plan(dependency_id, focused["plan_id"])
     assert result["status"] == "AUDIT_FAILED"
@@ -271,7 +284,7 @@ def test_dependency_audit_hash_chain_detects_tampering(tmp_path, monkeypatch):
 
     records = [json.loads(line) for line in path.read_text().splitlines()]
     records[0]["plan_id"] = "plan-tampered"
-    path.write_text("".join(json.dumps(item, sort_keys=True) + "\\n" for item in records))
+    path.write_text("".join(json.dumps(item, sort_keys=True) + "\n" for item in records))
     verified = installer.verify_dependency_audit(path)
     assert verified["valid"] is False
     assert verified["reason"] == "hash_mismatch"
