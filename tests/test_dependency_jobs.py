@@ -83,3 +83,17 @@ def test_cancel_marks_active_operation(tmp_path):
 def test_operation_id_is_validated(tmp_path):
     with pytest.raises(ValueError, match="invalid dependency operation ID"):
         dependency_jobs.get_install_operation(tmp_path, "../escape")
+
+
+def test_stale_operation_is_marked_interrupted(tmp_path):
+    operations = dependency_jobs._operations_dir(tmp_path)
+    operation_id = "abcdef0123456789abcdef0123456789"
+    state_path = operations / f"{operation_id}.json"
+    dependency_jobs._write_state(state_path, {
+        "schema_version": 1,
+        "operation_id": operation_id,
+        "status": "INSTALLING",
+        "updated_at": "2020-01-01T00:00:00+00:00",
+    })
+    operation = dependency_jobs.get_install_operation(tmp_path, operation_id)
+    assert operation["status"] == "INTERRUPTED"
