@@ -105,7 +105,7 @@ def apply_approved_dependency_plan(
         output = _redact((completed.stdout or "") + "\n" + (completed.stderr or ""))
         if exit_code != 0:
             result = {**base, "status": "INSTALL_FAILED", "exit_code": exit_code,
-                      "output": output, "recovery": "No automatic rollback was attempted. Re-run whaxon doctor; if the environment is inconsistent, recreate the virtual environment and reinstall from the approved lock/profile.", "finished_at": datetime.now(timezone.utc).isoformat()}
+                      "output": output, "recovery": "No automatic rollback was attempted. Re-run whaxon doctor; if the environment is inconsistent, recreate the virtual environment and reinstall from the approved lock/profile.", "finished_at": datetime.now(UTC).isoformat()}
             _append_audit(result)
             return result
     except subprocess.TimeoutExpired as exc:
