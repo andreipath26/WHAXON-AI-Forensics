@@ -186,17 +186,35 @@ class JobStore:
             return [dict(r) for r in rows]
         finally: c.close()
 
-    def claim_pending(self):
-        """Atomically move one pending row to running and return it, or None."""
+    def claim_pending(self, *, exclude_ids=None):
+        """Atomically claim one eligible pending row, or None.
+
+        exclude_ids lets one-shot callers leave jobs from earlier processes
+        untouched while draining only work created during the current run.
+        """
+        excluded = tuple(exclude_ids or ())
         with self._lock:
             c = self._conn()
             try:
-                row = c.execute(
-                    "UPDATE jobs SET status='running', started_at=? WHERE id=(SELECT id FROM jobs WHERE status='pending' ORDER BY started_at LIMIT 1) RETURNING id, tool, target",
-                    (time.time(),),
-                ).fetchone()
+                if excluded:
+                    placeholders = ",".join("?" for _ in excluded)
+                    row = c.execute(
+                        "UPDATE jobs SET status='running', started_at=? "
+                        "WHERE id=(SELECT id FROM jobs WHERE status='pending' "
+                        f"AND id NOT IN ({placeholders}) ORDER BY started_at LIMIT 1) "
+                        "RETURNING id, tool, target",
+                        (time.time(), *excluded),
+                    ).fetchone()
+                else:
+                    row = c.execute(
+                        "UPDATE jobs SET status='running', started_at=? "
+                        "WHERE id=(SELECT id FROM jobs WHERE status='pending' "
+                        "ORDER BY started_at LIMIT 1) RETURNING id, tool, target",
+                        (time.time(),),
+                    ).fetchone()
                 return dict(row) if row else None
-            finally: c.close()
+            finally:
+                c.close()
 
     def reconcile_stale(self, older_than_s=60.0):
         """Mark jobs left 'running' by a dead process as failed. A job is
