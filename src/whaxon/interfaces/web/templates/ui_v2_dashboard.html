@@ -100,9 +100,9 @@
 <div class="pointer-events-none absolute right-1/4 bottom-0 h-64 w-64 rounded-full bg-secondary/5 blur-2xl"></div>
 <div class="relative z-10 flex flex-col gap-space-lg max-w-4xl">
 <div class="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-1 self-start">
-<span class="font-label-sm text-label-sm text-primary uppercase font-bold tracking-widest">WHAXON OS 3.12-ALPHA</span>
+<span class="font-label-sm text-label-sm text-primary uppercase font-bold tracking-widest">WHAXON PLATFORM</span>
 <span class="font-code-sm text-code-sm text-outline">/</span>
-<span class="font-label-sm text-label-sm text-on-surface-variant">ENGINE STANDBY</span>
+<span id="dashboard-engine-state" class="font-label-sm text-label-sm text-on-surface-variant">CHECKING ENGINE</span>
 </div>
 <div class="flex flex-col gap-space-xs">
 <h1 class="font-headline-xl text-headline-xl text-on-surface tracking-tight">
@@ -593,6 +593,8 @@
     const scope = scopeAvailable ? scopeResult.value : {};
     const liveStatus = statusResult.status === "fulfilled" ? statusResult.value : {};
     const health = healthResult.status === "fulfilled" ? healthResult.value : {};
+    const engineState = document.getElementById("dashboard-engine-state");
+    if (engineState) engineState.textContent = health.ok === true ? "ENGINE ONLINE" : "ENGINE UNAVAILABLE";
     const findings = (report.jobs || []).flatMap(item => item.findings || []);
     const verified = findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length;
     const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
