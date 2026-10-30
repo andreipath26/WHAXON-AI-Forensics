@@ -25,7 +25,10 @@ def _history_path(data_dir: Path) -> Path:
         raise ValueError("dependency history path escapes the WHAXON data directory")
     if state_dir.is_symlink():
         raise ValueError("dependency history directory must not be a symlink")
-    return resolved / "dependency-readiness.json"
+    path = resolved / "dependency-readiness.json"
+    if path.is_symlink():
+        raise ValueError("dependency readiness history file must not be a symlink")
+    return path
 
 
 def _path_fingerprint(value: str | None) -> str | None:
@@ -82,7 +85,11 @@ def read_snapshots(data_dir: Path, limit: int = _DEFAULT_LIMIT) -> list[dict[str
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("dependency readiness history is unreadable") from exc
-    if raw.get("schema_version") != HISTORY_SCHEMA_VERSION or not isinstance(raw.get("snapshots"), list):
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema_version") != HISTORY_SCHEMA_VERSION
+        or not isinstance(raw.get("snapshots"), list)
+    ):
         raise RuntimeError("dependency readiness history has an unsupported schema")
     return raw["snapshots"][-limit:]
 
@@ -95,7 +102,11 @@ def record_snapshot(report: dict[str, Any], data_dir: Path) -> dict[str, Any]:
         if path.exists():
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
-                if raw.get("schema_version") != HISTORY_SCHEMA_VERSION or not isinstance(raw.get("snapshots"), list):
+                if (
+                    not isinstance(raw, dict)
+                    or raw.get("schema_version") != HISTORY_SCHEMA_VERSION
+                    or not isinstance(raw.get("snapshots"), list)
+                ):
                     raise RuntimeError("dependency readiness history has an unsupported schema")
                 snapshots = raw["snapshots"]
             except (OSError, json.JSONDecodeError) as exc:
