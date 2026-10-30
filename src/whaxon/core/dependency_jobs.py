@@ -41,7 +41,10 @@ def _operations_dir(data_dir: Path) -> Path:
 def _operation_path(data_dir: Path, operation_id: str) -> Path:
     if not _OPERATION_ID.fullmatch(operation_id):
         raise ValueError("invalid dependency operation ID")
-    return _operations_dir(data_dir) / f"{operation_id}.json"
+    path = _operations_dir(data_dir) / f"{operation_id}.json"
+    if path.is_symlink():
+        raise ValueError("dependency operation state file must not be a symlink")
+    return path
 
 
 def _write_state(path: Path, state: dict[str, Any]) -> None:
@@ -250,8 +253,16 @@ def cancel_install_operation(data_dir: Path, operation_id: str) -> dict[str, Any
         return state
     operations = _operations_dir(data_dir)
     cancel_path = operations / f"{operation_id}.cancel"
-    descriptor = os.open(cancel_path, os.O_CREAT | os.O_WRONLY, 0o600)
-    os.close(descriptor)
+    flags = os.O_CREAT | os.O_WRONLY | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(cancel_path, flags, 0o600)
+    except FileExistsError:
+        # A previous cancellation request is already pending.
+        pass
+    else:
+        os.close(descriptor)
     state["cancel_requested"] = True
     state["updated_at"] = _now()
     _write_state(_operation_path(data_dir, operation_id), state)
