@@ -233,6 +233,9 @@ def test_scope_header_does_not_claim_a_target_when_scope_is_empty(page, live_ser
     )
     assert page.locator("#scope-header-target").text_content().strip() == "Target: No target configured"
     assert page.locator("#scope-header-membership").inner_text() == "(NO TARGET RULE)"
+    assert "Enabled; no target rules" in page.locator("main").inner_text()
+    assert "bg-tertiary" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "no in-scope targets are configured" in page.locator("main").inner_text()
     assert "(IN SCOPE)" not in page.locator("header").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
 
@@ -252,6 +255,9 @@ def test_scope_header_reflects_disabled_enforcement(page, live_server):
         timeout=8000,
     )
     assert page.locator("#scope-header-membership").inner_text() == "(ENFORCEMENT DISABLED)"
+    assert "Enforcement disabled" in page.locator("main").inner_text()
+    assert "bg-error" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "Scope enforcement is disabled" in page.locator("main").inner_text()
     assert "STRICT BOUNDARY ENFORCED" not in page.locator("header").inner_text()
 
 
@@ -418,3 +424,22 @@ def test_scope_copy_cli_generates_a_valid_whaxon_scope_command(page, live_server
     command = page.evaluate("() => window.__copiedScopeCommand")
     assert command.startswith("whaxon scope --check ")
     assert "--target" not in command
+
+
+def test_scope_api_failure_does_not_claim_configuration_is_loaded(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"scope store unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Could not load live scope')",
+        timeout=8000,
+    )
+    assert "Waiting for scope configuration" in page.locator("main").inner_text()
+    assert "bg-outline" in page.locator("#scopeStatusDot").get_attribute("class")
+    assert "Scope configuration is loading" in page.locator("main").inner_text()
