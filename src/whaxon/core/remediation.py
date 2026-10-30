@@ -15,7 +15,9 @@ from whaxon.core.dependencies import collect_dependency_report, load_dependency_
 PLAN_SCHEMA_VERSION = 1
 
 
-def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
+def _python_package_option(
+    entry: dict[str, Any], *, automatic_installation_enabled: bool
+) -> dict[str, Any]:
     requirement = f"{entry['id']}>={entry['minimum_version']}"
     description = f"Install or upgrade {entry['id']} in the active interpreter."
     argv = [
@@ -41,7 +43,7 @@ def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
         "requires_privilege": False,
         "system_wide": False,
         "requires_virtual_environment": True,
-        "automated_execution_supported": True,
+        "automated_execution_supported": automatic_installation_enabled,
         "approval_required": True,
         "warning": "Preview only. This plan does not execute pip or resolve/install packages. After approval, pip may install or update transitive dependencies from the configured PyPI index; binary wheels only, no source builds.",
     }
@@ -53,6 +55,11 @@ def build_remediation_plan(*, dependency_ids: list[str] | None = None,
     manifest = load_dependency_manifest()
     report = collect_dependency_report(data_dir=data_dir)
     entries = {entry["id"]: entry for entry in manifest["dependencies"]}
+    policy = manifest.get("policy", {})
+    automatic_installation_enabled = (
+        policy.get("automatic_installation_enabled") is True
+        and "python-package" in policy.get("automatic_installation_kinds", [])
+    )
     observed = {entry["id"]: entry for entry in report["dependencies"]}
     selected = set(observed) if dependency_ids is None else set(dependency_ids)
     unknown = sorted(selected - set(observed))
@@ -66,7 +73,10 @@ def build_remediation_plan(*, dependency_ids: list[str] | None = None,
             actions.append({
                 "dependency_id": dep_id,
                 "current_status": result["status"],
-                "options": [_python_package_option(manifest_entry)],
+                "options": [_python_package_option(
+                    manifest_entry,
+                    automatic_installation_enabled=automatic_installation_enabled,
+                )],
             })
         elif dep_id == "python":
             actions.append({
