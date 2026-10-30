@@ -34,3 +34,17 @@ def test_empty_dependency_selection_produces_no_actions():
     plan = build_remediation_plan(dependency_ids=[])
     assert plan["actions"] == []
     assert plan["unknown_dependency_ids"] == []
+
+
+def test_python_package_plan_discloses_exact_restricted_install_contract():
+    plan = build_remediation_plan(dependency_ids=["textual"])
+    if not plan["actions"]:
+        return
+    option = plan["actions"][0]["options"][0]
+    assert option["kind"] == "python-package"
+    assert option["command"][0].endswith("python") or option["command"][0].endswith("python.exe")
+    assert "--isolated" in option["command"]
+    assert "--only-binary=:all:" in option["command"]
+    assert option["package_source"] == "https://pypi.org/simple"
+    assert option["may_install_transitive_dependencies"] is True
+    assert "transitive dependencies" in option["warning"]
