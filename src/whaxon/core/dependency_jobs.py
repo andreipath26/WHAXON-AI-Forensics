@@ -79,8 +79,15 @@ def get_install_operation(data_dir: Path, operation_id: str) -> dict[str, Any] |
         state = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("dependency operation state is unreadable") from exc
-    if state.get("operation_id") != operation_id:
-        raise RuntimeError("dependency operation state identity mismatch")
+    if not isinstance(state, dict):
+        raise RuntimeError("dependency operation state has an unsupported schema")
+    if (
+        state.get("schema_version") != 1
+        or state.get("operation_id") != operation_id
+        or not isinstance(state.get("status"), str)
+        or not isinstance(state.get("updated_at"), str)
+    ):
+        raise RuntimeError("dependency operation state has an unsupported schema")
     if state.get("status") in {"QUEUED", "INSTALLING", "VERIFYING"}:
         try:
             updated = datetime.fromisoformat(state["updated_at"])
@@ -107,6 +114,13 @@ def _claim_dependency_lock(operations: Path, dependency_id: str, operation_id: s
                 raise ValueError("invalid operation ID in lock file")
             previous_path = operations / f"{previous_id}.json"
             previous = json.loads(previous_path.read_text(encoding="utf-8"))
+            if (
+                not isinstance(previous, dict)
+                or previous.get("schema_version") != 1
+                or not isinstance(previous.get("status"), str)
+                or not isinstance(previous.get("updated_at"), str)
+            ):
+                raise ValueError("invalid operation state schema")
             updated = datetime.fromisoformat(previous["updated_at"])
             stale = (datetime.now(UTC) - updated).total_seconds() > 90
             terminal = previous.get("status") not in {"QUEUED", "INSTALLING", "VERIFYING"}
