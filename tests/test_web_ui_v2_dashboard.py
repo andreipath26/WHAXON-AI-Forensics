@@ -231,6 +231,28 @@ def test_dashboard_add_new_engagement_control_is_wired(page, live_server):
     page.get_by_role("button", name=re.compile(r"add New")).click()
     assert page.url.endswith("/ui-v2/scope")
 
+
+def test_dashboard_session_strip_uses_live_scope_and_avoids_fake_runtime_claims(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"enabled":true,"in_scope":["https://example.test"],"engagement":"Example engagement"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-session-engagement')?.textContent === 'Example engagement'",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-session-target").inner_text() == "https://example.test"
+    assert page.get_by_text("Active-job status not exposed").is_visible()
+    assert page.get_by_text("Version not reported").is_visible()
+    assert page.get_by_text("Pre-Flight Boundary Checklist").count() == 0
+    assert page.get_by_text("Explore Lab Environments").count() == 0
+
+
 def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, live_server):
     page.route(
         "**/api/scope",
