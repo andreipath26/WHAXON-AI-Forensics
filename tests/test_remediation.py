@@ -28,3 +28,9 @@ def test_plan_never_invents_command_for_external_tool():
 def test_unknown_dependency_is_reported():
     plan = build_remediation_plan(dependency_ids=["not-a-real-dependency"])
     assert plan["unknown_dependency_ids"] == ["not-a-real-dependency"]
+
+
+def test_empty_dependency_selection_produces_no_actions():
+    plan = build_remediation_plan(dependency_ids=[])
+    assert plan["actions"] == []
+    assert plan["unknown_dependency_ids"] == []
