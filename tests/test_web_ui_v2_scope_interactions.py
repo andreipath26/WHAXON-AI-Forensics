@@ -304,3 +304,32 @@ def test_scope_edit_invalidates_previous_preflight_result(page, live_server):
         assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
     finally:
         _save_scope(page, before)
+
+
+def test_scope_import_requires_confirmation_before_disabling_enforcement(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    assert before["enabled"] is True
+    imported = {
+        **before,
+        "enabled": False,
+        "engagement": "Confirmed enforcement disable",
+    }
+    try:
+        page.locator("#openImportDrawerBtn").click()
+        page.locator("#importDrawer textarea").fill(json.dumps(imported))
+        page.once("dialog", lambda dialog: dialog.dismiss())
+        page.locator("#executeImportBtn").click()
+        assert _read_scope(page)["enabled"] is True
+        assert page.locator("#importDrawer").is_visible()
+
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#executeImportBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+            timeout=5000,
+        )
+        assert _read_scope(page)["enabled"] is False
+    finally:
+        _save_scope(page, before)
