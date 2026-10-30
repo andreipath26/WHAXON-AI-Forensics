@@ -356,6 +356,17 @@
   document.querySelector("main")?.prepend(notice);
   let scope = null;
   let preflightRequestId = 0;
+  const scopeActionIds = [
+    "openTargetModalBtn", "openImportDrawerBtn", "saveTargetBtn",
+    "addDenyRuleBtn", "runScopeCheckBtn", "copyCliBtn", "executeImportBtn"
+  ];
+  function setScopeActionsEnabled(enabled) {
+    scopeActionIds.forEach(id => {
+      const control = $(id);
+      if (control) control.disabled = !enabled;
+    });
+  }
+  setScopeActionsEnabled(false);
   const esc = (v) => String(v ?? "");
   const say = (message, ok = true) => {
     notice.textContent = message;
@@ -603,6 +614,7 @@
   async function load() {
     try {
       scope = await api("/api/scope");
+      setScopeActionsEnabled(true);
       resetPreflightStatus();
       render();
       say("Loaded the active scope configuration.");
