@@ -31,8 +31,8 @@ _SECRET_PATTERNS = (
 
 def _redact(value: str, limit: int = 12000) -> str:
     clean = value[:limit]
-    for pattern in _SECRET_PATTERNS:
-        clean = pattern.sub(r"\1\2[REDACTED]", clean)
+    clean = _SECRET_PATTERNS[0].sub(r"\1\2[REDACTED]", clean)
+    clean = _SECRET_PATTERNS[1].sub(r"\1[REDACTED]", clean)
     return clean
 
 
