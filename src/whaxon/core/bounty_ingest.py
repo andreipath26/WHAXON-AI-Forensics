@@ -198,7 +198,6 @@ def _harden_draft(draft: dict, source_url: str) -> None:
     # delegated to the agent; only consequential decisions return to the user.
     ai.update({
         "mode": "bounded_autonomous_after_approval",
-        "activation": "pending_review",
         "execution_enabled": False,
         "activation": "disabled_until_program_approval",
         "allow_action_selection": False,
