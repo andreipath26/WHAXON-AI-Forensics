@@ -102,6 +102,7 @@ def test_scope_check_button_calls_live_scope_api(page, live_server):
         timeout=5000,
     )
     assert page.locator("#scopePreflightStatus").inner_text() == "LAST CHECK: ALLOWED"
+    assert "bg-primary" in page.locator("#scopePreflightIndicator").get_attribute("class")
 
 def test_scope_rules_remain_editable_after_enforcement_is_disabled(page, live_server):
     page.goto(f"{live_server}/ui-v2/scope")
