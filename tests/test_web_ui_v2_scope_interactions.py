@@ -196,3 +196,42 @@ def test_scope_text_inputs_have_accessible_names(page, live_server):
     page.keyboard.press("Escape")
     page.locator("#openImportDrawerBtn").click()
     assert page.get_by_role("textbox", name="Paste scope JSON definition").is_visible()
+
+
+def test_scope_import_rejects_json_null_without_mutating_configuration(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    page.locator("#openImportDrawerBtn").click()
+    page.locator("#importDrawer textarea").fill("null")
+    page.locator("#executeImportBtn").click()
+    assert "Import must be a JSON object." in page.locator("#scope-ui-notice").inner_text()
+    assert _read_scope(page) == before
+
+
+def test_scope_import_without_enabled_field_preserves_disabled_enforcement(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    before = _read_scope(page)
+    disabled = _save_scope(page, {**before, "enabled": False, "confirm_disable": True})
+    assert disabled["status"] == 200
+    try:
+        page.reload()
+        _wait_loaded(page)
+        page.locator("#openImportDrawerBtn").click()
+        page.locator("#importDrawer textarea").fill(json.dumps({
+            "engagement": "Preserve disabled enforcement",
+            "in_scope": ["127.0.0.1"],
+            "out_of_scope": [],
+            "notes": "import must not silently re-enable enforcement",
+        }))
+        page.locator("#executeImportBtn").click()
+        page.wait_for_function(
+            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+            timeout=5000,
+        )
+        after = _read_scope(page)
+        assert after["enabled"] is False
+        assert after["engagement"] == "Preserve disabled enforcement"
+    finally:
+        _save_scope(page, before)
