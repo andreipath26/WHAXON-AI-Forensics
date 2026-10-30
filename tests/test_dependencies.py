@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 
 from whaxon.core.dependencies import collect_dependency_report
 
@@ -42,3 +43,55 @@ def test_manifest_has_unique_ids_and_profiles():
     ids = [entry["id"] for entry in manifest["dependencies"]]
     assert len(ids) == len(set(ids))
     assert "core" in manifest["profiles"]
+
+
+def test_external_version_probe_is_opt_in_and_bounded(tmp_path, monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
+    }))
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(
+            argv, 0, stdout="Nmap version 7.95 ( https://nmap.org )", stderr=""
+        )
+
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/usr/bin/nmap")
+    monkeypatch.setattr(dependencies.subprocess, "run", fake_run)
+
+    detected = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=False
+    )
+    assert next(d for d in detected["dependencies"] if d["id"] == "nmap")["status"] == "DETECTED"
+    assert calls == []
+
+    verified = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=True
+    )
+    nmap = next(d for d in verified["dependencies"] if d["id"] == "nmap")
+    assert nmap["status"] == "READY"
+    assert nmap["detected_version"] == "7.95"
+    assert calls[0][1]["shell"] is False
+    assert calls[0][1]["timeout"] == 8
+
+
+def test_external_version_probe_failure_is_not_ready(tmp_path, monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
+    }))
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/usr/bin/nmap")
+    monkeypatch.setattr(
+        dependencies.subprocess,
+        "run",
+        lambda argv, **kwargs: subprocess.CompletedProcess(argv, 1, stdout="", stderr="bad"),
+    )
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=True
+    )
+    nmap = next(d for d in report["dependencies"] if d["id"] == "nmap")
+    assert nmap["status"] == "BROKEN"
