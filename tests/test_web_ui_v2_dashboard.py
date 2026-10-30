@@ -365,6 +365,23 @@ def test_dashboard_mobile_navigation_opens_closes_and_restores_focus(page, live_
     assert menu.evaluate("element => document.activeElement === element")
 
 
+
+def test_dashboard_closed_mobile_sidebar_is_removed_from_keyboard_navigation(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    sidebar = page.locator("body > aside")
+    menu = page.locator(".dashboard-mobile-menu")
+
+    assert sidebar.get_attribute("aria-hidden") == "true"
+    assert sidebar.evaluate("element => element.inert")
+    menu.click()
+    assert sidebar.get_attribute("aria-hidden") is None
+    assert not sidebar.evaluate("element => element.inert")
+    page.keyboard.press("Escape")
+    assert sidebar.get_attribute("aria-hidden") == "true"
+    assert sidebar.evaluate("element => element.inert")
+
+
 def test_dashboard_mobile_navigation_closes_after_route_selection(page, live_server):
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(f"{live_server}/ui-v2")
