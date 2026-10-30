@@ -11,6 +11,7 @@ import json
 import os
 import platform
 import re
+import re
 import subprocess
 import shutil
 import sys
@@ -25,7 +26,12 @@ def load_dependency_manifest() -> dict[str, Any]:
     """Load and minimally validate the packaged dependency manifest."""
     path = Path(__file__).resolve().parents[1] / "data" / "dependencies.json"
     raw = json.loads(path.read_text(encoding="utf-8"))
-    if raw.get("schema_version") != SCHEMA_VERSION or not isinstance(raw.get("dependencies"), list):
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema_version") != SCHEMA_VERSION
+        or not isinstance(raw.get("dependencies"), list)
+        or not isinstance(raw.get("profiles"), dict)
+    ):
         raise ValueError("unsupported or malformed dependency manifest")
     seen: set[str] = set()
     for entry in raw["dependencies"]:
@@ -34,6 +40,24 @@ def load_dependency_manifest() -> dict[str, Any]:
         seen.add(entry["id"])
         if entry.get("kind") == "python-package" and not entry.get("minimum_version"):
             raise ValueError(f"dependency {entry['id']} has no minimum_version")
+    external_tools = raw.get("external_tools", [])
+    if not isinstance(external_tools, list):
+        raise ValueError("dependency manifest external_tools must be a list")
+    external_ids: set[str] = set()
+    for entry in external_tools:
+        if (
+            not isinstance(entry, dict)
+            or not isinstance(entry.get("id"), str)
+            or entry["id"] in external_ids
+            or not isinstance(entry.get("binary"), str)
+            or not entry["binary"]
+            or not isinstance(entry.get("version_args"), list)
+            or any(not isinstance(arg, str) or "\\x00" in arg for arg in entry["version_args"])
+            or not isinstance(entry.get("version_regex"), str)
+        ):
+            raise ValueError("dependency manifest contains an invalid external-tool probe")
+        re.compile(entry["version_regex"])
+        external_ids.add(entry["id"])
     return raw
 
 
