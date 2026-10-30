@@ -100,7 +100,7 @@ def test_approvals_workspace_submits_operator_answer_to_waiting_run(page, live_s
         lambda response: response.request.method == "POST"
         and response.url.endswith("/api/ai/runs/seed-ai-approval-ui/answer")
     ) as response_info:
-        panel.get_by_role("button", name="Submit answer").click()
+        panel.get_by_role("article").filter(has_text="UI acceptance: operator approval").get_by_role("button", name="Submit answer").click()
     response = response_info.value
     assert response.status == 200
     assert response.json()["ok"] is True
