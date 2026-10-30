@@ -150,6 +150,73 @@
     "diagnostics_read_only": true,
     "automatic_installation_enabled": false,
     "network_detection_enabled": false,
-    "privilege_escalation_enabled": false
-  }
+    "privilege_escalation_enabled": false,
+    "external_version_probes": [
+      "nmap",
+      "gobuster",
+      "sqlmap",
+      "nuclei",
+      "ffuf",
+      "netexec",
+      "arjun"
+    ]
+  },
+  "external_tools": [
+    {
+      "id": "nmap",
+      "binary": "nmap",
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "Nmap version ([0-9]+(?:\\.[0-9]+)+)"
+    },
+    {
+      "id": "gobuster",
+      "binary": "gobuster",
+      "version_args": [
+        "version"
+      ],
+      "version_regex": "Gobuster v?([0-9]+(?:\\.[0-9]+)+)"
+    },
+    {
+      "id": "sqlmap",
+      "binary": "sqlmap",
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "([0-9]+(?:\\.[0-9]+)+)"
+    },
+    {
+      "id": "nuclei",
+      "binary": "nuclei",
+      "version_args": [
+        "-version"
+      ],
+      "version_regex": "Nuclei Engine Version: ([0-9]+(?:\\.[0-9]+)+)"
+    },
+    {
+      "id": "ffuf",
+      "binary": "ffuf",
+      "version_args": [
+        "-V"
+      ],
+      "version_regex": "ffuf version: ([0-9]+(?:\\.[0-9]+)+)"
+    },
+    {
+      "id": "netexec",
+      "binary": "netexec",
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "NetExec ([0-9]+(?:\\.[0-9]+)+)"
+    },
+    {
+      "id": "arjun",
+      "binary": "arjun",
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "([0-9]+(?:\\.[0-9]+)+)"
+    }
+  ]
 }
