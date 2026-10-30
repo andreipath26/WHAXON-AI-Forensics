@@ -982,4 +982,326 @@
  });}
 })();
 </script>
+<script id="whaxon-dependency-readiness-ui">
+(function () {
+  "use strict";
+  const main = document.querySelector("main");
+  if (!main || document.getElementById("whaxon-dependency-readiness")) return;
+
+  const section = document.createElement("section");
+  section.id = "whaxon-dependency-readiness";
+  section.className = "mx-margin my-space-lg p-margin rounded-xl bg-surface-container-low border border-outline-variant/30";
+  section.innerHTML = `
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-sm">
+      <div>
+        <div class="font-label-sm text-secondary uppercase tracking-wider">Environment &amp; capability readiness</div>
+        <h2 class="font-headline-lg text-headline-lg text-on-surface font-semibold mt-1">Dependency Readiness</h2>
+        <p class="font-body-sm text-on-surface-variant mt-1">Evidence-based runtime, package and external-tool checks. Missing optional tools do not block unrelated capabilities.</p>
+      </div>
+      <div class="flex flex-wrap gap-space-xs">
+        <button id="dep-check" type="button" class="px-space-md py-2 rounded bg-primary-container text-on-primary font-code-sm font-semibold">Check environment</button>
+        <button id="dep-verify" type="button" class="px-space-md py-2 rounded bg-surface-container-high text-secondary font-code-sm">Verify tools</button>
+        <button id="dep-snapshot" type="button" class="px-space-md py-2 rounded bg-surface-container-high text-on-surface font-code-sm">Save snapshot</button>
+      </div>
+    </div>
+    <p id="dep-status" role="status" aria-live="polite" class="mt-space-md text-body-sm text-on-surface-variant">Loading dependency readiness…</p>
+    <div id="dep-summary" class="mt-space-md grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-space-sm"></div>
+    <div class="mt-space-lg bg-surface-container rounded overflow-hidden">
+      <div class="px-space-md py-space-sm bg-surface-container-high flex items-center justify-between gap-2">
+        <h3 class="font-headline-sm text-on-surface">Dependency inventory</h3>
+        <span id="dep-count" class="font-label-sm text-outline">Not checked</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-body-sm">
+          <thead class="font-label-sm text-outline uppercase bg-surface-container-lowest">
+            <tr><th class="px-space-md py-space-sm">Dependency</th><th class="px-space-sm py-space-sm">State</th><th class="px-space-sm py-space-sm">Version / path</th><th class="px-space-sm py-space-sm">Capability</th><th class="px-space-md py-space-sm text-right">Action</th></tr>
+          </thead>
+          <tbody id="dep-rows"><tr><td colspan="5" class="px-space-md py-space-md text-on-surface-variant">Run a check to load dependencies.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="dep-plan" hidden class="mt-space-md p-space-md rounded bg-surface-container border border-outline-variant/30">
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="font-headline-sm text-on-surface">Guided fix / plan review</h3>
+        <button id="dep-plan-close" type="button" class="text-secondary font-code-sm">Close</button>
+      </div>
+      <p id="dep-plan-description" class="mt-2 text-body-sm text-on-surface-variant"></p>
+      <div class="mt-2 grid grid-cols-2 md:grid-cols-4 gap-space-sm text-body-sm" id="dep-plan-impact"></div>
+      <div class="mt-space-sm">
+        <div class="font-label-sm text-outline uppercase mb-1">Exact command preview</div>
+        <pre id="dep-command" class="whitespace-pre-wrap break-all rounded bg-surface-container-lowest p-space-sm text-code-sm text-secondary"></pre>
+      </div>
+      <p id="dep-plan-warning" class="mt-space-sm text-body-sm text-tertiary"></p>
+      <label class="mt-space-md flex items-start gap-space-sm text-body-sm text-on-surface">
+        <input id="dep-approve-check" type="checkbox" class="mt-1 accent-emerald-400"/>
+        <span>I have reviewed the package, source, command, network impact and recovery warning above and explicitly approve this operation.</span>
+      </label>
+      <div class="mt-space-sm flex flex-wrap gap-space-sm">
+        <button id="dep-install" type="button" disabled class="px-space-md py-2 rounded bg-primary-container text-on-primary font-code-sm font-semibold disabled:opacity-40">Approve &amp; install</button>
+        <span id="dep-plan-id" class="self-center font-code-sm text-outline break-all"></span>
+      </div>
+    </div>
+    <div id="dep-operation" hidden class="mt-space-md p-space-md rounded bg-surface-container border border-outline-variant/30">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h3 class="font-headline-sm text-on-surface">Installation progress &amp; verification</h3>
+        <button id="dep-cancel" type="button" class="px-space-sm py-1 rounded bg-error-container text-on-error-container font-code-sm">Cancel operation</button>
+      </div>
+      <p id="dep-operation-status" role="status" aria-live="polite" class="mt-2 text-body-sm text-on-surface-variant">Waiting for operation…</p>
+      <div class="mt-space-sm h-2 rounded bg-surface-container-lowest overflow-hidden"><div id="dep-progress" class="h-full bg-primary transition-all" style="width:0%"></div></div>
+      <div id="dep-operation-id" class="mt-1 font-code-sm text-outline break-all"></div>
+      <pre id="dep-operation-result" class="mt-space-sm whitespace-pre-wrap break-words text-code-sm text-on-surface-variant"></pre>
+    </div>
+    <div class="mt-space-md flex flex-wrap items-center justify-between gap-2">
+      <p id="dep-history-status" class="text-body-sm text-on-surface-variant">No readiness snapshot loaded.</p>
+      <button id="dep-history" type="button" class="text-secondary font-code-sm underline">View readiness history &amp; drift</button>
+    </div>
+  `;
+  const livePanel = document.getElementById("whaxon-live-diagnostics");
+  if (livePanel && livePanel.parentElement) livePanel.insertAdjacentElement("afterend", section);
+  else main.appendChild(section);
+
+  const $ = (id) => section.querySelector("#" + id);
+  const setText = (id, value) => { $(id).textContent = String(value ?? ""); };
+  const api = async (url, options = {}) => {
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      headers: {"Accept": "application/json", ...(options.body ? {"Content-Type": "application/json"} : {})},
+      ...options
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || ("HTTP " + response.status));
+    return body;
+  };
+  const addMetric = (host, label, value) => {
+    const card = document.createElement("div");
+    card.className = "rounded-lg bg-surface-container p-space-sm";
+    const caption = document.createElement("div");
+    caption.className = "font-label-sm text-outline uppercase";
+    caption.textContent = label;
+    const metric = document.createElement("div");
+    metric.className = "mt-1 font-headline-sm text-on-surface";
+    metric.textContent = String(value);
+    card.append(caption, metric);
+    host.appendChild(card);
+  };
+  let latestReport = null;
+  let activeOperation = null;
+  let activePlan = null;
+  const busy = (button, yes, label) => {
+    button.disabled = yes;
+    if (label) button.textContent = label;
+  };
+
+  function renderReport(report) {
+    latestReport = report;
+    const summary = $("dep-summary");
+    summary.replaceChildren();
+    const values = [
+      ["Overall", report.overall_status],
+      ["Dependencies", report.summary?.total ?? report.dependencies.length],
+      ["Ready", report.summary?.ready ?? 0],
+      ["Missing", report.summary?.missing ?? 0],
+      ["Incompatible", report.summary?.incompatible ?? 0],
+      ["Broken", report.summary?.broken ?? 0]
+    ];
+    values.forEach(([label, value]) => addMetric(summary, label, value));
+    const rows = $("dep-rows");
+    rows.replaceChildren();
+    const dependencies = Array.isArray(report.dependencies) ? report.dependencies : [];
+    setText("dep-count", dependencies.length + " records");
+    dependencies.forEach(dep => {
+      const tr = document.createElement("tr");
+      tr.className = "border-t border-outline-variant/20 hover:bg-surface-container-high/40";
+      const name = document.createElement("td");
+      name.className = "px-space-md py-space-sm";
+      const strong = document.createElement("div");
+      strong.className = "font-medium text-on-surface";
+      strong.textContent = dep.name || dep.id;
+      const kind = document.createElement("div");
+      kind.className = "font-label-sm text-outline mt-0.5";
+      kind.textContent = (dep.required ? "REQUIRED · " : "OPTIONAL · ") + dep.kind;
+      name.append(strong, kind);
+      const state = document.createElement("td");
+      state.className = "px-space-sm py-space-sm font-code-sm";
+      state.textContent = dep.status;
+      const observed = document.createElement("td");
+      observed.className = "px-space-sm py-space-sm font-code-sm text-on-surface-variant";
+      observed.textContent = dep.detected_version || dep.detected_path || dep.required_version || "—";
+      const capability = document.createElement("td");
+      capability.className = "px-space-sm py-space-sm text-on-surface-variant";
+      capability.textContent = (dep.capabilities || []).join(", ") || "—";
+      const action = document.createElement("td");
+      action.className = "px-space-md py-space-sm text-right";
+      if (!["READY", "DETECTED"].includes(dep.status)) {
+        const review = document.createElement("button");
+        review.type = "button";
+        review.className = "px-space-sm py-1 rounded bg-surface-container-high text-secondary font-code-sm";
+        review.textContent = "Review fix";
+        review.addEventListener("click", () => createPlan(dep.id));
+        action.appendChild(review);
+      } else if (dep.status === "DETECTED") {
+        const note = document.createElement("span");
+        note.className = "font-label-sm text-tertiary";
+        note.textContent = "Verify";
+        action.appendChild(note);
+      } else {
+        action.textContent = "—";
+      }
+      tr.append(name, state, observed, capability, action);
+      rows.appendChild(tr);
+    });
+    setText("dep-status", "Environment report loaded. External tools marked DETECTED have not yet passed a trusted version probe.");
+  }
+
+  async function refresh(verify = false) {
+    const button = verify ? $("dep-verify") : $("dep-check");
+    busy(button, true, verify ? "Verifying…" : "Checking…");
+    setText("dep-status", verify ? "Running bounded, manifest-curated version probes…" : "Checking the current interpreter and dependency inventory…");
+    try {
+      const report = verify
+        ? await api("/api/dependencies/verify", {method: "POST"})
+        : await api("/api/dependencies");
+      renderReport(report);
+    } catch (error) {
+      setText("dep-status", "Dependency check failed: " + error.message);
+    } finally {
+      busy(button, false, verify ? "Verify tools" : "Check environment");
+    }
+  }
+
+  async function createPlan(dependencyId) {
+    activePlan = null;
+    $("dep-plan").hidden = false;
+    $("dep-approve-check").checked = false;
+    $("dep-install").disabled = true;
+    setText("dep-plan-description", "Preparing a read-only remediation plan for " + dependencyId + "…");
+    setText("dep-command", "No command has been approved or executed.");
+    setText("dep-plan-warning", "");
+    setText("dep-plan-id", "");
+    try {
+      const plan = await api("/api/dependencies/plan", {
+        method: "POST",
+        body: JSON.stringify({dependency_ids: [dependencyId]})
+      });
+      const action = (plan.actions || []).find(item => item.dependency_id === dependencyId);
+      if (!action || !action.options?.length) {
+        setText("dep-plan-description", "No remediation action is available for this dependency.");
+        return;
+      }
+      const option = action.options[0];
+      activePlan = {dependencyId, planId: plan.plan_id, option};
+      setText("dep-plan-description", option.title || "Review the proposed remediation.");
+      const impact = $("dep-plan-impact");
+      impact.replaceChildren();
+      [
+        ["Network", option.requires_network === true ? "Required" : option.requires_network === false ? "No" : "Unknown"],
+        ["Privilege", option.requires_privilege === false ? "No elevation" : String(option.requires_privilege)],
+        ["System-wide", String(option.system_wide)],
+        ["Automation", option.automated_execution_supported ? "Supported" : "Manual only"]
+      ].forEach(([label, value]) => addMetric(impact, label, value));
+      setText("dep-command", option.display_command || (option.title || "Manual installation instructions only."));
+      setText("dep-plan-warning", option.warning || "Review the source and impact before proceeding.");
+      setText("dep-plan-id", "PLAN ID: " + plan.plan_id);
+      const approvalLabel = section.querySelector('label[for="dep-approve-check"]');
+      $("dep-approve-check").disabled = !option.automated_execution_supported;
+      $("dep-install").textContent = option.automated_execution_supported ? "Approve & install" : "Manual instructions only";
+      if (!option.automated_execution_supported) {
+        setText("dep-plan-warning", (option.warning || "") + " No automated install action is enabled.");
+      }
+    } catch (error) {
+      setText("dep-plan-description", "Could not prepare plan: " + error.message);
+    }
+  }
+
+  $("dep-approve-check").addEventListener("change", () => {
+    $("dep-install").disabled = !activePlan || !activePlan.option.automated_execution_supported || !$("dep-approve-check").checked;
+  });
+  $("dep-plan-close").addEventListener("click", () => { $("dep-plan").hidden = true; activePlan = null; });
+  $("dep-install").addEventListener("click", async () => {
+    if (!activePlan || !$("dep-approve-check").checked) return;
+    busy($("dep-install"), true, "Queueing…");
+    $("dep-operation").hidden = false;
+    setText("dep-operation-status", "Submitting the explicitly approved operation…");
+    try {
+      const operation = await api("/api/dependencies/install", {
+        method: "POST",
+        body: JSON.stringify({
+          dependency_id: activePlan.dependencyId,
+          approved_plan_id: activePlan.planId
+        })
+      });
+      activeOperation = operation.operation_id;
+      setText("dep-operation-id", "OPERATION ID: " + activeOperation);
+      setText("dep-operation-result", "");
+      pollOperation();
+    } catch (error) {
+      setText("dep-operation-status", "Installation was not queued: " + error.message);
+    } finally {
+      busy($("dep-install"), false, "Approve & install");
+    }
+  });
+
+  async function pollOperation() {
+    if (!activeOperation) return;
+    try {
+      const operation = await api("/api/dependencies/install/" + encodeURIComponent(activeOperation));
+      $("dep-progress").style.width = Math.max(0, Math.min(100, Number(operation.progress) || 0)) + "%";
+      setText("dep-operation-status", operation.status + " — " + (operation.message || operation.step || ""));
+      if (["QUEUED", "INSTALLING", "VERIFYING"].includes(operation.status)) {
+        setTimeout(pollOperation, 900);
+        return;
+      }
+      $("dep-cancel").disabled = true;
+      setText("dep-operation-result", operation.result ? JSON.stringify(operation.result, null, 2) : operation.message);
+      await refresh(false);
+    } catch (error) {
+      setText("dep-operation-status", "Unable to read operation state: " + error.message);
+    }
+  }
+
+  $("dep-cancel").addEventListener("click", async () => {
+    if (!activeOperation) return;
+    busy($("dep-cancel"), true, "Cancelling…");
+    try {
+      await api("/api/dependencies/install/" + encodeURIComponent(activeOperation) + "/cancel", {method: "POST"});
+      setText("dep-operation-status", "Cancellation requested. Waiting for the package manager to stop safely…");
+      setTimeout(pollOperation, 500);
+    } catch (error) {
+      setText("dep-operation-status", "Cancellation request failed: " + error.message);
+      busy($("dep-cancel"), false, "Cancel operation");
+    }
+  });
+
+  $("dep-snapshot").addEventListener("click", async () => {
+    busy($("dep-snapshot"), true, "Saving…");
+    try {
+      const snapshot = await api("/api/dependencies/snapshots", {method: "POST"});
+      setText("dep-history-status", "Saved readiness snapshot " + snapshot.fingerprint.slice(0, 12) + " at " + snapshot.recorded_at + ".");
+    } catch (error) {
+      setText("dep-history-status", "Snapshot failed: " + error.message);
+    } finally {
+      busy($("dep-snapshot"), false, "Save snapshot");
+    }
+  });
+
+  $("dep-history").addEventListener("click", async () => {
+    try {
+      const [history, drift] = await Promise.all([
+        api("/api/dependencies/history?limit=10"),
+        api("/api/dependencies/drift")
+      ]);
+      const latest = history.snapshots?.[history.snapshots.length - 1];
+      setText("dep-history-status", latest
+        ? history.snapshots.length + " snapshot(s). Latest: " + latest.recorded_at + ". Drift from baseline: " + (drift.changed ? "CHANGED" : "NO CHANGE") + "."
+        : "No saved baseline yet. Save a snapshot to enable drift tracking.");
+    } catch (error) {
+      setText("dep-history-status", "History unavailable: " + error.message);
+    }
+  });
+
+  $("dep-check").addEventListener("click", () => refresh(false));
+  $("dep-verify").addEventListener("click", () => refresh(true));
+  refresh(false);
+})();
+</script>
 </body></html>
