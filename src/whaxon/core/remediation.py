@@ -24,7 +24,11 @@ def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
         "kind": "python-package",
         "title": description,
         "command": argv,
-        "display_command": (subprocess.list2cmdline(argv) if platform.system() == "Windows" else shlex.join(argv)),
+        "display_command": (
+            subprocess.list2cmdline(argv)
+            if platform.system() == "Windows"
+            else shlex.join(argv)
+        ),
         "requires_network": True,
         "requires_privilege": False,
         "system_wide": False,
