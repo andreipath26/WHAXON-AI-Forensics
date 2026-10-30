@@ -78,13 +78,24 @@ def test_diagnostics_reference_buttons_cannot_run_simulated_operations(page, liv
     assert page.locator("#btn-run-diag").is_enabled(), "Run Full Diagnostic must refresh live diagnostics"
     assert page.locator("#btn-export-json").is_enabled(), "Export Health Report must export live API data"
     for button in page.locator("main button:visible").all():
-        if button.get_attribute("id") in (
+        label = button.inner_text().strip()
+        if label == "Review fix":
+            assert button.is_enabled(), "Review fix must open the guided remediation plan"
+        elif button.get_attribute("id") in (
             "diagnostics-refresh", "btn-run-diag", "btn-export-json",
             "dep-check", "dep-verify", "dep-snapshot", "dep-history", "dep-plan-close",
         ):
             assert button.is_enabled()
         else:
-            assert button.is_disabled(), f"Unwired diagnostic control is enabled: {button.inner_text()}"
+            assert button.is_disabled(), f"Unwired diagnostic control is enabled: {label}"
+
+    review = page.get_by_role("button", name="Review fix").first
+    if review.count():
+        review.click()
+        page.wait_for_function(
+            "() => document.querySelector('#dep-plan') && !document.querySelector('#dep-plan').hidden",
+            timeout=5000,
+        )
 
 def test_diagnostics_terminal_log_button_navigates_to_run_workspace(page, live_server):
     page.goto(f"{live_server}/ui-v2/diagnostics")
