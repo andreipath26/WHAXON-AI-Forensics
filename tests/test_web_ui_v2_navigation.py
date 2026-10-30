@@ -42,6 +42,17 @@ def test_dashboard_job_history_filter_has_an_accessible_name(page, live_server):
     assert page.locator("table tbody").is_visible()
 
 
+
+def test_findings_filter_has_an_accessible_name(page, live_server):
+    page.goto(f"{live_server}/ui-v2/findings")
+    filter_input = page.get_by_role(
+        "textbox", name="Filter findings by proof pattern, URL, or CVE"
+    )
+    assert filter_input.is_visible()
+    filter_input.fill("no-such-finding")
+    assert page.locator("#whaxon-findings-list").is_visible()
+
+
 def test_dashboard_uses_live_state_and_hides_fake_engagements(page, live_server):
     response = page.goto(f"{live_server}/ui-v2")
     assert response is not None and response.status == 200
