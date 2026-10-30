@@ -11,6 +11,7 @@ import json
 import os
 import re
 import subprocess
+import stat
 import sys
 import time
 import uuid
@@ -58,6 +59,8 @@ def _append_audit(record: dict[str, Any]) -> None:
         flags |= os.O_NOFOLLOW
     descriptor = os.open(path, flags, 0o600)
     try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise OSError("dependency audit target is not a regular file")
         if hasattr(os, "fchmod"):
             os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
