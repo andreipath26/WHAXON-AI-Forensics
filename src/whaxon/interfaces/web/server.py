@@ -1567,6 +1567,57 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify({"error": f"dependency diagnostics failed ({type(exc).__name__})"}), 500
         return jsonify(report)
 
+    @app.get("/api/dependencies/history")
+    def api_dependencies_history_get():
+        """Return recent locally persisted dependency readiness snapshots."""
+        from whaxon.core.dependency_history import read_snapshots
+
+        try:
+            limit = int(request.args.get("limit", "20"))
+            snapshots = read_snapshots(Path(core.data_dir), limit=limit)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except (OSError, RuntimeError) as exc:
+            return jsonify({"error": str(exc)}), 500
+        return jsonify({"schema_version": 1, "snapshots": snapshots})
+
+    @app.get("/api/dependencies/drift")
+    def api_dependencies_drift_get():
+        """Compare current read-only diagnostics with the latest saved snapshot."""
+        from whaxon.core.dependency_history import compare_with_latest
+        from whaxon.core.dependencies import collect_dependency_report
+
+        try:
+            report = collect_dependency_report(
+                data_dir=Path(core.data_dir),
+                include_optional=True,
+                include_external=True,
+            )
+            drift = compare_with_latest(report, Path(core.data_dir))
+        except Exception as exc:
+            app.logger.exception("Dependency drift comparison failed")
+            return jsonify({"error": f"dependency drift comparison failed ({type(exc).__name__})"}), 500
+        return jsonify(drift)
+
+    @app.post("/api/dependencies/snapshots")
+    @limiter.limit("10 per minute")
+    def api_dependencies_snapshot_post():
+        """Explicitly save a bounded local readiness snapshot."""
+        from whaxon.core.dependency_history import record_snapshot
+        from whaxon.core.dependencies import collect_dependency_report
+
+        try:
+            report = collect_dependency_report(
+                data_dir=Path(core.data_dir),
+                include_optional=True,
+                include_external=True,
+            )
+            snapshot = record_snapshot(report, Path(core.data_dir))
+        except Exception as exc:
+            app.logger.exception("Dependency snapshot could not be saved")
+            return jsonify({"error": f"dependency snapshot failed ({type(exc).__name__})"}), 500
+        return jsonify(snapshot), 201
+
     @app.post("/api/dependencies/plan")
     @limiter.limit("20 per minute")
     def api_dependencies_plan():
