@@ -557,8 +557,9 @@
     return cell;
   };
   async function load() {
-    const [historyResult, reportResult, toolsResult, scopeResult, statusResult, healthResult] = await Promise.allSettled([
+    const [historyResult, activeJobsResult, reportResult, toolsResult, scopeResult, statusResult, healthResult] = await Promise.allSettled([
       fetch("/api/history").then(r => { if (!r.ok) throw new Error("History HTTP " + r.status); return r.json(); }),
+      fetch("/api/jobs/active").then(r => { if (!r.ok) throw new Error("Active jobs HTTP " + r.status); return r.json(); }),
       fetch("/api/report?format=json").then(r => { if (!r.ok) throw new Error("Report HTTP " + r.status); return r.json(); }),
       fetch("/api/tools").then(r => { if (!r.ok) throw new Error("Tools HTTP " + r.status); return r.json(); }),
       fetch("/api/scope").then(r => { if (!r.ok) throw new Error("Scope HTTP " + r.status); return r.json(); }),
@@ -567,6 +568,8 @@
     ]);
     const historyAvailable = historyResult.status === "fulfilled" && Array.isArray(historyResult.value);
     const jobs = historyAvailable ? historyResult.value : [];
+    const activeJobsAvailable = activeJobsResult.status === "fulfilled" && Array.isArray(activeJobsResult.value);
+    const activeJobs = activeJobsAvailable ? activeJobsResult.value : [];
     const reportAvailable = reportResult.status === "fulfilled" && reportResult.value && typeof reportResult.value === "object" && Array.isArray(reportResult.value.jobs);
     const report = reportAvailable ? reportResult.value : {};
     const toolsAvailable = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value);
@@ -579,7 +582,7 @@
     const verified = findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length;
     const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
     const availableTools = tools.filter(t => t.available && t.adapter_available && t.binary_available).length;
-    setCardValue("Active Scans", "—", "LIVE STATUS NOT EXPOSED");
+    setCardValue("Active Scans", activeJobsAvailable ? activeJobs.length : "—", activeJobsAvailable ? (activeJobs.length ? "RUNNING" : "NO ACTIVE JOBS") : "STATUS UNAVAILABLE");
     setCardValue("Verified Findings", reportAvailable ? verified : "—", reportAvailable ? (falsePositives + " FALSE POSITIVES") : "STATUS UNAVAILABLE");
     setCardValue("Active Adapters", toolsAvailable ? availableTools : "—", toolsAvailable ? "TOOLS AVAILABLE" : "STATUS UNAVAILABLE");
     setCardValue("PTES Coverage", "—", "NOT RECORDED");
@@ -591,6 +594,10 @@
     const sessionTarget = document.getElementById("dashboard-session-target");
     if (sessionEngagement) sessionEngagement.textContent = engagementName;
     if (sessionTarget) sessionTarget.textContent = target;
+    const runtimeState = document.getElementById("dashboard-runtime-state");
+    const runtimeDetail = document.getElementById("dashboard-runtime-detail");
+    if (runtimeState) runtimeState.textContent = activeJobsAvailable ? (activeJobs.length ? activeJobs.length + " active job(s)" : "No active jobs") : "Runtime status unavailable";
+    if (runtimeDetail) runtimeDetail.textContent = activeJobsAvailable ? "Live job status" : "Active-job status unavailable";
     document.querySelectorAll("header span, header div").forEach(n => {
       if (textOf(n) === "Target: No target selected") n.textContent = "Target: " + target;
       if (["(IN SCOPE)", "(CONFIGURED RULE)", "(NO TARGET RULE)", "(ENFORCEMENT DISABLED)", "(STATUS UNAVAILABLE)", "(CHECKING SCOPE)"].includes(textOf(n))) {
@@ -743,12 +750,10 @@
     }
     async function haltActiveJobs() {
       try {
-        const response = await fetch("/api/history");
-        if (!response.ok) throw new Error("History HTTP " + response.status);
-        const records = await response.json();
-        const active = (Array.isArray(records) ? records : []).filter(job =>
-          ["running", "queued", "pending"].includes(String(job.status || "").toLowerCase())
-        );
+        const response = await fetch("/api/jobs/active");
+        if (!response.ok) throw new Error("Active jobs HTTP " + response.status);
+        const active = await response.json();
+        if (!Array.isArray(active)) throw new Error("Active jobs API returned an invalid response.");
         if (!active.length) {
           showActionStatus("No running or queued jobs were found. Nothing was cancelled.");
           return;
