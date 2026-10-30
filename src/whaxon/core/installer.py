@@ -93,12 +93,18 @@ def apply_approved_dependency_plan(
         )
 
     manifest = load_dependency_manifest()
+    policy = manifest.get("policy", {})
+    if (
+        policy.get("automatic_installation_enabled") is not True
+        or "python-package" not in policy.get("automatic_installation_kinds", [])
+    ):
+        raise ValueError("automatic Python-package installation is disabled by the dependency policy")
     entry = next((item for item in manifest["dependencies"] if item["id"] == dependency_id), None)
     if not entry or entry.get("kind") != "python-package":
         raise ValueError("Dependency is not an allowlisted Python package.")
     requirement = f"{entry['id']}>={entry['minimum_version']}"
     argv = [
-        sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
+        sys.executable, "-m", "pip", "--isolated", "install", "--disable-pip-version-check",
         "--no-input", "--quiet", "--progress-bar", "off",
         "--only-binary=:all:", "--index-url",
         "https://pypi.org/simple", requirement,
