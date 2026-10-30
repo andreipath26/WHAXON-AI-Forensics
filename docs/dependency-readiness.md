@@ -121,3 +121,20 @@ This feature is not considered production-deployable until all of the following 
 - Worker restart behavior, concurrent operations, lock recovery, cancellation and partial-install recovery are validated under realistic deployment process models.
 
 Until these gates pass, keep the pull request in draft and do not publish this feature as a finished product update.
+
+
+## Evidence principle and audit lifecycle (mandatory)
+
+WHAXON follows five mandatory operating principles: deterministic plans, explicit informed consent, bounded execution, independent verification, and **leave evidence**. Evidence is the accountability layer that makes the first four independently enforceable.
+
+For dependency readiness, the audit lifecycle must cover:
+- Plan created or regenerated: plan ID, canonical digest, manifest/policy version, environment binding, exact proposed action and impact disclosure.
+- Approval or rejection: actor, decision, timestamp, exact plan digest, approval context and expiry/revocation where applicable. A submitted plan ID alone is not proof that an informed approval occurred.
+- Action lifecycle: queued, started, parameters actually passed, process identity where available, progress/state transitions, cancellation, timeout, exit/result and finish time.
+- Verification: verifier identity/version, inputs, checks performed, observed distribution/version/import state, evidence digest and explicit pass/fail/inconclusive outcome.
+- Recovery: trigger, diagnosis, actions recommended or taken, operator decision, resulting state and follow-up verification.
+- Exceptional paths: denied approval, stale/changed plan, audit failure, worker crash/interruption, lock recovery and partial installation.
+
+Events must share stable plan, approval, operation and dependency identifiers so an auditor can reconstruct the complete sequence. Store append-only records with restrictive access, secret redaction and minimal personal data. Add a verifiable integrity mechanism (for example, a hash chain with a documented trust anchor); append-only JSONL and filesystem permissions alone do not prove tamper-evidence. Provide an integrity-check/export path. Never report a consequential operation as fully successful when required evidence could not be persisted or verified.
+
+**Current implementation gap:** the installer presently writes STARTED and terminal operation records, but plan preview and the actual approval decision are not yet recorded as distinct auditable events; operation-state JSON is not itself a tamper-evident event chain. Therefore this PR must not claim the complete fifth principle is implemented until those lifecycle events, integrity verification and failure-path tests are added. Keep the PR draft until then.
