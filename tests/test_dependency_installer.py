@@ -198,13 +198,20 @@ def test_cancel_before_start_never_spawns_package_manager(monkeypatch, tmp_path)
 def test_installer_enforces_manifest_automatic_install_policy(monkeypatch):
     import whaxon.core.installer as installer
 
-    from whaxon.core.remediation import build_remediation_plan
-
-    plan = build_remediation_plan(dependency_ids=["textual"])
-    if not plan["actions"]:
-        pytest.skip("Textual is already ready; no installation action to test")
     monkeypatch.setattr(sys, "prefix", "/tmp/whaxon-test-venv")
     monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(
+        installer,
+        "build_remediation_plan",
+        lambda **kwargs: {
+            "plan_id": "plan-0123456789abcdef",
+            "unknown_dependency_ids": [],
+            "actions": [{
+                "dependency_id": "textual",
+                "options": [{"kind": "python-package"}],
+            }],
+        },
+    )
     original = installer.load_dependency_manifest
     monkeypatch.setattr(
         installer,
@@ -218,4 +225,6 @@ def test_installer_enforces_manifest_automatic_install_policy(monkeypatch):
         },
     )
     with pytest.raises(ValueError, match="disabled by the dependency policy"):
-        installer.apply_approved_dependency_plan("textual", plan["plan_id"])
+        installer.apply_approved_dependency_plan(
+            "textual", "plan-0123456789abcdef"
+        )
