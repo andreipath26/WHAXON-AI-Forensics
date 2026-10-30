@@ -58,6 +58,22 @@ def test_concurrent_writes(store):
     for i in range(4):
         assert len(store.get(f"c{i}")["lines"]) == 50
 
+
+def test_active_jobs_returns_only_running_jobs(store):
+    store.create("active-running")
+    store.set_started("active-running", "nmap", "127.0.0.1")
+    store.create("active-finished")
+    store.set_started("active-finished", "nikto", "127.0.0.1")
+    store.set_finished("active-finished", 0, 1.0)
+    store.create("active-starting")
+
+    jobs = store.active_jobs()
+
+    assert [job["id"] for job in jobs] == ["active-running"]
+    assert jobs[0]["status"] == "running"
+    assert jobs[0]["tool"] == "nmap"
+
+
 def test_history_reports_finding_count_not_output_line_count(store):
     store.create("history-findings")
     store.set_started("history-findings", "nmap", "127.0.0.1")
