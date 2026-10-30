@@ -28,7 +28,8 @@ def _python_package_option(entry: dict[str, Any]) -> dict[str, Any]:
         "requires_network": True,
         "requires_privilege": False,
         "system_wide": False,
-        "automated_execution_supported": False,
+        "requires_virtual_environment": True,
+        "automated_execution_supported": True,
         "approval_required": True,
         "warning": "Preview only. This plan does not execute pip or resolve/install packages.",
     }
