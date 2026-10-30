@@ -94,7 +94,7 @@
 </div>
 <div class="my-space-xs flex flex-col">
 <span class="font-code-md text-code-md text-on-surface font-semibold truncate">WHAXON SCOPE MANAGER</span>
-<span class="font-label-sm text-label-sm text-primary tracking-wide uppercase font-semibold">Scope status loaded from backend</span>
+<span id="scope-enforcement-state" class="font-label-sm text-label-sm text-primary tracking-wide uppercase font-semibold">Waiting for scope configuration</span>
 </div>
 <div class="flex items-center justify-between font-label-sm text-label-sm text-outline border-t border-outline-variant/20 pt-space-xs">
 <span>Scope API</span>
@@ -482,6 +482,10 @@
     if (badge) badge.textContent = rows.length + " rules loaded";
     const inScopeCount = ruleList("in_scope").length;
     const enforcementEnabled = scope.enabled !== false;
+    const enforcementState = $("scope-enforcement-state");
+    if (enforcementState) enforcementState.textContent = !enforcementEnabled
+      ? "Enforcement disabled"
+      : inScopeCount ? "Enforcement enabled" : "Enabled; no target rules";
     const headerTarget = $("scope-header-target");
     if (headerTarget) headerTarget.textContent = "Target: " + (ruleList("in_scope")[0] || "No target configured");
     const membership = $("scope-header-membership");
@@ -577,7 +581,17 @@
       scope = await api("/api/scope");
       render();
       say("Loaded the active scope configuration.");
-    } catch (error) { say("Could not load live scope: " + error.message, false); }
+    } catch (error) {
+      const state = $("scope-enforcement-state");
+      if (state) state.textContent = "Waiting for scope configuration";
+      const target = $("scope-header-target");
+      if (target) target.textContent = "Target: Waiting for scope configuration";
+      const membership = $("scope-header-membership");
+      if (membership) membership.textContent = "(SCOPE STATUS UNKNOWN)";
+      const boundary = $("scope-header-boundary");
+      if (boundary) boundary.textContent = "SCOPE CONFIGURATION UNAVAILABLE";
+      say("Could not load live scope: " + error.message, false);
+    }
   }
   let lastDialogTrigger = null;
   const openDialog = (dialog, trigger, focusSelector) => {
