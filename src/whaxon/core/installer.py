@@ -46,6 +46,24 @@ def _append_audit(record: dict[str, Any]) -> None:
         stream.write(json.dumps(record, sort_keys=True) + "\n")
 
 
+def _finish_audit(result: dict[str, Any]) -> dict[str, Any]:
+    """Never misreport an executed install if its final audit write fails."""
+    try:
+        _append_audit(result)
+    except OSError as exc:
+        return {
+            **result,
+            "original_status": result["status"],
+            "status": "AUDIT_FAILED",
+            "audit_error": type(exc).__name__,
+            "recovery": (
+                "The operation ran but its final audit record could not be written. "
+                "Run whaxon doctor to establish current state and inspect the local audit directory."
+            ),
+        }
+    return result
+
+
 def apply_approved_dependency_plan(
     dependency_id: str,
     approved_plan_id: str,
@@ -106,19 +124,19 @@ def apply_approved_dependency_plan(
         if exit_code != 0:
             result = {**base, "status": "INSTALL_FAILED", "exit_code": exit_code,
                       "output": output, "recovery": "No automatic rollback was attempted. Re-run whaxon doctor; if the environment is inconsistent, recreate the virtual environment and reinstall from the approved lock/profile.", "finished_at": datetime.now(UTC).isoformat()}
-            _append_audit(result)
+            result = _finish_audit(result)
             return result
     except subprocess.TimeoutExpired as exc:
         result = {**base, "status": "TIMED_OUT", "exit_code": None,
                   "output": _redact(str(exc)), "recovery": "The pip process was terminated after timeout. Re-run whaxon doctor; recreate the virtual environment if package state is uncertain.", "finished_at": datetime.now(timezone.utc).isoformat()}
-        _append_audit(result)
+        result = _finish_audit(result)
         return result
     except KeyboardInterrupt:
         result = {**base, "status": "INTERRUPTED", "exit_code": None,
                   "output": "Installation interrupted by user.",
                   "recovery": "The package manager may have partially changed the virtual environment. Re-run whaxon doctor and recreate the venv if state is inconsistent.",
                   "finished_at": datetime.now(timezone.utc).isoformat()}
-        _append_audit(result)
+        _finish_audit(result)
         raise
 
     try:
@@ -142,5 +160,5 @@ def apply_approved_dependency_plan(
         "output": output,
         "finished_at": datetime.now(timezone.utc).isoformat(),
     }
-    _append_audit(result)
+    result = _finish_audit(result)
     return result
