@@ -129,6 +129,7 @@ def apply_approved_dependency_plan(
         return _finish_audit(result)
     if progress_callback:
         progress_callback("INSTALLING", "Installing the approved Python package.")
+    process = None
     try:
         process = subprocess.Popen(
             argv,
@@ -142,7 +143,8 @@ def apply_approved_dependency_plan(
         last_progress = started_monotonic
         while True:
             if cancel_requested and cancel_requested():
-                process.terminate()
+                if process.poll() is None:
+                    process.terminate()
                 try:
                     stdout, stderr = process.communicate(timeout=5)
                 except subprocess.TimeoutExpired:
@@ -163,7 +165,8 @@ def apply_approved_dependency_plan(
                 progress_callback("INSTALLING", f"Package manager running for {int(elapsed)} seconds.")
                 last_progress = elapsed
             if elapsed >= INSTALL_TIMEOUT_SECONDS:
-                process.terminate()
+                if process.poll() is None:
+                    process.terminate()
                 try:
                     stdout, stderr = process.communicate(timeout=5)
                 except subprocess.TimeoutExpired:
@@ -197,6 +200,13 @@ def apply_approved_dependency_plan(
         result = _finish_audit(result)
         return result
     except KeyboardInterrupt:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
         result = {**base, "status": "INTERRUPTED", "exit_code": None,
                   "output": "Installation interrupted by user.",
                   "recovery": "The package manager may have partially changed the virtual environment. Re-run whaxon doctor and recreate the venv if state is inconsistent.",
