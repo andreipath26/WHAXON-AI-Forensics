@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import tempfile
 import threading
 import uuid
@@ -148,6 +149,14 @@ def start_install_operation(
     )
     if not entry or entry.get("kind") != "python-package":
         raise ValueError("only manifest-listed Python packages can be installed automatically")
+    policy = manifest.get("policy", {})
+    if (
+        policy.get("automatic_installation_enabled") is not True
+        or "python-package" not in policy.get("automatic_installation_kinds", [])
+    ):
+        raise ValueError("automatic Python-package installation is disabled by the dependency policy")
+    if sys.prefix == getattr(sys, "base_prefix", sys.prefix):
+        raise ValueError("automatic installation requires an active virtual environment")
     plan = build_remediation_plan(dependency_ids=[dependency_id], data_dir=data_dir)
     if plan["plan_id"] != approved_plan_id:
         raise ValueError("approval does not match the current plan; regenerate and review it")
@@ -155,8 +164,12 @@ def start_install_operation(
         (item for item in plan["actions"] if item["dependency_id"] == dependency_id),
         None,
     )
-    if not action or action["options"][0]["kind"] != "python-package":
-        raise ValueError("dependency does not have an eligible installation plan")
+    if (
+        not action
+        or action["options"][0]["kind"] != "python-package"
+        or action["options"][0].get("automated_execution_supported") is not True
+    ):
+        raise ValueError("dependency does not have an eligible automated installation plan")
     operation_id = uuid.uuid4().hex
     operations = _operations_dir(data_dir)
     lock_path = _claim_dependency_lock(operations, dependency_id, operation_id)
@@ -241,7 +254,23 @@ def start_install_operation(
     thread = threading.Thread(target=worker, name=f"whaxon-dependency-{operation_id[:8]}", daemon=True)
     with _LOCK:
         _ACTIVE_THREADS[operation_id] = thread
-    thread.start()
+    try:
+        thread.start()
+    except Exception:
+        state.update({
+            "status": "FAILED",
+            "step": "FAILED",
+            "progress": 100,
+            "message": "Installation worker could not be started.",
+            "updated_at": _now(),
+        })
+        try:
+            _write_state(state_path, state)
+        finally:
+            lock_path.unlink(missing_ok=True)
+            with _LOCK:
+                _ACTIVE_THREADS.pop(operation_id, None)
+        raise RuntimeError("dependency installation worker could not be started")
     return state
 
 
