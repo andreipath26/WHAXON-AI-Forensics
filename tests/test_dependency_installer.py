@@ -228,3 +228,30 @@ def test_installer_enforces_manifest_automatic_install_policy(monkeypatch):
         installer.apply_approved_dependency_plan(
             "textual", "plan-0123456789abcdef"
         )
+
+
+def test_audit_refuses_symlinked_whaxon_root(tmp_path, monkeypatch):
+    import whaxon.core.installer as installer
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / ".whaxon").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(installer.Path, "home", classmethod(lambda cls: tmp_path))
+    with pytest.raises(OSError, match="audit root must not be a symlink"):
+        installer._append_audit({"status": "STARTED"})
+    assert list(outside.iterdir()) == []
+
+
+def test_audit_refuses_symlinked_log_file(tmp_path, monkeypatch):
+    import whaxon.core.installer as installer
+
+    root = tmp_path / ".whaxon"
+    audit = root / "audit"
+    audit.mkdir(parents=True)
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text("untouched")
+    (audit / "dependency-install.jsonl").symlink_to(outside)
+    monkeypatch.setattr(installer.Path, "home", classmethod(lambda cls: tmp_path))
+    with pytest.raises(OSError, match="audit log must not be a symlink"):
+        installer._append_audit({"status": "STARTED"})
+    assert outside.read_text() == "untouched"
