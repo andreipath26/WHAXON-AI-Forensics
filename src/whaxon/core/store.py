@@ -451,6 +451,18 @@ class JobStore:
                 })
             return out
         finally: c.close()
+    def active_jobs(self):
+        """Return currently running jobs for live operational controls."""
+        c = self._conn()
+        try:
+            rows = c.execute(
+                "SELECT id, tool, target, status, started_at FROM jobs "
+                "WHERE status='running' ORDER BY started_at DESC"
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            c.close()
+
     def history(self, limit=50):
         c = self._conn()
         try:
