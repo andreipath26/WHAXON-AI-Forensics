@@ -16,17 +16,20 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA_VERSION = 1
-CORE_PACKAGES = (
-    ("platformdirs", "platformdirs", "4.0"),
-    ("dnspython", "dns", "2.6"),
-    ("defusedxml", "defusedxml", "0.7.1"),
-)
-OPTIONAL_EXTRAS = {
-    "tui": (("textual", "textual", "0.80"), ("rich", "rich", "13")),
-    "gui": (("PySide6", "PySide6", "6.7"), ("qasync", "qasync", "0.27")),
-    "web": (("flask", "flask", "3.0"),),
-    "metasploit": (("pymetasploit3", "pymetasploit3", "2.0"),),
-}
+def load_dependency_manifest() -> dict[str, Any]:
+    """Load and minimally validate the packaged dependency manifest."""
+    path = Path(__file__).resolve().parents[1] / "data" / "dependencies.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if raw.get("schema_version") != SCHEMA_VERSION or not isinstance(raw.get("dependencies"), list):
+        raise ValueError("unsupported or malformed dependency manifest")
+    seen: set[str] = set()
+    for entry in raw["dependencies"]:
+        if not isinstance(entry, dict) or not entry.get("id") or entry["id"] in seen:
+            raise ValueError("dependency manifest contains an invalid or duplicate id")
+        seen.add(entry["id"])
+        if entry.get("kind") == "python-package" and not entry.get("minimum_version"):
+            raise ValueError(f"dependency {entry['id']} has no minimum_version")
+    return raw
 
 
 @dataclass(frozen=True)
@@ -114,16 +117,27 @@ def collect_dependency_report(*, data_dir: Path | None = None,
         "Install Python 3.11 or newer and run WHAXON with that interpreter."
         if py_status != "READY" else "",
     ))
-    for dist, import_name, minimum in CORE_PACKAGES:
-        results.append(_package_result(
-            dist, import_name, minimum, required=True, capability="core",
+    manifest_error = ""
+    try:
+        manifest = load_dependency_manifest()
+        for entry in manifest["dependencies"]:
+            if entry.get("kind") != "python-package":
+                continue
+            if not include_optional and not entry.get("required", False):
+                continue
+            capability = (entry.get("capabilities") or ["core"])[0]
+            results.append(_package_result(
+                entry["id"], entry.get("import_name", entry["id"]),
+                entry["minimum_version"], required=bool(entry.get("required")),
+                capability=capability,
+            ))
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        manifest_error = f"Dependency manifest unavailable or invalid ({type(exc).__name__})."
+        results.append(DependencyResult(
+            "dependency-manifest", "Dependency manifest", "resource", True, "BROKEN",
+            reason=manifest_error,
+            remediation="Restore a valid packaged dependencies.json manifest.",
         ))
-    if include_optional:
-        for extra, packages in OPTIONAL_EXTRAS.items():
-            for dist, import_name, minimum in packages:
-                results.append(_package_result(
-                    dist, import_name, minimum, required=False, capability=extra,
-                ))
 
     catalog_path = (Path(data_dir) / "tools.json") if data_dir else (
         Path(__file__).resolve().parents[1] / "data" / "tools.json"
@@ -145,7 +159,7 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                     capabilities=(f"tool:{tool_id}",),
                     reason=("Executable resolved on PATH." if path else
                             f"Executable '{binary}' was not found on PATH."),
-                    remediation=(" " if path else
+                    remediation=("" if path else
                                  "Use the platform's trusted package source or the official project instructions; "
                                  "WHAXON has not attempted an installation."),
                 ))
