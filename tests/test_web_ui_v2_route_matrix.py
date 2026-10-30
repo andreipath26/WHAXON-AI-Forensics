@@ -5,8 +5,6 @@ Detailed interaction tests remain in the page-specific test modules.
 """
 from __future__ import annotations
 
-import pytest
-
 
 UI_V2_ROUTES = (
     "/ui-v2",
@@ -35,11 +33,11 @@ UI_V2_ROUTES = (
 )
 
 
-@pytest.mark.parametrize("route", UI_V2_ROUTES)
-def test_every_canonical_ui_route_renders(page, live_server, route):
-    response = page.goto(f"{live_server}{route}")
-    assert response is not None, f"{route} did not produce a document response"
-    assert response.status == 200, f"{route} returned HTTP {response.status}"
-    assert page.locator("body").is_visible()
-    assert page.locator("main").count() == 1, f"{route} must render one main workspace"
-    assert page.locator("main").inner_text().strip(), f"{route} rendered an empty workspace"
+def test_every_canonical_ui_route_renders(page, live_server):
+    for route in UI_V2_ROUTES:
+        response = page.goto(f"{live_server}{route}")
+        assert response is not None, f"{route} did not produce a document response"
+        assert response.status == 200, f"{route} returned HTTP {response.status}"
+        assert page.locator("body").is_visible()
+        assert page.locator("main").count() == 1, f"{route} must render one main workspace"
+        assert page.locator("main").inner_text().strip(), f"{route} rendered an empty workspace"
