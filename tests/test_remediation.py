@@ -48,3 +48,25 @@ def test_python_package_plan_discloses_exact_restricted_install_contract():
     assert option["package_source"] == "https://pypi.org/simple"
     assert option["may_install_transitive_dependencies"] is True
     assert "transitive dependencies" in option["warning"]
+
+
+def test_plan_honors_disabled_automatic_install_policy(monkeypatch):
+    import whaxon.core.remediation as remediation
+
+    original = remediation.load_dependency_manifest
+    monkeypatch.setattr(
+        remediation,
+        "load_dependency_manifest",
+        lambda: {
+            **original(),
+            "policy": {
+                "automatic_installation_enabled": False,
+                "automatic_installation_kinds": [],
+            },
+        },
+    )
+    plan = build_remediation_plan(dependency_ids=["pymetasploit3"])
+    if not plan["actions"]:
+        return
+    option = plan["actions"][0]["options"][0]
+    assert option["automated_execution_supported"] is False
