@@ -10,6 +10,8 @@ import importlib.util
 import json
 import os
 import platform
+import re
+import subprocess
 import shutil
 import sys
 from dataclasses import asdict, dataclass
@@ -115,7 +117,8 @@ def _environment() -> dict[str, Any]:
 
 def collect_dependency_report(*, data_dir: Path | None = None,
                                include_optional: bool = True,
-                               include_external: bool = True) -> dict[str, Any]:
+                               include_external: bool = True,
+                               verify_external: bool = False) -> dict[str, Any]:
     """Return a deterministic, read-only report; no install or network actions."""
     results: list[DependencyResult] = []
     py_status = "READY"
@@ -145,6 +148,9 @@ def collect_dependency_report(*, data_dir: Path | None = None,
             remediation="Restore a valid packaged dependencies.json manifest.",
         ))
 
+    external_probe_specs = {
+        item["id"]: item for item in manifest.get("external_tools", [])
+    } if "manifest" in locals() else {}
     catalog_path = (Path(data_dir) / "tools.json") if data_dir else (
         Path(__file__).resolve().parents[1] / "data" / "tools.json"
     )
@@ -162,15 +168,53 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                     continue
                 path = shutil.which(binary)
                 tool_id = str(tool.get("id") or binary)
+                status = "DETECTED" if path else "MISSING"
+                version = None
+                reason = (
+                    "Executable resolved on PATH; version and smoke test are not yet verified."
+                    if path else f"Executable '{binary}' was not found on PATH."
+                )
+                probe = external_probe_specs.get(tool_id)
+                if path and verify_external and probe:
+                    try:
+                        completed = subprocess.run(
+                            [path, *probe["version_args"]],
+                            shell=False,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                            timeout=8,
+                            stdin=subprocess.DEVNULL,
+                        )
+                        output = ((completed.stdout or "") + "\\n" + (completed.stderr or ""))[:8192]
+                        match = re.search(probe["version_regex"], output, re.IGNORECASE)
+                        if completed.returncode == 0 and match:
+                            status = "READY"
+                            version = match.group(1) if match.lastindex else match.group(0)
+                            reason = "Trusted version probe succeeded."
+                        else:
+                            status = "BROKEN"
+                            reason = (
+                                f"Trusted version probe did not confirm the expected version "
+                                f"(exit code {completed.returncode})."
+                            )
+                    except subprocess.TimeoutExpired:
+                        status = "BROKEN"
+                        reason = "Trusted version probe timed out after 8 seconds."
+                    except OSError as exc:
+                        status = "BROKEN"
+                        reason = f"Trusted version probe could not execute ({type(exc).__name__})."
+                elif path and verify_external and not probe:
+                    reason = "Executable detected; no trusted version probe is configured."
                 results.append(DependencyResult(
                     tool_id, str(tool.get("name") or tool_id), "external-tool", False,
-                    "DETECTED" if path else "MISSING",
+                    status,
+                    detected_version=version,
                     detected_path=path,
                     capabilities=(f"tool:{tool_id}",),
-                    reason=("Executable resolved on PATH; version and smoke test are not yet verified." if path else
-                            f"Executable '{binary}' was not found on PATH."),
-                    remediation=("" if path else
-                                 "Use the platform's trusted package source or the official project instructions; "
+                    reason=reason,
+                    remediation=("" if status in {"READY", "DETECTED"} else
+                                 "Use the platform's trusted package source or official project instructions; "
                                  "WHAXON has not attempted an installation."),
                 ))
         except (OSError, ValueError, TypeError) as exc:
