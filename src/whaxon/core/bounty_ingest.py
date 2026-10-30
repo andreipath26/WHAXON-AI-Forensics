@@ -280,6 +280,7 @@ def ingest_yeswehack_text(text: str, source_url: str = "") -> dict:
         "status": "draft_requires_review",
         "policy_draft": draft,
         "evidence": evidence,
+        "review": _review_status(draft),
         "source": {
             "url": source_url,
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
