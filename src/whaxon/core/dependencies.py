@@ -11,9 +11,8 @@ import json
 import os
 import platform
 import re
-import re
-import subprocess
 import shutil
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -52,7 +51,7 @@ def load_dependency_manifest() -> dict[str, Any]:
             or not isinstance(entry.get("binary"), str)
             or not entry["binary"]
             or not isinstance(entry.get("version_args"), list)
-            or any(not isinstance(arg, str) or "\\x00" in arg for arg in entry["version_args"])
+            or any(not isinstance(arg, str) or "\x00" in arg for arg in entry["version_args"])
             or not isinstance(entry.get("version_regex"), str)
         ):
             raise ValueError("dependency manifest contains an invalid external-tool probe")
