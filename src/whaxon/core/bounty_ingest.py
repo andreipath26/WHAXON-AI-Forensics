@@ -196,10 +196,10 @@ def _harden_draft(draft: dict, source_url: str) -> None:
     # Imported programme terms are not permission to begin testing.
     # Once the operator approves the programme, routine in-scope work is
     # delegated to the agent; only consequential decisions return to the user.
-    draft["authorization_status"] = "pending_review"
-    draft["execution_enabled"] = False
     ai.update({
         "mode": "bounded_autonomous_after_approval",
+        "activation": "pending_review",
+        "execution_enabled": False,
         "activation": "disabled_until_program_approval",
         "allow_action_selection": False,
         "allow_live_requests": False,
