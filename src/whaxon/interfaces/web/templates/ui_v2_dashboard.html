@@ -388,7 +388,7 @@
 <span class="material-symbols-outlined text-base text-secondary">folder_managed</span>
 <div class="flex flex-col">
 <span class="font-label-sm text-label-sm uppercase text-outline">Archived Audit Trails</span>
-<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Recent Engagements &amp; Workspaces</h3>
+<h3 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Recent Job History</h3>
 </div>
 </div>
 <div class="flex items-center gap-space-sm">
@@ -404,10 +404,10 @@
 </div>
 <!-- Historical Table Grid -->
 <div class="overflow-x-auto">
-<table class="w-full text-left font-body-sm text-body-sm">
+<table aria-label="Recent recorded WHAXON jobs" class="w-full text-left font-body-sm text-body-sm">
 <thead>
 <tr class="bg-surface-container-lowest font-label-sm text-label-sm uppercase text-outline">
-<th class="px-space-xl py-space-sm">Engagement ID</th>
+<th class="px-space-xl py-space-sm">Job ID</th>
 <th class="px-space-md py-space-sm">Target Scope</th>
 <th class="px-space-md py-space-sm">Tool</th>
 <th class="px-space-md py-space-sm">Timeline</th>
@@ -880,7 +880,7 @@
         const panel = h.closest(".px-gutter-lg.pt-space-lg") || h.parentElement?.parentElement?.parentElement;
         if (panel) panel.style.display = "none";
       }
-      if (textOf(h).includes("Recent Engagements & Workspaces")) {
+      if (textOf(h).includes("Recent Job History")) {
         const panel = h.parentElement?.parentElement?.parentElement?.parentElement;
         if (panel) panel.querySelectorAll("span").forEach(s => {
           if (textOf(s).includes("ENFORCING ED25519 IMMUTABILITY")) s.textContent = "LIVE JOB HISTORY";
