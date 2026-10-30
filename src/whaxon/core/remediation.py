@@ -46,7 +46,7 @@ def build_remediation_plan(*, dependency_ids: list[str] | None = None,
     report = collect_dependency_report(data_dir=data_dir)
     entries = {entry["id"]: entry for entry in manifest["dependencies"]}
     observed = {entry["id"]: entry for entry in report["dependencies"]}
-    selected = set(dependency_ids or observed)
+    selected = set(observed) if dependency_ids is None else set(dependency_ids)
     unknown = sorted(selected - set(observed))
     actions: list[dict[str, Any]] = []
     for dep_id in sorted(selected & set(observed)):
