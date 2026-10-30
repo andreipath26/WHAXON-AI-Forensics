@@ -171,6 +171,7 @@ def test_dashboard_upload_artifact_button_opens_file_picker_and_imports_xml(page
 
     page.route("**/api/import/burp", fulfill_import)
     page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached", timeout=8000)
     with page.expect_file_chooser() as chooser_info:
         page.get_by_role("button", name=re.compile(r"Upload Artifact")).click()
     chooser_info.value.set_files({
@@ -184,6 +185,7 @@ def test_dashboard_upload_artifact_button_opens_file_picker_and_imports_xml(page
 
 def test_dashboard_configure_filters_focuses_the_live_history_filter(page, live_server):
     page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached", timeout=8000)
     filter_input = page.get_by_role(
         "textbox", name="Filter recent job history by ID, target, or tool"
     )
