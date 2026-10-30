@@ -24,13 +24,22 @@ def test_dependency_report_json_serializable():
     assert '"dependencies"' in encoded
 
 
-def test_missing_catalog_is_reported(tmp_path):
+def test_packaged_catalog_is_used_when_user_data_is_not_initialized(tmp_path):
     report = collect_dependency_report(data_dir=tmp_path, include_optional=False)
     catalog = next(d for d in report["dependencies"] if d["id"] == "tool-catalog")
-    assert catalog["status"] == "MISSING"
+    assert catalog["status"] == "READY"
 
 
 def test_optional_dependencies_do_not_block_core(tmp_path):
     report = collect_dependency_report(data_dir=tmp_path, include_optional=True)
     if report["summary"]["required_blockers"] == 0:
         assert report["overall_status"] in {"READY", "DEGRADED"}
+
+
+def test_manifest_has_unique_ids_and_profiles():
+    from whaxon.core.dependencies import load_dependency_manifest
+
+    manifest = load_dependency_manifest()
+    ids = [entry["id"] for entry in manifest["dependencies"]]
+    assert len(ids) == len(set(ids))
+    assert "core" in manifest["profiles"]
