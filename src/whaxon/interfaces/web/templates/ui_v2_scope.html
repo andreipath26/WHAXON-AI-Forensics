@@ -610,7 +610,6 @@
     try { if (await save(incoming, true)) close(); }
     catch (error) { say(error.message, false); }
   });
-  $("openImportDrawerBtn")?.addEventListener("click", () => drawer?.classList.remove("hidden"));
   // Only scope.json is currently supported; hide the nonfunctional source picker entirely.
   drawer?.querySelectorAll("label").forEach(label => {
     if (label.textContent.includes("Select Scope Source")) label.parentElement.style.display = "none";
