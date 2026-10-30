@@ -12,13 +12,12 @@ import os
 import re
 import subprocess
 import sys
-import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from whaxon.core.dependencies import load_dependency_manifest, _version_tuple
+from whaxon.core.dependencies import _version_tuple, load_dependency_manifest
 from whaxon.core.remediation import build_remediation_plan
 
 INSTALL_TIMEOUT_SECONDS = 900
@@ -66,9 +65,11 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
     if not entry or entry.get("kind") != "python-package":
         raise ValueError("Dependency is not an allowlisted Python package.")
     requirement = f"{entry['id']}>={entry['minimum_version']}"
-    argv = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
-            "--no-input", "--only-binary=:all:", "--index-url",
-            "https://pypi.org/simple", requirement]
+    argv = [
+        sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
+        "--no-input", "--only-binary=:all:", "--index-url",
+        "https://pypi.org/simple", requirement,
+    ]
     operation_id = str(uuid.uuid4())
     started = datetime.now(timezone.utc).isoformat()
     base = {
