@@ -35,7 +35,7 @@ def test_ui_v2_entry_route_opens_integrated_interface(page, live_server):
 def test_dashboard_job_history_filter_has_an_accessible_name(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     filter_input = page.get_by_role(
-        "textbox", name="Filter job history by ID, target, or operator"
+        "textbox", name="Filter recent job history by ID, target, or operator"
     )
     assert filter_input.is_visible()
     filter_input.fill("no-such-job")
