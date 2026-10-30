@@ -23,7 +23,7 @@ def test_dashboard_filter_narrows_live_job_history(page, live_server):
         "() => [...document.querySelectorAll('table tbody tr')].some(row => row.textContent.includes('seed-job-1'))",
         timeout=8000,
     )
-    filter_input = page.get_by_role("textbox", name="Filter recent job history")
+    filter_input = page.get_by_role("textbox", name="Filter recent job history by ID, target, or operator")
     filter_input.fill("seed-job-1")
     visible_rows = page.locator("table tbody tr:visible")
     assert visible_rows.count() == 1
