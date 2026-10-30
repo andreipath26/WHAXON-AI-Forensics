@@ -280,6 +280,11 @@ def test_dashboard_mobile_navigation_opens_closes_and_restores_focus(page, live_
     )
     assert menu.evaluate("element => document.activeElement === element")
 
+    menu.click()
+    page.locator(".dashboard-mobile-nav-backdrop").click(position={"x": 8, "y": 8})
+    assert menu.get_attribute("aria-expanded") == "false"
+    assert menu.evaluate("element => document.activeElement === element")
+
 
 def test_dashboard_mobile_navigation_closes_after_route_selection(page, live_server):
     page.set_viewport_size({"width": 390, "height": 844})
