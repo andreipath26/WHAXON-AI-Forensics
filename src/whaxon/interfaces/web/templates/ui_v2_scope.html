@@ -716,7 +716,7 @@
     try {
       const verdict = await api("/api/scope/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({target})});
       if (result) {
-        result.textContent = (verdict.allowed ? "ALLOWED — " : "BLOCKED — ") +
+        result.textContent = (verdict.allowed ? "ALLOWED — " : "BLOCKED — ") + target + " — " +
           (verdict.reason || "No reason recorded") +
           (verdict.matched_rule ? " · Rule: " + verdict.matched_rule : "");
         result.className = verdict.allowed ? "text-primary font-semibold" : "text-error font-semibold";
@@ -732,6 +732,7 @@
       if (indicator) indicator.className = "h-2 w-2 rounded-full bg-error";
     }
   });
+  $("scopeCheckTarget")?.addEventListener("input", resetPreflightStatus);
   $("scopeCheckTarget")?.addEventListener("keydown", event => {
     if (event.key === "Enter") $("runScopeCheckBtn")?.click();
   });
