@@ -261,8 +261,8 @@ def test_dashboard_mobile_navigation_closes_after_route_selection(page, live_ser
 def test_dashboard_mobile_menu_is_not_shown_on_desktop(page, live_server):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(f"{live_server}/ui-v2")
-    assert page.get_by_role("button", name="Open navigation").count() == 1
-    assert not page.get_by_role("button", name="Open navigation").is_visible()
+    assert page.locator(".dashboard-mobile-menu").count() == 1
+    assert not page.locator(".dashboard-mobile-menu").is_visible()
 
 def test_dashboard_lab_deployment_is_not_present_as_a_live_action(page, live_server):
     page.goto(f"{live_server}/ui-v2")
