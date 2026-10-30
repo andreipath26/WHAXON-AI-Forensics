@@ -12,7 +12,6 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
     assert page.locator("#run-target-input").count() == 1
     assert page.locator("#run-target-input").is_visible()
     assert page.locator("#run-active-btn").is_visible()
-    assert page.locator("#run-passive-btn").is_visible()
     assert page.get_by_role("button", name="Spawn Sub-tool").is_hidden()
     assert page.get_by_role("button", name="Inject Payload").is_hidden()
     assert page.get_by_role("button", name="Emergency Abort").is_hidden()
@@ -85,7 +84,7 @@ def test_run_page_passive_button_starts_guarded_job(page, live_server):
     )
     page.locator("#run-tool-select").select_option("echo")
     page.locator("#run-target-input").fill("127.0.0.1")
-    page.locator("#run-passive-btn").click()
+    page.locator("#run-active-btn").click()
     page.wait_for_function(
         "() => document.querySelector('#run-job-status')?.textContent.toLowerCase().includes('finished')",
         timeout=15000,
@@ -188,3 +187,36 @@ def test_run_page_header_reflects_live_scope_without_claiming_strict_boundary(pa
     assert "scope configuration loaded" in header.lower()
     assert "strict boundary enforced" not in header.lower()
 
+
+
+def test_run_page_never_presents_reference_sample_telemetry_as_live_state(page, live_server):
+    page.goto(f"{live_server}/ui-v2/run")
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    main = page.locator("main").inner_text()
+    for sample in (
+        "#WX-8492", "04 Active Replayers", "Nmap 7.94", "Nuclei v3.2.0",
+        "Nikto 2.5.0", "sqlmap 1.8.3", "14 Candidates", "1,489 / 2,050",
+        "142 req/s", "10/10 Enabled", "12 services found", "PID: 28491",
+        "Awaiting Nuclei completion boundary", "whaxon://cli-pipeline",
+        "VULN_CANDIDATE", "184,209", "31 Validated", "Recon: 100% | Enum: 72%",
+        "CVE-2023-38606", "production endpoint candidate",
+    ):
+        assert sample not in main
+    for name in ("View stdout", "Re-run", "Pause", "Abort"):
+        assert page.get_by_role("button", name=name, exact=True).count() == 0
+
+
+def test_run_page_exposes_one_truthful_dispatch_action(page, live_server):
+    page.goto(f"{live_server}/ui-v2/run")
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    assert page.locator("#run-passive-btn").count() == 0
+    run_button = page.locator("#run-active-btn")
+    assert run_button.is_visible()
+    assert "Run Selected Tool" in run_button.inner_text()
+    assert run_button.is_enabled()
