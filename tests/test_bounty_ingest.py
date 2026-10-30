@@ -64,7 +64,14 @@ High
     assert result["policy_draft"]["rate"]["respect_robots_txt"] is True
     assert result["policy_draft"]["tools"]["mode"] == "allowlist"
     assert result["policy_draft"]["tools"]["allowlist"] == []
-    assert result["policy_draft"]["ai_policy"]["allow_live_requests"] is False
+    ai = result["policy_draft"]["ai_policy"]
+    assert ai["mode"] == "bounded_autonomous_after_approval"
+    assert ai["require_human_confirm"] is False
+    assert ai["allow_live_requests"] is False
+    assert "scope_expansion_or_ambiguous_scope" in ai["human_approval_required_for"]
+    assert "draft_report_preparation" in ai["post_approval_autonomous_actions"]
+    assert result["policy_draft"]["authorization_status"] == "pending_review"
+    assert result["policy_draft"]["execution_enabled"] is False
     assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
     assert result["policy_draft"]["account_access"]["vpn_required"] is True
     assert result["review"]["scope.out_of_scope"] == "manual_review_required_not_extracted"
