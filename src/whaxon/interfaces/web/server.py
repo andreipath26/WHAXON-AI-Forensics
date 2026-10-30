@@ -2183,7 +2183,7 @@ def main(args: list[str] | None = None) -> None:
     auth_on = "enabled" if auth_user else "DISABLED"
     print()
     print("  WHAXON web interface")
-    print(f"  → http://{host}:{port}/ui")
+    print(f"  → http://{host}:{port}/ui-v2")
     print(f"  → data directory: {data_dir}")
     print(f"  → authentication: {auth_on}" + (f" (user: {auth_user})" if auth_user else ""))
     print()
