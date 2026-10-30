@@ -203,6 +203,11 @@ def main(args: list[str] | None = None) -> None:
         await asyncio.sleep(0)
         state["primary_job_id"] = state.get("job_id")
         state["primary_findings"] = list(state.get("findings") or [])
+        # Drain on the same live loop so worker events are delivered normally.
+        from whaxon.core.worker import drain_async
+        state["drained_jobs"] = await drain_async(
+            core.store, core.runner, exclude_ids=state.get("pending_before", set())
+        )
         return result
 
 
@@ -225,19 +230,11 @@ def main(args: list[str] | None = None) -> None:
         print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
         sys.exit(EXIT_TOOL_ERROR)
 
-    # Drain jobs queued by the initial run's findings (e.g. nmap -> nikto).
-    # The initial run's event callbacks have been flushed inside _go before its
-    # event loop closes; worker.drain then safely processes the durable queue.
     job_id = state.get("primary_job_id", state.get("job_id"))
     findings = state.get("primary_findings", state.get("findings") or [])
-    try:
-        from whaxon.core.worker import drain
-        drained = drain(core.store, core.runner, exclude_ids=state.get("pending_before", set()))
-        if drained and not quiet:
-            print(f"[run] auto-chain: completed {drained} queued job(s)", file=sys.stderr)
-    except Exception as e:
-        print(f"[run] auto-chain drain failed: {type(e).__name__}: {e}", file=sys.stderr)
-        sys.exit(EXIT_TOOL_ERROR)
+    drained = state.get("drained_jobs", 0)
+    if drained and not quiet:
+        print(f"[run] auto-chain: completed {drained} queued job(s)", file=sys.stderr)
     # Worker events may include other job IDs/findings; keep this command's
     # report attached to the initial tool execution.
     state["job_id"] = job_id
