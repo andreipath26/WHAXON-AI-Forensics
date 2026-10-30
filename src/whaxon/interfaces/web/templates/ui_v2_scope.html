@@ -640,8 +640,10 @@
       if (match) visible += 1;
     });
     const empty = $("scope-empty-state");
-    if (empty) {
-      empty.style.display = !rows.length || visible === 0 ? "" : "none";
+    if (empty && rows.length && visible > 0) {
+      empty.remove();
+    } else if (empty) {
+      empty.style.display = "";
       const cell = empty.querySelector("td");
       if (cell) cell.textContent = rows.length && q
         ? "No scope rules match this filter."
