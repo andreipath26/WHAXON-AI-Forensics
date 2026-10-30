@@ -148,7 +148,7 @@
   },
   "policy": {
     "diagnostics_read_only": true,
-    "automatic_installation_enabled": false,
+    "automatic_installation_enabled": true,
     "network_detection_enabled": false,
     "privilege_escalation_enabled": false,
     "external_version_probes": [
@@ -159,6 +159,9 @@
       "ffuf",
       "netexec",
       "arjun"
+    ],
+    "automatic_installation_kinds": [
+      "python-package"
     ]
   },
   "external_tools": [
