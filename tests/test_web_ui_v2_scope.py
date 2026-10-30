@@ -320,16 +320,26 @@ def test_scope_registry_edits_and_persists_existing_rules(page, live_server):
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=8000,
     )
-    page.once("dialog", lambda dialog: dialog.accept("127.0.0.2"))
-    page.get_by_role("button", name="Edit in scope rule 127.0.0.0/8").click()
+    page.evaluate("""async () => {
+      const scope = await fetch('/api/scope').then(r => r.json());
+      scope.in_scope.push('scope-edit-before.example.com');
+      await fetch('/api/scope', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(scope)});
+    }""")
+    page.reload()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.once("dialog", lambda dialog: dialog.accept("scope-edit-after.example.com"))
+    page.get_by_role("button", name="Edit in scope rule scope-edit-before.example.com").click()
     page.wait_for_function(
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
         timeout=8000,
     )
     scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
-    assert "127.0.0.2" in scope["in_scope"]
-    assert "127.0.0.0/8" not in scope["in_scope"]
-    assert "127.0.0.2" in page.locator("#targetTableBody").inner_text()
+    assert "scope-edit-after.example.com" in scope["in_scope"]
+    assert "scope-edit-before.example.com" not in scope["in_scope"]
+    assert "scope-edit-after.example.com" in page.locator("#targetTableBody").inner_text()
 
 
 def test_scope_registry_removes_rule_after_confirmation(page, live_server):
@@ -338,15 +348,25 @@ def test_scope_registry_removes_rule_after_confirmation(page, live_server):
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=8000,
     )
+    page.evaluate("""async () => {
+      const scope = await fetch('/api/scope').then(r => r.json());
+      scope.in_scope.push('scope-remove-test.example.com');
+      await fetch('/api/scope', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(scope)});
+    }""")
+    page.reload()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
     page.once("dialog", lambda dialog: dialog.accept())
-    page.get_by_role("button", name="Remove in scope rule 127.0.0.0/8").click()
+    page.get_by_role("button", name="Remove in scope rule scope-remove-test.example.com").click()
     page.wait_for_function(
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
         timeout=8000,
     )
     scope = page.evaluate("() => fetch('/api/scope').then(r => r.json())")
-    assert "127.0.0.0/8" not in scope["in_scope"]
-    assert "127.0.0.0/8" not in page.locator("#targetTableBody").inner_text()
+    assert "scope-remove-test.example.com" not in scope["in_scope"]
+    assert "scope-remove-test.example.com" not in page.locator("#targetTableBody").inner_text()
 
 
 def test_scope_registry_shows_empty_state_and_filter_no_match(page, live_server):
