@@ -20,7 +20,7 @@
 <h1 class="font-headline-md text-headline-md text-on-surface tracking-tight font-bold">Scope &amp; Target Definition</h1>
 <span class="px-space-xs py-0.5 rounded bg-primary/10 text-primary border border-primary/30 font-label-sm text-label-sm uppercase tracking-wider">AGPL-3.0-or-later</span>
 </div>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Scope configuration is loading. Wait for the live API status before relying on the displayed rules.</p>
+<p id="scopeIntro" class="font-body-sm text-body-sm text-on-surface-variant">Scope configuration is loading. Wait for the live API status before relying on the displayed rules.</p>
 </div>
 </div>
 <!-- Quick Action Triggers -->
@@ -488,7 +488,7 @@
     if (statusPulse) statusPulse.className = "absolute inline-flex h-full w-full rounded-full " +
       (statusTone === "primary" ? "bg-primary opacity-75 animate-ping" : "bg-" + statusTone + " opacity-0");
     if (statusDot) statusDot.className = "relative inline-flex rounded-full h-2 w-2 bg-" + statusTone;
-    const intro = [...document.querySelectorAll("main p")].find(p => p.textContent.includes("WHAXON checks configured scope before runner actions.") || p.textContent.includes("Zero unauthorized egress"));
+    const intro = $("scopeIntro");
     if (intro) intro.textContent = !enforcementEnabled
       ? "Scope enforcement is disabled. Re-enable it and configure authorized targets before starting assessment runs."
       : !inScopeCount
