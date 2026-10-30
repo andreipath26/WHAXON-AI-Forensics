@@ -9,6 +9,21 @@
 - **URGENT** — do before other queued work
 - **OUT** — explicitly excluded, never built
 
+## Foundational operating principles — five, all mandatory
+
+These principles apply to every WHAXON subsystem that plans or performs consequential work, including dependency readiness, tool execution, validation, autonomous agents, evidence handling and reporting. They are architectural invariants, not optional UX guidance.
+
+1. **Deterministic plans.** The executable plan is produced and checked by deterministic code against versioned policy, manifest, environment and capability constraints. AI may explain or recommend, but cannot silently rewrite the executable plan.
+2. **Explicit, informed consent.** Consequential actions require approval bound to the exact plan, scope, parameters, impact and expiry. A profile, prior approval, UI state or model response is not blanket authorization.
+3. **Bounded execution.** Execution is allowlisted, least-privilege, resource-limited, cancellable and constrained by the approved plan. Any material change invalidates approval and requires a new review.
+4. **Independent verification.** Success is established by a separate verification step and evidence, not by an installer exit code, tool assertion, UI state or agent claim. Unverified outcomes remain explicitly unverified.
+5. **Leave evidence.** Every plan, approval decision, action, verification and recovery must produce an attributable, timestamped, tamper-evident and reviewable audit event. The record must connect what was proposed, what was approved, what actually executed, what was observed, and how the final state was determined. It must record denials, cancellations, failures, exceptions and recovery—not only successful outcomes. Missing or failed audit writes must never be represented as a fully compliant success. Auditability is what makes principles 1–4 enforceable after the fact.
+
+**Evidence-chain requirements:** use stable event/operation/plan identifiers; record actor and approval basis; bind approval to a canonical plan digest and policy/manifest version; capture exact bounded action identity and parameters; record start/end/outcome, timestamps and relevant environment; link verification inputs/results and evidence digests; record recovery decisions and final state. Protect records against silent alteration/deletion, restrict access, redact secrets and minimize personal data. Provide export and integrity-check mechanisms. Do not claim tamper-evidence merely because a file is append-only: use a verifiable hash chain or equivalent integrity mechanism, with an explicit trust anchor and documented limitations.
+
+A capability is DONE only when tests prove the evidence chain is complete across success, rejection, cancellation, timeout, crash/interruption, audit-write failure and recovery paths. A missing event, unverifiable chain, or approval/action mismatch is a release blocker for consequential workflows.
+
+
 ## Repository reality check — 2026-10-25 (reconciled against source tree)
 
 This section supersedes stale progress estimates and any older status statements below where they conflict. It is a repository inspection, not a claim that every capability has passed end-to-end acceptance testing.
