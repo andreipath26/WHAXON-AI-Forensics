@@ -122,6 +122,84 @@
       "capabilities": [
         "metasploit"
       ]
+    },
+    {
+      "id": "textual-image",
+      "name": "Textual Image",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "0.8",
+      "import_name": "textual_image",
+      "extra": "tui",
+      "capabilities": [
+        "tui",
+        "image-preview"
+      ]
+    },
+    {
+      "id": "gunicorn",
+      "name": "Gunicorn",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "21",
+      "import_name": "gunicorn",
+      "extra": "web",
+      "capabilities": [
+        "web",
+        "production-server"
+      ]
+    },
+    {
+      "id": "waitress",
+      "name": "Waitress",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "3.0",
+      "import_name": "waitress",
+      "extra": "web",
+      "capabilities": [
+        "web",
+        "production-server"
+      ]
+    },
+    {
+      "id": "bcrypt",
+      "name": "bcrypt",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "4.0",
+      "import_name": "bcrypt",
+      "extra": "web",
+      "capabilities": [
+        "web",
+        "authentication"
+      ]
+    },
+    {
+      "id": "flask-limiter",
+      "name": "Flask-Limiter",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "3.5",
+      "import_name": "flask_limiter",
+      "extra": "web",
+      "capabilities": [
+        "web",
+        "rate-limiting"
+      ]
+    },
+    {
+      "id": "markdown",
+      "name": "Markdown",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "3.5",
+      "import_name": "markdown",
+      "extra": "web",
+      "capabilities": [
+        "web",
+        "report-rendering"
+      ]
     }
   ],
   "profiles": {
@@ -133,14 +211,20 @@
     ],
     "tui": [
       "textual",
-      "rich"
+      "rich",
+      "textual-image"
     ],
     "gui": [
       "PySide6",
       "qasync"
     ],
     "web": [
-      "flask"
+      "flask",
+      "gunicorn",
+      "waitress",
+      "bcrypt",
+      "flask-limiter",
+      "markdown"
     ],
     "metasploit": [
       "pymetasploit3"
