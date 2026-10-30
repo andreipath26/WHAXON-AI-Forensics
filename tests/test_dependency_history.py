@@ -43,6 +43,8 @@ def test_snapshot_round_trip_and_private_permissions(tmp_path):
     assert payload["schema_version"] == 1
     assert len(read_snapshots(tmp_path)) == 1
     assert "cwd" not in path.read_text()
+    assert "/private/user/path" not in path.read_text()
+    assert "/venv/bin/python" not in path.read_text()
     assert path.stat().st_mode & 0o077 == 0
 
 
