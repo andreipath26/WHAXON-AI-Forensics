@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
-import tomllib
 import subprocess
+import tomllib
 
-from whaxon.core.dependencies import collect_dependency_report
+from whaxon.core.dependencies import collect_dependency_report, load_dependency_manifest
 
 
 def test_dependency_report_is_read_only_and_versioned():
