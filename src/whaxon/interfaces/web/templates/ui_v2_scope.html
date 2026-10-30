@@ -540,9 +540,30 @@
   $("openImportDrawerBtn")?.addEventListener("click", event =>
     openDialog(drawer, event.currentTarget, "textarea"));
   document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && [modal, drawer].some(dialog => dialog && !dialog.classList.contains("hidden"))) {
+    const activeDialog = [modal, drawer].find(dialog => dialog && !dialog.classList.contains("hidden"));
+    if (!activeDialog) return;
+    if (event.key === "Escape") {
       event.preventDefault();
       close();
+      return;
+    }
+    if (event.key === "Tab") {
+      const focusable = [...activeDialog.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )].filter(element => element.getClientRects().length > 0);
+      if (!focusable.length) {
+        event.preventDefault();
+        activeDialog.focus();
+        return;
+      }
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !activeDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !activeDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   });
   $("targetFilterInput")?.addEventListener("input", event => {

@@ -167,6 +167,12 @@ def test_scope_dialogs_support_escape_and_restore_focus(page, live_server):
     page.keyboard.press("Escape")
     assert page.locator("#targetModal").is_hidden()
     assert target_trigger.evaluate("(el) => el === document.activeElement")
+    page.keyboard.press("Enter")
+    page.keyboard.press("Tab")
+    assert page.locator("#closeTargetModalBtn").evaluate("(el) => el === document.activeElement")
+    page.keyboard.press("Shift+Tab")
+    assert page.locator("#saveTargetBtn").evaluate("(el) => el === document.activeElement")
+    page.keyboard.press("Escape")
 
     import_trigger = page.locator("#openImportDrawerBtn")
     import_trigger.click()
