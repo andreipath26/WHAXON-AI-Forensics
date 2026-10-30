@@ -152,7 +152,7 @@
 </div>
 <div class="flex items-center gap-space-xs">
 <span class="h-2 w-2 rounded-full bg-primary"></span>
-<span class="font-label-sm text-label-sm text-primary uppercase font-bold">PRE-FLIGHT PASSED</span>
+<span id="scopePreflightStatus" class="font-label-sm text-label-sm text-outline uppercase font-bold" role="status" aria-live="polite">NO CHECK RUN</span>
 </div>
 </div>
 <div class="bg-background rounded p-space-md font-code-sm text-code-sm text-on-surface-variant flex flex-col gap-1 border border-outline-variant/20 overflow-x-auto">
@@ -681,7 +681,9 @@
     const target = $("scopeCheckTarget")?.value.trim();
     const result = $("scopeCheckResult");
     if (!target) { if (result) result.textContent = "Enter a target to check."; return; }
+    const preflight = $("scopePreflightStatus");
     if (result) result.textContent = "Checking target against live scope…";
+    if (preflight) { preflight.textContent = "CHECKING…"; preflight.className = "font-label-sm text-label-sm text-secondary uppercase font-bold"; }
     try {
       const verdict = await api("/api/scope/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({target})});
       if (result) {
@@ -690,8 +692,13 @@
           (verdict.matched_rule ? " · Rule: " + verdict.matched_rule : "");
         result.className = verdict.allowed ? "text-primary font-semibold" : "text-error font-semibold";
       }
+      if (preflight) {
+        preflight.textContent = verdict.allowed ? "LAST CHECK: ALLOWED" : "LAST CHECK: BLOCKED";
+        preflight.className = "font-label-sm text-label-sm uppercase font-bold " + (verdict.allowed ? "text-primary" : "text-error");
+      }
     } catch (error) {
       if (result) { result.textContent = "Scope check failed: " + error.message; result.className = "text-error"; }
+      if (preflight) { preflight.textContent = "CHECK ERROR"; preflight.className = "font-label-sm text-label-sm text-error uppercase font-bold"; }
     }
   });
   $("scopeCheckTarget")?.addEventListener("keydown", event => {
