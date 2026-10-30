@@ -37,15 +37,37 @@ def _redact(value: str, limit: int = 12000) -> str:
 
 
 def _audit_path() -> Path:
-    return Path.home() / ".whaxon" / "audit" / "dependency-install.jsonl"
+    root = Path.home() / ".whaxon"
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if root.is_symlink():
+        raise OSError("WHAXON audit root must not be a symlink")
+    audit_dir = root / "audit"
+    audit_dir.mkdir(mode=0o700, exist_ok=True)
+    if audit_dir.is_symlink() or not audit_dir.resolve().is_relative_to(root.resolve()):
+        raise OSError("WHAXON audit directory is unsafe")
+    path = audit_dir / "dependency-install.jsonl"
+    if path.is_symlink():
+        raise OSError("WHAXON audit log must not be a symlink")
+    return path
 
 
 def _append_audit(record: dict[str, Any]) -> None:
     path = _audit_path()
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o600)
-    with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
-        stream.write(json.dumps(record, sort_keys=True) + "\n")
+    flags = os.O_APPEND | os.O_CREAT | os.O_WRONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags, 0o600)
+    try:
+        if hasattr(os, "fchmod"):
+            os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
+            descriptor = -1
+            stream.write(json.dumps(record, sort_keys=True) + "\\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
 
 
 def _finish_audit(result: dict[str, Any]) -> dict[str, Any]:
