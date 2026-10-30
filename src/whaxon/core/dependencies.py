@@ -87,9 +87,9 @@ def _version_tuple(value: str) -> tuple[int, ...]:
     digits as one numeric component.
     """
     match = re.fullmatch(
-        r"\\s*(?:[0-9]+!)?(\\d+(?:\\.\\d+)*)"
-        r"(?:[-_.]?(a|alpha|b|beta|rc|pre|preview|dev|post)[-_.]?(\\d*)?)?"
-        r"(?:\\+[a-zA-Z0-9.-]+)?\\s*",
+        r"\s*(?:[0-9]+!)?(\\d+(?:\.\d+)*)"
+        r"(?:[-_.]?(a|alpha|b|beta|rc|pre|preview|dev|post)[-_.]?(\d*)?)?"
+        r"(?:\+[a-zA-Z0-9.-]+)?\s*",
         value,
         re.IGNORECASE,
     )
