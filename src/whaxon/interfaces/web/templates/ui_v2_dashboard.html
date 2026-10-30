@@ -562,9 +562,12 @@
       fetch("/api/status").then(r => { if (!r.ok) throw new Error("Status HTTP " + r.status); return r.json(); }),
       fetch("/api/health/simple").then(r => { if (!r.ok) throw new Error("Health HTTP " + r.status); return r.json(); })
     ]);
-    const jobs = historyResult.status === "fulfilled" && Array.isArray(historyResult.value) ? historyResult.value : [];
-    const report = reportResult.status === "fulfilled" ? reportResult.value : {};
-    const tools = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value) ? toolsResult.value : [];
+    const historyAvailable = historyResult.status === "fulfilled" && Array.isArray(historyResult.value);
+    const jobs = historyAvailable ? historyResult.value : [];
+    const reportAvailable = reportResult.status === "fulfilled" && reportResult.value && typeof reportResult.value === "object" && Array.isArray(reportResult.value.jobs);
+    const report = reportAvailable ? reportResult.value : {};
+    const toolsAvailable = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value);
+    const tools = toolsAvailable ? toolsResult.value : [];
     const scopeAvailable = scopeResult.status === "fulfilled";
     const scope = scopeAvailable ? scopeResult.value : {};
     const liveStatus = statusResult.status === "fulfilled" ? statusResult.value : {};
@@ -574,9 +577,9 @@
     const verified = findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length;
     const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
     const availableTools = tools.filter(t => t.available && t.adapter_available && t.binary_available).length;
-    setCardValue("Active Scans", active, active ? "RUNNING" : "NO ACTIVE JOBS");
-    setCardValue("Verified Findings", verified, falsePositives + " FALSE POSITIVES");
-    setCardValue("Active Adapters", availableTools, "TOOLS AVAILABLE");
+    setCardValue("Active Scans", historyAvailable ? active : "—", historyAvailable ? (active ? "RUNNING" : "NO ACTIVE JOBS") : "STATUS UNAVAILABLE");
+    setCardValue("Verified Findings", reportAvailable ? verified : "—", reportAvailable ? (falsePositives + " FALSE POSITIVES") : "STATUS UNAVAILABLE");
+    setCardValue("Active Adapters", toolsAvailable ? availableTools : "—", toolsAvailable ? "TOOLS AVAILABLE" : "STATUS UNAVAILABLE");
     setCardValue("PTES Coverage", "—", "NOT RECORDED");
     const target = scopeAvailable ? (scope.in_scope?.[0] || "No target configured") : "unavailable";
     document.querySelectorAll("header span, header div").forEach(n => {
@@ -636,9 +639,10 @@
     const body = table?.querySelector("tbody");
     if (body) {
       body.replaceChildren();
-      if (!jobs.length) {
+      if (!historyAvailable || !jobs.length) {
         const row = document.createElement("tr");
-        const cell = td(row, "No job history has been recorded yet.", "px-space-md py-space-lg text-center text-on-surface-variant font-code-sm");
+        const message = historyAvailable ? "No job history has been recorded yet." : "Live job history is unavailable. Check the server connection and try again.";
+        const cell = td(row, message, "px-space-md py-space-lg text-center text-on-surface-variant font-code-sm");
         cell.colSpan = 7;
         body.appendChild(row);
       } else {
@@ -801,7 +805,7 @@
       const label = buttonLabel(button);
       if (button.dataset.dashboardWired === "true") return;
       let handler = null;
-      if (button.dataset.dashboardAction === "scope" || label.startsWith("No active engagement") || /^(New|Switch Target Session|Start New Engagement|Open Scope Setup|Continue Setup)$/.test(label)) {
+      if (button.dataset.dashboardAction === "scope" || label.startsWith("No active engagement") || /^(New|add New|Switch Target Session|Start New Engagement|Open Scope Setup|Continue Setup)$/.test(label)) {
         handler = () => route("/ui-v2/scope");
       } else if (label === "Terminal Log") {
         handler = () => route("/ui-v2/run");
