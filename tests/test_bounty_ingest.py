@@ -71,7 +71,7 @@ High
     assert ai["allow_live_requests"] is False
     assert "scope_expansion_or_ambiguous_scope" in ai["human_approval_required_for"]
     assert "draft_report_preparation" in ai["post_approval_autonomous_actions"]
-    assert ai["activation"] == "pending_review"
+    assert ai["activation"] == "disabled_until_program_approval"
     assert ai["execution_enabled"] is False
     validate_policy(result["policy_draft"])
     assert result["policy_draft"]["hunting_requirements"]["disclosure_allowed"] is False
