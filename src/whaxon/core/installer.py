@@ -25,7 +25,7 @@ from whaxon.core.remediation import build_remediation_plan
 INSTALL_TIMEOUT_SECONDS = 900
 _SECRET_PATTERNS = (
     re.compile(r"(?i)(token|password|secret|api[_-]?key)(\s*[:=]\s*)[^\s,;]+"),
-    re.compile(r"(?i)bearer\s+[A-Za-z0-9._~+/=-]+"),
+    re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+"),
 )
 
 
