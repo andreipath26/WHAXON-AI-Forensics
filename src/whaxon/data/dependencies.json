@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "dependencies": [
+    {
+      "id": "python",
+      "name": "Python",
+      "kind": "runtime",
+      "required": true,
+      "minimum_version": "3.11",
+      "capabilities": [
+        "core",
+        "cli",
+        "web",
+        "tui",
+        "gui"
+      ],
+      "detection": "runtime"
+    },
+    {
+      "id": "platformdirs",
+      "name": "platformdirs",
+      "kind": "python-package",
+      "required": true,
+      "minimum_version": "4.0",
+      "import_name": "platformdirs",
+      "capabilities": [
+        "core"
+      ]
+    },
+    {
+      "id": "dnspython",
+      "name": "dnspython",
+      "kind": "python-package",
+      "required": true,
+      "minimum_version": "2.6",
+      "import_name": "dns",
+      "capabilities": [
+        "core",
+        "dns-recon"
+      ]
+    },
+    {
+      "id": "defusedxml",
+      "name": "defusedxml",
+      "kind": "python-package",
+      "required": true,
+      "minimum_version": "0.7.1",
+      "import_name": "defusedxml",
+      "capabilities": [
+        "core",
+        "xml-import"
+      ]
+    },
+    {
+      "id": "textual",
+      "name": "Textual",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "0.80",
+      "import_name": "textual",
+      "extra": "tui",
+      "capabilities": [
+        "tui"
+      ]
+    },
+    {
+      "id": "rich",
+      "name": "Rich",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "13",
+      "import_name": "rich",
+      "extra": "tui",
+      "capabilities": [
+        "tui"
+      ]
+    },
+    {
+      "id": "PySide6",
+      "name": "PySide6",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "6.7",
+      "import_name": "PySide6",
+      "extra": "gui",
+      "capabilities": [
+        "gui"
+      ]
+    },
+    {
+      "id": "qasync",
+      "name": "qasync",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "0.27",
+      "import_name": "qasync",
+      "extra": "gui",
+      "capabilities": [
+        "gui"
+      ]
+    },
+    {
+      "id": "flask",
+      "name": "Flask",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "3.0",
+      "import_name": "flask",
+      "extra": "web",
+      "capabilities": [
+        "web"
+      ]
+    },
+    {
+      "id": "pymetasploit3",
+      "name": "pymetasploit3",
+      "kind": "python-package",
+      "required": false,
+      "minimum_version": "2.0",
+      "import_name": "pymetasploit3",
+      "extra": "metasploit",
+      "capabilities": [
+        "metasploit"
+      ]
+    }
+  ],
+  "profiles": {
+    "core": [
+      "python",
+      "platformdirs",
+      "dnspython",
+      "defusedxml"
+    ],
+    "tui": [
+      "textual",
+      "rich"
+    ],
+    "gui": [
+      "PySide6",
+      "qasync"
+    ],
+    "web": [
+      "flask"
+    ],
+    "metasploit": [
+      "pymetasploit3"
+    ]
+  },
+  "policy": {
+    "diagnostics_read_only": true,
+    "automatic_installation_enabled": false,
+    "network_detection_enabled": false,
+    "privilege_escalation_enabled": false
+  }
+}
