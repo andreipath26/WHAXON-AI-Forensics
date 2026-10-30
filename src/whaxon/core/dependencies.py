@@ -102,7 +102,8 @@ def _environment() -> dict[str, Any]:
 
 
 def collect_dependency_report(*, data_dir: Path | None = None,
-                               include_optional: bool = True) -> dict[str, Any]:
+                               include_optional: bool = True,
+                               include_external: bool = True) -> dict[str, Any]:
     """Return a deterministic, read-only report; no install or network actions."""
     results: list[DependencyResult] = []
     if sys.version_info < (3, 11):
@@ -132,18 +133,18 @@ def collect_dependency_report(*, data_dir: Path | None = None,
     except (OSError, ValueError, TypeError, KeyError) as exc:
         results.append(DependencyResult(
             "dependency-manifest", "Dependency manifest", "resource", True, "BROKEN",
-            reason=manifest_error,
+            reason=f"Dependency manifest unavailable or invalid ({type(exc).__name__}).",
             remediation="Restore a valid packaged dependencies.json manifest.",
         ))
 
     catalog_path = (Path(data_dir) / "tools.json") if data_dir else (
         Path(__file__).resolve().parents[1] / "data" / "tools.json"
     )
-    if not catalog_path.is_file():
+    if include_external and not catalog_path.is_file():
         packaged_catalog = Path(__file__).resolve().parents[1] / "data" / "tools.json"
         if packaged_catalog.is_file():
             catalog_path = packaged_catalog
-    if catalog_path.is_file():
+    if include_external and catalog_path.is_file():
         try:
             raw = json.loads(catalog_path.read_text(encoding="utf-8"))
             for tool in raw.get("tools", []):
@@ -169,7 +170,7 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 "tool-catalog", "Tool catalog", "resource", True, "BROKEN",
                 reason=f"Could not read tool catalog ({type(exc).__name__}).",
             ))
-    else:
+    elif include_external:
         results.append(DependencyResult(
             "tool-catalog", "Tool catalog", "resource", True, "MISSING",
             reason=f"Tool catalog not found at {catalog_path}.",
