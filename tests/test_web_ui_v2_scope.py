@@ -448,3 +448,28 @@ def test_scope_api_failure_does_not_claim_configuration_is_loaded(page, live_ser
     assert "Waiting for scope configuration" in page.locator("main").inner_text()
     assert "bg-outline" in page.locator("#scopeStatusDot").get_attribute("class")
     assert "Scope configuration is loading" in page.locator("main").inner_text()
+
+
+def test_scope_copy_cli_quotes_wildcard_target_for_shell(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"engagement":"wildcard-copy-test","enabled":true,"in_scope":["*.example.com"],"out_of_scope":[],"notes":""}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.evaluate("""() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {writeText: async value => { window.__copiedScopeCommand = value; }}
+      });
+    }""")
+    page.locator("#copyCliBtn").click()
+    page.wait_for_function("() => Boolean(window.__copiedScopeCommand)")
+    assert page.evaluate("() => window.__copiedScopeCommand") == "whaxon scope --check '*.example.com'"
