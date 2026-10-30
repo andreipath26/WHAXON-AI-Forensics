@@ -65,8 +65,19 @@ def test_plan_honors_disabled_automatic_install_policy(monkeypatch):
             },
         },
     )
+    monkeypatch.setattr(
+        remediation,
+        "collect_dependency_report",
+        lambda **kwargs: {
+            "environment": {"os": "Linux", "python": "3.12.0"},
+            "overall_status": "DEGRADED",
+            "dependencies": [{
+                "id": "pymetasploit3",
+                "status": "MISSING",
+                "remediation": "Install the documented extra.",
+            }],
+        },
+    )
     plan = build_remediation_plan(dependency_ids=["pymetasploit3"])
-    if not plan["actions"]:
-        return
     option = plan["actions"][0]["options"][0]
     assert option["automated_execution_supported"] is False
