@@ -149,6 +149,28 @@ def _request(url: str) -> tuple[bytes, str, str]:
     raise IngestionError("Redirect limit reached")
 
 
+def _source_evidence(source_text: str, draft: dict) -> list[dict]:
+    lines = source_text.splitlines()
+    evidence: list[dict] = []
+    for entry in (draft.get("scope") or {}).get("in_scope", []):
+        value = str(entry.get("scope") or "") if isinstance(entry, dict) else str(entry)
+        for number, line in enumerate(lines, 1):
+            if value and value in line:
+                evidence.append({"field": "scope.in_scope", "value": value,
+                                 "line": number, "excerpt": line.strip()[:500]})
+                break
+    terms = ("out of scope", "excluded", "not allowed", "forbidden", "must ",
+             "do not", "rate limit", "requests per", "automated scanner",
+             "disclosure", "report", "authentication", "vpn", "user-agent",
+             "proof of", "bounty eligible", "first reporter")
+    for number, line in enumerate(lines, 1):
+        if any(term in line.lower() for term in terms):
+            excerpt = line.strip()[:500]
+            if excerpt and not any(item["line"] == number for item in evidence):
+                evidence.append({"field": "program_rule", "value": None,
+                                 "line": number, "excerpt": excerpt})
+    return evidence
+
 def _harden_draft(draft: dict, source_url: str) -> None:
     """Replace parser guesses with conservative values until a human confirms them."""
     draft["program_url"] = source_url
@@ -192,9 +214,11 @@ def ingest_yeswehack_url(url: str) -> dict:
     slug = slug_match.group(1).lower() if slug_match else ""
     draft = parse_yeswehack(source_text, slug=slug)
     _harden_draft(draft, final_url)
+    evidence = _source_evidence(source_text, draft)
     return {
         "status": "draft_requires_review",
         "policy_draft": draft,
+        "evidence": evidence,
         "source": {
             "url": final_url,
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
@@ -223,10 +247,12 @@ def ingest_yeswehack_text(text: str, source_url: str = "") -> dict:
         _validated_url(source_url)
     draft = parse_yeswehack(text)
     _harden_draft(draft, source_url)
+    evidence = _source_evidence(text, draft)
     raw = text.encode("utf-8")
     return {
         "status": "draft_requires_review",
         "policy_draft": draft,
+        "evidence": evidence,
         "source": {
             "url": source_url,
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
