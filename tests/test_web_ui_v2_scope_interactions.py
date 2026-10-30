@@ -333,3 +333,20 @@ def test_scope_import_requires_confirmation_before_disabling_enforcement(page, l
         assert _read_scope(page)["enabled"] is False
     finally:
         _save_scope(page, before)
+
+
+def test_scope_preflight_verdict_is_cleared_when_checked_target_changes(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    target = page.locator("#scopeCheckTarget")
+    target.fill("127.0.0.1")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopePreflightStatus')?.textContent === 'LAST CHECK: ALLOWED'",
+        timeout=5000,
+    )
+    assert "127.0.0.1" in page.locator("#scopeCheckResult").inner_text()
+    target.fill("127.0.0.2")
+    assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
+    assert "bg-outline" in page.locator("#scopePreflightIndicator").get_attribute("class")
+    assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
