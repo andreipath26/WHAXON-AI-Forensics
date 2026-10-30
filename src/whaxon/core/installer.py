@@ -117,6 +117,16 @@ def apply_approved_dependency_plan(
         "shell": False,
     }
     _append_audit({**base, "status": "STARTED"})
+    if cancel_requested and cancel_requested():
+        result = {
+            **base,
+            "status": "CANCELLED",
+            "exit_code": None,
+            "output": "Installation was cancelled before the package manager started.",
+            "recovery": "No package-manager command was started. Re-run doctor and create a new plan if needed.",
+            "finished_at": datetime.now(UTC).isoformat(),
+        }
+        return _finish_audit(result)
     if progress_callback:
         progress_callback("INSTALLING", "Installing the approved Python package.")
     try:
@@ -129,6 +139,7 @@ def apply_approved_dependency_plan(
             text=True,
         )
         started_monotonic = time.monotonic()
+        last_progress = started_monotonic
         while True:
             if cancel_requested and cancel_requested():
                 process.terminate()
@@ -148,6 +159,9 @@ def apply_approved_dependency_plan(
                 result = _finish_audit(result)
                 return result
             elapsed = time.monotonic() - started_monotonic
+            if progress_callback and elapsed - last_progress >= 5:
+                progress_callback("INSTALLING", f"Package manager running for {int(elapsed)} seconds.")
+                last_progress = elapsed
             if elapsed >= INSTALL_TIMEOUT_SECONDS:
                 process.terminate()
                 try:
