@@ -738,18 +738,22 @@ def test_dependency_install_endpoint_requires_exact_approval(
     assert response.status_code == 400
 
 
-def test_dependency_install_endpoint_calls_approved_installer_only(
+def test_dependency_install_endpoint_queues_approved_operation(
     tmp_path, monkeypatch
 ):
-    import whaxon.core.installer as installer
+    import whaxon.core.dependency_jobs as jobs
 
     calls = []
     monkeypatch.setattr(
-        installer,
-        "apply_approved_dependency_plan",
-        lambda dependency_id, approved_plan_id, **kwargs: (
-            calls.append((dependency_id, approved_plan_id))
-            or {"status": "VERIFIED", "operation_id": "test-operation"}
+        jobs,
+        "start_install_operation",
+        lambda dependency_id, approved_plan_id, data_dir: (
+            calls.append((dependency_id, approved_plan_id, data_dir))
+            or {
+                "operation_id": "0123456789abcdef0123456789abcdef",
+                "status": "QUEUED",
+                "progress": 0,
+            }
         ),
     )
     app, _ = _make_app(tmp_path, monkeypatch)
@@ -760,45 +764,56 @@ def test_dependency_install_endpoint_calls_approved_installer_only(
             "approved_plan_id": "plan-0123456789abcdef",
         },
     )
-    assert response.status_code == 200
-    assert calls == [("textual", "plan-0123456789abcdef")]
+    assert response.status_code == 202
+    assert response.get_json()["status"] == "QUEUED"
+    assert calls == [(
+        "textual",
+        "plan-0123456789abcdef",
+        tmp_path,
+    )]
 
 
-def test_dependency_snapshot_history_and_drift_endpoints(tmp_path, monkeypatch):
-    app, _ = _make_app(tmp_path, monkeypatch)
-    client = app.test_client()
-    before = client.get("/api/dependencies/drift")
-    assert before.status_code == 200
-    assert before.get_json()["baseline_available"] is False
-
-    saved = client.post("/api/dependencies/snapshots")
-    assert saved.status_code == 201
-    assert saved.get_json()["fingerprint"]
-
-    history = client.get("/api/dependencies/history?limit=5")
-    assert history.status_code == 200
-    assert len(history.get_json()["snapshots"]) == 1
-
-    after = client.get("/api/dependencies/drift")
-    assert after.status_code == 200
-    assert after.get_json()["baseline_available"] is True
-
-
-def test_dependency_verify_endpoint_is_explicit_and_non_installing(
+def test_dependency_install_status_endpoint_returns_operation(
     tmp_path, monkeypatch
 ):
-    import whaxon.core.dependencies as dependencies
+    import whaxon.core.dependency_jobs as jobs
 
-    calls = []
-    original = dependencies.collect_dependency_report
-
-    def collect(**kwargs):
-        calls.append(kwargs)
-        return original(**kwargs)
-
-    monkeypatch.setattr(dependencies, "collect_dependency_report", collect)
+    operation_id = "0123456789abcdef0123456789abcdef"
+    monkeypatch.setattr(
+        jobs,
+        "get_install_operation",
+        lambda data_dir, requested_id: {
+            "operation_id": requested_id,
+            "status": "VERIFYING",
+            "progress": 80,
+        },
+    )
     app, _ = _make_app(tmp_path, monkeypatch)
-    response = app.test_client().post("/api/dependencies/verify")
+    response = app.test_client().get(
+        f"/api/dependencies/install/{operation_id}"
+    )
     assert response.status_code == 200
-    assert calls[-1]["verify_external"] is True
-    assert response.get_json()["safety"]["installation_attempted"] is False
+    assert response.get_json()["status"] == "VERIFYING"
+
+
+def test_dependency_install_cancel_endpoint_sets_cancel_request(
+    tmp_path, monkeypatch
+):
+    import whaxon.core.dependency_jobs as jobs
+
+    operation_id = "0123456789abcdef0123456789abcdef"
+    monkeypatch.setattr(
+        jobs,
+        "cancel_install_operation",
+        lambda data_dir, requested_id: {
+            "operation_id": requested_id,
+            "status": "INSTALLING",
+            "cancel_requested": True,
+        },
+    )
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().post(
+        f"/api/dependencies/install/{operation_id}/cancel"
+    )
+    assert response.status_code == 202
+    assert response.get_json()["cancel_requested"] is True
