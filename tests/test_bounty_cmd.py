@@ -98,7 +98,6 @@ def test_run_refuses_tool_missing_from_allowlist(tmp_path: Path, monkeypatch, ca
 def test_run_allows_only_tools_in_allowlist(tmp_path: Path, monkeypatch, capsys) -> None:
     _init(tmp_path, monkeypatch)
     path = tmp_path / "programs" / "moneybox.json"
-    import json
     policy = json.loads(path.read_text(encoding="utf-8"))
     policy["tools"] = {"mode": "allowlist", "allowlist": ["curl"], "denylist": []}
     path.write_text(json.dumps(policy), encoding="utf-8")
