@@ -11,7 +11,7 @@ import ipaddress
 import re
 import socket
 import ssl
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
@@ -223,7 +223,7 @@ def ingest_yeswehack_url(url: str) -> dict:
         "evidence": evidence,
         "source": {
             "url": final_url,
-            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "retrieved_at": datetime.now(UTC).isoformat(),
             "content_sha256": hashlib.sha256(body).hexdigest(),
             "content_type": content_type,
             "parser": "yeswehack",
