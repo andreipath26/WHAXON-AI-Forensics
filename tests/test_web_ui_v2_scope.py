@@ -397,3 +397,21 @@ def test_scope_registry_filter_reports_no_matching_rules(page, live_server):
     page.locator("#targetFilterInput").fill("")
     assert page.locator("#scope-empty-state").count() == 0
     assert page.locator("#targetTableBody tr").count() >= 1
+
+def test_scope_copy_cli_generates_a_valid_whaxon_scope_command(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000,
+    )
+    page.evaluate("""() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: {writeText: async value => { window.__copiedScopeCommand = value; }}
+      });
+    }""")
+    page.locator("#copyCliBtn").click()
+    page.wait_for_function("() => Boolean(window.__copiedScopeCommand)")
+    command = page.evaluate("() => window.__copiedScopeCommand")
+    assert command.startswith("whaxon scope --check ")
+    assert "--target" not in command
