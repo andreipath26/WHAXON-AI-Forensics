@@ -404,7 +404,7 @@ def test_dashboard_all_visible_enabled_buttons_have_real_actions_and_names(page,
 def test_dashboard_mobile_layout_has_no_horizontal_page_overflow(page, live_server):
     page.set_viewport_size({"width": 390, "height": 844})
     page.goto(f"{live_server}/ui-v2")
-    page.wait_for_selector(".dashboard-mobile-menu")
+    page.wait_for_selector(".dashboard-mobile-menu", state="attached")
     assert page.evaluate(
         "() => document.documentElement.scrollWidth <= window.innerWidth"
     )
