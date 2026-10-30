@@ -82,6 +82,27 @@ def get_install_operation(data_dir: Path, operation_id: str) -> dict[str, Any] |
 
 def _claim_dependency_lock(operations: Path, dependency_id: str, operation_id: str) -> Path:
     lock_path = operations / f"{dependency_id}.lock"
+    if lock_path.exists():
+        try:
+            previous_id = lock_path.read_text(encoding="utf-8").strip()
+            previous_path = operations / f"{previous_id}.json"
+            previous = json.loads(previous_path.read_text(encoding="utf-8"))
+            updated = datetime.fromisoformat(previous["updated_at"])
+            stale = (datetime.now(UTC) - updated).total_seconds() > 90
+            terminal = previous.get("status") not in {"QUEUED", "INSTALLING", "VERIFYING"}
+            if stale and not terminal:
+                previous.update({
+                    "status": "INTERRUPTED",
+                    "step": "INTERRUPTED",
+                    "message": "The worker stopped updating this operation; its package state must be re-checked.",
+                    "updated_at": _now(),
+                })
+                _write_state(previous_path, previous)
+            if terminal or stale:
+                lock_path.unlink(missing_ok=True)
+        except (OSError, KeyError, ValueError, json.JSONDecodeError):
+            # An unreadable lock is not safe to steal automatically.
+            pass
     try:
         descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError as exc:
