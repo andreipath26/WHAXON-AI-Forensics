@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -77,7 +77,7 @@ def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) ->
         "https://pypi.org/simple", requirement,
     ]
     operation_id = str(uuid.uuid4())
-    started = datetime.now(timezone.utc).isoformat()
+    started = datetime.now(UTC).isoformat()
     base = {
         "schema_version": 1,
         "operation_id": operation_id,
