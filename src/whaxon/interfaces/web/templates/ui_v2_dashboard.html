@@ -184,7 +184,7 @@
 <div class="mt-space-lg pt-space-md flex items-center justify-between">
 <span class="font-label-sm text-label-sm text-outline">EST. TIME: ~3 MIN</span>
 <button class="flex items-center gap-space-xs rounded bg-primary px-space-md py-1.5 font-code-sm text-code-sm text-on-primary font-semibold hover:bg-primary-fixed-dim transition-colors" type="button">
-<span>Launch Wizard</span>
+<span>Open Scope Setup</span>
 <span class="material-symbols-outlined text-xs">arrow_forward</span>
 </button>
 </div>
@@ -742,7 +742,7 @@
       const label = buttonLabel(button);
       if (button.dataset.dashboardWired === "true") return;
       let handler = null;
-      if (button.dataset.dashboardAction === "scope" || label.startsWith("No active engagement") || /^(New|Switch Target Session|Start New Engagement|Launch Wizard|Continue Setup)$/.test(label)) {
+      if (button.dataset.dashboardAction === "scope" || label.startsWith("No active engagement") || /^(New|Switch Target Session|Start New Engagement|Open Scope Setup|Continue Setup)$/.test(label)) {
         handler = () => route("/ui-v2/scope");
       } else if (label === "Terminal Log") {
         handler = () => route("/ui-v2/run");
