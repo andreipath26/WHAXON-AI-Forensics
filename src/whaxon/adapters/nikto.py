@@ -27,6 +27,9 @@ _NOISE_PREFIXES = (
 # Path extraction: "+ /path: message" or "+ OSVDB-1234: /path: message"
 _PATH_RE = re.compile(r"(?P<path>/[A-Za-z0-9_\-./]*[A-Za-z0-9_\-/])")
 _OSVDB_RE = re.compile(r"OSVDB-(\d+)")
+_NIKTO_ID_RE = re.compile(r"^\[(?P<id>\d+)\]\s*")
+_SEE_RE = re.compile(r"\s+See:\s*<?(?P<url>https?://[^\s)>]+)>?\s*$", re.IGNORECASE)
+_URL_RE = re.compile(r"https?://[^\s)>]+", re.IGNORECASE)
 
 
 # (pattern, severity, cwe, cvss, remediation, impact)
