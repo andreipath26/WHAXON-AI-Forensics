@@ -58,9 +58,21 @@ High
     assert result["status"] == "draft_requires_review"
     assert result["source"]["content_sha256"]
     assert result["source"]["parser_version"] == bounty_ingest.PARSER_VERSION
+    assert result["evidence"]
+    assert result["policy_draft"]["rate"]["max_requests_per_second"] == 0
+    assert result["policy_draft"]["rate"]["max_concurrent_connections"] == 0
+    assert result["policy_draft"]["rate"]["respect_robots_txt"] is True
+    assert result["policy_draft"]["tools"]["mode"] == "allowlist"
+    assert result["policy_draft"]["tools"]["allowlist"] == []
+    assert result["policy_draft"]["ai_policy"]["allow_live_requests"] is False
     assert result["policy_draft"]["slug"] == "example-program"
     assert any("not proof of authorization" in item for item in result["warnings"])
     assert "saved" in result["warnings"][-1]
+
+
+def test_malformed_url_is_rejected_cleanly():
+    with pytest.raises(bounty_ingest.IngestionError, match="Malformed"):
+        bounty_ingest._validated_url("https://[not-an-ip]/programs/test")
 
 
 def test_pasted_text_size_limit_is_enforced():
