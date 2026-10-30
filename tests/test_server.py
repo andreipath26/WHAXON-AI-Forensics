@@ -124,6 +124,21 @@ def test_history_returns_finished_jobs(tmp_path, monkeypatch):
     data = r.get_json()
     ids = {e["id"] for e in data}
     assert ids == {"j1", "j2"}
+    assert all(isinstance(e["started_at"], (int, float)) for e in data)
+
+
+def test_active_jobs_lists_only_running_jobs(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, "running-job", status="running")
+    _seed_job(core, "finished-job", status="finished")
+
+    response = app.test_client().get("/api/jobs/active")
+
+    assert response.status_code == 200
+    jobs = response.get_json()
+    assert [job["id"] for job in jobs] == ["running-job"]
+    assert jobs[0]["status"] == "running"
+    assert jobs[0]["tool"] == "nmap"
 
 
 # ---------------------------------------------------------------- /api/jobs/<id>
