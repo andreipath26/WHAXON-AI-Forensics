@@ -193,3 +193,22 @@ def test_cancel_before_start_never_spawns_package_manager(monkeypatch, tmp_path)
     assert result["status"] == "CANCELLED"
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
     assert [record["status"] for record in records] == ["STARTED", "CANCELLED"]
+
+
+def test_installer_enforces_manifest_automatic_install_policy(monkeypatch):
+    import whaxon.core.installer as installer
+
+    original = installer.load_dependency_manifest
+    monkeypatch.setattr(
+        installer,
+        "load_dependency_manifest",
+        lambda: {
+            **original(),
+            "policy": {
+                "automatic_installation_enabled": False,
+                "automatic_installation_kinds": [],
+            },
+        },
+    )
+    with pytest.raises(ValueError, match="disabled by the dependency policy"):
+        installer.apply_approved_dependency_plan("textual", "plan-0000000000000000")
