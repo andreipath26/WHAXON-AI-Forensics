@@ -817,3 +817,18 @@ def test_dependency_install_cancel_endpoint_sets_cancel_request(
     )
     assert response.status_code == 202
     assert response.get_json()["cancel_requested"] is True
+
+
+def test_dependency_readiness_is_integrated_into_existing_diagnostics_page(
+    tmp_path, monkeypatch
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    response = app.test_client().get("/ui-v2/diagnostics")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="whaxon-dependency-readiness-ui"' in page
+    assert 'id="dep-check"' in page
+    assert 'id="dep-rows"' in page
+    assert 'id="dep-plan"' in page
+    assert 'id="dep-operation"' in page
+    assert "bg-surface-container-low" in page
