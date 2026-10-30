@@ -99,7 +99,7 @@ def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_s
     )
     page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
     page.wait_for_function(
-        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('No running jobs were found')",
         timeout=5000,
     )
 
@@ -283,7 +283,7 @@ def test_dashboard_session_strip_uses_live_scope_and_avoids_fake_runtime_claims(
         timeout=8000,
     )
     assert page.locator("#dashboard-session-target").inner_text() == "https://example.test"
-    assert page.get_by_text("Active-job status unavailable").is_visible()
+    assert page.get_by_text("Live job status").is_visible()
     assert page.get_by_text("Version not reported").is_visible()
     assert page.get_by_text("Pre-Flight Boundary Checklist").is_hidden()
     assert page.get_by_text("Explore Lab Environments").is_hidden()
