@@ -382,3 +382,41 @@ def test_scope_preflight_ignores_response_after_target_changes(page, live_server
     page.wait_for_timeout(50)
     assert page.locator("#scopePreflightStatus").inner_text() == "NO CHECK RUN"
     assert "No scope check has been run" in page.locator("#scopeCheckResult").inner_text()
+
+def test_scope_save_locks_mutation_controls_until_api_response(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    _wait_loaded(page)
+    page.evaluate("""() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (url, options = {}) => {
+        if (url === "/api/scope" && options.method === "POST") {
+          const payload = JSON.parse(options.body);
+          return new Promise(resolve => {
+            window.__resolveScopeSave = () => resolve(new Response(JSON.stringify(payload), {
+              status: 200,
+              headers: {"Content-Type": "application/json"}
+            }));
+          });
+        }
+        return originalFetch(url, options);
+      };
+    }""")
+    page.locator("#openTargetModalBtn").click()
+    page.locator("#modalTargetInput").fill("scope-save-lock.example.invalid")
+    page.locator("#authConfirmCheckbox").check()
+    page.locator("#saveTargetBtn").click()
+    page.wait_for_function("() => typeof window.__resolveScopeSave === 'function'", timeout=5000)
+
+    assert page.locator("#saveTargetBtn").is_disabled()
+    assert page.locator("#openImportDrawerBtn").is_disabled()
+    assert page.locator("#runScopeCheckBtn").is_disabled()
+    assert page.locator("#openTargetModalBtn").is_disabled()
+
+    page.evaluate("() => window.__resolveScopeSave()")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=5000,
+    )
+    assert page.locator("#saveTargetBtn").is_enabled()
+    assert page.locator("#openImportDrawerBtn").is_enabled()
+    assert page.locator("#runScopeCheckBtn").is_enabled()
