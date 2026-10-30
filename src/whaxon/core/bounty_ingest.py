@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 import http.client
 import ipaddress
-import json
 import re
 import socket
 import ssl
@@ -60,7 +59,11 @@ class _VisibleText(HTMLParser):
 def _validated_url(url: str):
     if not isinstance(url, str) or len(url) > 2048:
         raise IngestionError("URL is missing or too long")
-    parsed = urlsplit(url.strip())
+    try:
+        parsed = urlsplit(url.strip())
+        port = parsed.port
+    except ValueError as exc:
+        raise IngestionError("Malformed program URL") from exc
     host = (parsed.hostname or "").lower().rstrip(".")
     if parsed.scheme.lower() != "https":
         raise IngestionError("Only HTTPS program URLs are accepted")
@@ -68,7 +71,7 @@ def _validated_url(url: str):
         raise IngestionError("Credentials in URLs are not accepted")
     if host not in _ALLOWED_HOSTS:
         raise IngestionError("Only public YesWeHack program URLs are supported")
-    if parsed.port not in (None, 443):
+    if port not in (None, 443):
         raise IngestionError("Non-standard ports are not accepted")
     if not re.fullmatch(r"/programs/[A-Za-z0-9][A-Za-z0-9_-]{0,127}/?", parsed.path):
         raise IngestionError("URL must identify a YesWeHack public program")
@@ -138,7 +141,6 @@ def _request(url: str) -> tuple[bytes, str, str]:
             body = response.read(_MAX_BYTES + 1)
             if len(body) > _MAX_BYTES:
                 raise IngestionError("Program page exceeds the 2 MiB limit")
-            charset = "utf-8"
             return body, content_type, current
         except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
             raise IngestionError(f"Could not retrieve program page: {exc}") from exc
@@ -146,6 +148,28 @@ def _request(url: str) -> tuple[bytes, str, str]:
             conn.close()
     raise IngestionError("Redirect limit reached")
 
+
+def _harden_draft(draft: dict, source_url: str) -> None:
+    """Replace parser guesses with conservative values until a human confirms them."""
+    draft["program_url"] = source_url
+    rate = draft.setdefault("rate", {})
+    rate["max_requests_per_second"] = 0
+    rate["max_concurrent_connections"] = 0
+    rate["respect_robots_txt"] = True
+    hunting = draft.setdefault("hunting_requirements", {})
+    if hunting.get("automated_scanners") == "limited":
+        hunting["automated_scanners"] = "unknown"
+    tools = draft.setdefault("tools", {})
+    tools["mode"] = "allowlist"
+    tools["allowlist"] = []
+    tools["denylist"] = []
+    ai = draft.setdefault("ai_policy", {})
+    ai.update({
+        "allow_action_selection": False,
+        "allow_live_requests": False,
+        "allow_auto_mode": False,
+        "require_human_confirm": True,
+    })
 
 def ingest_yeswehack_url(url: str) -> dict:
     """Fetch a public program page and return an unapproved, provenance-rich draft."""
@@ -167,6 +191,7 @@ def ingest_yeswehack_url(url: str) -> dict:
                               urlsplit(final_url).path)
     slug = slug_match.group(1).lower() if slug_match else ""
     draft = parse_yeswehack(source_text, slug=slug)
+    _harden_draft(draft, final_url)
     return {
         "status": "draft_requires_review",
         "policy_draft": draft,
@@ -197,6 +222,7 @@ def ingest_yeswehack_text(text: str, source_url: str = "") -> dict:
     if source_url:
         _validated_url(source_url)
     draft = parse_yeswehack(text)
+    _harden_draft(draft, source_url)
     raw = text.encode("utf-8")
     return {
         "status": "draft_requires_review",
