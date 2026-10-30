@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import sys
 
@@ -258,7 +259,6 @@ def test_audit_refuses_symlinked_log_file(tmp_path, monkeypatch):
 
 
 def test_dependency_audit_hash_chain_detects_tampering(tmp_path, monkeypatch):
-    import json
     import whaxon.core.installer as installer
 
     path = tmp_path / "audit.jsonl"
@@ -278,7 +278,6 @@ def test_dependency_audit_hash_chain_detects_tampering(tmp_path, monkeypatch):
 
 
 def test_dependency_audit_chain_serializes_concurrent_writers(tmp_path, monkeypatch):
-    from concurrent.futures import ThreadPoolExecutor
     import whaxon.core.installer as installer
 
     path = tmp_path / "audit.jsonl"
