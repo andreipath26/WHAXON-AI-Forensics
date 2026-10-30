@@ -134,7 +134,7 @@ def _claim_dependency_lock(operations: Path, dependency_id: str, operation_id: s
                 _write_state(previous_path, previous)
             if terminal or stale:
                 lock_path.unlink(missing_ok=True)
-        except (OSError, KeyError, ValueError, json.JSONDecodeError):
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
             # An unreadable lock is not safe to steal automatically.
             pass
     try:
