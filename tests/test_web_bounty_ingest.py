@@ -1,7 +1,6 @@
 """Web API tests for safe bounty program import."""
 from __future__ import annotations
 
-
 _PROGRAM_TEXT = """Public programs
 Example Program
 Last update on 2026-10-29
