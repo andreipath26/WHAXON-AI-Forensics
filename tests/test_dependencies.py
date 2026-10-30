@@ -207,3 +207,8 @@ def test_untrusted_catalog_cannot_redirect_curated_probe(tmp_path, monkeypatch):
 def test_version_comparison_honours_epochs():
     from whaxon.core.dependencies import _version_tuple
     assert _version_tuple("2!1.0") > _version_tuple("1!99.0")
+
+def test_version_comparison_keeps_release_segments_separate_from_stage():
+    from whaxon.core.dependencies import _version_tuple
+    assert _version_tuple("1.0.1") > _version_tuple("1.0.dev1")
+    assert _version_tuple("1.0.1") > _version_tuple("1.0")
