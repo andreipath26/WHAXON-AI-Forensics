@@ -1006,6 +1006,7 @@
     </div>
     <p id="dep-status" role="status" aria-live="polite" class="mt-space-md text-body-sm text-on-surface-variant">Loading dependency readiness…</p>
     <div id="dep-summary" class="mt-space-md grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-space-sm"></div>
+    <p id="dep-environment" class="mt-space-sm font-code-sm text-outline"></p>
     <div class="mt-space-lg bg-surface-container rounded overflow-hidden">
       <div class="px-space-md py-space-sm bg-surface-container-high flex items-center justify-between gap-2">
         <h3 class="font-headline-sm text-on-surface">Dependency inventory</h3>
@@ -1105,6 +1106,8 @@
       ["Broken", report.summary?.broken ?? 0]
     ];
     values.forEach(([label, value]) => addMetric(summary, label, value));
+    const env = report.environment || {};
+    setText("dep-environment", [env.os, env.os_release, env.architecture, "Python " + (env.python || "unknown"), env.virtual_environment ? "virtual environment" : "system interpreter"].filter(Boolean).join(" · "));
     const rows = $("dep-rows");
     rows.replaceChildren();
     const dependencies = Array.isArray(report.dependencies) ? report.dependencies : [];
@@ -1202,7 +1205,6 @@
       setText("dep-command", option.display_command || (option.title || "Manual installation instructions only."));
       setText("dep-plan-warning", option.warning || "Review the source and impact before proceeding.");
       setText("dep-plan-id", "PLAN ID: " + plan.plan_id);
-      const approvalLabel = section.querySelector('label[for="dep-approve-check"]');
       $("dep-approve-check").disabled = !option.automated_execution_supported;
       $("dep-install").textContent = option.automated_execution_supported ? "Approve & install" : "Manual instructions only";
       if (!option.automated_execution_supported) {
@@ -1231,13 +1233,18 @@
         })
       });
       activeOperation = operation.operation_id;
+      activePlan = null;
+      $("dep-approve-check").checked = false;
+      $("dep-approve-check").disabled = true;
+      $("dep-install").disabled = true;
+      $("dep-install").textContent = "Installation queued";
       setText("dep-operation-id", "OPERATION ID: " + activeOperation);
       setText("dep-operation-result", "");
       pollOperation();
     } catch (error) {
       setText("dep-operation-status", "Installation was not queued: " + error.message);
     } finally {
-      busy($("dep-install"), false, "Approve & install");
+      if (activePlan) busy($("dep-install"), false, "Approve & install");
     }
   });
 
