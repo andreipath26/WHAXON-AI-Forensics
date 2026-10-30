@@ -142,7 +142,7 @@ def apply_approved_dependency_plan(
         started_monotonic = time.monotonic()
         last_progress = started_monotonic
         while True:
-            if cancel_requested and cancel_requested():
+            if cancel_requested and cancel_requested() and process.poll() is None:
                 if process.poll() is None:
                     process.terminate()
                 try:
@@ -164,9 +164,8 @@ def apply_approved_dependency_plan(
             if progress_callback and elapsed - last_progress >= 5:
                 progress_callback("INSTALLING", f"Package manager running for {int(elapsed)} seconds.")
                 last_progress = elapsed
-            if elapsed >= INSTALL_TIMEOUT_SECONDS:
-                if process.poll() is None:
-                    process.terminate()
+            if elapsed >= INSTALL_TIMEOUT_SECONDS and process.poll() is None:
+                process.terminate()
                 try:
                     stdout, stderr = process.communicate(timeout=5)
                 except subprocess.TimeoutExpired:
