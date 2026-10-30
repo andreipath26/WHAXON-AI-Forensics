@@ -46,9 +46,14 @@ def _append_audit(record: dict[str, Any]) -> None:
         stream.write(json.dumps(record, sort_keys=True) + "\n")
 
 
-def apply_approved_dependency_plan(dependency_id: str, approved_plan_id: str) -> dict[str, Any]:
+def apply_approved_dependency_plan(
+    dependency_id: str,
+    approved_plan_id: str,
+    *,
+    data_dir: Path | None = None,
+) -> dict[str, Any]:
     """Install exactly one manifest-declared Python package after plan-ID approval."""
-    plan = build_remediation_plan(dependency_ids=[dependency_id])
+    plan = build_remediation_plan(dependency_ids=[dependency_id], data_dir=data_dir)
     if plan["unknown_dependency_ids"]:
         raise ValueError(f"Unknown dependency: {dependency_id}")
     if plan["plan_id"] != approved_plan_id:
