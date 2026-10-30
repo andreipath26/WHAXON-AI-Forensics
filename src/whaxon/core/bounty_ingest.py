@@ -39,13 +39,13 @@ class _VisibleText(HTMLParser):
     def handle_starttag(self, tag: str, attrs) -> None:
         if tag.lower() in self._HIDDEN:
             self.hidden += 1
-        elif tag.lower() in {"br", "p", "div", "li", "tr", "h1", "h2", "h3"}:
+        elif tag.lower() in {"br", "p", "div", "li", "tr", "td", "th", "h1", "h2", "h3"}:
             self.parts.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
         if tag.lower() in self._HIDDEN and self.hidden:
             self.hidden -= 1
-        elif tag.lower() in {"p", "div", "li", "tr", "h1", "h2", "h3"}:
+        elif tag.lower() in {"p", "div", "li", "tr", "td", "th", "h1", "h2", "h3"}:
             self.parts.append("\n")
 
     def handle_data(self, data: str) -> None:
