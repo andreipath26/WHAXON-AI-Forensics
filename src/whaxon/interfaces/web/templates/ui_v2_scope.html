@@ -363,6 +363,14 @@
     notice.hidden = false;
   };
   const ruleList = (key) => Array.isArray(scope?.[key]) ? [...scope[key]] : [];
+  function resetPreflightStatus() {
+    const status = $("scopePreflightStatus");
+    const indicator = $("scopePreflightIndicator");
+    const result = $("scopeCheckResult");
+    if (status) { status.textContent = "NO CHECK RUN"; status.className = "font-label-sm text-label-sm text-outline uppercase font-bold"; }
+    if (indicator) indicator.className = "h-2 w-2 rounded-full bg-outline";
+    if (result) { result.textContent = "No scope check has been run in this session."; result.className = "text-on-surface-variant"; }
+  }
   async function api(url, options) {
     const response = await fetch(url, options);
     const data = await response.json().catch(() => ({}));
@@ -382,6 +390,7 @@
       payload.confirm_disable = true;
     }
     scope = await api("/api/scope", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+    resetPreflightStatus();
     render();
     say("Scope saved to the active WHAXON configuration.");
     return true;
@@ -592,6 +601,7 @@
   async function load() {
     try {
       scope = await api("/api/scope");
+      resetPreflightStatus();
       render();
       say("Loaded the active scope configuration.");
     } catch (error) { say("Could not load live scope: " + error.message, false); }
