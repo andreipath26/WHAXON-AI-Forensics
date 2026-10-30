@@ -83,6 +83,7 @@ The framework has advanced substantially beyond the older `docs/STATE.md` snapsh
 37. Post-v1.0 Strategic Pivots
 38. v1.0 Release Blockers and acceptance checklist
 39. Tooling portfolio review and integration gates
+45. Bug Bounty Intelligence & Autonomous Research subsystem
 
 ---
 
@@ -1434,11 +1435,11 @@ A per-program mode that encodes the platform's rules and the program's rules bef
 ## 26.0 Purpose and capability model
 
 Three capabilities, in order:
-1. **Program policy enforcement** — refuse to touch a target until a policy file exists, parses, and matches the host.
-2. **Differential and invariant analysis** — compare sessions, infer workflows, detect state-machine violations. Deterministic, no LLM.
-3. **Human-gated AI assistance** — the AI may select actions only if the policy explicitly allows it. Default deny.
+1. **Program policy enforcement** — no action until a programme policy is imported, reviewed and explicitly activated by the operator; every action is checked against deterministic programme and host-scope gates.
+2. **Differential and invariant analysis** — compare sessions, infer workflows, detect state-machine violations. Deterministic validation remains independent of the LLM.
+3. **Bounded autonomous AI research** — after explicit campaign activation, the AI may plan and perform routine actions inside the approved scope, tool allowlist, rate/concurrency limits and impact ceiling. It must request human approval for consequential decisions.
 
-The one unconditional non-goal: **no unattended runs against a bounty target.** Every session requires a human in the loop, because a bounty program's rules are not the same as a client's written authorization.
+**Autonomy decision (supersedes the earlier unconditional no-unattended-runs statement in this section):** routine operations do not require repeated user confirmation once a programme/campaign has been explicitly approved. The AI is autonomous only inside a deterministic, externally enforced permission envelope. Programme import is never authorization and never starts testing. The user remains the decision-maker for campaign activation, scope changes/ambiguity, increased rate or concurrency, intrusive/destructive tests, sensitive-data access, account creation/external identity, third-party testing, public disclosure/report submission and paid/external-cost actions. The AI cannot grant itself permission or modify the authoritative scope.
 
 ## 26.1 Program policy layer
 
@@ -1472,7 +1473,7 @@ Dependency: after §26.1 (done). Before §26.4 (reports consume captured finding
 
 ## 26.3 AI role (gated)
 
-Policy field `ai_policy.allow_action_selection` defaults false. When false, the AI cannot propose actions — only annotate findings. When true, the executor guardrails from §B/H apply unchanged. Indirect prompt injection defense folded in here (§24.1). **Effort: 6h.**
+Policy fields distinguish pending review from an activated campaign and routine autonomy from consequential actions. Before activation, execution is disabled and the AI may only analyse the imported programme and prepare a proposed plan. After explicit activation, `ai_policy` may permit autonomous action selection only within the approved scope, tool allowlist, request/rate/concurrency budgets, test-impact ceiling and expiry. Deterministic gates—not model instructions—authorize every action. Routine actions include programme-rule analysis, in-scope asset matching, passive recon, permitted low-impact checks, allowlisted tool selection, finding correlation/deduplication, bounded evidence reproduction, severity/impact assessment and report drafting. Human approval is required for campaign activation; scope expansion or ambiguity; rate/concurrency increases; intrusive/destructive tests; sensitive-data access; account creation or external identity; third-party testing; public disclosure/report submission; and paid/external-cost actions. Defend against indirect prompt injection (§24.1). **Effort: revise after implementation design.**
 
 ## 26.4 Report generation
 
@@ -1480,7 +1481,7 @@ Bounty report shape, not pentest report shape. Platform-specific form templates 
 
 ## 26.5 Scope
 
-Unconditional non-goal: unattended runs. Gated: any action the policy's `tools.denylist` names. Out of scope project-wide: the §13 list, unchanged. **Effort: 2h** (mostly wiring the existing scope gate to the policy gate).
+Unconditional non-goal: unapproved, out-of-scope or unbounded unattended activity. Bounded autonomous operation after explicit campaign activation is in scope. Enforce the programme policy gate, host scope gate, tool allowlist/denylist, rate and concurrency ceilings, request budgets, test-impact limits, expiry and emergency stop. Out of scope project-wide: the §13 list, unchanged. **Effort: revise after implementation design.**
 
 ## 26.6 Relationship to existing components
 
@@ -1492,7 +1493,7 @@ Per-program state: last run, findings submitted, findings accepted, disclosure d
 
 ## 26.8 Legal and ethical boundary
 
-Every bounty session requires a human in the loop. The policy file must name the program URL and last_reviewed date. Reports cross-check the override log. **Effort: 2h** (mostly documentation and test).
+Every programme requires explicit human review and campaign activation before testing. Routine in-envelope operations may then run autonomously; consequential actions remain approval-gated. The policy file must name the programme URL and `last_reviewed` date, retain source provenance and expiry/staleness state, and reports must cross-check the append-only override/audit log. **Effort: revise after implementation design.**
 
 ## 26.9 Effort summary
 
@@ -1533,9 +1534,9 @@ Against measured throughput (roadmap estimates run 3–5× high; §19 was 8×), 
 1. Accept a URL or pasted/exported program text. Record source URL, retrieval timestamp, parser/version and content hash where practical. Respect authentication and platform access restrictions; provide a manual paste/import fallback when content cannot be accessed.
 2. Parse assets and asset types, explicit in-scope entries, exclusions, testing permissions/prohibitions, rate limits, authentication requirements, disallowed vulnerability classes, disclosure rules, bounty eligibility and report-submission requirements.
 3. Produce a structured policy draft using the existing §26.1 schema. Preserve source excerpts/locations for every material extracted rule. Label missing, inferred, contradictory, stale or ambiguous rules; do not silently invent policy values.
-4. Require operator review/confirmation before saving the policy or running any tests. Refresh/review policy before a session when the source may have changed.
+4. Require operator review/confirmation before activating a programme policy or campaign. Import never authorizes or launches tests. Once activated, routine operations may proceed autonomously only inside the approved permission envelope; consequential actions require separate approval. Refresh/review policy before a session and suspend affected work when material source changes or staleness are detected.
 5. Enforce the program policy gate and existing host scope gate together. Deny by default when scope is missing, conflicting, stale, ambiguous or cannot be resolved uniquely. No AI-generated interpretation may weaken deterministic enforcement.
-6. Generate a proposed test plan from only confirmed in-scope assets and permitted test classes. Require human approval before execution; no unattended bounty runs.
+6. Generate a plan from only confirmed in-scope assets and permitted test classes. Require explicit human approval to activate the campaign and its limits; after activation, the agent may execute routine approved actions autonomously. It must pause and request approval for consequential actions, uncertainty, policy conflicts or exhausted limits.
 7. Keep provenance from source page → extracted rule → approved policy → test/action → evidence/finding → platform-specific report draft. Report drafts must satisfy §26.4 and must never be submitted without explicit human approval.
 
 **Security requirements:** Treat page contents and linked documents as untrusted data, not instructions. Defend against prompt injection, SSRF and unsafe redirects during URL ingestion; restrict schemes and destinations, block loopback/private/link-local/metadata destinations as appropriate, revalidate redirects and DNS resolution, limit response size/time/content types, and avoid executing downloaded content. Do not bypass authentication, paywalls, platform controls or access restrictions. A URL alone is not proof of authorization.
@@ -1546,6 +1547,9 @@ Against measured throughput (roadmap estimates run 3–5× high; §19 was 8×), 
 - URL-fetch tests for redirects, private-address/SSRF attempts, oversized responses, timeouts, unsupported schemes and hostile prompt-injection text.
 - Scope-gate tests proving excluded or ambiguous targets cannot run even when the AI recommends them.
 - Human approval required before policy activation, testing and submission.
+- Import must never activate a programme or launch tests; explicit campaign activation is required.
+- After activation, routine permitted actions run without repetitive confirmation; tests prove every action is still checked by deterministic policy and scope gates.
+- Consequential actions (scope/rate changes, intrusive tests, sensitive-data access, external identities, third-party testing, disclosure/submission and expenditure) pause for explicit approval.
 - End-to-end tests from fixture/page import through approved policy, plan, evidence and report draft.
 - Platform-specific fixtures and report validation for YesWeHack first, with other platforms added only after their terms/access methods are reviewed.
 
@@ -2532,3 +2536,197 @@ The UI is considered functionally complete only when all of the following are de
 6. Release only capabilities that pass their acceptance criteria; update the roadmap and claims to match verified behavior.
 
 **Sequencing rule:** UI functional completion first; multi-target/subnet orchestration second; measured competitive differentiation third. No redesign and no unsupported superiority claims.
+
+
+---
+
+# 45. BUG BOUNTY INTELLIGENCE & AUTONOMOUS RESEARCH SUBSYSTEM (APPROVED ROADMAP EXPANSION)
+
+**Status:** Approved product direction; queued. This section expands §26 into a complete, programme-aware autonomous research subsystem. It does not mark any capability implemented. §26 remains the foundational policy, ingestion, capture, analysis and reporting design; this section defines the broader target architecture and delivery plan.
+
+**Product objective:** WHAXON accepts an explicitly authorized bug-bounty programme, understands and continuously tracks its rules, builds an asset and permission model, autonomously investigates within approved limits, independently verifies discoveries, preserves reproducible evidence, and prepares accurate platform-specific reports. The core differentiator is evidence-backed verification—not raw scanner volume.
+
+**Supersession and consistency:** This approved autonomy model supersedes older §26 statements that require a human to approve every session action or prohibit all unattended bounty runs. It does not weaken authorization, scope, safety or deterministic enforcement. §26.12 import remains draft-only; imported programme text is untrusted evidence, never authorization. No testing begins until the operator explicitly activates a reviewed campaign and its permission envelope.
+
+## 45.1 Product principles and autonomy contract
+
+1. **Programme approval is explicit.** The operator reviews the extracted policy, scope, exclusions, permitted techniques, tool allowlist, request/rate/concurrency limits, impact ceiling, campaign expiry and stop conditions before activation.
+2. **Routine autonomy after activation.** The AI may make operational decisions and perform routine permitted work without repeated prompts: analyse rules, match approved assets, conduct passive recon, select allowlisted tools, run permitted low-impact checks, correlate/deduplicate findings, reproduce evidence within limits, assess severity/impact and draft reports.
+3. **Consequential decisions require approval.** Pause and request the user for campaign activation; scope expansion or unresolved scope ambiguity; increased rate/concurrency/budget; intrusive, destructive or availability-impacting tests; sensitive-data access or retention beyond minimal proof; account creation/external identities; third-party infrastructure or testing; external disclosure/report submission; paid actions or external costs.
+4. **Deterministic enforcement is outside the model.** Every network action, subprocess, redirect, DNS resolution, replay and validation request must pass authoritative scope, policy, tool, budget and impact checks. LLM output, imported content, tool output and frontend state cannot grant permission or weaken a gate.
+5. **Fail closed.** Missing, stale, conflicting, ambiguous or unverifiable authorization/policy state blocks affected actions. Scope changes invalidate or suspend affected plans until re-evaluated and approved.
+6. **Observable autonomy.** The operator can inspect the current plan, action queue, current activity, next intended action, rationale, permission basis, resource use, evidence and pause/stop state. Record decisions and approvals in an append-only audit trail.
+7. **Safe stopping and recovery.** Provide pause, cancel and emergency stop; enforce hard request/time/resource ceilings; persist state; recover interrupted investigations without replaying unsafe or already-completed actions.
+8. **No fabricated certainty.** Separate observations, hypotheses, validated findings, inconclusive tests and blocked work. Severity, confidence, eligibility and reward estimates remain distinct.
+
+## 45.2 Programme intelligence and policy understanding
+
+Extend §26.12 ingestion into a versioned programme intelligence record:
+- Extract assets, asset types, wildcards, exclusions, ownership/third-party boundaries, allowed and prohibited techniques, rate limits, authentication requirements, vulnerability-class eligibility, disclosure terms, reward conditions and submission requirements.
+- Preserve source URL, retrieval time, content hash, parser/version, source excerpts/locations and confidence for each material rule.
+- Classify every rule as explicit, inferred, missing, contradictory, ambiguous or stale. Never silently promote an inference to authorization.
+- Build a machine-readable permission matrix linking asset × action/test class × identity × rate/impact limit × validity period.
+- Resolve wildcard domains and discovered assets against approved scope without automatically authorizing newly discovered assets.
+- Track policy revisions and compare versions. Identify exactly which assets, plans, running jobs and findings are affected by changed scope or rules; pause affected activity pending review.
+- Support YesWeHack first, then add HackerOne, Bugcrowd and other platforms only after platform-specific access, terms, schemas and report workflows are reviewed.
+- Provide manual paste/import fallback; never bypass login, paywalls, anti-bot controls or platform access restrictions.
+
+## 45.3 Asset intelligence and relationship graph
+
+Create a programme-scoped asset inventory and graph:
+- Model domains, subdomains, IPs, ports, services, web applications, APIs, technologies, certificates, cloud resources and ownership/third-party relationships where supported.
+- Preserve discovery source, timestamp, confidence, scope decision and last-seen state for every asset/edge.
+- Distinguish confirmed in-scope, excluded, third-party, unresolved and newly discovered assets.
+- Detect duplicate assets, DNS changes, ownership changes, newly added/removed assets and relationships across programmes without leaking programme-specific private data.
+- Require explicit approval before an unresolved/new asset is promoted into active-test scope.
+- Provide asset detail, history, provenance and an explanation of why an asset is or is not eligible for a particular action.
+
+## 45.4 Autonomous investigation planner and execution controller
+
+Build a closed-loop investigation engine:
+1. Convert the approved programme policy and operator objective into a constrained investigation plan.
+2. Break work into auditable tasks with prerequisites, permission basis, expected impact, budget and success/stop conditions.
+3. Choose tools from the approved allowlist using tool capability metadata, dependencies, reliability history and target technology.
+4. Execute passive discovery and permitted low-impact tests through existing WHAXON adapters and shared execution services.
+5. Parse and normalize output while retaining raw artifacts, tool version, command, timestamps and target context.
+6. Evaluate results and choose the next routine investigation step based on evidence gaps and expected information gain.
+7. Stop when evidence is sufficient, the plan is exhausted, limits are reached, uncertainty becomes material, policy changes, or human approval is required.
+8. Persist every state transition and support pause/resume/cancel without bypassing authorization checks.
+
+The LLM may plan and recommend; the policy engine and executor independently authorize. Do not create a parallel scanner or duplicate the existing scope/Trust Layer.
+
+## 45.5 Verification, evidence reproduction and evidence vault — flagship differentiator
+
+Make independent verification the centre of the subsystem:
+- Maintain a finding lifecycle: candidate → triaged → reproduction attempted → validated / inconclusive / rejected → report-ready → submitted (only on explicit approval) → accepted/duplicate/closed where status is available.
+- Attempt an independent reproduction method where practical; prefer a different evidence path over simply repeating the original scanner.
+- Support exact HTTP request/response evidence, command/service evidence, browser/HAR evidence and other typed proof artifacts supported by the adapters.
+- Capture target/asset identity, scope decision, timestamp, environment, tool and version, command/request, response/output, validation method, result, limitations and confidence.
+- Preserve raw evidence and normalized representations; hash artifacts and maintain a tamper-evident provenance chain.
+- Minimize sensitive data: redact secrets and personal data, avoid unnecessary collection, and require approval for any test that would access or retain sensitive information.
+- Generate a replay recipe that another researcher can execute safely within the same approved boundaries. Replay must re-check current authorization and scope; a historical approval is not perpetual permission.
+- Distinguish reproducible, partially reproducible, observable-only, inconclusive, rejected and not-replayable results. Never convert a scanner assertion into a confirmed vulnerability without adequate evidence.
+- Retain rejected hypotheses and failed reproduction attempts internally to improve calibration without polluting submitted reports.
+
+## 45.6 Finding correlation, deduplication and attack-path analysis
+
+- Correlate observations across tools, endpoints, assets and sessions while retaining asset-specific evidence.
+- Detect same-root-cause manifestations versus distinct vulnerabilities; avoid merging findings solely because titles or payloads match.
+- Identify regressions and reappearances after remediation.
+- Build evidence-backed relationship/attack-path graphs where multiple weaknesses combine into a plausible impact chain.
+- Require each edge in a chain to have supporting evidence and label speculative links clearly.
+- Keep per-programme isolation and platform duplicate semantics; do not disclose findings across programmes.
+
+## 45.7 Programme-aware prioritisation
+
+Rank investigation candidates using explicit, explainable factors:
+- Programme eligibility and policy permission.
+- Scope confidence and asset ownership.
+- Evidence strength and independent reproducibility.
+- Exploitability demonstrated within permitted limits.
+- Realistic impact and affected asset importance.
+- Duplicate likelihood and known prior outcomes.
+- Remaining investigation effort, resource cost and expected information gain.
+- Risk of target disruption or policy violation.
+
+Do not conflate severity, likelihood of acceptance, bounty reward and confidence. Reward estimates are optional, explicitly uncertain and never drive unsafe escalation. Explain ranking factors and allow operator review.
+
+## 45.8 Continuous programme and asset monitoring
+
+- Periodically re-check programme pages and approved source documents within access rules.
+- Detect policy, scope, reward, disclosure and rate-limit changes; preserve version diffs and provenance.
+- Monitor approved passive asset signals and detect new, removed or changed assets.
+- Mark policies stale according to configurable review/expiry rules.
+- Automatically pause affected active tasks when authorization materially changes, becomes unavailable or expires.
+- Notify the operator with a concise impact assessment and proposed safe next steps.
+- Resume only after deterministic re-evaluation; require approval when the change affects the permission envelope.
+- Monitoring itself must respect platform terms, rate limits and configured resource budgets.
+
+## 45.9 Programme knowledge engine and learning loop
+
+Build a structured, auditable knowledge base from completed investigations:
+- Technology fingerprints and validated testing-method compatibility.
+- Tool reliability, parser limitations and observed false-positive patterns.
+- Reproduction techniques and evidence quality by finding class.
+- Common root causes, recurring patterns and remediation outcomes.
+- Programme-specific historical state, acceptance/duplicate outcomes where legitimately available.
+- Confidence calibration and reasons for inconclusive/rejected findings.
+
+Use explicit provenance, versioning, confidence and programme isolation. Do not silently train on unverified claims or sensitive programme data. Learning may improve recommendations and prioritisation but must never change scope, authorization, tool permissions or safety limits.
+
+## 45.10 Reporting and disclosure workflow
+
+Generate two separate report products:
+- **External submission draft:** platform-specific title, affected asset, concise summary, reproducible steps, exact evidence, demonstrated impact, severity rationale, remediation and required fields. Redact researcher identity/secrets where required by programme policy.
+- **Internal investigation dossier:** plan and action history, permission decisions, tools/versions, raw evidence references, reproduction attempts, rejected hypotheses, confidence, uncertainty, coverage gaps, resource use and audit trail.
+
+Validate drafts against platform-specific requirements and programme eligibility. Submission, disclosure, publication or communication to a third party always requires explicit user approval. Record submission and subsequent programme status only when confirmed by the platform/user; never infer acceptance or bounty payment.
+
+## 45.11 Bug Bounty AI Control Centre — integrate with the approved WHAXON UI
+
+Extend the existing approved UI; do not redesign it or create a parallel visual system. Provide:
+1. **Programmes:** import, policy versions, source provenance, review, activation, expiry and status.
+2. **Assets:** asset inventory, relationships, scope decisions, history and discovery provenance.
+3. **Investigations:** plan, queue, live activity, next action, rationale, progress, resource use, pause/resume/cancel and approval requests.
+4. **Findings:** lifecycle, triage, correlation, severity, eligibility and evidence completeness.
+5. **Verification:** reproduction attempts, methods, outcomes, confidence and replay artifacts.
+6. **Reports:** internal dossier, external drafts, platform validation and explicitly approved submission workflow.
+7. **Intelligence:** policy diffs, asset changes, historical knowledge and programme alerts.
+8. **Agent Control:** autonomy state, approved boundaries, allowlist, rate/concurrency/budget/impact limits, expiry, emergency stop and audit history.
+
+Every visible control must invoke a real backend contract. UI state is never an authorization boundary. Show partial, blocked, inconclusive and failed work honestly; never display false completion.
+
+## 45.12 API, integrations and multi-programme architecture
+
+- Expose versioned service/API contracts for programme ingestion, policy review/activation, asset inventory, investigation jobs, approval requests, findings, evidence, reports and monitoring.
+- Keep CLI, web UI and future external agents as clients of shared services; avoid business logic duplication.
+- Support multiple isolated programmes and concurrent investigations with per-programme policy, state, budgets, evidence access and audit trails.
+- Add external integrations only through explicit user configuration and permission grants; document data flow and costs.
+- Keep plugin/tool selection constrained by the programme's approved allowlist and centrally enforced execution policy.
+- Design for restart recovery, job idempotency, cancellation, bounded worker pools and observable resource consumption.
+
+## 45.13 Security, privacy and operational controls
+
+- Enforce scope at every request and subprocess boundary, including redirects, DNS resolution/rebinding, alternate IP forms, discovered assets, browser navigation, replay and child processes.
+- Apply per-programme and global request, rate, concurrency, time, storage and cost ceilings.
+- Provide circuit breakers for elevated error rates, unexpected response volume, latency, target instability or policy uncertainty.
+- Default to minimal proof and data retention; redact credentials, tokens, personal data and unrelated customer information.
+- Encrypt sensitive stored evidence where supported; define retention, export and deletion behavior.
+- Treat programme pages, issue descriptions, target responses, tool output and imported files as untrusted data; defend against prompt injection and content-triggered tool execution.
+- Maintain append-only audit events for policy imports/changes, approvals, action decisions, tool executions, evidence access, report exports and submissions.
+- Provide an emergency stop that prevents new work and cancels active work as far as the underlying tools support it.
+
+## 45.14 Six-phase delivery roadmap and dependencies
+
+The six phases below are approved as the target delivery sequence. Each phase must be delivered in small vertical slices with tests; phase completion is evidence-based, not inferred from code presence.
+
+| Phase | Scope | Exit condition |
+|---|---|---|
+| **1 — Policy foundation and programme intelligence** | Finish §26.12 ingestion; source-backed extraction; policy review/versioning; deterministic permission matrix; explicit campaign activation; stale/change detection; audit log; safe persistence. | Imported programmes remain inert until approval; approved policies validate; every rule has provenance/uncertainty; policy and host-scope gates fail closed; policy changes suspend affected work. |
+| **2 — Bounded autonomous investigation** | Investigation planner; task/state model; allowlisted tool selection; passive and permitted low-impact execution; approval queue for consequential decisions; budgets, pause/resume/cancel and recovery; agent control UI. | In a controlled authorized lab, the agent completes routine tasks without repetitive prompts, requests approval at every consequential boundary, and cannot bypass deterministic gates. |
+| **3 — Asset intelligence and programme monitoring** | Programme-scoped asset inventory/graph; scope classification; asset provenance/history; policy and asset change monitoring; alerts and safe suspension. | Asset changes are detected and explained; unresolved/new assets receive no active testing; material policy changes suspend affected work; no cross-programme data leakage. |
+| **4 — Verification, correlation and evidence reproduction** | Finding lifecycle; independent reproduction; evidence vault/provenance hashes; cross-tool correlation/deduplication; regression detection; attack-path relationships; coverage and confidence. | Seeded lab findings are correctly classified; evidence is reproducible by a second method where feasible; false positives, inconclusive outcomes and coverage gaps are accurately reported. |
+| **5 — Knowledge engine and intelligent prioritisation** | Structured historical knowledge; tool reliability and false-positive learning; explainable prioritisation; confidence calibration; programme-aware eligibility and effort estimates. | Recommendations are explainable and benchmarked against a baseline; unverified or sensitive data cannot silently influence policy or cross-programme decisions. |
+| **6 — Reporting, integrations and multi-programme orchestration** | Platform-specific external drafts; internal dossiers; report validation; approval-gated submission; versioned API; multi-programme isolation; selected integrations; operational hardening. | End-to-end multi-programme workflows pass security, integration and browser tests; reports preserve provenance; external actions require explicit approval; recovery, isolation and resource limits are verified. |
+
+**Cross-phase acceptance gates:**
+- Unit, integration, security, regression and browser/end-to-end tests for every new workflow.
+- Adversarial tests for prompt injection, SSRF, DNS rebinding, redirect escapes, scope confusion, tool allowlist bypass, policy staleness, race conditions and approval forgery.
+- Controlled seeded-lab benchmark with ground truth; measure asset discovery accuracy, scope compliance, precision/recall, independently reproducible findings, time-to-evidence, resource consumption, cancellation and recovery.
+- Zero unauthorized/out-of-scope requests in the test corpus; any violation is a release blocker.
+- Measure false-positive and inconclusive rates honestly; do not claim zero false positives without sufficient defined evidence.
+- Demonstrate that frontend manipulation, LLM output, tool output and imported programme text cannot authorize actions.
+- Preserve existing WHAXON CLI, web, validator, Trust Layer, scope and report compatibility.
+
+## 45.15 Sequencing relative to the wider WHAXON roadmap
+
+1. Finish the active bug-bounty ingestion implementation and its tests/CI; keep PR #78 distinct from this larger roadmap expansion.
+2. Complete the current approved WHAXON UI functional gate in §44 before broad UI expansion; the existing bounty ingestion/review workflow is part of the current scoped work, not permission to redesign the UI.
+3. Deliver Phase 1 and verify the policy/approval/persistence boundary before enabling autonomous execution.
+4. Deliver Phase 2 in a controlled lab; do not enable live autonomous testing until deterministic enforcement, budgets, audit, pause/stop and approval tests pass.
+5. Deliver Phases 3 and 4 before broadening the knowledge and reporting claims; verification/evidence reproduction is the flagship differentiator.
+6. Deliver Phases 5 and 6 after the evidence and asset foundations are stable.
+7. Keep the §43 competitor matrix and benchmark protocol aligned with these phases; compare measured outcomes, not feature counts or vendor marketing.
+8. Mark each capability DONE only after implementation, tests, end-to-end verification and documented limitations are present.
+
+**Definition of done:** An operator can import and review a real programme, explicitly activate a bounded permission envelope, and let WHAXON autonomously conduct routine permitted research; the system independently verifies and correlates findings, preserves tamper-evident reproducible evidence, adapts safely to programme changes, and prepares defensible reports. It pauses for user decisions that materially change authorization, impact, disclosure or cost. All activity remains auditable, scope-enforced and honest about uncertainty and coverage.
