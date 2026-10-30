@@ -80,13 +80,34 @@ class DependencyResult:
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
-    parts: list[int] = []
-    for part in value.split("."):
-        digits = "".join(ch for ch in part if ch.isdigit())
-        if not digits:
-            break
-        parts.append(int(digits))
-    return tuple(parts)
+    """Compare common PEP 440 release/prerelease forms without string coercion.
+
+    Local build labels do not affect the minimum-version decision. Unknown
+    version syntax fails closed instead of accidentally treating letters and
+    digits as one numeric component.
+    """
+    match = re.fullmatch(
+        r"\\s*(?:[0-9]+!)?(\\d+(?:\\.\\d+)*)"
+        r"(?:[-_.]?(a|alpha|b|beta|rc|pre|preview|dev|post)[-_.]?(\\d*)?)?"
+        r"(?:\\+[a-zA-Z0-9.-]+)?\\s*",
+        value,
+        re.IGNORECASE,
+    )
+    if not match:
+        raise ValueError(f"unsupported version format: {value!r}")
+    release = [int(part) for part in match.group(1).split(".")]
+    release = (release + [0] * 8)[:8]
+    label = (match.group(2) or "").lower()
+    number = int(match.group(3) or 0)
+    stage = {
+        "dev": -3,
+        "a": -2, "alpha": -2,
+        "b": -1, "beta": -1,
+        "rc": 0, "pre": 0, "preview": 0,
+        "": 1,
+        "post": 2,
+    }[label]
+    return (*release, stage, number)
 
 
 def _package_result(dist: str, import_name: str, minimum: str, *, required: bool,
