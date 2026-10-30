@@ -446,6 +446,9 @@ def test_scope_api_failure_does_not_claim_configuration_is_loaded(page, live_ser
         timeout=8000,
     )
     assert "Waiting for scope configuration" in page.locator("main").inner_text()
+    assert page.locator("#openTargetModalBtn").is_disabled()
+    assert page.locator("#openImportDrawerBtn").is_disabled()
+    assert page.locator("#runScopeCheckBtn").is_disabled()
     assert "bg-outline" in page.locator("#scopeStatusDot").get_attribute("class")
     assert "Scope configuration is loading" in page.locator("main").inner_text()
 
