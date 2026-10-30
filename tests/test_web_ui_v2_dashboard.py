@@ -194,3 +194,31 @@ def test_dashboard_reports_scope_unavailable_instead_of_claiming_no_rules(page, 
     assert "(NO TARGET RULE)" not in header
     assert "NO TARGET RULE CONFIGURED" not in header
     assert "SCOPE ENFORCEMENT ENABLED" not in header
+
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    ("button_name", "expected_path"),
+    [
+        (re.compile(r"Launch Wizard"), "/ui-v2/scope"),
+        (re.compile(r"Start New Engagement"), "/ui-v2/scope"),
+        (re.compile(r"Switch Target Session"), "/ui-v2/scope"),
+        (re.compile(r"Terminal Log"), "/ui-v2/run"),
+    ],
+)
+def test_dashboard_quick_actions_navigate_to_their_real_workspaces(page, live_server, button_name, expected_path):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    page.get_by_role("button", name=button_name).click()
+    assert page.url.endswith(expected_path)
+
+
+def test_dashboard_lab_deployment_is_not_present_as_a_live_action(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    assert page.get_by_role("button", name=re.compile(r"Deploy Mock")).count() == 0
+    assert page.get_by_text("Explore Lab Environments").count() == 0
