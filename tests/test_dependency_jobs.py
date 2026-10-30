@@ -97,3 +97,41 @@ def test_stale_operation_is_marked_interrupted(tmp_path):
     })
     operation = dependency_jobs.get_install_operation(tmp_path, operation_id)
     assert operation["status"] == "INTERRUPTED"
+
+
+def test_queue_rejects_disabled_install_policy_before_locking(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        dependency_jobs,
+        "load_dependency_manifest",
+        lambda: {
+            "dependencies": [{"id": "sample", "kind": "python-package"}],
+            "policy": {
+                "automatic_installation_enabled": False,
+                "automatic_installation_kinds": [],
+            },
+        },
+    )
+    with pytest.raises(ValueError, match="disabled by the dependency policy"):
+        dependency_jobs.start_install_operation("sample", "plan-0123456789abcdef", tmp_path)
+    operations = dependency_jobs._operations_dir(tmp_path)
+    assert list(operations.iterdir()) == []
+
+
+def test_queue_requires_virtual_environment_before_locking(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        dependency_jobs,
+        "load_dependency_manifest",
+        lambda: {
+            "dependencies": [{"id": "sample", "kind": "python-package"}],
+            "policy": {
+                "automatic_installation_enabled": True,
+                "automatic_installation_kinds": ["python-package"],
+            },
+        },
+    )
+    monkeypatch.setattr(dependency_jobs.sys, "prefix", "/usr")
+    monkeypatch.setattr(dependency_jobs.sys, "base_prefix", "/usr")
+    with pytest.raises(ValueError, match="active virtual environment"):
+        dependency_jobs.start_install_operation("sample", "plan-0123456789abcdef", tmp_path)
+    operations = dependency_jobs._operations_dir(tmp_path)
+    assert list(operations.iterdir()) == []
