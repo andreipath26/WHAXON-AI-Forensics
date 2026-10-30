@@ -472,4 +472,4 @@ def test_scope_copy_cli_quotes_wildcard_target_for_shell(page, live_server):
     }""")
     page.locator("#copyCliBtn").click()
     page.wait_for_function("() => Boolean(window.__copiedScopeCommand)")
-    assert page.evaluate("() => window.__copiedScopeCommand") == "whaxon scope --check '*.example.com'"
+    assert page.evaluate('() => window.__copiedScopeCommand') == 'whaxon scope --check "*.example.com"'
