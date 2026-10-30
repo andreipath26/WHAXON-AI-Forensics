@@ -89,7 +89,7 @@ def test_approved_install_uses_fixed_pypi_wheel_command(monkeypatch, tmp_path):
     assert "--only-binary=:all:" in argv
     assert argv[argv.index("--index-url") + 1] == "https://pypi.org/simple"
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [record["status"] for record in records] == ["STARTED", "VERIFIED"]
+    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "VERIFIED"]
 
 
 def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
@@ -127,7 +127,7 @@ def test_timeout_is_audited_and_returns_recovery(monkeypatch, tmp_path):
     assert result["status"] == "TIMED_OUT"
     assert "recreate the virtual environment" in result["recovery"]
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [record["status"] for record in records] == ["STARTED", "TIMED_OUT"]
+    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "TIMED_OUT"]
 
 
 def test_final_audit_failure_does_not_claim_install_was_not_started(monkeypatch):
@@ -192,7 +192,7 @@ def test_cancel_before_start_never_spawns_package_manager(monkeypatch, tmp_path)
     )
     assert result["status"] == "CANCELLED"
     records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
-    assert [record["status"] for record in records] == ["STARTED", "CANCELLED"]
+    assert [record["event_type"] for record in records] == ["PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "CANCELLED"]
 
 
 def test_installer_enforces_manifest_automatic_install_policy(monkeypatch):
@@ -255,3 +255,23 @@ def test_audit_refuses_symlinked_log_file(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="audit log must not be a symlink"):
         installer._append_audit({"status": "STARTED"})
     assert outside.read_text() == "untouched"
+
+
+def test_dependency_audit_hash_chain_detects_tampering(tmp_path, monkeypatch):
+    import json
+    import whaxon.core.installer as installer
+
+    path = tmp_path / "audit.jsonl"
+    monkeypatch.setattr(installer, "_audit_path", lambda: path)
+    installer._append_audit({"event_type": "PLAN_CREATED", "plan_id": "plan-one"})
+    installer._append_audit({"event_type": "APPROVAL_ACCEPTED", "plan_id": "plan-one"})
+    verified = installer.verify_dependency_audit(path)
+    assert verified["valid"] is True
+    assert verified["events_checked"] == 2
+
+    records = [json.loads(line) for line in path.read_text().splitlines()]
+    records[0]["plan_id"] = "plan-tampered"
+    path.write_text("".join(json.dumps(item, sort_keys=True) + "\\n" for item in records))
+    verified = installer.verify_dependency_audit(path)
+    assert verified["valid"] is False
+    assert verified["reason"] == "hash_mismatch"
