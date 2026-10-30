@@ -11,11 +11,12 @@ import json
 import os
 import re
 import subprocess
+import time
 import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from whaxon.core.dependencies import _version_tuple, load_dependency_manifest
 from whaxon.core.remediation import build_remediation_plan
@@ -69,6 +70,8 @@ def apply_approved_dependency_plan(
     approved_plan_id: str,
     *,
     data_dir: Path | None = None,
+    progress_callback: Callable[[str, str], None] | None = None,
+    cancel_requested: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Install exactly one manifest-declared Python package after plan-ID approval."""
     plan = build_remediation_plan(dependency_ids=[dependency_id], data_dir=data_dir)
@@ -114,21 +117,69 @@ def apply_approved_dependency_plan(
         "shell": False,
     }
     _append_audit({**base, "status": "STARTED"})
+    if progress_callback:
+        progress_callback("INSTALLING", "Installing the approved Python package.")
     try:
-        completed = subprocess.run(
-            argv, shell=False, check=False, capture_output=True, text=True,
-            timeout=INSTALL_TIMEOUT_SECONDS,
+        process = subprocess.Popen(
+            argv,
+            shell=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
-        exit_code = completed.returncode
-        output = _redact((completed.stdout or "") + "\n" + (completed.stderr or ""))
+        started_monotonic = time.monotonic()
+        while True:
+            if cancel_requested and cancel_requested():
+                process.terminate()
+                try:
+                    stdout, stderr = process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                result = {
+                    **base,
+                    "status": "CANCELLED",
+                    "exit_code": process.returncode,
+                    "output": _redact((stdout or "") + "\n" + (stderr or "")),
+                    "recovery": "The package operation was terminated; package state may be partial. Re-run whaxon doctor and recreate the virtual environment if inconsistent.",
+                    "finished_at": datetime.now(UTC).isoformat(),
+                }
+                result = _finish_audit(result)
+                return result
+            elapsed = time.monotonic() - started_monotonic
+            if elapsed >= INSTALL_TIMEOUT_SECONDS:
+                process.terminate()
+                try:
+                    stdout, stderr = process.communicate(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    stdout, stderr = process.communicate()
+                result = {
+                    **base,
+                    "status": "TIMED_OUT",
+                    "exit_code": process.returncode,
+                    "output": _redact((stdout or "") + "\n" + (stderr or "")),
+                    "recovery": "The package manager was terminated after timeout. Re-run whaxon doctor; recreate the virtual environment if package state is uncertain.",
+                    "finished_at": datetime.now(UTC).isoformat(),
+                }
+                result = _finish_audit(result)
+                return result
+            try:
+                stdout, stderr = process.communicate(timeout=0.25)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        exit_code = process.returncode
+        output = _redact((stdout or "") + "\n" + (stderr or ""))
         if exit_code != 0:
             result = {**base, "status": "INSTALL_FAILED", "exit_code": exit_code,
                       "output": output, "recovery": "No automatic rollback was attempted. Re-run whaxon doctor; if the environment is inconsistent, recreate the virtual environment and reinstall from the approved lock/profile.", "finished_at": datetime.now(UTC).isoformat()}
             result = _finish_audit(result)
             return result
-    except subprocess.TimeoutExpired as exc:
-        result = {**base, "status": "TIMED_OUT", "exit_code": None,
-                  "output": _redact(str(exc)), "recovery": "The pip process was terminated after timeout. Re-run whaxon doctor; recreate the virtual environment if package state is uncertain.", "finished_at": datetime.now(UTC).isoformat()}
+    except OSError as exc:
+        result = {**base, "status": "INSTALL_FAILED", "exit_code": None,
+                  "output": _redact(str(exc)), "recovery": "The package manager could not be started. No successful installation is confirmed.", "finished_at": datetime.now(UTC).isoformat()}
         result = _finish_audit(result)
         return result
     except KeyboardInterrupt:
@@ -139,6 +190,8 @@ def apply_approved_dependency_plan(
         _finish_audit(result)
         raise
 
+    if progress_callback:
+        progress_callback("VERIFYING", "Checking installed package version and import availability.")
     try:
         version = importlib.metadata.version(entry["id"])
         importlib.import_module(entry.get("import_name", entry["id"]))
@@ -161,4 +214,6 @@ def apply_approved_dependency_plan(
         "finished_at": datetime.now(timezone.utc).isoformat(),
     }
     result = _finish_audit(result)
+    if progress_callback:
+        progress_callback(result["status"], result.get("verification", result.get("recovery", "Installation finished.")))
     return result
