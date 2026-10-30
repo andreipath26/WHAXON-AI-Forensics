@@ -486,7 +486,7 @@
       el.textContent.includes("STRICT BOUNDARY ENFORCED") || el.textContent.includes("SCOPE ENFORCEMENT DISABLED")
     );
     if (status) status.textContent = scope.enabled ? "SCOPE ENFORCEMENT ENABLED" : "SCOPE ENFORCEMENT DISABLED";
-    const footer = document.querySelector("#targetTableBody")?.closest(".overflow-x-auto")?.parentElement?.querySelector(".p-space-md.bg-surface-container-lowest");
+    const footer = document.querySelector("#targetTableBody")?.closest(".overflow-x-auto")?.parentElement?.querySelector("div.p-space-md[class*='bg-surface-container-lowest']");
     if (footer) footer.textContent = "LIVE CONFIGURATION · " + ruleList("in_scope").length + " in-scope · " + ruleList("out_of_scope").length + " excluded";
     // Remove unsupported navigation and all demo-only panels that claim invented hosts or metrics.
     document.querySelectorAll("a[data-path]").forEach(a => {
