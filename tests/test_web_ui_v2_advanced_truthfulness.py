@@ -105,9 +105,11 @@ def test_approvals_workspace_submits_operator_answer_to_waiting_run(page, live_s
     assert response.status == 200
     assert response.json()["ok"] is True
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('0 pending item(s)')",
+        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Answer recorded for run seed-ai-run.')",
         timeout=10000,
     )
+    assert panel.get_by_role("textbox", name="Answer for run seed-ai-run").count() == 0
+    assert "No pending AI approvals are recorded." in panel.inner_text()
     approvals = page.evaluate(
         "() => fetch('/api/ai/runs/seed-ai-run').then(response => response.json())"
     )
