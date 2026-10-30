@@ -284,7 +284,7 @@ def start_install_operation(
             lock_path.unlink(missing_ok=True)
             with _LOCK:
                 _ACTIVE_THREADS.pop(operation_id, None)
-        raise RuntimeError("dependency installation worker could not be started") from exc
+        raise RuntimeError("dependency installation worker could not be started") from exc from exc
     return state
 
 
