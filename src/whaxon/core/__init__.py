@@ -160,16 +160,40 @@ class Core:
         """Validate and persist a versioned mission DAG."""
         return self.store.save_workflow_plan(plan_id, plan)
 
-    def workflow_scheduler(self, *, authorize, dispatch=None, worker_id: str = "workflow-worker"):
-        """Build a scheduler with explicit policy and provider execution boundaries."""
+    def authorize_workflow_task(self, task) -> bool:
+        """Fail-closed default policy for scoped, read-only catalog scans."""
+        from .capabilities import CapabilityUnavailable
+
+        try:
+            manifest = self.capabilities.resolve(task.capability_id).manifest
+        except (CapabilityUnavailable, ValueError):
+            return False
+        impact_rank = {
+            "read_only": 0, "low": 1, "moderate": 2, "high": 3, "critical": 4,
+        }
+        if task.impact not in impact_rank or manifest.impact not in impact_rank:
+            return False
+        if task.impact != manifest.impact or set(task.permissions) != set(manifest.permissions):
+            return False
+        if impact_rank[task.impact] > impact_rank["moderate"]:
+            return False
+        try:
+            return bool(self.scope.check(task.target).allowed)
+        except Exception:
+            return False
+
+    def workflow_scheduler(
+        self, *, authorize=None, dispatch=None, worker_id: str = "workflow-worker",
+    ):
+        """Build a scheduler with fail-closed scope policy and real catalog providers."""
         from .scheduler import WorkflowScheduler
         return WorkflowScheduler(
-            self.store, authorize=authorize,
+            self.store, authorize=authorize or self.authorize_workflow_task,
             dispatch=dispatch or self.providers.dispatch, worker_id=worker_id,
         )
 
     async def run_workflow_plan(
-        self, plan_id: str, *, authorize, dispatch=None,
+        self, plan_id: str, *, authorize=None, dispatch=None,
         worker_id: str = "workflow-worker", max_tasks: int = 100, max_attempts: int = 2,
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""

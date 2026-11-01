@@ -105,3 +105,40 @@ def test_provider_does_not_register_exploit_or_credential_tools(monkeypatch):
         runner=_Runner(), store=_Store(), registry=registry,
     )
     assert [item.capability_id for item in registry.list()] == ["tool.nmap"]
+
+
+def test_core_default_workflow_policy_requires_scope_permission_and_matching_impact():
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.nmap",
+        provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v1",
+        transports=("local_process",),
+        permissions=("network.scan",),
+        impact="moderate",
+    ))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=target == "192.0.2.10"),
+    )
+    allowed = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    assert core.authorize_workflow_task(allowed) is True
+    assert core.authorize_workflow_task(WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10", impact="moderate",
+    )) is False
+    assert core.authorize_workflow_task(WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="low",
+    )) is False
+    assert core.authorize_workflow_task(WorkflowTask(
+        "scan", "tool.nmap", "198.51.100.20",
+        permissions=("network.scan",), impact="moderate",
+    )) is False
