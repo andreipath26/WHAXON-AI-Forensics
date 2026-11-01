@@ -186,7 +186,7 @@ class CapabilityRegistry:
         self._manifests[key] = manifest
 
     def list(self, capability_id: str | None = None) -> list[CapabilityManifest]:
-        values = self._manifests.values()
+        values = list(self._manifests.values())
         if capability_id is not None:
             values = (item for item in values if item.capability_id == capability_id)
         return sorted(values, key=lambda item: (
