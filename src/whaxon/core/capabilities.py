@@ -1,0 +1,196 @@
+"""Versioned capability manifests and deterministic provider resolution.
+
+A manifest describes what a provider can do; it never grants permission to do it.
+Authorization remains a separate policy decision at execution time.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+CAPABILITY_SCHEMA_VERSION = "whaxon.capability.v1"
+_READINESS = {
+    "registered": 0,
+    "installed": 1,
+    "smoke_tested": 2,
+    "lab_validated": 3,
+    "end_to_end_verified": 4,
+}
+_IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
+
+
+def _canonical(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+@dataclass(frozen=True)
+class CapabilityManifest:
+    """Declarative, versioned provider capability and execution constraints."""
+
+    capability_id: str
+    provider_id: str
+    provider_version: str
+    transports: tuple[str, ...]
+    target_types: tuple[str, ...] = ()
+    protocols: tuple[str, ...] = ()
+    platforms: tuple[str, ...] = ()
+    auth_methods: tuple[str, ...] = ()
+    permissions: tuple[str, ...] = ()
+    side_effects: tuple[str, ...] = ()
+    impact: str = "read_only"
+    readiness: str = "registered"
+    timeout_s: float = 300.0
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
+    limitations: tuple[str, ...] = ()
+    schema_version: str = CAPABILITY_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != CAPABILITY_SCHEMA_VERSION:
+            raise ValueError(f"unsupported capability schema: {self.schema_version}")
+        for name, value in (
+            ("capability_id", self.capability_id),
+            ("provider_id", self.provider_id),
+            ("provider_version", self.provider_version),
+        ):
+            if not _IDENTIFIER.fullmatch(value):
+                raise ValueError(f"invalid {name}: {value!r}")
+        if not self.transports or any(not item for item in self.transports):
+            raise ValueError("at least one execution transport is required")
+        if self.readiness not in _READINESS:
+            raise ValueError(f"unsupported readiness level: {self.readiness}")
+        if self.impact not in {"read_only", "low", "moderate", "high", "critical"}:
+            raise ValueError(f"unsupported impact: {self.impact}")
+        if self.timeout_s <= 0:
+            raise ValueError("timeout_s must be positive")
+        for name in (
+            "transports", "target_types", "protocols", "platforms", "auth_methods",
+            "permissions", "side_effects", "limitations",
+        ):
+            values = getattr(self, name)
+            if len(values) != len(set(values)) or any(not item for item in values):
+                raise ValueError(f"{name} must contain unique non-empty values")
+
+    def to_dict(self) -> dict[str, Any]:
+        value = asdict(self)
+        for name in (
+            "transports", "target_types", "protocols", "platforms", "auth_methods",
+            "permissions", "side_effects", "limitations",
+        ):
+            value[name] = list(getattr(self, name))
+        return value
+
+    @property
+    def fingerprint(self) -> str:
+        return hashlib.sha256(_canonical(self.to_dict()).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class CapabilityRequirements:
+    """Constraints a task requires from a provider; empty fields are unconstrained."""
+
+    target_type: str = ""
+    protocol: str = ""
+    platform: str = ""
+    auth_method: str = ""
+    transport: str = ""
+    minimum_readiness: str = "registered"
+    allowed_providers: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class CapabilityResolution:
+    manifest: CapabilityManifest
+    registry_digest: str
+    considered: int
+    rejected: tuple[str, ...] = ()
+
+
+class CapabilityUnavailable(LookupError):
+    """No registered provider satisfies the task's declared requirements."""
+
+    def __init__(self, capability_id: str, rejected: tuple[str, ...]) -> None:
+        self.capability_id = capability_id
+        self.rejected = rejected
+        detail = "; ".join(rejected) if rejected else "no providers are registered"
+        super().__init__(f"no provider for {capability_id!r}: {detail}")
+
+
+class CapabilityRegistry:
+    """In-memory, deterministic registry; callers persist/version snapshots separately."""
+
+    def __init__(self) -> None:
+        self._manifests: dict[tuple[str, str, str], CapabilityManifest] = {}
+
+    def register(self, manifest: CapabilityManifest) -> None:
+        if not isinstance(manifest, CapabilityManifest):
+            raise TypeError("manifest must be a CapabilityManifest")
+        key = (manifest.capability_id, manifest.provider_id, manifest.provider_version)
+        existing = self._manifests.get(key)
+        if existing is not None and existing.fingerprint != manifest.fingerprint:
+            raise ValueError("provider manifest version is immutable")
+        self._manifests[key] = manifest
+
+    def list(self, capability_id: str | None = None) -> list[CapabilityManifest]:
+        values = self._manifests.values()
+        if capability_id is not None:
+            values = (item for item in values if item.capability_id == capability_id)
+        return sorted(values, key=lambda item: (
+            item.capability_id, item.provider_id, item.provider_version,
+        ))
+
+    @property
+    def digest(self) -> str:
+        snapshot = [item.to_dict() for item in self.list()]
+        return hashlib.sha256(_canonical(snapshot).encode("utf-8")).hexdigest()
+
+    def resolve(
+        self,
+        capability_id: str,
+        requirements: CapabilityRequirements | None = None,
+    ) -> CapabilityResolution:
+        requirements = requirements or CapabilityRequirements()
+        if requirements.minimum_readiness not in _READINESS:
+            raise ValueError(f"unsupported minimum readiness: {requirements.minimum_readiness}")
+        candidates = self.list(capability_id)
+        rejected: list[str] = []
+        eligible: list[CapabilityManifest] = []
+        for manifest in candidates:
+            reason = ""
+            if _READINESS[manifest.readiness] < _READINESS[requirements.minimum_readiness]:
+                reason = f"{manifest.provider_id}: readiness {manifest.readiness} is below {requirements.minimum_readiness}"
+            elif requirements.allowed_providers and manifest.provider_id not in requirements.allowed_providers:
+                reason = f"{manifest.provider_id}: provider is not allowlisted"
+            else:
+                for field_name in (
+                    "target_type", "protocol", "platform", "auth_method", "transport",
+                ):
+                    required = getattr(requirements, field_name)
+                    supported = getattr(manifest, {
+                        "target_type": "target_types",
+                        "protocol": "protocols",
+                        "platform": "platforms",
+                        "auth_method": "auth_methods",
+                        "transport": "transports",
+                    }[field_name])
+                    if required and required not in supported:
+                        reason = f"{manifest.provider_id}: unsupported {field_name} {required!r}"
+                        break
+            if reason:
+                rejected.append(reason)
+            else:
+                eligible.append(manifest)
+        if not eligible:
+            raise CapabilityUnavailable(capability_id, tuple(rejected))
+        eligible.sort(key=lambda item: (
+            -_READINESS[item.readiness], item.provider_id, item.provider_version,
+        ))
+        return CapabilityResolution(
+            manifest=eligible[0],
+            registry_digest=self.digest,
+            considered=len(candidates),
+            rejected=tuple(rejected),
+        )
