@@ -1749,6 +1749,42 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             }), 500
         return jsonify(operation), 202
 
+    @app.post("/api/dependencies/install-batch")
+    @limiter.limit("5 per minute")
+    def api_dependencies_install_batch():
+        """Queue a profile batch only after exact plan-ID approval."""
+        from whaxon.core.dependency_jobs import start_install_batch_operation
+
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "request body must be a JSON object"}), 400
+        dependency_ids = data.get("dependency_ids")
+        approved_plan_id = data.get("approved_plan_id")
+        if (
+            not isinstance(dependency_ids, list)
+            or not dependency_ids
+            or len(dependency_ids) > 64
+            or any(not isinstance(item, str) for item in dependency_ids)
+            or not isinstance(approved_plan_id, str)
+            or not re.fullmatch(r"plan-[a-f0-9]{16}", approved_plan_id)
+        ):
+            return jsonify({"error": "dependency_ids and a valid approved_plan_id are required"}), 400
+        try:
+            operation = start_install_batch_operation(
+                dependency_ids, approved_plan_id, Path(core.data_dir)
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "installation_started": False}), 409
+        except RuntimeError as exc:
+            return jsonify({"error": str(exc), "installation_started": False}), 409
+        except OSError as exc:
+            app.logger.exception("Profile installation could not be queued")
+            return jsonify({
+                "error": f"profile installation could not be queued ({type(exc).__name__})",
+                "installation_started": False,
+            }), 500
+        return jsonify(operation), 202
+
     @app.get("/api/dependencies/install/<operation_id>")
     def api_dependencies_install_status(operation_id: str):
         from whaxon.core.dependency_jobs import get_install_operation

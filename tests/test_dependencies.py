@@ -4,6 +4,8 @@ import json
 import subprocess
 import tomllib
 
+import pytest
+
 from whaxon.core.dependencies import collect_dependency_report, load_dependency_manifest
 
 
@@ -60,7 +62,10 @@ def test_external_version_probe_is_opt_in_and_bounded(tmp_path, monkeypatch):
             argv, 0, stdout="Nmap version 7.95 ( https://nmap.org )", stderr=""
         )
 
-    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/usr/bin/nmap")
+    executable = tmp_path / "nmap"
+    executable.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: str(executable))
     monkeypatch.setattr(dependencies.subprocess, "run", fake_run)
 
     detected = dependencies.collect_dependency_report(
@@ -85,7 +90,10 @@ def test_external_version_probe_failure_is_not_ready(tmp_path, monkeypatch):
     (tmp_path / "tools.json").write_text(json.dumps({
         "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
     }))
-    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/usr/bin/nmap")
+    executable = tmp_path / "nmap"
+    executable.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: str(executable))
     monkeypatch.setattr(
         dependencies.subprocess,
         "run",
@@ -118,7 +126,10 @@ def test_invalid_manifest_disables_external_version_probes(tmp_path, monkeypatch
         "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
     }))
     monkeypatch.setattr(dependencies, "load_dependency_manifest", lambda: (_ for _ in ()).throw(ValueError("invalid")))
-    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/usr/bin/nmap")
+    executable = tmp_path / "nmap"
+    executable.write_text("nmap executable", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: str(executable))
     monkeypatch.setattr(
         dependencies.subprocess,
         "run",
@@ -189,7 +200,10 @@ def test_untrusted_catalog_cannot_redirect_curated_probe(tmp_path, monkeypatch):
         }]
     }))
     calls = []
-    monkeypatch.setattr(dependencies.shutil, "which", lambda binary: f"/tmp/{binary}")
+    executable = tmp_path / "attacker-controlled-binary"
+    executable.write_text("#!/bin/sh\\nexit 0\\n", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: str(executable))
 
     def fake_run(argv, **kwargs):
         calls.append(argv)
@@ -212,3 +226,116 @@ def test_version_comparison_keeps_release_segments_separate_from_stage():
     from whaxon.core.dependencies import _version_tuple
     assert _version_tuple("1.0.1") > _version_tuple("1.0.dev1")
     assert _version_tuple("1.0.1") > _version_tuple("1.0")
+
+def test_external_binary_reports_path_ambiguity_and_filesystem_identity(tmp_path, monkeypatch):
+    import os
+
+    import whaxon.core.dependencies as dependencies
+
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    binary_a = first / "nmap"
+    binary_b = second / "nmap"
+    binary_a.write_text("first executable", encoding="utf-8")
+    binary_b.write_text("second executable", encoding="utf-8")
+    binary_a.chmod(0o755)
+    binary_b.chmod(0o755)
+    monkeypatch.setenv("PATH", os.pathsep.join((str(first), str(second))))
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: str(binary_a))
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
+    }), encoding="utf-8")
+
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=False
+    )
+    nmap = next(item for item in report["dependencies"] if item["id"] == "nmap")
+    assert nmap["status"] == "DETECTED"
+    assert nmap["path_conflict"] is True
+    assert len(nmap["path_candidates"]) == 2
+    assert nmap["executable_identity"]["identity_kind"] == "local-filesystem-metadata"
+    assert len(nmap["executable_identity"]["fingerprint"]) == 64
+    assert "PATH ambiguity" in nmap["reason"]
+
+
+def test_external_binary_with_unreadable_identity_is_not_version_probed(tmp_path, monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
+    }), encoding="utf-8")
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: "/missing/nmap")
+    monkeypatch.setattr(
+        dependencies.subprocess, "run",
+        lambda *_args, **_kwargs: pytest.fail("must not probe an uninspectable executable"),
+    )
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=True
+    )
+    nmap = next(item for item in report["dependencies"] if item["id"] == "nmap")
+    assert nmap["status"] == "BROKEN"
+    assert nmap["executable_identity"] is None
+    assert "identity could not be inspected" in nmap["reason"]
+
+
+def test_version_probe_does_not_clear_path_ambiguity(tmp_path, monkeypatch):
+    import os
+
+    import whaxon.core.dependencies as dependencies
+
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    selected = first / "nmap"
+    other = second / "nmap"
+    selected.write_text("selected executable", encoding="utf-8")
+    other.write_text("shadow executable", encoding="utf-8")
+    selected.chmod(0o755)
+    other.chmod(0o755)
+    (tmp_path / "tools.json").write_text(json.dumps({
+        "tools": [{"id": "nmap", "name": "Nmap", "binary": "nmap", "transport": "cli"}]
+    }), encoding="utf-8")
+    monkeypatch.setenv("PATH", os.pathsep.join((str(first), str(second))))
+    monkeypatch.setattr(dependencies.shutil, "which", lambda _binary: str(selected))
+    monkeypatch.setattr(
+        dependencies.subprocess, "run",
+        lambda argv, **kwargs: subprocess.CompletedProcess(
+            argv, 0, stdout="Nmap version 7.95", stderr=""
+        ),
+    )
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path, include_optional=False, verify_external=True
+    )
+    nmap = next(item for item in report["dependencies"] if item["id"] == "nmap")
+    assert nmap["status"] == "BROKEN"
+    assert nmap["path_conflict"] is True
+    assert "PATH ambiguity" in nmap["reason"]
+
+
+
+def test_gobuster_version_probe_uses_global_version_flag():
+    import re
+
+    gobuster = next(
+        item for item in load_dependency_manifest()["external_tools"]
+        if item["id"] == "gobuster"
+    )
+    assert gobuster["version_args"] == ["--version"]
+    assert re.search(gobuster["version_regex"], "Gobuster v3.8.2")
+    assert re.search(gobuster["version_regex"], "3.8.2")
+    assert re.search(gobuster["version_regex"], "gobuster version 3.8.2")
+
+
+
+def test_nuclei_version_probe_accepts_prefixed_version():
+    import re
+
+    nuclei = next(
+        item for item in load_dependency_manifest()["external_tools"]
+        if item["id"] == "nuclei"
+    )
+    assert re.search(nuclei["version_regex"], "Nuclei Engine Version: v3.4.10")
+    assert re.search(nuclei["version_regex"], "Nuclei Engine Version: 3.4.10")

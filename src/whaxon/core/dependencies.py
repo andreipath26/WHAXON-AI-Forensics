@@ -6,6 +6,7 @@ module; diagnostics never mutate the environment or invoke package managers.
 """
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
 import importlib.util
 import json
@@ -77,6 +78,59 @@ class DependencyResult:
     capabilities: tuple[str, ...] = ()
     reason: str = ""
     remediation: str = ""
+    path_candidates: tuple[str, ...] = ()
+    path_conflict: bool = False
+    executable_identity: dict[str, Any] | None = None
+
+
+def _path_candidates(binary: str, selected: str | None) -> tuple[str, ...]:
+    """List distinct executable candidates in PATH order without executing them."""
+    candidates: list[str] = []
+    extensions = [""]
+    if os.name == "nt":
+        extensions = [item.lower() for item in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")]
+        if Path(binary).suffix:
+            extensions = [""]
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        # Empty PATH entries mean the current directory; never treat cwd as an
+        # implicit executable search location in diagnostics.
+        if not entry:
+            continue
+        for extension in extensions:
+            candidate = Path(entry) / (binary + extension)
+            try:
+                if candidate.is_file() and (os.name == "nt" or os.access(candidate, os.X_OK)):
+                    resolved = os.path.realpath(candidate)
+                    if resolved not in candidates:
+                        candidates.append(resolved)
+            except OSError:
+                continue
+    if selected:
+        resolved_selected = os.path.realpath(selected)
+        if resolved_selected not in candidates:
+            candidates.insert(0, resolved_selected)
+    return tuple(candidates)
+
+
+def _executable_identity(path: str | None) -> dict[str, Any] | None:
+    """Return a local file identity fingerprint, not a publisher/signature claim."""
+    if not path:
+        return None
+    try:
+        resolved = os.path.realpath(path)
+        info = os.stat(resolved)
+        if not os.path.isfile(resolved):
+            return None
+        identity = f"{resolved}\\0{info.st_dev}\\0{info.st_ino}\\0{info.st_size}\\0{info.st_mtime_ns}"
+        return {
+            "real_path": resolved,
+            "size_bytes": info.st_size,
+            "modified_ns": info.st_mtime_ns,
+            "fingerprint": hashlib.sha256(identity.encode("utf-8", errors="surrogateescape")).hexdigest(),
+            "identity_kind": "local-filesystem-metadata",
+        }
+    except OSError:
+        return None
 
 
 def _version_tuple(value: str) -> tuple[int, tuple[int, ...], int, int]:
@@ -230,51 +284,66 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                 if not binary or transport != "cli":
                     continue
                 path = shutil.which(binary)
+                candidates = _path_candidates(binary, path)
+                identity = _executable_identity(path)
+                path_conflict = len(candidates) > 1
                 tool_id = str(tool.get("id") or binary)
                 status = "DETECTED" if path else "MISSING"
                 version = None
                 reason = (
-                    "Executable resolved on PATH; version and smoke test are not yet verified."
+                    "Executable resolved on PATH; version and functional behavior are not yet verified."
                     if path else f"Executable '{binary}' was not found on PATH."
                 )
+                if path and identity is None:
+                    status = "BROKEN"
+                    reason = "Executable resolved on PATH but its filesystem identity could not be inspected."
                 probe = external_probe_specs.get(tool_id)
                 # The writable tool catalog may discover binaries, but it must
                 # never redirect a trusted probe to a different executable.
                 if probe and probe.get("binary") != binary:
                     probe = None
-                if path and verify_external and not probe:
-                    reason = "No trusted version probe is configured for this catalog entry; binary remains detected only."
-                if path and verify_external and probe:
-                    try:
-                        completed = subprocess.run(
-                            [path, *probe["version_args"]],
-                            shell=False,
-                            check=False,
-                            capture_output=True,
-                            text=True,
-                            timeout=8,
-                            stdin=subprocess.DEVNULL,
-                        )
-                        output = ((completed.stdout or "") + "\\n" + (completed.stderr or ""))[:8192]
-                        match = re.search(probe["version_regex"], output, re.IGNORECASE)
-                        if completed.returncode == 0 and match:
-                            status = "READY"
-                            version = match.group(1) if match.lastindex else match.group(0)
-                            reason = "Trusted version probe succeeded."
-                        else:
-                            status = "BROKEN"
-                            reason = (
-                                f"Trusted version probe did not confirm the expected version "
-                                f"(exit code {completed.returncode})."
+                if path and verify_external:
+                    if probe is None:
+                        reason = "Executable detected; no trusted version probe is configured."
+                    elif identity is None:
+                        reason = "Executable identity could not be inspected; trusted version probe was not run."
+                    else:
+                        try:
+                            completed = subprocess.run(
+                                [path, *probe["version_args"]], shell=False, check=False,
+                                capture_output=True, text=True, timeout=8,
+                                stdin=subprocess.DEVNULL,
                             )
-                    except subprocess.TimeoutExpired:
-                        status = "BROKEN"
-                        reason = "Trusted version probe timed out after 8 seconds."
-                    except OSError as exc:
-                        status = "BROKEN"
-                        reason = f"Trusted version probe could not execute ({type(exc).__name__})."
-                elif path and verify_external and not probe:
-                    reason = "Executable detected; no trusted version probe is configured."
+                            output = ((completed.stdout or "") + "\\n" + (completed.stderr or ""))[:8192]
+                            match = re.search(probe["version_regex"], output, re.IGNORECASE)
+                            if completed.returncode == 0 and match:
+                                version = match.group(1) if match.lastindex else match.group(0)
+                                if path_conflict:
+                                    status = "BROKEN"
+                                    reason = (
+                                        "Trusted version probe succeeded, but multiple distinct executables "
+                                        "are present on PATH; resolve the ambiguity before use."
+                                    )
+                                else:
+                                    status = "READY"
+                                    reason = "Trusted version probe succeeded."
+                            else:
+                                status = "BROKEN"
+                                reason = (
+                                    "Trusted version probe did not confirm the expected version "
+                                    f"(exit code {completed.returncode})."
+                                )
+                        except subprocess.TimeoutExpired:
+                            status = "BROKEN"
+                            reason = "Trusted version probe timed out after 8 seconds."
+                        except OSError as exc:
+                            status = "BROKEN"
+                            reason = f"Trusted version probe could not execute ({type(exc).__name__})."
+                if path_conflict:
+                    reason += (
+                        f" PATH ambiguity: {len(candidates)} distinct executable candidates were found; "
+                        "the first PATH entry is selected. Review the candidate paths before use."
+                    )
                 results.append(DependencyResult(
                     tool_id, str(tool.get("name") or tool_id), "external-tool", False,
                     status,
@@ -282,9 +351,16 @@ def collect_dependency_report(*, data_dir: Path | None = None,
                     detected_path=path,
                     capabilities=(f"tool:{tool_id}",),
                     reason=reason,
-                    remediation=("" if status in {"READY", "DETECTED"} else
-                                 "Use the platform's trusted package source or official project instructions; "
-                                 "WHAXON has not attempted an installation."),
+                    remediation=(
+                        "Review PATH order and remove unintended duplicate executables before use."
+                        if path_conflict else
+                        ("" if status in {"READY", "DETECTED"} else
+                         "Use the platform's trusted package source or official project instructions; "
+                         "WHAXON has not attempted an installation.")
+                    ),
+                    path_candidates=candidates,
+                    path_conflict=path_conflict,
+                    executable_identity=identity,
                 ))
         except (OSError, ValueError, TypeError) as exc:
             results.append(DependencyResult(
@@ -296,6 +372,25 @@ def collect_dependency_report(*, data_dir: Path | None = None,
             "tool-catalog", "Tool catalog", "resource", True, "MISSING",
             reason=f"Tool catalog not found at {catalog_path}.",
             remediation="Restore the packaged tools.json resource or initialize the WHAXON data directory.",
+        ))
+
+    # Packaged validation payloads are mandatory runtime resources. Check them
+    # independently of optional external-tool discovery and never fetch replacements.
+    payload_dir = Path(__file__).resolve().parents[1] / "data" / "payloads"
+    try:
+        payload_files = [item for item in payload_dir.rglob("*") if item.is_file()]
+        if not payload_dir.is_dir() or not payload_files:
+            raise FileNotFoundError("payload directory is missing or empty")
+    except OSError as exc:
+        results.append(DependencyResult(
+            "validation-payloads", "Validation payloads", "resource", True, "BROKEN",
+            reason=f"Packaged validation payloads could not be inspected ({type(exc).__name__}).",
+            remediation="Restore the packaged whaxon/data/payloads resources from the release artifact.",
+        ))
+    else:
+        results.append(DependencyResult(
+            "validation-payloads", "Validation payloads", "resource", True, "READY",
+            reason=f"{len(payload_files)} packaged validation resource file(s) are present.",
         ))
 
     required_bad = [r for r in results if r.required and r.status != "READY"]

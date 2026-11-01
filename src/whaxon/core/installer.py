@@ -145,6 +145,13 @@ def _append_audit(record: dict[str, Any]) -> None:
                 os.close(descriptor)
 
 
+def record_dependency_install_event(event: dict[str, Any]) -> None:
+    """Append a setup-install event to the local tamper-evident audit chain."""
+    if not isinstance(event, dict) or not isinstance(event.get("event_type"), str):
+        raise ValueError("audit event must include an event_type")
+    _append_audit(event)
+
+
 def _verify_dependency_audit_unlocked(path: Path | None = None) -> dict[str, Any]:
     """Verify sequence and links; cannot detect an attacker rewriting the whole chain."""
     import hashlib
@@ -397,3 +404,113 @@ def apply_approved_dependency_plan(
     if progress_callback:
         progress_callback(result["status"], result.get("verification", result.get("recovery", "Installation finished.")))
     return result
+
+
+def apply_approved_dependency_batch(
+    dependency_ids: list[str],
+    approved_plan_id: str,
+    *,
+    data_dir: Path | None = None,
+    progress_callback: Callable[[str, str], None] | None = None,
+    cancel_requested: Callable[[], bool] | None = None,
+) -> dict[str, Any]:
+    """Apply a reviewed multi-package plan sequentially; never elevates privileges.
+
+    The batch plan hash binds the exact dependency selection and environment.
+    Each package is then re-planned and passed through the existing single-item
+    installer, preserving its allowlist, verification and audit behaviour.
+    """
+    from whaxon.core.remediation import build_remediation_plan
+
+    plan = build_remediation_plan(dependency_ids=dependency_ids, data_dir=data_dir)
+    if plan["plan_id"] != approved_plan_id:
+        raise ValueError("Approval does not match the current setup plan; regenerate and review it.")
+    if plan["unknown_dependency_ids"]:
+        raise ValueError("Setup plan contains unknown dependencies.")
+    actions = plan["actions"]
+    unsupported = [
+        action["dependency_id"]
+        for action in actions
+        if len(action.get("options", [])) != 1
+        or action["options"][0].get("kind") != "python-package"
+        or action["options"][0].get("automated_execution_supported") is not True
+    ]
+    if unsupported:
+        raise ValueError(
+            "Batch contains dependencies without a trusted automated Python installer: "
+            + ", ".join(unsupported)
+        )
+
+    # Record approval of the exact profile plan before the first package action.
+    # A batch's child package plans are regenerated for safe sequential execution;
+    # this event preserves the operator-approved parent selection in the audit chain.
+    _append_audit({
+        "event_type": "PROFILE_BATCH_APPROVAL_ACCEPTED",
+        "plan_id": approved_plan_id,
+        "dependency_ids": list(dependency_ids),
+        "status": "APPROVED",
+    })
+
+    def finish_batch(result: dict[str, Any]) -> dict[str, Any]:
+        try:
+            _append_audit({
+                "event_type": "PROFILE_BATCH_FINISHED",
+                "plan_id": approved_plan_id,
+                "dependency_ids": list(dependency_ids),
+                "status": result.get("status", "UNKNOWN"),
+            })
+        except (OSError, RuntimeError, ValueError) as exc:
+            return {
+                **result,
+                "original_status": result.get("status"),
+                "status": "AUDIT_FAILED",
+                "recovery": (
+                    "The profile operation ran, but its terminal audit event could not be persisted. "
+                    "Inspect the environment with whaxon doctor and verify the local audit chain "
+                    f"before retrying ({type(exc).__name__})."
+                ),
+            }
+        return result
+
+    completed: list[dict[str, Any]] = []
+    for index, action in enumerate(actions, start=1):
+        dependency_id = action["dependency_id"]
+        if cancel_requested and cancel_requested():
+            return finish_batch({
+                "status": "CANCELLED",
+                "completed": completed,
+                "remaining": [item["dependency_id"] for item in actions[index - 1:]],
+                "message": "Cancellation requested; completed package operations were not rolled back.",
+            })
+        if progress_callback:
+            progress_callback(dependency_id, f"Installing {index}/{len(actions)}")
+        single = build_remediation_plan(
+            dependency_ids=[dependency_id], data_dir=data_dir
+        )
+        result = apply_approved_dependency_plan(
+            dependency_id,
+            single["plan_id"],
+            data_dir=data_dir,
+            progress_callback=progress_callback,
+            cancel_requested=cancel_requested,
+        )
+        completed.append({"dependency_id": dependency_id, "result": result})
+        if result.get("status") != "VERIFIED":
+            remaining = [item["dependency_id"] for item in actions[index:]]
+            status = "CANCELLED" if result.get("status") == "CANCELLED" else "PARTIAL_FAILURE"
+            return finish_batch({
+                "status": status,
+                "completed": completed,
+                "remaining": remaining,
+                "message": (
+                    "Cancellation requested; completed package operations were not rolled back."
+                    if status == "CANCELLED"
+                    else "Stopped after the first failed or unverified package. Review doctor output before retrying."
+                ),
+            })
+    return finish_batch({
+        "status": "VERIFIED",
+        "completed": completed,
+        "remaining": [],
+        "message": "All approved Python package actions completed and passed their post-install checks.",
+    })

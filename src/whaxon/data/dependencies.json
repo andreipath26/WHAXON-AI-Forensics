@@ -261,9 +261,9 @@
       "id": "gobuster",
       "binary": "gobuster",
       "version_args": [
-        "version"
+        "--version"
       ],
-      "version_regex": "Gobuster v?([0-9]+(?:\\.[0-9]+)+)"
+      "version_regex": "(?:Gobuster v)?([0-9]+(?:\\.[0-9]+)+)"
     },
     {
       "id": "sqlmap",
@@ -279,7 +279,7 @@
       "version_args": [
         "-version"
       ],
-      "version_regex": "Nuclei Engine Version: ([0-9]+(?:\\.[0-9]+)+)"
+      "version_regex": "Nuclei Engine Version: v?([0-9]+(?:\\.[0-9]+)+)"
     },
     {
       "id": "ffuf",

@@ -19,7 +19,7 @@ The package metadata in `pyproject.toml` currently declares version `1.0.0` and 
 
 Some capabilities remain partial or environment-dependent. In particular, not every web-interface page is backed by a live service: the interaction audit marks individual controls as passing, wired-but-not-yet-browser-verified, mockups, or hidden. See [Web UI interaction audit](docs/WEB_UI_INTERACTION_AUDIT.md) before treating the browser interface as feature-complete.
 
-`main` now also includes the dependency-readiness and guided-installation workflow, plus the first safe bug-bounty ingestion slice. The dependency workflow provides read-only diagnostics, environment-bound remediation plans, explicit plan approval, and a restricted installer for manifest-listed Python packages. Bug-bounty ingestion creates review-only program drafts from supported public YesWeHack URLs or pasted text; it does not activate scope, authorize testing, or launch scans. These are bounded first implementations, not claims of complete cross-platform dependency remediation or a fully automated bug-bounty workflow.
+The dependency-readiness and guided-installation workflow provides read-only diagnostics, environment-bound remediation plans, explicit plan approval, and a restricted installer for manifest-listed Python packages. A separate curated OS-package installer supports selected tools on Debian/Ubuntu/Kali and supported macOS/Homebrew hosts; Windows and unsupported hosts receive manual guidance. Bug-bounty ingestion creates review-only program drafts from supported public YesWeHack URLs or pasted text; it does not activate scope, authorize testing, or launch scans. These are bounded first implementations, not claims of complete cross-platform dependency remediation or a fully automated bug-bounty workflow.
 
 ## What WHAXON does
 
@@ -30,7 +30,7 @@ Some capabilities remain partial or environment-dependent. In particular, not ev
 - **Validates selected findings conservatively.** Deterministic checks cover only defined finding types and request shapes. Unsupported or inconclusive findings remain candidates for analyst review.
 - **Preserves evidence and produces reports.** Stores engagement/job data locally and generates Markdown, HTML, PDF, JSON, and WHAXON-format engagement outputs where supported.
 - **Supports optional AI planning.** Configurable providers can propose actions and next steps. Execution remains bounded by the platform's scope and approval controls; AI output is not itself proof of a vulnerability.
-- **Diagnoses dependency readiness.** Reports required and optional Python packages, selected external-tool availability, environment drift, and reviewable remediation plans. Package installation is restricted to manifest-approved Python packages in an active virtual environment and requires explicit approval of a fresh plan.
+- **Diagnoses dependency readiness.** Reports required and optional Python packages, selected external-tool availability, environment drift, and reviewable remediation plans. Python package installation is restricted to manifest-approved packages in an active virtual environment and requires exact-plan approval. A separate OS-package installer supports a small curated external-tool mapping, with separate system-change and privilege consent.
 - **Imports bug-bounty program rules for review.** Accepts supported public YesWeHack program URLs or pasted/exported text and extracts draft scope/rule information with source provenance. Imports are not activated policies and do not grant authorization.
 
 ## Finding validation: what the verdicts mean
@@ -88,6 +88,26 @@ Catalog presence does not mean the executable is installed, configured, licensed
 ## Installation and dependency setup
 
 WHAXON requires **Python 3.11 or newer**. The installation workflow is designed to make the environment visible before changing it: install the package, run diagnostics, review missing dependencies, then explicitly approve any supported automated package installation.
+
+### Guided first-run setup (new)
+
+The guided setup command can create a fresh virtual environment and preview a dependency profile:
+
+```bash
+whaxon setup --create-venv
+# Activate the environment using the command printed by WHAXON.
+python -m pip install --upgrade whaxon
+whaxon doctor
+whaxon setup --profile standard
+```
+
+Choose `core`, `standard`, `full`, or `custom` according to the capabilities you need. The setup preview is read-only and prints an approval ID. Missing, explicitly allowlisted Python packages can be installed through the Python-package approval flow. A separate external-tool flow supports only curated package mappings available on the detected host; unsupported tool/platform combinations are reported as manual rather than guessed. Reuse the same profile and options when submitting the Python-package approval:
+
+```bash
+whaxon setup --profile standard --install --approve PLAN_ID
+```
+
+The command refuses to overwrite an existing virtual-environment directory. Package installation requires that the newly created environment is activated. External-tool installation is separate and opt-in. First preview the exact curated package mapping, then repeat the selected tool IDs and approve that exact plan. System package changes require a second explicit consent flag; Linux package managers that require root also require explicit non-interactive elevation consent. For example, on a Homebrew host: `whaxon setup --tool nmap --tool ffuf`, then `whaxon setup --tool nmap --tool ffuf --install-tools --approve-tools TOOLS_PLAN_ID --allow-system-changes`. Nmap, Gobuster, SQLmap and ffuf have curated apt/Homebrew mappings; Nuclei has a Homebrew mapping only; other tools and unsupported hosts remain manual. The installer verifies installed tools with the trusted version probes in the dependency manifest. It does not run scans.
 
 ### 1. Prepare an isolated Python environment
 
@@ -178,7 +198,7 @@ To run the bounded version checks for the external tools explicitly listed in th
 whaxon doctor --verify
 ```
 
-This checks curated version commands for supported tools such as Nmap, Gobuster, SQLmap, Nuclei, ffuf, NetExec, and Arjun. It is a version/readiness check, not a functional scan and not proof that every adapter or tool feature works. External security tools are **not installed by WHAXON's automatic installer**; install and configure them through their trusted platform-specific sources.
+This checks curated version commands for supported tools such as Nmap, Gobuster, SQLmap, Nuclei, ffuf, NetExec, and Arjun. It is a version/readiness check, not a functional scan and not proof that every adapter or tool feature works. External security tools are installed only through the separate curated OS-package flow described above. Tools without a trusted package mapping for the current host remain manual.
 
 ### 5. Review a guided remediation plan
 
