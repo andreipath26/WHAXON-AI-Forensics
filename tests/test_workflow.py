@@ -180,3 +180,83 @@ async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
     ).run("p")
     assert result["tasks"] == [{"id": "slow", "status": "uncertain"}]
     assert result["attempts"] == 1
+
+
+
+async def test_scheduler_runs_independent_tasks_concurrently(tmp_path):
+    import asyncio
+
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "scheduler-parallel.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "provider.a", "192.0.2.10"),
+        WorkflowTask("b", "provider.b", "192.0.2.11"),
+        WorkflowTask("c", "provider.c", "192.0.2.12", depends_on=("a", "b")),
+    )))
+    active = 0
+    peak = 0
+    gate = asyncio.Event()
+
+    async def dispatch(task):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        if task.id in ("a", "b"):
+            if peak >= 2:
+                gate.set()
+            await asyncio.wait_for(gate.wait(), timeout=1)
+        else:
+            assert task.id == "c"
+            states = store.list_workflow_tasks("p")
+            assert all(x["status"] == "succeeded" for x in states[:2])
+        active -= 1
+        return {"task": task.id}
+
+    result = await WorkflowScheduler(
+        store, authorize=lambda task: True, dispatch=dispatch,
+    ).run("p", max_concurrency=2)
+
+    assert peak == 2
+    assert result["attempts"] == 3
+    assert result["complete"] is True
+    assert [task["status"] for task in result["tasks"]] == [
+        "succeeded", "succeeded", "succeeded",
+    ]
+
+
+async def test_scheduler_respects_max_concurrency_and_task_budget(tmp_path):
+    import asyncio
+
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "scheduler-budget.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan("p", WorkflowPlan("m", tuple(
+        WorkflowTask(f"task-{i}", "provider.scan", f"192.0.2.{i + 1}")
+        for i in range(5)
+    )))
+    active = 0
+    peak = 0
+
+    async def dispatch(task):
+        nonlocal active, peak
+        active += 1
+        peak = max(peak, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return task.id
+
+    result = await WorkflowScheduler(
+        store, authorize=lambda task: True, dispatch=dispatch,
+    ).run("p", max_tasks=3, max_concurrency=2)
+
+    assert result["attempts"] == 3
+    assert peak <= 2
+    assert sum(task["status"] == "succeeded" for task in result["tasks"]) == 3
+    assert result["complete"] is False

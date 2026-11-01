@@ -38,6 +38,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--id", required=True)
     run.add_argument("--max-tasks", type=int, default=100)
     run.add_argument("--max-attempts", type=int, default=2)
+    run.add_argument("--max-concurrency", type=int, default=4,
+                     help="maximum independent workflow tasks running at once")
     return parser
 
 
@@ -73,8 +75,8 @@ def main(args: list[str] | None = None) -> int:
             }, indent=2, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "run":
-            if options.max_tasks < 1 or options.max_attempts < 1:
-                print("--max-tasks and --max-attempts must be positive", file=sys.stderr)
+            if options.max_tasks < 1 or options.max_attempts < 1 or options.max_concurrency < 1:
+                print("--max-tasks, --max-attempts and --max-concurrency must be positive", file=sys.stderr)
                 return 2
 
             async def execute():
@@ -82,6 +84,7 @@ def main(args: list[str] | None = None) -> int:
                 return await core.run_workflow_plan(
                     options.id, max_tasks=options.max_tasks,
                     max_attempts=options.max_attempts,
+                    max_concurrency=options.max_concurrency,
                 )
 
             workflow_result = asyncio.run(execute())

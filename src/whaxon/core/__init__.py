@@ -195,6 +195,7 @@ class Core:
     async def run_workflow_plan(
         self, plan_id: str, *, authorize=None, dispatch=None,
         worker_id: str = "workflow-worker", max_tasks: int = 100, max_attempts: int = 2,
+        max_concurrency: int = 4,
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""
         scheduler = self.workflow_scheduler(
@@ -202,6 +203,7 @@ class Core:
         )
         return await scheduler.run(
             plan_id, max_tasks=max_tasks, max_attempts=max_attempts,
+            max_concurrency=max_concurrency,
         )
 
     async def initialize(self, drain: bool = True) -> None:
