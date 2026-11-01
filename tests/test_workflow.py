@@ -88,8 +88,8 @@ def test_approval_binding_is_invalidated_by_any_bound_change():
 
 
 async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_path):
-    from whaxon.core.store import JobStore
     from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
 
     store = JobStore(tmp_path / "scheduler-exhausted.db")
     store.create_mission("mission-1", "objective")

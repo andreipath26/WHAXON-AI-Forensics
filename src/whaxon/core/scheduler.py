@@ -87,5 +87,8 @@ class WorkflowScheduler:
         return {
             "plan_id": plan_id, "attempts": completed, "outcomes": outcomes,
             "tasks": [{"id": task["id"], "status": task["status"]} for task in tasks],
-            "complete": all(\n                task["status"] in ("succeeded", "failed", "blocked", "cancelled", "uncertain")\n                for task in tasks\n            ),
+            "complete": all(
+                task["status"] in ("succeeded", "failed", "blocked", "cancelled", "uncertain")
+                for task in tasks
+            ),
         }
