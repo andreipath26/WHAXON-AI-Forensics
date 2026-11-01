@@ -263,11 +263,27 @@ class JobStore:
         c = self._conn()
         try:
             return c.execute(
-                "SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?",
+                "SELECT 1 FROM jobs WHERE id=? AND status IN ('running', 'finished') AND lease_token=?",
                 (job_id, lease_token),
             ).fetchone() is not None
         finally:
             c.close()
+
+    def release_lease(self, job_id, lease_token):
+        """Release a terminal job lease after its event callbacks have persisted."""
+        if not lease_token:
+            return False
+        with self._lock:
+            c = self._conn()
+            try:
+                cur = c.execute(
+                    "UPDATE jobs SET lease_owner=NULL, lease_token=NULL, heartbeat_at=NULL "
+                    "WHERE id=? AND status IN ('finished', 'failed') AND lease_token=?",
+                    (job_id, lease_token),
+                )
+                return cur.rowcount == 1
+            finally:
+                c.close()
 
     def reconcile_stale(self, older_than_s=120.0):
         """Fail expired running jobs without replaying uncertain side effects."""
@@ -374,8 +390,7 @@ class JobStore:
             try:
                 if lease_token:
                     cur = c.execute(
-                        "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=?, "
-                        "lease_owner=NULL, lease_token=NULL, heartbeat_at=NULL "
+                        "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? "
                         "WHERE id=? AND status='running' AND lease_token=?",
                         (exit_code, duration_s, time.time(), job_id, lease_token),
                     )
