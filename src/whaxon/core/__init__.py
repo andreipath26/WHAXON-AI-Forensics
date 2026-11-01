@@ -139,6 +139,33 @@ class Core:
             self.store.record_coverage(e.job_id, e.tool_id, e.target, e.kind, e.detail, getattr(e, "phase", ""))
         self.bus.subscribe(CoverageSkipped, _on_coverage)
 
+    def create_mission(self, mission_id: str, objective: str, metadata=None):
+        """Create a durable Engine v2 mission through the shared Core service."""
+        return self.store.create_mission(mission_id, objective, metadata)
+
+    def save_workflow_plan(self, plan_id: str, plan):
+        """Validate and persist a versioned mission DAG."""
+        return self.store.save_workflow_plan(plan_id, plan)
+
+    def workflow_scheduler(self, *, authorize, dispatch, worker_id: str = "workflow-worker"):
+        """Build a scheduler with explicit policy and provider execution boundaries."""
+        from .scheduler import WorkflowScheduler
+        return WorkflowScheduler(
+            self.store, authorize=authorize, dispatch=dispatch, worker_id=worker_id,
+        )
+
+    async def run_workflow_plan(
+        self, plan_id: str, *, authorize, dispatch,
+        worker_id: str = "workflow-worker", max_tasks: int = 100, max_attempts: int = 2,
+    ):
+        """Run a persisted plan; all authorization and dispatch stay injected."""
+        scheduler = self.workflow_scheduler(
+            authorize=authorize, dispatch=dispatch, worker_id=worker_id,
+        )
+        return await scheduler.run(
+            plan_id, max_tasks=max_tasks, max_attempts=max_attempts,
+        )
+
     async def initialize(self, drain: bool = True) -> None:
         """Called once by any interface. Awaitable inside a splash screen.
 
@@ -153,7 +180,10 @@ class Core:
         # jobs a previous process queued (the durable auto-chain).
         try:
             self.store.reconcile_stale()
+            self.store.reconcile_workflow_attempts()
         except Exception:
+            # Startup remains available, but an unreconciled workflow task
+            # cannot be reclaimed by the scheduler; operators can inspect it.
             pass
         if drain:
             try:

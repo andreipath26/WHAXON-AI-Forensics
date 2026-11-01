@@ -874,6 +874,37 @@ class JobStore:
         finally:
             c.close()
 
+    def reconcile_workflow_attempts(self):
+        """Mark orphaned running attempts uncertain; never replay unknown side effects."""
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                rows = c.execute(
+                    "SELECT id, task_id FROM task_attempts WHERE status='running'"
+                ).fetchall()
+                for row in rows:
+                    error = "worker stopped before recording an outcome; reconcile before retry"
+                    c.execute(
+                        "UPDATE task_attempts SET status='uncertain', finished_at=?, error=? "
+                        "WHERE id=? AND status='running'",
+                        (now, error, row["id"]),
+                    )
+                    c.execute(
+                        "UPDATE workflow_tasks SET status='uncertain', error=?, updated_at=? "
+                        "WHERE id=? AND status='running'",
+                        (error, now, row["task_id"]),
+                    )
+                c.execute("COMMIT")
+                return len(rows)
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
     def claim_ready_workflow_task(self, plan_id, worker_id, max_attempts=3):
         """Atomically claim the next DAG node whose dependencies all succeeded."""
         import uuid

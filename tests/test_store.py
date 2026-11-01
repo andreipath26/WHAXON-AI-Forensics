@@ -286,3 +286,26 @@ def test_task_attempt_rejects_idempotency_mismatch(tmp_path):
     )
     with pytest.raises(ValueError, match="idempotency key mismatch"):
         store.start_task_attempt("a", "scan", 1, idempotency_key="other")
+
+
+def test_reconcile_running_workflow_attempts_as_uncertain(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-recovery.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("scan", "network.port_scan", "192.0.2.10"),)),
+    )
+    row = store.claim_ready_workflow_task("p", "worker-a")
+    assert row is not None
+    assert store.reconcile_workflow_attempts() == 1
+    assert store.list_workflow_tasks("p")[0]["status"] == "uncertain"
+    conn = store._conn()
+    try:
+        attempt = conn.execute("SELECT status, error FROM task_attempts").fetchone()
+        assert attempt["status"] == "uncertain"
+        assert "reconcile before retry" in attempt["error"]
+    finally:
+        conn.close()
+    assert store.reconcile_workflow_attempts() == 0

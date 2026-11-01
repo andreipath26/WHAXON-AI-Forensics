@@ -79,3 +79,30 @@ def test_capability_manifest_nested_schema_is_immutable():
     with pytest.raises(TypeError, match="immutable"):
         manifest.input_schema["properties"]["new"] = {}
     assert manifest.input_schema["properties"]["ports"]["enum"] == (80, 443)
+
+
+def test_capability_registry_persists_and_reloads_manifests(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "capabilities.db")
+    registry = CapabilityRegistry(store=store)
+    manifest = _manifest("provider.persisted", readiness="smoke_tested")
+    registry.register(manifest)
+    restored = CapabilityRegistry(store=store)
+    result = restored.resolve(
+        "network.port_scan",
+        CapabilityRequirements(minimum_readiness="smoke_tested"),
+    )
+    assert result.manifest.fingerprint == manifest.fingerprint
+    assert restored.digest == registry.digest
+
+
+def test_store_rejects_manifest_version_mutation(tmp_path):
+    import pytest
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "capability-immutable.db")
+    registry = CapabilityRegistry(store=store)
+    registry.register(_manifest("provider.immutable", readiness="installed"))
+    with pytest.raises(ValueError, match="immutable"):
+        registry.register(_manifest("provider.immutable", readiness="lab_validated"))

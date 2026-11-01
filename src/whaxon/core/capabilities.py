@@ -117,6 +117,16 @@ class CapabilityManifest:
             value[name] = list(getattr(self, name))
         return value
 
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> CapabilityManifest:
+        fields = dict(value)
+        for name in (
+            "transports", "target_types", "protocols", "platforms", "auth_methods",
+            "permissions", "side_effects", "limitations",
+        ):
+            fields[name] = tuple(fields.get(name) or ())
+        return cls(**fields)
+
     @property
     def fingerprint(self) -> str:
         return hashlib.sha256(_canonical(self.to_dict()).encode("utf-8")).hexdigest()
@@ -156,16 +166,22 @@ class CapabilityUnavailable(LookupError):
 class CapabilityRegistry:
     """In-memory, deterministic registry; callers persist/version snapshots separately."""
 
-    def __init__(self) -> None:
+    def __init__(self, store=None) -> None:
+        self._store = store
         self._manifests: dict[tuple[str, str, str], CapabilityManifest] = {}
+        if store is not None:
+            for value in store.list_capability_manifests():
+                self.register(CapabilityManifest.from_dict(value), persist=False)
 
-    def register(self, manifest: CapabilityManifest) -> None:
+    def register(self, manifest: CapabilityManifest, *, persist: bool = True) -> None:
         if not isinstance(manifest, CapabilityManifest):
             raise TypeError("manifest must be a CapabilityManifest")
         key = (manifest.capability_id, manifest.provider_id, manifest.provider_version)
         existing = self._manifests.get(key)
         if existing is not None and existing.fingerprint != manifest.fingerprint:
             raise ValueError("provider manifest version is immutable")
+        if persist and self._store is not None:
+            self._store.save_capability_manifest(manifest.to_dict())
         self._manifests[key] = manifest
 
     def list(self, capability_id: str | None = None) -> list[CapabilityManifest]:
