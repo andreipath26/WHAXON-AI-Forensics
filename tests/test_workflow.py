@@ -85,3 +85,43 @@ def test_approval_binding_is_invalidated_by_any_bound_change():
     assert not approval.is_valid(
         plan_digest=plan.digest, task=task, policy_version="policy.v1", now=200.0,
     )
+
+
+async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.scheduler import WorkflowScheduler
+
+    store = JobStore(tmp_path / "scheduler-exhausted.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    calls = []
+
+    def dispatch(task):
+        calls.append(task.id)
+        raise RuntimeError("provider unavailable")
+
+    scheduler = WorkflowScheduler(store, authorize=lambda task: True, dispatch=dispatch)
+    result = await scheduler.run("p", max_attempts=1)
+    assert calls == ["recon"]
+    assert result["tasks"] == [
+        {"id": "recon", "status": "failed"},
+        {"id": "web", "status": "blocked"},
+    ]
+    assert result["complete"] is True
+
+
+async def test_scheduler_blocks_dependants_after_policy_denial(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.scheduler import WorkflowScheduler
+
+    store = JobStore(tmp_path / "scheduler-blocked.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    result = await WorkflowScheduler(
+        store, authorize=lambda task: False, dispatch=lambda task: None,
+    ).run("p")
+    assert result["tasks"] == [
+        {"id": "recon", "status": "blocked"},
+        {"id": "web", "status": "blocked"},
+    ]
+    assert result["complete"] is True

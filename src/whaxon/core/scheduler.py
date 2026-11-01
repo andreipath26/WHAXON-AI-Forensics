@@ -52,7 +52,16 @@ class WorkflowScheduler:
             )
             attempt_id = row["attempt_id"]
             try:
-                if self.authorize(task) is not True:
+                try:
+                    authorized = self.authorize(task)
+                except Exception as exc:
+                    self.store.finish_task_attempt(
+                        attempt_id, "blocked",
+                        error=f"policy authorization failed closed: {type(exc).__name__}",
+                    )
+                    outcomes.append({"task_id": task.id, "status": "blocked"})
+                    continue
+                if authorized is not True:
                     self.store.finish_task_attempt(
                         attempt_id, "blocked", error="deterministic policy denied task",
                     )
@@ -78,5 +87,5 @@ class WorkflowScheduler:
         return {
             "plan_id": plan_id, "attempts": completed, "outcomes": outcomes,
             "tasks": [{"id": task["id"], "status": task["status"]} for task in tasks],
-            "complete": all(task["status"] in ("succeeded", "blocked", "cancelled") for task in tasks),
+            "complete": all(\n                task["status"] in ("succeeded", "failed", "blocked", "cancelled", "uncertain")\n                for task in tasks\n            ),
         }

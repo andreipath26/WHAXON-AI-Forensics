@@ -900,7 +900,29 @@ class JobStore:
                             f"SELECT id, status FROM workflow_tasks WHERE id IN ({marks})",
                             tuple(dependencies),
                         ).fetchall()
-                        if len(states) != len(dependencies) or any(x["status"] != "succeeded" for x in states):
+                        if len(states) != len(dependencies):
+                            continue
+                        failed_terminal = False
+                        for dependency in states:
+                            if dependency["status"] in ("blocked", "cancelled", "uncertain"):
+                                failed_terminal = True
+                                break
+                            if dependency["status"] == "failed":
+                                dep_attempts = c.execute(
+                                    "SELECT COUNT(*) AS n FROM task_attempts WHERE task_id=?",
+                                    (dependency["id"],),
+                                ).fetchone()["n"]
+                                if dep_attempts >= max_attempts:
+                                    failed_terminal = True
+                                    break
+                        if failed_terminal:
+                            c.execute(
+                                "UPDATE workflow_tasks SET status='blocked', "
+                                "error='dependency did not complete successfully', updated_at=? WHERE id=?",
+                                (time.time(), row["id"]),
+                            )
+                            continue
+                        if any(x["status"] != "succeeded" for x in states):
                             continue
                     attempt_no = count + 1
                     attempt_id = uuid.uuid4().hex
