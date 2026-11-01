@@ -147,6 +147,7 @@ def test_workflow_contract_nested_mappings_are_immutable():
 
 def test_workflow_task_rejects_non_finite_timeout():
     import math
+
     import pytest
 
     with pytest.raises(ValueError, match="finite"):
