@@ -209,3 +209,80 @@ def test_release_lease_rejects_wrong_token_and_nonterminal_job(tmp_path):
     assert not store.release_lease("job-2", "wrong-token")
     assert not store.release_lease("job-2", token)
     assert store.owns_lease("job-2", token)
+
+
+def test_workflow_plan_persistence_is_immutable_and_roundtrips(tmp_path):
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow.db")
+    store.create_mission("mission-1", "Assess the approved web target")
+    plan = WorkflowPlan(
+        mission_id="mission-1",
+        tasks=(
+            WorkflowTask("recon", "network.port_scan", "192.0.2.10"),
+            WorkflowTask("web", "web.fingerprint", "192.0.2.10", depends_on=("recon",)),
+        ),
+    )
+    assert store.save_workflow_plan("plan-1", plan) is True
+    assert store.save_workflow_plan("plan-1", plan) is False
+    saved = store.get_workflow_plan("plan-1")
+    assert saved["digest"] == plan.digest
+    assert saved["plan"] == plan.to_dict()
+    tasks = store.list_workflow_tasks("plan-1")
+    assert [task["id"] for task in tasks] == ["recon", "web"]
+    assert tasks[1]["depends_on"] == ["recon"]
+
+
+def test_workflow_plan_cannot_be_replaced_or_saved_without_mission(tmp_path):
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-immutable.db")
+    plan = WorkflowPlan("missing", (WorkflowTask("a", "recon", "192.0.2.1"),))
+    with pytest.raises(ValueError, match="unknown mission"):
+        store.save_workflow_plan("plan", plan)
+    store.create_mission("m", "objective")
+    plan = WorkflowPlan("m", (WorkflowTask("a", "recon", "192.0.2.1"),))
+    store.save_workflow_plan("plan", plan)
+    changed = WorkflowPlan("m", (WorkflowTask("a", "recon", "192.0.2.2"),))
+    with pytest.raises(ValueError, match="immutable"):
+        store.save_workflow_plan("plan", changed)
+
+
+def test_task_attempt_lifecycle_is_durable_and_atomic(tmp_path):
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-attempts.db")
+    store.create_mission("m", "objective")
+    plan = WorkflowPlan(
+        "m",
+        (WorkflowTask("scan", "network.port_scan", "192.0.2.10",
+                      idempotency_key="scan-m-1"),),
+    )
+    store.save_workflow_plan("p", plan)
+    assert store.start_task_attempt(
+        "attempt-1", "scan", 1, worker_id="worker-a", idempotency_key="scan-m-1",
+    )
+    assert store.list_workflow_tasks("p")[0]["status"] == "running"
+    assert store.finish_task_attempt(
+        "attempt-1", "succeeded", result={"finding_count": 2},
+    )
+    task = store.list_workflow_tasks("p")[0]
+    assert task["status"] == "succeeded"
+    assert task["result"] == {"finding_count": 2}
+    with pytest.raises(ValueError, match="already terminal"):
+        store.finish_task_attempt("attempt-1", "failed")
+
+
+def test_task_attempt_rejects_idempotency_mismatch(tmp_path):
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-idempotency.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan(
+            "m", (WorkflowTask("scan", "network.port_scan", "192.0.2.10",
+                               idempotency_key="expected"),),
+        ),
+    )
+    with pytest.raises(ValueError, match="idempotency key mismatch"):
+        store.start_task_attempt("a", "scan", 1, idempotency_key="other")

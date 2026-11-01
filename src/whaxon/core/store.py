@@ -29,6 +29,31 @@ CREATE TABLE IF NOT EXISTS ai_runs (id TEXT PRIMARY KEY, goal TEXT NOT NULL, pro
 CREATE TABLE IF NOT EXISTS ai_run_steps (run_id TEXT, seq INTEGER, action_json TEXT, result_json TEXT, created_at REAL, PRIMARY KEY (run_id, seq));
 CREATE INDEX IF NOT EXISTS idx_ai_runs_started ON ai_runs(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_run_steps_run ON ai_run_steps(run_id, seq);
+CREATE TABLE IF NOT EXISTS missions (
+    id TEXT PRIMARY KEY, objective TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft',
+    metadata_json TEXT NOT NULL DEFAULT '{}', created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workflow_plans (
+    id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, schema_version TEXT NOT NULL,
+    digest TEXT NOT NULL, plan_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'proposed',
+    created_at REAL NOT NULL, UNIQUE(mission_id, digest)
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_plans_mission ON workflow_plans(mission_id, created_at);
+CREATE TABLE IF NOT EXISTS workflow_tasks (
+    id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, capability_id TEXT NOT NULL,
+    target TEXT NOT NULL, inputs_json TEXT NOT NULL, depends_on_json TEXT NOT NULL,
+    permissions_json TEXT NOT NULL, impact TEXT NOT NULL, timeout_s REAL NOT NULL,
+    idempotency_key TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
+    result_json TEXT, error TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_tasks_plan ON workflow_tasks(plan_id);
+CREATE TABLE IF NOT EXISTS task_attempts (
+    id TEXT PRIMARY KEY, task_id TEXT NOT NULL, attempt_no INTEGER NOT NULL,
+    status TEXT NOT NULL, worker_id TEXT NOT NULL DEFAULT '', idempotency_key TEXT NOT NULL DEFAULT '',
+    started_at REAL NOT NULL, finished_at REAL, result_json TEXT, error TEXT,
+    UNIQUE(task_id, attempt_no)
+);
+CREATE INDEX IF NOT EXISTS idx_task_attempts_task ON task_attempts(task_id, attempt_no);
 """
 
 
@@ -726,6 +751,195 @@ class JobStore:
                     reverse=True,
                 )
                 return result[:limit]
+            finally:
+                c.close()
+
+    # --- Engine v2 mission and workflow persistence ----------------------
+
+    def create_mission(self, mission_id, objective, metadata=None):
+        """Persist a mission objective; repeated identical creation is idempotent."""
+        if not mission_id or not str(mission_id).strip() or not objective or not str(objective).strip():
+            raise ValueError("mission id and objective are required")
+        now = time.time()
+        encoded = json.dumps(metadata or {}, sort_keys=True)
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute(
+                    "INSERT OR IGNORE INTO missions "
+                    "(id, objective, metadata_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (mission_id, objective, encoded, now, now),
+                )
+                row = c.execute("SELECT objective, metadata_json FROM missions WHERE id=?", (mission_id,)).fetchone()
+                if row["objective"] != objective or row["metadata_json"] != encoded:
+                    raise ValueError("mission id already exists with different content")
+                return self.get_mission(mission_id)
+            finally:
+                c.close()
+
+    def get_mission(self, mission_id):
+        c = self._conn()
+        try:
+            row = c.execute("SELECT * FROM missions WHERE id=?", (mission_id,)).fetchone()
+            if row is None:
+                return None
+            value = dict(row)
+            value["metadata"] = json.loads(value.pop("metadata_json") or "{}")
+            return value
+        finally:
+            c.close()
+
+    def save_workflow_plan(self, plan_id, plan):
+        """Persist an immutable validated WorkflowPlan and its DAG nodes atomically."""
+        from .workflow import WorkflowPlan
+        if isinstance(plan, dict):
+            plan = WorkflowPlan.from_dict(plan)
+        if not isinstance(plan, WorkflowPlan):
+            raise TypeError("plan must be a WorkflowPlan or its dictionary representation")
+        if not plan_id or not str(plan_id).strip():
+            raise ValueError("plan_id is required")
+        encoded = json.dumps(plan.to_dict(), sort_keys=True, separators=(",", ":"))
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (plan.mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {plan.mission_id}")
+                existing = c.execute(
+                    "SELECT digest FROM workflow_plans WHERE id=?", (plan_id,)
+                ).fetchone()
+                if existing:
+                    if existing["digest"] != plan.digest:
+                        raise ValueError("workflow plan ids are immutable; create a new plan id")
+                    c.execute("COMMIT")
+                    return False
+                c.execute(
+                    "INSERT INTO workflow_plans "
+                    "(id, mission_id, schema_version, digest, plan_json, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (plan_id, plan.mission_id, plan.schema_version, plan.digest, encoded, now),
+                )
+                for task in plan.tasks:
+                    c.execute(
+                        "INSERT INTO workflow_tasks "
+                        "(id, plan_id, capability_id, target, inputs_json, depends_on_json, "
+                        "permissions_json, impact, timeout_s, idempotency_key, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            task.id, plan_id, task.capability_id, task.target,
+                            json.dumps(task.inputs, sort_keys=True),
+                            json.dumps(task.depends_on), json.dumps(task.permissions),
+                            task.impact, task.timeout_s, task.idempotency_key, now, now,
+                        ),
+                    )
+                c.execute("COMMIT")
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_workflow_plan(self, plan_id):
+        c = self._conn()
+        try:
+            row = c.execute("SELECT * FROM workflow_plans WHERE id=?", (plan_id,)).fetchone()
+            if row is None:
+                return None
+            value = dict(row)
+            value["plan"] = json.loads(value.pop("plan_json"))
+            return value
+        finally:
+            c.close()
+
+    def list_workflow_tasks(self, plan_id):
+        c = self._conn()
+        try:
+            rows = c.execute(
+                "SELECT * FROM workflow_tasks WHERE plan_id=? ORDER BY rowid", (plan_id,)
+            ).fetchall()
+            result = []
+            for row in rows:
+                value = dict(row)
+                for column, key in (
+                    ("inputs_json", "inputs"), ("depends_on_json", "depends_on"),
+                    ("permissions_json", "permissions"), ("result_json", "result"),
+                ):
+                    raw = value.pop(column)
+                    value[key] = json.loads(raw) if raw else (None if key == "result" else {})
+                result.append(value)
+            return result
+        finally:
+            c.close()
+
+    def start_task_attempt(self, attempt_id, task_id, attempt_no, worker_id="", idempotency_key=""):
+        """Create a durable attempt and atomically move its task to running."""
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                task = c.execute(
+                    "SELECT status, idempotency_key FROM workflow_tasks WHERE id=?", (task_id,)
+                ).fetchone()
+                if task is None:
+                    raise ValueError(f"unknown workflow task: {task_id}")
+                if task["status"] in ("succeeded", "cancelled"):
+                    raise ValueError(f"task is terminal: {task_id}")
+                if task["idempotency_key"] and idempotency_key != task["idempotency_key"]:
+                    raise ValueError("task attempt idempotency key mismatch")
+                c.execute(
+                    "INSERT INTO task_attempts "
+                    "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at) "
+                    "VALUES (?, ?, ?, 'running', ?, ?, ?)",
+                    (attempt_id, task_id, int(attempt_no), worker_id, idempotency_key, now),
+                )
+                c.execute(
+                    "UPDATE workflow_tasks SET status='running', error=NULL, updated_at=? WHERE id=?",
+                    (now, task_id),
+                )
+                c.execute("COMMIT")
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def finish_task_attempt(self, attempt_id, status, result=None, error=""):
+        """Record an attempt outcome and update its task in one transaction."""
+        if status not in ("succeeded", "failed", "cancelled", "uncertain"):
+            raise ValueError(f"invalid terminal attempt status: {status}")
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute(
+                    "SELECT task_id, status FROM task_attempts WHERE id=?", (attempt_id,)
+                ).fetchone()
+                if row is None:
+                    raise ValueError(f"unknown task attempt: {attempt_id}")
+                if row["status"] != "running":
+                    raise ValueError("task attempt is already terminal")
+                encoded = json.dumps(result, sort_keys=True) if result is not None else None
+                c.execute(
+                    "UPDATE task_attempts SET status=?, finished_at=?, result_json=?, error=? WHERE id=?",
+                    (status, now, encoded, error, attempt_id),
+                )
+                c.execute(
+                    "UPDATE workflow_tasks SET status=?, result_json=?, error=?, updated_at=? WHERE id=?",
+                    (status, encoded, error, now, row["task_id"]),
+                )
+                c.execute("COMMIT")
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
             finally:
                 c.close()
 
