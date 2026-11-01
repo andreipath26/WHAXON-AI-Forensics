@@ -63,6 +63,8 @@ class WorkflowScheduler:
                 if inspect.isawaitable(authorized):
                     authorized = await authorized
             except Exception as exc:
+                if lease_lost.is_set():
+                    return {"task_id": task.id, "status": "uncertain"}
                 self.store.finish_task_attempt(
                     attempt_id, "blocked",
                     error=f"policy authorization failed closed: {type(exc).__name__}",
@@ -103,7 +105,7 @@ class WorkflowScheduler:
         except asyncio.CancelledError:
             if not lease_lost.is_set():
                 self.store.finish_task_attempt(
-                attempt_id, "uncertain",
+                    attempt_id, "uncertain",
                     error="scheduler cancelled while task was active; reconcile before retry",
                 )
             raise
