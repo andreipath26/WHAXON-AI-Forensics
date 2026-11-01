@@ -3573,3 +3573,27 @@ Do not bypass E1/E2/E3, create a competing manifest/scheduler, or pull deferred 
 Prove that: all current catalog/adapters/transports/providers are reconciled; mismatches and duplicates are detected; local discovery does not run operational functionality or mutate the system; candidate reports are reproducible and source-backed; upstream support is distinguishable from implementation/testing/authorization; compatibility, licensing and maintenance risks are reported; malicious metadata cannot grant permission or execute code; no install/upgrade/plugin/credential/operation occurs without separate approval; lifecycle is auditable/revocable; monitoring reports deltas without runtime changes; new providers do not require scheduler changes; and existing regressions remain green.
 
 **Definition of done:** an operator can audit the portfolio or evaluate a candidate and receive a reproducible capability/gap/risk report and controlled implementation proposal. Approved providers use the same versioned Engine v2 contracts as existing and future tools.
+
+
+## Implementation update — 2026-11-01 (supersedes the earlier E2/E3-only status)
+
+The following Engine v2 work is now implemented on `main`; release acceptance is still open:
+
+- **E2 contracts/persistence:** versioned WorkflowTask/WorkflowPlan contracts, immutable nested JSON values, deterministic plan digests, exact ApprovalBinding, durable mission/plan/task/attempt storage, immutable versioned capability manifests, and plan-local task identifiers.
+- **E3 scheduler/recovery:** atomic dependency-ready claims, bounded retries, explicit fail-closed authorization, synchronous and asynchronous provider deadlines, stale-attempt fencing, cancellation/timeout uncertainty, interrupted-worker reconciliation, and legacy attempt recovery. Unknown outcomes are not automatically replayed.
+- **E4 first integration slice:** catalog-backed adapter providers are registered through the common capability registry. An allowlist of read-only scanner adapters dispatches through the existing ToolRunner, preserving existing scope checks, process isolation, adapter parsing, events and evidence persistence. Credential attacks, exploit frameworks, command execution and session transports are intentionally excluded pending dedicated policy/approval contracts.
+- **Shared Core:** Core now exposes mission/plan/scheduler services and a default fail-closed policy that requires an exact manifest permission/impact match and an in-scope target. The scheduler can use the real catalog provider bridge without a caller-supplied dispatch callback.
+- **Headless:** the CI headless Linux server smoke passed on the provider-integration build. Full Python-version regression and static checks remain under CI verification; do not mark the release green until the latest run is complete.
+
+### Still required before v2 deployment
+
+1. Complete E1 security acceptance and regression testing, including scope/DNS/pivot edge cases and worker ownership races.
+2. Complete E3 production guarantees: durable cancellation semantics, execution budgets/concurrency limits, audit/outbox guarantees, and reconciliation interfaces for uncertain external effects.
+3. Complete E4 portfolio reconciliation and truthful capability/readiness extraction; add supported session/Metasploit/API transports only behind their own policy and tests.
+4. Complete E5 shared CLI/API/headless application lifecycle and expose durable progress, coverage, evidence and verification state.
+5. Complete E6 supplied-UI integration without redesign or placeholder capabilities.
+6. Run full cross-version tests, static analysis, packaging/install/upgrade tests, restart/recovery tests and controlled-target end-to-end acceptance. Deployment is blocked until all required jobs pass.
+
+### Current execution example
+
+The first provider-backed task uses a capability such as `tool.nmap`, with `permissions=("network.scan",)`, `impact="moderate"`, an explicitly in-scope target and empty `inputs`. Dynamic CLI arguments are deliberately rejected by this initial provider bridge. The provider invokes the existing ToolRunner; it does not construct shell commands or bypass scope enforcement.

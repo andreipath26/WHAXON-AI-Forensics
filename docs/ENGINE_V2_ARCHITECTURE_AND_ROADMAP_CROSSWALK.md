@@ -291,3 +291,27 @@ The first implementation slice is on main:
 - E3 foundation: WorkflowScheduler atomically claims dependency-ready tasks, bounds retries, requires an explicit authorization callback and marks timeouts uncertain rather than replaying potentially side-effecting work.
 - These are foundational primitives, not a claim that Engine v2 is integrated or release-ready. The scheduler is not yet connected to a capability provider resolver or Core/API/UI. AI cannot directly authorize or bypass dispatch.
 - Next: pass E1 security/regression acceptance; add task-attempt lease recovery, cancellation and budget enforcement; then bridge catalog/adapters through versioned capability manifests and integrate the scheduler behind shared Core services.
+
+
+## Implementation update — 2026-11-01 (supersedes the earlier E2/E3-only status)
+
+The following Engine v2 work is now implemented on `main`; release acceptance is still open:
+
+- **E2 contracts/persistence:** versioned WorkflowTask/WorkflowPlan contracts, immutable nested JSON values, deterministic plan digests, exact ApprovalBinding, durable mission/plan/task/attempt storage, immutable versioned capability manifests, and plan-local task identifiers.
+- **E3 scheduler/recovery:** atomic dependency-ready claims, bounded retries, explicit fail-closed authorization, synchronous and asynchronous provider deadlines, stale-attempt fencing, cancellation/timeout uncertainty, interrupted-worker reconciliation, and legacy attempt recovery. Unknown outcomes are not automatically replayed.
+- **E4 first integration slice:** catalog-backed adapter providers are registered through the common capability registry. An allowlist of read-only scanner adapters dispatches through the existing ToolRunner, preserving existing scope checks, process isolation, adapter parsing, events and evidence persistence. Credential attacks, exploit frameworks, command execution and session transports are intentionally excluded pending dedicated policy/approval contracts.
+- **Shared Core:** Core now exposes mission/plan/scheduler services and a default fail-closed policy that requires an exact manifest permission/impact match and an in-scope target. The scheduler can use the real catalog provider bridge without a caller-supplied dispatch callback.
+- **Headless:** the CI headless Linux server smoke passed on the provider-integration build. Full Python-version regression and static checks remain under CI verification; do not mark the release green until the latest run is complete.
+
+### Still required before v2 deployment
+
+1. Complete E1 security acceptance and regression testing, including scope/DNS/pivot edge cases and worker ownership races.
+2. Complete E3 production guarantees: durable cancellation semantics, execution budgets/concurrency limits, audit/outbox guarantees, and reconciliation interfaces for uncertain external effects.
+3. Complete E4 portfolio reconciliation and truthful capability/readiness extraction; add supported session/Metasploit/API transports only behind their own policy and tests.
+4. Complete E5 shared CLI/API/headless application lifecycle and expose durable progress, coverage, evidence and verification state.
+5. Complete E6 supplied-UI integration without redesign or placeholder capabilities.
+6. Run full cross-version tests, static analysis, packaging/install/upgrade tests, restart/recovery tests and controlled-target end-to-end acceptance. Deployment is blocked until all required jobs pass.
+
+### Current execution example
+
+The first provider-backed task uses a capability such as `tool.nmap`, with `permissions=("network.scan",)`, `impact="moderate"`, an explicitly in-scope target and empty `inputs`. Dynamic CLI arguments are deliberately rejected by this initial provider bridge. The provider invokes the existing ToolRunner; it does not construct shell commands or bypass scope enforcement.
