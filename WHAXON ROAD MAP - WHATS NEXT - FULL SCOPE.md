@@ -24,6 +24,121 @@ These principles apply to every WHAXON subsystem that plans or performs conseque
 A capability is DONE only when tests prove the evidence chain is complete across success, rejection, cancellation, timeout, crash/interruption, audit-write failure and recovery paths. A missing event, unverifiable chain, or approval/action mismatch is a release blocker for consequential workflows.
 
 
+# 0. AUTHORITATIVE EXECUTION ORDER — DEPENDENCIES, GATES AND CRITICAL PATH
+
+**This is the single controlling sequence for future WHAXON implementation.** It resolves conflicts between the older near-term schedule (§12), the solo v1.0 path (§34), the UI-first gate (§44), the tooling portfolio (§39), bug-bounty delivery (§45), autonomous campaigns (§46), first-run installation (§47) and headless/release acceptance (§48). Where those sections suggest a different order, follow this section. Their detailed requirements remain valid; this section controls *when* they may be implemented.
+
+**Operating rule:** do not start a downstream feature until its prerequisite contract and safety gate are satisfied. Independent work may run in parallel only after shared interfaces are agreed, ownership is isolated, and integration tests are defined. Do not turn this sequence into unnecessary serial work.
+
+## 0.1 Stage 0 — Establish the real baseline (first; no feature expansion)
+
+1. Inspect the current `main` tree and current CI state; do not rely on historical counts, old session logs or stale DONE labels.
+2. Build the §48 capability inventory for every advertised tool, adapter, CLI command, API route, UI page, worker, transport and deployment mode. Distinguish implemented, integrated, partial, planned, unverified, unsupported and blocked.
+3. Trace critical workflows end to end and map source paths, service contracts, authorization boundaries, dependencies, persisted state, tests and known defects.
+4. Reconcile the roadmap's status claims and estimates against that evidence. Keep historical session notes as history; do not treat them as the active task queue.
+5. Produce the dependency graph, critical path, workstream ownership and acceptance plan required by the engineering rule above.
+
+**Exit gate:** there is one evidence-backed view of what exists, what works, what is broken, and which contracts downstream work can rely on.
+
+## 0.2 Stage 1 — Close correctness and security blockers in the existing engine
+
+Fix and verify defects that can invalidate every later workflow before expanding functionality:
+
+1. Make `whaxon run` reliably drain or durably schedule Automator follow-up jobs; the initiating CLI process must not abandon queued work.
+2. Repair and fixture-test the Nikto adapter parser for real Nikto v2.6.1 output, including `[ID]`-prefixed findings and `See:` suffixes; verify successful scans produce normalized findings rather than an empty result.
+3. Verify fail-closed scope enforcement at every execution boundary, including child/follow-up jobs, redirects, DNS, validation and pivot transitions.
+4. Verify finding lifecycle and Trust Layer semantics: candidates/inconclusive results never become verified through an LLM or UI path; retest state transitions and coverage disclosures must reflect persisted evidence.
+5. Close evidence-chain gaps for success, denial, cancellation, timeout, crash, audit-write failure and recovery. Do not claim tamper-evidence without a verifiable integrity mechanism and trust anchor.
+
+**Exit gate:** no known critical workflow silently drops work, loses parser output, bypasses scope, fabricates success or misstates verification/evidence. Record any residual limitation as a blocker or explicit unsupported capability.
+
+## 0.3 Stage 2 — Stabilise shared service contracts and durable execution
+
+Before adding more UI or autonomous features, establish the common backend contracts:
+
+1. Define shared service/API contracts for campaign/job creation, authorization, approvals, task state, progress, cancellation, findings, evidence, reports and errors.
+2. Separate request/ browser lifetime from worker/job lifetime. Persist jobs, task graphs, approvals, progress, logs and evidence references.
+3. Implement bounded worker pools, resource/time ceilings, idempotency, safe retry, cancellation propagation, graceful shutdown and crash/restart reconciliation.
+4. Ensure CLI, API and web are clients of the same services; no duplicated business logic or UI-only authorization.
+5. Make follow-up scheduling/draining observable and recoverable, with no duplicate unsafe replay.
+
+**Exit gate:** a controlled end-to-end job can be launched, observed, cancelled, recovered and audited through the shared service layer, independently of a browser connection.
+
+## 0.4 Stage 3 — First-run readiness, installation and headless runtime
+
+These workstreams can proceed in parallel once Stage 2 contracts and capability metadata are stable.
+
+**A. First-run and dependency readiness (§§40, 47):**
+- Inventory OS/runtime/Python/system dependencies, external tools, permissions, paths, package sources and optional integrations.
+- Implement truthful Core/Standard/Full/Custom profiles, deterministic reviewed plans, explicit operation-bound consent, bounded installation, functional verification, partial-failure recovery and audit.
+- Support Linux, macOS, native Windows and WSL as distinct tested environments. Never imply universal automated installation.
+
+**B. Headless server and deployment (§48):**
+- Ensure CLI/API setup, diagnostics, administration, campaign/job control and status work without desktop, browser or TUI.
+- Validate foreground operation first, then daemon/service operation, systemd and Docker only to the extent they are actually implemented and tested.
+- Verify persistent state, health/readiness, structured logs, secrets, authentication, TLS/reverse-proxy guidance, resource limits, backup/restore and restart recovery.
+
+**Exit gate:** a clean supported machine can install a truthful capability profile, run the service headlessly, and retain/recover jobs, approvals and evidence across disconnects and restarts. Unsupported combinations are documented rather than implied.
+
+## 0.5 Stage 4 — Complete the supplied new UI against real backend contracts
+
+The new UI integration is an active v1.0 workstream, not a redesign project. It may proceed alongside independent Stage 3 work after the required backend contracts are agreed.
+
+1. Use only the supplied `web ui files and rendering/` source and design references. Preserve the design exactly; do not create substitute screens or redesign components.
+2. Keep the deprecated UI untouched. Do not use its completion state as evidence that the new UI is complete.
+3. Wire one page/workflow at a time, end to end, to real services and authorization. Complete and verify the page before moving to the next.
+4. Hide or disable unsupported controls/pages without deleting source assets, mocking data or exposing placeholder flows.
+5. Verify loading, empty, error, permission-denied, progress, cancellation, reconnect, responsive, keyboard and visual-regression states.
+6. Keep CLI/API/UI results consistent; a page rendering or route returning HTTP 200 is not functional acceptance.
+
+**Exit gate:** every exposed page/control has a real backend contract, authorization and honest failure/recovery behavior; unsupported capabilities remain inaccessible; the supplied design is preserved and browser acceptance passes.
+
+## 0.6 Stage 5 — Integrated solo v1.0 acceptance and release
+
+Run the full §38 and §48 release gates only after Stages 1–4 are integrated. This includes clean installation, CLI/API/web/headless parity, tool/parser verification, orchestration, scope enforcement, Trust Layer, evidence/report integrity, browser acceptance, packaging, supported-platform regression and current CI/release identity.
+
+Dogfooding, report reproducibility and launch activity in §34.3 follow acceptance—not merely implementation. Do not declare v1.0 deployment-ready while a correctness, safety, installability, user-visible UI or evidence gate remains open.
+
+## 0.7 Stage 6 — Bug-bounty foundation, then bounded autonomy
+
+Do not enable autonomous bug-bounty execution before deterministic programme policy and the shared execution controls exist.
+
+1. Complete §26.12 and §45 Phase 1: source-backed programme ingestion, policy versioning, deterministic permission matrix, explicit activation, audit and policy-change suspension.
+2. Reuse the Stage 2 job/task/approval/evidence contracts; deliver §45 Phase 2 in a controlled authorized lab only.
+3. Deliver asset intelligence and monitoring (§45 Phase 3), then independent verification/evidence/correlation (§45 Phase 4).
+4. Add knowledge/prioritisation (§45 Phase 5) only after evidence quality is measurable.
+5. Add reporting, integrations and multi-programme orchestration (§45 Phase 6) after isolation, API, audit and recovery are proven.
+6. Apply §46 autonomy levels through the same deterministic authorization, approval, budget, persistence and emergency-stop controls. Customer pentest and bug-bounty authorization/state remain isolated.
+
+**Exit gate:** no live autonomous testing until policy enforcement, scope, approvals, budgets, audit, pause/stop, recovery and independent verification pass adversarial controlled-lab tests.
+
+## 0.8 Stage 7 — Multi-target orchestration and competitive measurement
+
+Only after the existing UI gate and solo v1.0 foundation are accepted:
+- Implement §42 multi-target/subnet orchestration, reusing the proven scope, scheduler, worker, evidence and reporting contracts.
+- Implement §43 competitive matrix and benchmark protocol; measure against controlled ground truth rather than feature counts or vendor claims.
+- Add new UI surfaces only when backed by real services and within the locked design system.
+
+## 0.9 Stage 8 — Selective platform expansion; otherwise defer
+
+Only take on work justified by measured customer need and a capability gap:
+- §39 tool additions/substitutions and §7 broad tool adoption: evaluate distinct value, maintenance, licensing, platform, parser and end-to-end evidence before adoption. Do not chase a tool-count target.
+- §8 cloud scope, §9 portability extensions, §10 advanced AI modes, §17 team capabilities, §18 company-grade platform and §20 broader market coverage: defer unless required by a validated v1.0 blocker or explicit customer demand.
+- §35 portfolio R&D remains post-WHAXON and must not displace the WHAXON release critical path.
+
+## 0.10 Parallel work rules and change control
+
+- Stages define dependency gates, not a requirement that all work be serial. Parallelise independent workstreams after contracts are stable.
+- Stage 3 readiness and headless work may run concurrently; Stage 4 UI wiring may overlap once its backend contracts are stable.
+- Do not start §42/§43 implementation before the Stage 4 UI gate and Stage 5 solo v1.0 acceptance.
+- Do not start autonomous bug-bounty execution before Stage 6 Phase 1 policy/authorization gate.
+- A newly discovered critical defect may move earlier if it blocks a dependency or creates a safety/correctness risk. Record why and update the dependency graph.
+- Keep related changes consolidated into substantial commits; avoid trivial commit churn. Verification must not be deferred merely to reduce commit count.
+
+**Precedence:** this section supersedes conflicting execution order or priority statements in §§12, 19, 34, 39, 40, 41, 44, 45.15, 46.9, 47 and 48. It does not delete their detailed requirements or acceptance criteria.
+
+---
+
 ## Repository reality check — 2026-10-25 (reconciled against source tree)
 
 This section supersedes stale progress estimates and any older status statements below where they conflict. It is a repository inspection, not a claim that every capability has passed end-to-end acceptance testing.
@@ -105,6 +220,7 @@ Optimise verified end-to-end lead time, early blocker discovery, low integration
 
 ## TABLE OF CONTENTS
 
+0. **Authoritative execution order and dependency gates**
 1. Vision phases
 2. Migration plans
 3. Current capabilities
@@ -463,7 +579,7 @@ At 2.5h/session: ~9–10 months evenings, or ~2.5 months full-time.
 
 **No version is a hard target. Each is a natural checkpoint.**
 
-**URGENT override:** §19 (UI redesign) and §20.1 (PTaaS) take priority over the above.
+**Historical schedule only — superseded.** This table is retained to explain the original near-term estimates; it is not an active execution plan. Its ordering and the former §19 “UI redesign” wording are superseded by §0 and the locked supplied-design integration requirements in §§34, 38, 41 and 44. Do not start PTaaS or broad tool/cloud/AI expansion ahead of the v1.0 critical path.
 
 ---
 
@@ -2703,6 +2819,10 @@ The UI is considered functionally complete only when all of the following are de
 - If a UI fix exposes a prerequisite security or correctness defect, fix or document it as part of making the current workflow reliable; do not use it as an excuse to start unrelated expansion.
 
 ### 44.4 Post-gate execution sequence
+
+**Precedence note:** the complete cross-project order is controlled by §0. This local sequence applies only after the existing supplied UI is accepted; it must not be read as permission to start §42/§43 before the integrated solo v1.0 release gate in §0.5.
+
+
 
 1. **Pass and document the UI gate in §44.2.**
 2. Re-audit the current CLI, API, job model, target/scope validation, scanner adapters, cancellation, reporting, and tests before changing orchestration behavior.
