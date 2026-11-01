@@ -3305,7 +3305,7 @@ The release record must list the exact commit, environment, commands/workflows, 
 
 # 49. ENGINE V2 — CAPABILITY-DRIVEN EXECUTION ARCHITECTURE
 
-**Status:** Architecture specification recorded; implementation not started or implied.  
+**Status:** Architecture specified; initial E2 mission/task contracts and E3 DAG scheduler primitives implemented on main; E1 acceptance and end-to-end integration remain open.  
 **Specification:** `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md`  
 **Authority:** Subordinate to §0; this section does not reorder roadmap gates.
 

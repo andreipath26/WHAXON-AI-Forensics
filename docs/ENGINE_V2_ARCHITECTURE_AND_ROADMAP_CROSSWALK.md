@@ -280,3 +280,14 @@ Dependency mapping:
 Logical modules may include local discovery, source research, documentation ingestion, capability extraction, normalization, gap analysis, compatibility, risk assessment, onboarding workflow and report persistence. They must reuse shared contracts and must not create a second scheduler, policy engine or registry.
 
 Acceptance includes full portfolio reconciliation; safe local discovery; reproducible source-backed reports; explicit upstream/implementation/test/authorization separation; malicious metadata/schema handling; no automatic installation/execution; auditable/revocable lifecycle; upstream drift reports without runtime changes; and provider extensibility without changing mission/scheduler/evidence core.
+
+
+## Implementation record — 2026-11-01
+
+The first implementation slice is on main:
+
+- E1: worker leases carry owner/token/heartbeat; stale recovery uses heartbeat age; Metasploit session dispatch requires persisted session identity and scope revalidation; TLS verification is enabled by default and the weak default RPC password is removed. CI acceptance remains pending.
+- E2 foundation: versioned WorkflowTask and immutable WorkflowPlan contracts validate DAGs and produce a content digest. ApprovalBinding ties consent to the exact plan, task, target, inputs, permissions, impact, policy version and expiry. SQLite persists missions, plans, tasks and attempts transactionally.
+- E3 foundation: WorkflowScheduler atomically claims dependency-ready tasks, bounds retries, requires an explicit authorization callback and marks timeouts uncertain rather than replaying potentially side-effecting work.
+- These are foundational primitives, not a claim that Engine v2 is integrated or release-ready. The scheduler is not yet connected to a capability provider resolver or Core/API/UI. AI cannot directly authorize or bypass dispatch.
+- Next: pass E1 security/regression acceptance; add task-attempt lease recovery, cancellation and budget enforcement; then bridge catalog/adapters through versioned capability manifests and integrate the scheduler behind shared Core services.

@@ -4,7 +4,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from .workflow import WorkflowTask
 
@@ -62,7 +63,7 @@ class WorkflowScheduler:
                     result = await asyncio.wait_for(result, timeout=task.timeout_s)
                 self.store.finish_task_attempt(attempt_id, "succeeded", result=result)
                 outcomes.append({"task_id": task.id, "status": "succeeded"})
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self.store.finish_task_attempt(
                     attempt_id, "uncertain", error="task timed out; reconcile before retry",
                 )
