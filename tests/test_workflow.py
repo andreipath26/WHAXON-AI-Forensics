@@ -157,6 +157,7 @@ def test_workflow_task_rejects_non_finite_timeout():
 
 async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
     import time
+
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
     from whaxon.core.workflow import WorkflowPlan, WorkflowTask

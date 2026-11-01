@@ -92,12 +92,6 @@ class WorkflowScheduler:
                     error="scheduler cancelled while task was active; reconcile before retry",
                 )
                 raise
-            except asyncio.CancelledError:
-                self.store.finish_task_attempt(
-                    attempt_id, "uncertain",
-                    error="scheduler cancelled while task was active; reconcile before retry",
-                )
-                raise
             except Exception as exc:
                 _log.exception("workflow task %s failed", task.id)
                 self.store.finish_task_attempt(

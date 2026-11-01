@@ -111,6 +111,7 @@ def test_store_rejects_manifest_version_mutation(tmp_path):
 
 def test_capability_manifest_rejects_non_finite_timeout():
     import math
+
     import pytest
 
     with pytest.raises(ValueError, match="finite"):
