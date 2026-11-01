@@ -113,6 +113,19 @@ class Core:
         if self.catalog.path.exists():
             self.catalog.load()
 
+        # Engine v2 uses the same catalog, runner, adapter parser and event store
+        # as the existing interfaces. The provider bridge is intentionally
+        # limited to read-only scanners until dedicated approval models exist.
+        from .capabilities import CapabilityRegistry
+        from .providers import CatalogAdapterProvider
+        self.capabilities = CapabilityRegistry(self.store)
+        self.providers = CatalogAdapterProvider(
+            catalog=self.catalog,
+            runner=self.runner,
+            store=self.store,
+            registry=self.capabilities,
+        )
+
     def _wire_store(self) -> None:
         """Subscribe the store to every job event so history persists."""
         def _on_started(e):
@@ -147,15 +160,16 @@ class Core:
         """Validate and persist a versioned mission DAG."""
         return self.store.save_workflow_plan(plan_id, plan)
 
-    def workflow_scheduler(self, *, authorize, dispatch, worker_id: str = "workflow-worker"):
+    def workflow_scheduler(self, *, authorize, dispatch=None, worker_id: str = "workflow-worker"):
         """Build a scheduler with explicit policy and provider execution boundaries."""
         from .scheduler import WorkflowScheduler
         return WorkflowScheduler(
-            self.store, authorize=authorize, dispatch=dispatch, worker_id=worker_id,
+            self.store, authorize=authorize,
+            dispatch=dispatch or self.providers.dispatch, worker_id=worker_id,
         )
 
     async def run_workflow_plan(
-        self, plan_id: str, *, authorize, dispatch,
+        self, plan_id: str, *, authorize, dispatch=None,
         worker_id: str = "workflow-worker", max_tasks: int = 100, max_attempts: int = 2,
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""
