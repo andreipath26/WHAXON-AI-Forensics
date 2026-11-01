@@ -14,6 +14,37 @@ WORKFLOW_SCHEMA_VERSION = "whaxon.workflow.v1"
 _ALLOWED_IMPACTS = {"read_only", "low", "moderate", "high", "critical"}
 
 
+class _FrozenDict(dict):
+    """JSON-serializable dictionary that rejects mutation after construction."""
+
+    def __init__(self, value=()):
+        dict.__init__(self, ((key, _freeze(item)) for key, item in dict(value).items()))
+
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("workflow contract mappings are immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+    def __deepcopy__(self, memo):
+        return self
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, dict):
+        return _FrozenDict(value)
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -43,6 +74,7 @@ class WorkflowTask:
             raise ValueError("task dependencies must be unique and cannot include itself")
         if not isinstance(self.inputs, dict):
             raise TypeError("task inputs must be an object")
+        object.__setattr__(self, "inputs", _freeze(self.inputs))
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -79,6 +111,9 @@ class WorkflowPlan:
             raise ValueError(f"unsupported workflow schema: {self.schema_version}")
         if not self.mission_id.strip():
             raise ValueError("mission_id is required")
+        if not isinstance(self.metadata, dict):
+            raise TypeError("plan metadata must be an object")
+        object.__setattr__(self, "metadata", _freeze(self.metadata))
         ids = [task.id for task in self.tasks]
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("a plan requires uniquely identified tasks")

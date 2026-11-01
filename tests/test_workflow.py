@@ -125,3 +125,21 @@ async def test_scheduler_blocks_dependants_after_policy_denial(tmp_path):
         {"id": "web", "status": "blocked"},
     ]
     assert result["complete"] is True
+
+
+def test_workflow_contract_nested_mappings_are_immutable():
+    import pytest
+
+    inputs = {"options": {"ports": [80, 443]}}
+    metadata = {"labels": ["approved"]}
+    task = WorkflowTask("scan", "network.port_scan", "192.0.2.10", inputs=inputs)
+    plan = WorkflowPlan("m", (task,), metadata=metadata)
+    digest = plan.digest
+    inputs["options"]["ports"].append(8080)
+    metadata["labels"].append("changed")
+    assert plan.digest == digest
+    with pytest.raises(TypeError, match="immutable"):
+        task.inputs["new"] = "value"
+    with pytest.raises(TypeError, match="immutable"):
+        task.inputs["options"]["new"] = "value"
+    assert task.inputs["options"]["ports"] == (80, 443)
