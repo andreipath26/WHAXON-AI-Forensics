@@ -188,7 +188,7 @@ class CapabilityRegistry:
     def list(self, capability_id: str | None = None) -> list[CapabilityManifest]:
         values = list(self._manifests.values())
         if capability_id is not None:
-            values = (item for item in values if item.capability_id == capability_id)
+            values = [item for item in values if item.capability_id == capability_id]
         return sorted(values, key=lambda item: (
             item.capability_id, item.provider_id, item.provider_version,
         ))
