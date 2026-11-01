@@ -46,8 +46,8 @@ def main(args: list[str] | None = None) -> int:
     core = Core(data_dir=Path(options.data_dir))
     try:
         if options.command == "capabilities":
-            result = [manifest.to_dict() for manifest in core.capabilities.list()]
-            print(json.dumps(result, indent=2, sort_keys=True))
+            capability_result = [manifest.to_dict() for manifest in core.capabilities.list()]
+            print(json.dumps(capability_result, indent=2, sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "create":
             created = core.create_mission(options.id, options.objective)
@@ -84,10 +84,10 @@ def main(args: list[str] | None = None) -> int:
                     max_attempts=options.max_attempts,
                 )
 
-            result = asyncio.run(execute())
-            print(json.dumps(result, indent=2, sort_keys=True))
-            return 0 if result["complete"] and all(
-                task["status"] == "succeeded" for task in result["tasks"]
+            workflow_result = asyncio.run(execute())
+            print(json.dumps(workflow_result, indent=2, sort_keys=True))
+            return 0 if workflow_result["complete"] and all(
+                task["status"] == "succeeded" for task in workflow_result["tasks"]
             ) else 1
         return 2
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
