@@ -915,7 +915,10 @@ class JobStore:
         c = self._conn()
         try:
             rows = c.execute(
-                "SELECT *, task_key AS id FROM workflow_tasks WHERE plan_id=? ORDER BY rowid",
+                "SELECT id AS task_ref, task_key AS id, plan_id, capability_id, target, "
+                "inputs_json, depends_on_json, permissions_json, impact, timeout_s, "
+                "idempotency_key, status, result_json, error, active_attempt_id, "
+                "created_at, updated_at FROM workflow_tasks WHERE plan_id=? ORDER BY rowid",
                 (plan_id,),
             ).fetchall()
             result = []

@@ -347,3 +347,33 @@ def test_reconcile_clears_active_attempt_fence(tmp_path):
     task = store.list_workflow_tasks("p")[0]
     assert task["status"] == "uncertain"
     assert task["active_attempt_id"] is None
+
+
+def test_workflow_task_ids_are_scoped_to_their_plan(tmp_path):
+    import pytest
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "plan-local-task-ids.db")
+    store.create_mission("m1", "first objective")
+    store.create_mission("m2", "second objective")
+    store.save_workflow_plan(
+        "plan-one", WorkflowPlan("m1", (
+            WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+        )),
+    )
+    store.save_workflow_plan(
+        "plan-two", WorkflowPlan("m2", (
+            WorkflowTask("recon", "tool.whois", "example.org"),
+            WorkflowTask("scan", "tool.nmap", "192.0.2.10", depends_on=("recon",)),
+        )),
+    )
+    assert [row["id"] for row in store.list_workflow_tasks("plan-one")] == ["scan"]
+    assert [row["id"] for row in store.list_workflow_tasks("plan-two")] == ["recon", "scan"]
+    first = store.claim_ready_workflow_task("plan-one", "worker-one")
+    second = store.claim_ready_workflow_task("plan-two", "worker-two")
+    assert first["id"] == "scan"
+    assert second["id"] == "recon"
+    with pytest.raises(ValueError, match="ambiguous"):
+        store.start_task_attempt("ambiguous", "scan", 1)
