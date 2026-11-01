@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -68,10 +69,16 @@ class WorkflowTask:
             raise ValueError("task id, capability_id and target are required")
         if self.impact not in _ALLOWED_IMPACTS:
             raise ValueError(f"unsupported task impact: {self.impact}")
-        if self.timeout_s <= 0:
-            raise ValueError("task timeout_s must be positive")
-        if self.id in self.depends_on or len(set(self.depends_on)) != len(self.depends_on):
+        if not math.isfinite(self.timeout_s) or self.timeout_s <= 0:
+            raise ValueError("task timeout_s must be finite and positive")
+        dependencies = tuple(self.depends_on)
+        permissions = tuple(self.permissions)
+        if self.id in dependencies or len(set(dependencies)) != len(dependencies):
             raise ValueError("task dependencies must be unique and cannot include itself")
+        if any(not isinstance(item, str) or not item for item in dependencies + permissions):
+            raise ValueError("task dependencies and permissions must be non-empty strings")
+        object.__setattr__(self, "depends_on", dependencies)
+        object.__setattr__(self, "permissions", permissions)
         if not isinstance(self.inputs, dict):
             raise TypeError("task inputs must be an object")
         object.__setattr__(self, "inputs", _freeze(self.inputs))
@@ -109,6 +116,7 @@ class WorkflowPlan:
     def __post_init__(self) -> None:
         if self.schema_version != WORKFLOW_SCHEMA_VERSION:
             raise ValueError(f"unsupported workflow schema: {self.schema_version}")
+        object.__setattr__(self, "tasks", tuple(self.tasks))
         if not self.mission_id.strip():
             raise ValueError("mission_id is required")
         if not isinstance(self.metadata, dict):
@@ -179,7 +187,8 @@ class ApprovalBinding:
     def is_valid(self, *, plan_digest: str, task: WorkflowTask,
                  policy_version: str, now: float) -> bool:
         return (
-            now < self.expires_at
+            math.isfinite(self.expires_at)
+            and now < self.expires_at
             and self.plan_digest == plan_digest
             and self.task_id == task.id
             and self.target == task.target

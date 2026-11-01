@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -93,8 +94,8 @@ class CapabilityManifest:
             raise ValueError(f"unsupported readiness level: {self.readiness}")
         if self.impact not in {"read_only", "low", "moderate", "high", "critical"}:
             raise ValueError(f"unsupported impact: {self.impact}")
-        if self.timeout_s <= 0:
-            raise ValueError("timeout_s must be positive")
+        if not math.isfinite(self.timeout_s) or self.timeout_s <= 0:
+            raise ValueError("timeout_s must be finite and positive")
         for name in (
             "transports", "target_types", "protocols", "platforms", "auth_methods",
             "permissions", "side_effects", "limitations",

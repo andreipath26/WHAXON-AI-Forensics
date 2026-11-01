@@ -143,3 +143,38 @@ def test_workflow_contract_nested_mappings_are_immutable():
     with pytest.raises(TypeError, match="immutable"):
         task.inputs["options"]["new"] = "value"
     assert task.inputs["options"]["ports"] == (80, 443)
+
+
+def test_workflow_task_rejects_non_finite_timeout():
+    import math
+    import pytest
+
+    with pytest.raises(ValueError, match="finite"):
+        WorkflowTask("bad", "cap", "host", timeout_s=math.inf)
+    with pytest.raises(ValueError, match="finite"):
+        WorkflowTask("bad", "cap", "host", timeout_s=math.nan)
+
+
+async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
+    import time
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "scheduler-sync-timeout.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (
+            WorkflowTask("slow", "provider.sync", "192.0.2.10", timeout_s=0.01),
+        )),
+    )
+
+    def dispatch(task):
+        time.sleep(0.1)
+        return {"done": True}
+
+    result = await WorkflowScheduler(
+        store, authorize=lambda task: True, dispatch=dispatch,
+    ).run("p")
+    assert result["tasks"] == [{"id": "slow", "status": "uncertain"}]
+    assert result["attempts"] == 1

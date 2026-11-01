@@ -180,6 +180,9 @@ class Core:
         # jobs a previous process queued (the durable auto-chain).
         try:
             self.store.reconcile_stale()
+        except Exception:
+            pass
+        try:
             self.store.reconcile_workflow_attempts()
         except Exception:
             # Startup remains available, but an unreconciled workflow task

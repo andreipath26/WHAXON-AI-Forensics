@@ -106,3 +106,11 @@ def test_store_rejects_manifest_version_mutation(tmp_path):
     registry.register(_manifest("provider.immutable", readiness="installed"))
     with pytest.raises(ValueError, match="immutable"):
         registry.register(_manifest("provider.immutable", readiness="lab_validated"))
+
+
+def test_capability_manifest_rejects_non_finite_timeout():
+    import math
+    import pytest
+
+    with pytest.raises(ValueError, match="finite"):
+        _manifest("provider.nan", timeout_s=math.nan)

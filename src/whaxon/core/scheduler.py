@@ -67,9 +67,18 @@ class WorkflowScheduler:
                     )
                     outcomes.append({"task_id": task.id, "status": "blocked"})
                     continue
-                result = self.dispatch(task)
+                started = asyncio.get_running_loop().time()
+                if inspect.iscoroutinefunction(self.dispatch):
+                    result = self.dispatch(task)
+                else:
+                    result = await asyncio.wait_for(
+                        asyncio.to_thread(self.dispatch, task), timeout=task.timeout_s,
+                    )
                 if inspect.isawaitable(result):
-                    result = await asyncio.wait_for(result, timeout=task.timeout_s)
+                    remaining = task.timeout_s - (asyncio.get_running_loop().time() - started)
+                    if remaining <= 0:
+                        raise TimeoutError
+                    result = await asyncio.wait_for(result, timeout=remaining)
                 self.store.finish_task_attempt(attempt_id, "succeeded", result=result)
                 outcomes.append({"task_id": task.id, "status": "succeeded"})
             except TimeoutError:
@@ -77,6 +86,12 @@ class WorkflowScheduler:
                     attempt_id, "uncertain", error="task timed out; reconcile before retry",
                 )
                 outcomes.append({"task_id": task.id, "status": "uncertain"})
+            except asyncio.CancelledError:
+                self.store.finish_task_attempt(
+                    attempt_id, "uncertain",
+                    error="scheduler cancelled while task was active; reconcile before retry",
+                )
+                raise
             except Exception as exc:
                 _log.exception("workflow task %s failed", task.id)
                 self.store.finish_task_attempt(
