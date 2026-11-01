@@ -44,7 +44,8 @@ CREATE TABLE IF NOT EXISTS workflow_tasks (
     target TEXT NOT NULL, inputs_json TEXT NOT NULL, depends_on_json TEXT NOT NULL,
     permissions_json TEXT NOT NULL, impact TEXT NOT NULL, timeout_s REAL NOT NULL,
     idempotency_key TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
-    result_json TEXT, error TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL
+    result_json TEXT, error TEXT, active_attempt_id TEXT,
+    created_at REAL NOT NULL, updated_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_plan ON workflow_tasks(plan_id);
 CREATE TABLE IF NOT EXISTS task_attempts (
@@ -184,6 +185,10 @@ class JobStore:
                 pass
             try:
                 c.execute("ALTER TABLE coverage ADD COLUMN phase TEXT DEFAULT ''")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                c.execute("ALTER TABLE workflow_tasks ADD COLUMN active_attempt_id TEXT")
             except sqlite3.OperationalError:
                 pass
             c.execute("CREATE TABLE IF NOT EXISTS approvals (run_id TEXT, seq INTEGER, user TEXT, answer TEXT, note TEXT, at REAL, PRIMARY KEY (run_id, seq))")
@@ -892,9 +897,10 @@ class JobStore:
                         (now, error, row["id"]),
                     )
                     c.execute(
-                        "UPDATE workflow_tasks SET status='uncertain', error=?, updated_at=? "
-                        "WHERE id=? AND status='running'",
-                        (error, now, row["task_id"]),
+                        "UPDATE workflow_tasks SET status='uncertain', error=?, "
+                        "active_attempt_id=NULL, updated_at=? "
+                        "WHERE id=? AND status='running' AND active_attempt_id=?",
+                        (error, now, row["task_id"], row["id"]),
                     )
                 c.execute("COMMIT")
                 return len(rows)
@@ -959,8 +965,9 @@ class JobStore:
                     attempt_id = uuid.uuid4().hex
                     now = time.time()
                     cur = c.execute(
-                        "UPDATE workflow_tasks SET status='running', error=NULL, updated_at=? "
-                        "WHERE id=? AND status IN ('pending','failed')", (now, row["id"]),
+                        "UPDATE workflow_tasks SET status='running', active_attempt_id=?, "
+                        "error=NULL, updated_at=? WHERE id=? AND status IN ('pending','failed')",
+                        (attempt_id, now, row["id"]),
                     )
                     if cur.rowcount != 1:
                         continue
@@ -1001,8 +1008,12 @@ class JobStore:
                 ).fetchone()
                 if task is None:
                     raise ValueError(f"unknown workflow task: {task_id}")
-                if task["status"] in ("succeeded", "cancelled"):
+                if task["status"] in ("succeeded", "cancelled", "blocked", "uncertain"):
                     raise ValueError(f"task is terminal: {task_id}")
+                if task["status"] == "running":
+                    raise ValueError(f"task already has an active attempt: {task_id}")
+                if task["status"] not in ("pending", "failed"):
+                    raise ValueError(f"task is not claimable: {task_id}")
                 if task["idempotency_key"] and idempotency_key != task["idempotency_key"]:
                     raise ValueError("task attempt idempotency key mismatch")
                 c.execute(
@@ -1011,10 +1022,13 @@ class JobStore:
                     "VALUES (?, ?, ?, 'running', ?, ?, ?)",
                     (attempt_id, task_id, int(attempt_no), worker_id, idempotency_key, now),
                 )
-                c.execute(
-                    "UPDATE workflow_tasks SET status='running', error=NULL, updated_at=? WHERE id=?",
-                    (now, task_id),
+                cur = c.execute(
+                    "UPDATE workflow_tasks SET status='running', active_attempt_id=?, "
+                    "error=NULL, updated_at=? WHERE id=? AND status IN ('pending','failed')",
+                    (attempt_id, now, task_id),
                 )
+                if cur.rowcount != 1:
+                    raise ValueError(f"task is already claimed: {task_id}")
                 c.execute("COMMIT")
                 return True
             except Exception:
@@ -1045,10 +1059,14 @@ class JobStore:
                     "UPDATE task_attempts SET status=?, finished_at=?, result_json=?, error=? WHERE id=?",
                     (status, now, encoded, error, attempt_id),
                 )
-                c.execute(
-                    "UPDATE workflow_tasks SET status=?, result_json=?, error=?, updated_at=? WHERE id=?",
-                    (status, encoded, error, now, row["task_id"]),
+                cur = c.execute(
+                    "UPDATE workflow_tasks SET status=?, result_json=?, error=?, "
+                    "active_attempt_id=NULL, updated_at=? "
+                    "WHERE id=? AND status='running' AND active_attempt_id=?",
+                    (status, encoded, error, now, row["task_id"], attempt_id),
                 )
+                if cur.rowcount != 1:
+                    raise ValueError("stale task attempt cannot update the workflow task")
                 c.execute("COMMIT")
                 return True
             except Exception:

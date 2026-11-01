@@ -309,3 +309,41 @@ def test_reconcile_running_workflow_attempts_as_uncertain(tmp_path):
     finally:
         conn.close()
     assert store.reconcile_workflow_attempts() == 0
+
+
+def test_task_attempt_is_fenced_and_cannot_be_started_twice(tmp_path):
+    import pytest
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "attempt-fencing.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("scan", "cap.scan", "192.0.2.10"),)),
+    )
+    assert store.start_task_attempt("attempt-one", "scan", 1, worker_id="worker-a")
+    with pytest.raises(ValueError, match="active attempt"):
+        store.start_task_attempt("attempt-two", "scan", 2, worker_id="worker-b")
+    with pytest.raises(ValueError, match="stale task attempt"):
+        store.finish_task_attempt("attempt-one", "succeeded", result={"ok": True})
+    # A completed attempt is fenced and clears its active token atomically.
+    assert store.finish_task_attempt("attempt-one", "failed", error="retryable")
+    assert store.start_task_attempt("attempt-two", "scan", 2, worker_id="worker-b")
+    assert store.finish_task_attempt("attempt-two", "succeeded", result={"ok": True})
+
+
+def test_reconcile_clears_active_attempt_fence(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "attempt-reconcile-fence.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("scan", "cap.scan", "192.0.2.10"),)),
+    )
+    store.claim_ready_workflow_task("p", "worker-a")
+    assert store.reconcile_workflow_attempts() == 1
+    task = store.list_workflow_tasks("p")[0]
+    assert task["status"] == "uncertain"
+    assert task["active_attempt_id"] is None
