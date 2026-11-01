@@ -22,6 +22,35 @@ _READINESS = {
 _IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
 
 
+class _FrozenDict(dict):
+    def __init__(self, value=()):
+        dict.__init__(self, ((key, _freeze(item)) for key, item in dict(value).items()))
+
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("capability manifest mappings are immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+    def __deepcopy__(self, memo):
+        return self
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, dict):
+        return _FrozenDict(value)
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -70,9 +99,14 @@ class CapabilityManifest:
             "transports", "target_types", "protocols", "platforms", "auth_methods",
             "permissions", "side_effects", "limitations",
         ):
-            values = getattr(self, name)
+            values = tuple(getattr(self, name))
             if len(values) != len(set(values)) or any(not item for item in values):
                 raise ValueError(f"{name} must contain unique non-empty values")
+            object.__setattr__(self, name, values)
+        if not isinstance(self.input_schema, dict) or not isinstance(self.output_schema, dict):
+            raise TypeError("input_schema and output_schema must be objects")
+        object.__setattr__(self, "input_schema", _freeze(self.input_schema))
+        object.__setattr__(self, "output_schema", _freeze(self.output_schema))
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)

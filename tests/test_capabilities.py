@@ -66,3 +66,16 @@ def test_capability_manifest_does_not_authorize_execution():
     assert manifest.permissions == ("network.scan",)
     assert manifest.impact == "moderate"
     assert not hasattr(manifest, "authorized")
+
+
+def test_capability_manifest_nested_schema_is_immutable():
+    import pytest
+
+    schema = {"properties": {"ports": {"enum": [80, 443]}}}
+    manifest = _manifest("provider.a", input_schema=schema)
+    fingerprint = manifest.fingerprint
+    schema["properties"]["ports"]["enum"].append(8080)
+    assert manifest.fingerprint == fingerprint
+    with pytest.raises(TypeError, match="immutable"):
+        manifest.input_schema["properties"]["new"] = {}
+    assert manifest.input_schema["properties"]["ports"]["enum"] == (80, 443)
