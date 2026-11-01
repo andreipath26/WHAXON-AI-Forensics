@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS workflow_tasks (
     created_at REAL NOT NULL, updated_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_plan ON workflow_tasks(plan_id);
+CREATE TABLE IF NOT EXISTS capability_manifests (capability_id TEXT NOT NULL, provider_id TEXT NOT NULL, provider_version TEXT NOT NULL, fingerprint TEXT NOT NULL, manifest_json TEXT NOT NULL, registered_at REAL NOT NULL, PRIMARY KEY (capability_id, provider_id, provider_version));
 CREATE TABLE IF NOT EXISTS task_attempts (
     id TEXT PRIMARY KEY, task_id TEXT NOT NULL, attempt_no INTEGER NOT NULL,
     status TEXT NOT NULL, worker_id TEXT NOT NULL DEFAULT '', idempotency_key TEXT NOT NULL DEFAULT '',
@@ -758,6 +759,46 @@ class JobStore:
                 return result[:limit]
             finally:
                 c.close()
+
+    def save_capability_manifest(self, manifest):
+        import hashlib
+        encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+        key = (manifest["capability_id"], manifest["provider_id"], manifest["provider_version"])
+        fingerprint = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+        with self._lock:
+            c = self._conn()
+            try:
+                row = c.execute(
+                    "SELECT fingerprint FROM capability_manifests WHERE capability_id=? AND provider_id=? AND provider_version=?",
+                    key,
+                ).fetchone()
+                if row is not None:
+                    if row["fingerprint"] != fingerprint:
+                        raise ValueError("provider manifest version is immutable")
+                    return False
+                c.execute(
+                    "INSERT INTO capability_manifests (capability_id, provider_id, provider_version, fingerprint, manifest_json, registered_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (*key, fingerprint, encoded, time.time()),
+                )
+                return True
+            finally:
+                c.close()
+
+    def list_capability_manifests(self, capability_id=None):
+        c = self._conn()
+        try:
+            if capability_id is None:
+                rows = c.execute(
+                    "SELECT manifest_json FROM capability_manifests ORDER BY capability_id, provider_id, provider_version"
+                ).fetchall()
+            else:
+                rows = c.execute(
+                    "SELECT manifest_json FROM capability_manifests WHERE capability_id=? ORDER BY provider_id, provider_version",
+                    (capability_id,),
+                ).fetchall()
+            return [json.loads(row["manifest_json"]) for row in rows]
+        finally:
+            c.close()
 
     # --- Engine v2 mission and workflow persistence ----------------------
 
