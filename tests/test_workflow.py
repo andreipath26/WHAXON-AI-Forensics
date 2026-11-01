@@ -1,5 +1,7 @@
 from whaxon.core.workflow import (
-    ApprovalBinding, WorkflowPlan, WorkflowTask,
+    ApprovalBinding,
+    WorkflowPlan,
+    WorkflowTask,
 )
 
 

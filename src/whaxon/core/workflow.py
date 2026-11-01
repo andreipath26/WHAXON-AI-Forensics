@@ -51,7 +51,7 @@ class WorkflowTask:
         return value
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> "WorkflowTask":
+    def from_dict(cls, value: dict[str, Any]) -> WorkflowTask:
         return cls(
             id=value["id"],
             capability_id=value["capability_id"],
@@ -115,7 +115,7 @@ class WorkflowPlan:
         return hashlib.sha256(_canonical(self.to_dict()).encode("utf-8")).hexdigest()
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> "WorkflowPlan":
+    def from_dict(cls, value: dict[str, Any]) -> WorkflowPlan:
         return cls(
             mission_id=value["mission_id"],
             schema_version=value.get("schema_version", WORKFLOW_SCHEMA_VERSION),

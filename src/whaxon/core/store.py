@@ -874,6 +874,68 @@ class JobStore:
         finally:
             c.close()
 
+    def claim_ready_workflow_task(self, plan_id, worker_id, max_attempts=3):
+        """Atomically claim the next DAG node whose dependencies all succeeded."""
+        import uuid
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                candidates = c.execute(
+                    "SELECT * FROM workflow_tasks WHERE plan_id=? AND status IN ('pending','failed') "
+                    "ORDER BY created_at, id", (plan_id,),
+                ).fetchall()
+                for row in candidates:
+                    count = c.execute(
+                        "SELECT COUNT(*) AS n FROM task_attempts WHERE task_id=?", (row["id"],)
+                    ).fetchone()["n"]
+                    if count >= max_attempts:
+                        continue
+                    dependencies = json.loads(row["depends_on_json"] or "[]")
+                    if dependencies:
+                        marks = ",".join("?" for _ in dependencies)
+                        states = c.execute(
+                            f"SELECT id, status FROM workflow_tasks WHERE id IN ({marks})",
+                            tuple(dependencies),
+                        ).fetchall()
+                        if len(states) != len(dependencies) or any(x["status"] != "succeeded" for x in states):
+                            continue
+                    attempt_no = count + 1
+                    attempt_id = uuid.uuid4().hex
+                    now = time.time()
+                    cur = c.execute(
+                        "UPDATE workflow_tasks SET status='running', error=NULL, updated_at=? "
+                        "WHERE id=? AND status IN ('pending','failed')", (now, row["id"]),
+                    )
+                    if cur.rowcount != 1:
+                        continue
+                    c.execute(
+                        "INSERT INTO task_attempts "
+                        "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at) "
+                        "VALUES (?, ?, ?, 'running', ?, ?, ?)",
+                        (attempt_id, row["id"], attempt_no, worker_id, row["idempotency_key"], now),
+                    )
+                    value = dict(row)
+                    value.update({
+                        "attempt_id": attempt_id, "attempt_no": attempt_no,
+                        "worker_id": worker_id, "status": "running",
+                        "inputs": json.loads(row["inputs_json"] or "{}"),
+                        "depends_on": dependencies,
+                        "permissions": json.loads(row["permissions_json"] or "[]"),
+                    })
+                    c.execute("COMMIT")
+                    return value
+                c.execute("COMMIT")
+                return None
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
     def start_task_attempt(self, attempt_id, task_id, attempt_no, worker_id="", idempotency_key=""):
         """Create a durable attempt and atomically move its task to running."""
         now = time.time()
@@ -911,7 +973,7 @@ class JobStore:
 
     def finish_task_attempt(self, attempt_id, status, result=None, error=""):
         """Record an attempt outcome and update its task in one transaction."""
-        if status not in ("succeeded", "failed", "cancelled", "uncertain"):
+        if status not in ("succeeded", "failed", "cancelled", "uncertain", "blocked"):
             raise ValueError(f"invalid terminal attempt status: {status}")
         now = time.time()
         with self._lock:
