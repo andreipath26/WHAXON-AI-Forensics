@@ -2903,3 +2903,84 @@ The six phases below are approved as the target delivery sequence. Each phase mu
 8. Mark each capability DONE only after implementation, tests, end-to-end verification and documented limitations are present.
 
 **Definition of done:** An operator can import and review a real programme, explicitly activate a bounded permission envelope, and let WHAXON autonomously conduct routine permitted research; the system independently verifies and correlates findings, preserves tamper-evident reproducible evidence, adapts safely to programme changes, and prepares defensible reports. It pauses for user decisions that materially change authorization, impact, disclosure or cost. All activity remains auditable, scope-enforced and honest about uncertainty and coverage.
+
+
+---
+
+# 46. AUTONOMOUS WHAXON CAMPAIGNS
+
+**Status:** Approved roadmap addition — planned, not yet implemented.
+
+## 46.1 User-selectable autonomy
+
+Every campaign supports four modes, selectable independently per campaign:
+
+1. **Manual:** the user authorizes every action.
+2. **Guided:** WHAXON analyses and plans; the user approves significant steps.
+3. **Supervised autonomous:** the user approves the plan and starts the campaign; WHAXON performs routine permitted work and pauses for consequential decisions.
+4. **Fully autonomous:** the user supplies the authorized target or programme, objective and limits, approves activation, and WHAXON carries out the permitted campaign without routine interruptions.
+
+A user may choose a different mode for every campaign. Changing mode never expands authorization.
+
+## 46.2 Separate customer and bug-bounty modes
+
+**Customer pentesting** continues to use the customer engagement scope, rules of engagement and existing authorization enforcement.
+
+**Bug-bounty research** is a separate subsystem. It ingests programme rules, builds its own machine-readable permission profile, plans the research and executes under a dedicated bounty authorization engine. It must not be constrained by, wrap, or use the customer pentest scope enforcer as its authorization source. Customer and bounty policies, campaign state, approvals and audit records remain isolated.
+
+Bounty autonomy is not unrestricted testing: the bounty engine must enforce the actual programme's in-scope assets, exclusions, permitted and prohibited techniques, third-party restrictions, rate limits, impact limits, expiry and disclosure rules. Importing a programme does not authorize testing; the user must review and activate it. After activation, routine permitted research proceeds autonomously. Ambiguity or consequential decisions pause for approval.
+
+Shared neutral infrastructure may be reused (tool adapters, findings, validation, evidence storage and reporting), but not authorization decisions or campaign state.
+
+## 46.3 Autonomy controller and approval rules
+
+Build a shared campaign controller with mode-specific authorization services. It manages planning, task dependencies, tool selection, execution, follow-up, budgets, progress, approvals, pause/resume/cancel, emergency stop and recovery.
+
+Authorization is deterministic and enforced outside the AI model at the execution boundary. Every network action, subprocess, redirect, DNS resolution, pivot and validation request is checked. The AI cannot grant permission or override a policy.
+
+Campaign activation requires explicit user approval. Once activated, routine actions inside the approved envelope do not require repeated confirmation. Approval is required for scope expansion or ambiguity, increased limits, destructive or availability-impacting actions, sensitive-data access, account creation, unapproved third-party activity, external disclosure/report submission, paid actions or other irreversible operations. Missing or conflicting authorization fails closed.
+
+## 46.4 Long-running campaign reliability
+
+Campaigns must persist and recover rather than depend on an in-memory agent session. Persist the plan and version, task graph, campaign state, completed and in-flight actions, findings, evidence, decisions, budgets and checkpoints. Support interruption, restart and safe resume; reconcile in-flight work before retrying; prevent duplicate or unsafe replay; retain structured investigation context and failed approaches; adapt plans to new evidence while rechecking authorization; bound retries and resource use; and provide visible progress, pause, cancellation and emergency stop.
+
+**Acceptance:** interrupted campaigns resume from durable state without losing evidence, repeating completed actions or bypassing authorization checks.
+
+## 46.5 Independent verification and evidence
+
+Discovery and verification are separate. Scanner output or an AI assertion alone cannot establish a verified finding. Reproduce findings using deterministic independent checks where feasible. Preserve raw output, relevant requests/responses, timestamps, tool versions, authorization basis and integrity/provenance data.
+
+Distinguish observations, candidates, verified, refuted, inconclusive, blocked and not-tested outcomes. A failed replay is not proof that a vulnerability is absent. Keep severity, confidence and verification status separate. Benchmark false positives, false negatives and coverage against seeded ground-truth labs.
+
+**Acceptance:** seeded vulnerable and clean targets produce measured classification results, reproducible evidence and honest reporting of uncertainty and coverage gaps.
+
+## 46.6 Stateful attack chains and reachability
+
+Connect reconnaissance, enumeration, discovery, permitted validation and follow-up into evidence-linked attack paths. Track host/service reachability, routes, pivots, sessions and transport context. Integrate route resolution and pivot-aware execution into applicable tools. Recheck authorization at every host, redirect, DNS resolution and pivot. Record each transition as demonstrated, failed, blocked, untested or inconclusive; do not report inferred paths as completed attacks.
+
+**Acceptance:** a controlled multi-host lab demonstrates a complete permitted chain, including pivot context, authorization checks, evidence, verification and recovery after interruption.
+
+## 46.7 Real transport and Windows validation
+
+Verify supported SSH, SMB, WMI and Metasploit session/transport paths against controlled authorized targets. Verify native Windows installation, dependency discovery, tool execution, output parsing, cleanup and recovery. Test connection loss, timeouts, permission errors, partial output and cancellation. Distinguish implemented, smoke-tested, lab-validated and end-to-end-verified support; do not advertise unverified combinations as supported.
+
+## 46.8 Known execution defects
+
+Close and regression-test these observed defects:
+- The CLI `whaxon run` can exit after its initial tool run while Automator follow-up jobs remain queued. It must drain follow-up work, subject to bounded execution and cancellation, and report truthful terminal states and findings.
+- The Nikto v2.6.1 adapter returned no findings and marked a job failed despite a completed scan reporting 25 findings. Update `src/whaxon/adapters/nikto.py` to parse bracketed IDs and optional `See:` suffixes, including observed lines such as `[750001] ... /actuator/env`, `[750500] /config/` and `[013587] /`. Preserve raw evidence and add real-output regression fixtures plus an end-to-end follow-up test.
+
+## 46.9 Delivery and completion gates
+
+1. Fix CLI follow-up draining and Nikto parsing with regression tests.
+2. Complete the existing functional UI gate without redesigning the supplied UI.
+3. Implement durable campaign state, audit history, budgets, pause/stop and recovery.
+4. Implement the four autonomy levels and shared controller for customer pentesting.
+5. Implement and test the independent bounty authorization and programme-ingestion foundation.
+6. Prove customer/bounty isolation before autonomous bounty execution.
+7. Deliver bounded autonomous investigation, independent verification and seeded benchmarks.
+8. Deliver attack-chain/pivot handling and transport/Windows validation.
+9. Complete long-duration, interruption/recovery, budget and adversarial authorization tests.
+10. Complete reporting, knowledge and integrations in coordination with the existing bug-bounty roadmap.
+
+**Definition of done:** each capability has implementation evidence, automated tests and controlled end-to-end results. No feature is marked complete merely because a design, route, mock or AI prompt exists. Existing v1.0 release blockers remain in force.
