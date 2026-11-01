@@ -1004,6 +1004,36 @@
         <button id="dep-snapshot" type="button" class="px-space-md py-2 rounded bg-surface-container-high text-on-surface font-code-sm">Save snapshot</button>
       </div>
     </div>
+    <div class="mt-space-md rounded-lg border border-outline-variant/40 bg-surface-container p-space-md">
+      <div class="flex flex-col md:flex-row md:items-end gap-space-sm">
+        <div class="flex-1">
+          <label for="dep-profile" class="block font-label-sm text-outline uppercase mb-1">First-run setup profile</label>
+          <select id="dep-profile" class="w-full rounded bg-surface-container-lowest border border-outline-variant p-space-sm text-on-surface">
+            <option value="core">Core — essential runtime and CLI</option>
+            <option value="standard" selected>Standard — core, terminal and web</option>
+            <option value="full">Full — all declared capabilities</option>
+            <option value="custom">Custom — choose capabilities</option>
+          </select>
+        </div>
+        <button id="dep-profile-plan" type="button" class="px-space-md py-2 rounded bg-primary-container text-on-primary font-code-sm font-semibold">Review setup profile</button>
+      </div>
+      <div id="dep-custom-capabilities" hidden class="mt-space-sm flex flex-wrap gap-space-md text-body-sm">
+        <label><input type="checkbox" value="core" checked disabled/> Core</label>
+        <label><input type="checkbox" value="tui"/> Terminal UI</label>
+        <label><input type="checkbox" value="web"/> Web UI</label>
+        <label><input type="checkbox" value="gui"/> Desktop UI</label>
+        <label><input type="checkbox" value="metasploit"/> Metasploit integration</label>
+      </div>
+      <p id="dep-profile-status" role="status" aria-live="polite" class="mt-space-sm text-body-sm text-on-surface-variant">Choose a profile to build a read-only plan from the detected environment.</p>
+      <div id="dep-profile-actions" class="mt-space-sm space-y-2"></div>
+      <div id="dep-profile-approval" hidden class="mt-space-sm border-t border-outline-variant/40 pt-space-sm">
+        <label class="flex items-start gap-space-sm text-body-sm text-on-surface">
+          <input id="dep-profile-approve-check" type="checkbox" class="mt-1 accent-emerald-400"/>
+          <span>I reviewed the complete profile plan and approve installing all eligible missing Python packages listed above. OS packages and external tools are not included.</span>
+        </label>
+        <button id="dep-profile-install" type="button" disabled class="mt-space-sm px-space-md py-2 rounded bg-primary-container text-on-primary font-code-sm font-semibold disabled:opacity-40">Approve &amp; install profile</button>
+      </div>
+    </div>
     <p id="dep-status" role="status" aria-live="polite" class="mt-space-md text-body-sm text-on-surface-variant">Loading dependency readiness…</p>
     <div id="dep-summary" class="mt-space-md grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-space-sm"></div>
     <p id="dep-environment" class="mt-space-sm font-code-sm text-outline"></p>
@@ -1175,6 +1205,138 @@
       busy(button, false, verify ? "Verify tools" : "Check environment");
     }
   }
+
+  const profileSelect = $("dep-profile");
+  const customCapabilities = $("dep-custom-capabilities");
+  let activeProfilePlan = null;
+  $("dep-profile-approve-check").addEventListener("change", event => {
+    $("dep-profile-install").disabled = !event.target.checked || !activeProfilePlan;
+  });
+  $("dep-profile-install").addEventListener("click", async () => {
+    if (!activeProfilePlan || !$("dep-profile-approve-check").checked) return;
+    const button = $("dep-profile-install");
+    busy(button, true, "Queueing profile…");
+    try {
+      const operation = await api("/api/dependencies/install-batch", {
+        method: "POST",
+        body: JSON.stringify({
+          dependency_ids: activeProfilePlan.dependencyIds,
+          approved_plan_id: activeProfilePlan.planId
+        })
+      });
+      activeOperation = operation.operation_id;
+      $("dep-operation").hidden = false;
+      $("dep-cancel").disabled = false;
+      $("dep-refresh-operation").disabled = false;
+      $("dep-approve-check").checked = false;
+      $("dep-approve-check").disabled = true;
+      $("dep-install").disabled = true;
+      $("dep-profile-approve-check").checked = false;
+      $("dep-profile-approve-check").disabled = true;
+      $("dep-profile-install").disabled = true;
+      activeProfilePlan = null;
+      setText("dep-operation-id", "OPERATION ID: " + activeOperation);
+      setText("dep-operation-status", "Approved profile installation queued.");
+      setText("dep-operation-result", "");
+      pollOperation();
+    } catch (error) {
+      setText("dep-profile-status", "Profile installation was not queued: " + error.message);
+    } finally {
+      busy(button, false, "Approve & install profile");
+      button.disabled = !activeProfilePlan || !$("dep-profile-approve-check").checked;
+    }
+  });
+  profileSelect.addEventListener("change", () => {
+    customCapabilities.hidden = profileSelect.value !== "custom";
+    activeProfilePlan = null;
+    $("dep-profile-approval").hidden = true;
+    $("dep-profile-approve-check").checked = false;
+    $("dep-profile-approve-check").disabled = false;
+    $("dep-profile-install").disabled = true;
+  });
+  customCapabilities.addEventListener("change", () => {
+    if (profileSelect.value !== "custom") return;
+    activeProfilePlan = null;
+    $("dep-profile-approval").hidden = true;
+    $("dep-profile-approve-check").checked = false;
+    $("dep-profile-install").disabled = true;
+  });
+  $("dep-profile-plan").addEventListener("click", async () => {
+    const button = $("dep-profile-plan");
+    busy(button, true, "Planning…");
+    activeProfilePlan = null;
+    $("dep-profile-approval").hidden = true;
+    $("dep-profile-approve-check").checked = false;
+    $("dep-profile-install").disabled = true;
+    setText("dep-profile-status", "Building a read-only plan; no package commands will run.");
+    $("dep-profile-actions").replaceChildren();
+    try {
+      const report = latestReport || await api("/api/dependencies");
+      const profile = profileSelect.value;
+      const profileCapabilities = {
+        core: ["core"],
+        standard: ["core", "tui", "web"],
+        full: ["core", "tui", "web", "gui", "metasploit"]
+      };
+      const capabilities = profile === "custom"
+        ? Array.from(customCapabilities.querySelectorAll("input:checked")).map(input => input.value)
+        : profileCapabilities[profile];
+      if (!capabilities || !capabilities.length) throw new Error("Select at least one custom capability.");
+      const selected = (report.dependencies || []).filter(dep =>
+        dep.id === "python" || (dep.capabilities || []).some(cap => capabilities.includes(cap))
+      ).map(dep => dep.id);
+      const plan = await api("/api/dependencies/plan", {
+        method: "POST",
+        body: JSON.stringify({dependency_ids: selected})
+      });
+      const host = $("dep-profile-actions");
+      const summary = document.createElement("p");
+      summary.className = "text-body-sm text-on-surface";
+      summary.textContent = profile.toUpperCase() + " profile · " + capabilities.join(", ") +
+        " · " + (plan.actions || []).length + " remediation action(s) · plan " + plan.plan_id;
+      host.appendChild(summary);
+      if (!(plan.actions || []).length) {
+        const ready = document.createElement("p");
+        ready.className = "text-body-sm text-on-surface-variant";
+        ready.textContent = "No remediation actions are currently required for the selected profile.";
+        host.appendChild(ready);
+      }
+      (plan.actions || []).forEach(action => {
+        const row = document.createElement("div");
+        row.className = "flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded bg-surface-container-lowest p-space-sm";
+        const detail = document.createElement("div");
+        detail.className = "min-w-0";
+        const title = document.createElement("div");
+        title.className = "font-medium text-on-surface";
+        title.textContent = action.dependency_id;
+        const option = (action.options || [])[0] || {};
+        const description = document.createElement("div");
+        description.className = "text-body-sm text-on-surface-variant break-words";
+        description.textContent = (option.title || "Manual remediation") + " · " +
+          (option.automated_execution_supported ? "approval-based installation available" : "manual instructions only");
+        detail.append(title, description);
+        const review = document.createElement("button");
+        review.type = "button";
+        review.className = "shrink-0 px-space-sm py-1 rounded bg-surface-container-high text-secondary font-code-sm";
+        review.textContent = "Review this fix";
+        review.addEventListener("click", () => createPlan(action.dependency_id));
+        row.append(detail, review);
+        host.appendChild(row);
+      });
+      activeProfilePlan = (plan.actions || []).length
+        ? {dependencyIds: selected, planId: plan.plan_id}
+        : null;
+      $("dep-profile-approval").hidden = !activeProfilePlan;
+      $("dep-profile-approve-check").checked = false;
+      $("dep-profile-approve-check").disabled = false;
+      $("dep-profile-install").disabled = true;
+      setText("dep-profile-status", "Plan generated without executing commands. Review every listed action, then explicitly approve the complete eligible Python-package batch.");
+    } catch (error) {
+      setText("dep-profile-status", "Could not build profile plan: " + error.message);
+    } finally {
+      busy(button, false, "Review setup profile");
+    }
+  });
 
   async function createPlan(dependencyId) {
     const requestSequence = ++planRequestSequence;

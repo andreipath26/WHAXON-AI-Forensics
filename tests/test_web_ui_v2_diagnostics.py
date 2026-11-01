@@ -1,6 +1,8 @@
 """Browser coverage for the canonical live diagnostics page."""
 from __future__ import annotations
 
+import json
+
 
 def test_diagnostics_page_uses_live_health_and_tool_apis(page, live_server):
     health = page.request.get(f"{live_server}/api/health")
@@ -84,6 +86,7 @@ def test_diagnostics_reference_buttons_cannot_run_simulated_operations(page, liv
         elif button.get_attribute("id") in (
             "diagnostics-refresh", "btn-run-diag", "btn-export-json",
             "dep-check", "dep-verify", "dep-snapshot", "dep-history", "dep-plan-close",
+            "dep-profile-plan",
         ):
             assert button.is_enabled()
         else:
@@ -205,3 +208,138 @@ def test_dependency_readiness_plan_requires_explicit_ui_approval(page, live_serv
     assert page.locator("#dep-install").is_disabled()
     assert page.locator("#dep-approve-check").is_visible()
     assert page.locator("#dep-operation").is_hidden()
+
+
+
+def test_first_run_profile_wizard_builds_read_only_capability_plan(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/diagnostics")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('#dep-status')?.textContent.includes('Environment report loaded')",
+        timeout=10000,
+    )
+
+    submitted = []
+    page.route(
+        "**/api/dependencies/plan",
+        lambda route: (
+            submitted.append(route.request.post_data_json),
+            route.continue_(),
+        )[1],
+    )
+    page.locator("#dep-profile").select_option("standard")
+    page.locator("#dep-profile-plan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#dep-profile-status')?.textContent.includes('Plan generated')",
+        timeout=10000,
+    )
+    assert submitted
+    assert "python" in submitted[0]["dependency_ids"]
+    assert page.locator("#dep-profile-actions").inner_text()
+    assert page.locator("#dep-profile-plan").is_enabled()
+
+    page.locator("#dep-profile").select_option("custom")
+    assert page.locator("#dep-custom-capabilities").is_visible()
+    page.locator("#dep-custom-capabilities input[value='web']").check()
+    page.locator("#dep-profile-plan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#dep-profile-status')?.textContent.includes('Plan generated')",
+        timeout=10000,
+    )
+    assert submitted[-1]["dependency_ids"]
+    # Profile planning is read-only; the installer endpoint must never be called.
+    assert page.locator("#dep-operation").is_hidden()
+
+
+
+def test_profile_batch_install_requires_explicit_approval_and_tracks_operation(page, live_server):
+    invalid = page.request.post(
+        f"{live_server}/api/dependencies/install-batch",
+        data={},
+    )
+    assert invalid.status == 400
+    page.goto(f"{live_server}/ui-v2/diagnostics")
+    page.wait_for_function(
+        "() => document.querySelector('#dep-status')?.textContent.includes('Environment report loaded')",
+        timeout=10000,
+    )
+    page.route(
+        "**/api/dependencies/plan",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "plan_id": "plan-0123456789abcdef",
+                "actions": [{
+                    "dependency_id": route.request.post_data_json["dependency_ids"][0],
+                    "options": [{
+                        "title": "Install approved package",
+                        "kind": "python-package",
+                        "automated_execution_supported": True,
+                    }],
+                }],
+            }),
+        ),
+    )
+    page.locator("#dep-profile").select_option("standard")
+    page.locator("#dep-profile-plan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#dep-profile-status')?.textContent.includes('Plan generated')",
+        timeout=10000,
+    )
+    assert page.locator("#dep-profile-approval").is_visible()
+    assert page.locator("#dep-profile-install").is_disabled()
+    page.locator("#dep-profile-approve-check").check()
+    assert page.locator("#dep-profile-install").is_enabled()
+    # Changing the profile invalidates the previously reviewed approval.
+    page.locator("#dep-profile").select_option("custom")
+    assert page.locator("#dep-profile-approval").is_hidden()
+    assert page.locator("#dep-profile-install").is_disabled()
+    page.locator("#dep-custom-capabilities input[value='web']").check()
+    page.locator("#dep-profile-plan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#dep-profile-status')?.textContent.includes('Plan generated')",
+        timeout=10000,
+    )
+    assert page.locator("#dep-profile-approval").is_visible()
+    assert page.locator("#dep-profile-install").is_disabled()
+    submitted = []
+    page.route(
+        "**/api/dependencies/install-batch",
+        lambda route: (
+            submitted.append(route.request.post_data_json),
+            route.fulfill(
+                status=202,
+                content_type="application/json",
+                body=json.dumps({
+                    "operation_id": "0123456789abcdef0123456789abcdef",
+                    "status": "QUEUED",
+                    "progress": 0,
+                }),
+            ),
+        )[1],
+    )
+    page.route(
+        "**/api/dependencies/install/0123456789abcdef0123456789abcdef",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps({
+                "operation_id": "0123456789abcdef0123456789abcdef",
+                "status": "VERIFIED",
+                "progress": 100,
+                "message": "Profile batch verified.",
+                "result": {"status": "VERIFIED"},
+            }),
+        ),
+    )
+    page.locator("#dep-profile-approve-check").check()
+    assert page.locator("#dep-profile-install").is_enabled()
+    page.locator("#dep-profile-install").click()
+    page.wait_for_function(
+        "() => document.querySelector('#dep-operation-status')?.textContent.includes('VERIFIED')",
+        timeout=10000,
+    )
+    assert len(submitted) == 1
+    assert submitted[0]["approved_plan_id"].startswith("plan-")
+    assert submitted[0]["dependency_ids"]

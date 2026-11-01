@@ -68,6 +68,30 @@ jobs:
           python -m build
           python -m twine check dist/*
 
+      - name: Verify source distribution includes runtime data and payloads
+        if: matrix.python-version == '3.12'
+        run: |
+          python - <<'PY'
+          import tarfile
+          from pathlib import Path
+
+          archives = list(Path("dist").glob("*.tar.gz"))
+          assert len(archives) == 1, f"expected one source archive, found {len(archives)}"
+          with tarfile.open(archives[0], "r:gz") as archive:
+              names = archive.getnames()
+          assert any(name.endswith("/src/whaxon/data/dependencies.json") for name in names), (
+              "sdist is missing the dependency manifest"
+          )
+          assert any(name.endswith("/src/whaxon/data/tools.json") for name in names), (
+              "sdist is missing the external-tool catalog"
+          )
+          assert any(
+              "/src/whaxon/data/payloads/" in name and not name.endswith("/")
+              for name in names
+          ), "sdist contains no validation payload files"
+          print("Source distribution contains the dependency manifest, tool catalog and payloads.")
+          PY
+
       - name: Smoke-test built wheel in a clean environment
         if: matrix.python-version == '3.12'
         run: |
@@ -76,6 +100,18 @@ jobs:
           /tmp/whaxon-ci-smoke/bin/python -m pip install --upgrade pip
           /tmp/whaxon-ci-smoke/bin/python -m pip install dist/*.whl
           /tmp/whaxon-ci-smoke/bin/whaxon --help
+          /tmp/whaxon-ci-smoke/bin/whaxon doctor --json > doctor-report.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("doctor-report.json").read_text(encoding="utf-8"))
+          assert report["schema_version"] == 1
+          assert report["summary"]["required_blockers"] == 0
+          payloads = next(
+              item for item in report["dependencies"] if item["id"] == "validation-payloads"
+          )
+          assert payloads["status"] == "READY", payloads
+          PY
           SMOKE_DATA="$(mktemp -d)"
           /tmp/whaxon-ci-smoke/bin/whaxon scope --show --data "$SMOKE_DATA"
           SMOKE_DATA="$SMOKE_DATA" /tmp/whaxon-ci-smoke/bin/python - <<'PY'
@@ -139,3 +175,188 @@ jobs:
 
           print("Installed-wheel CLI, catalog, scope, payload, and HTTP validation smoke tests passed.")
           PY
+
+
+  setup-platform-smoke:
+    name: setup smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build and install wheel
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m pip install dist/*.whl
+      - name: Verify first-run preview and venv bootstrap
+        shell: bash
+        run: |
+          set -eu
+          whaxon setup --profile core --json > setup-plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan = json.loads(Path("setup-plan.json").read_text(encoding="utf-8"))
+          assert plan["profile"] == "core"
+          assert plan["execution"]["commands_executed"] is False
+          assert plan["execution"]["network_accessed"] is False
+          assert plan["execution"]["privilege_escalation_attempted"] is False
+          assert plan["dependency_plan"]["plan_id"].startswith("plan-")
+          PY
+          whaxon setup --create-venv --venv-path .ci-setup-venv
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(".ci-setup-venv")
+          assert (root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")).is_file()
+          PY
+
+  setup-external-tool-smoke:
+    name: curated apt tool installation smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Refresh apt metadata
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+      - name: Build and install WHAXON wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m pip install dist/*.whl
+      - name: Preview and explicitly approve curated external tools
+        run: |
+          set -euo pipefail
+          whaxon setup --profile core --tool nmap --tool gobuster --tool sqlmap --tool ffuf --json > tool-plan.json
+          PLAN_ID="$(python -c 'import json; print(json.load(open("tool-plan.json", encoding="utf-8"))["external_tool_plan"]["plan_id"])')"
+          set +e
+          whaxon setup --profile core --tool nmap --tool gobuster --tool sqlmap --tool ffuf --install-tools --approve-tools "$PLAN_ID" --allow-system-changes --allow-elevation --json > tool-install.json
+          INSTALL_RC=$?
+          set -e
+          if [[ "$INSTALL_RC" -ne 0 ]]; then
+            cat tool-install.json
+            echo "Gobuster --version output:"
+            gobuster --version || true
+            echo "Gobuster version subcommand output:"
+            gobuster version || true
+            whaxon doctor --verify --json > doctor-report.json
+            python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("doctor-report.json").read_text(encoding="utf-8"))
+          gobuster = next(item for item in report["dependencies"] if item["id"] == "gobuster")
+          print(json.dumps(gobuster, indent=2))
+          PY
+            exit "$INSTALL_RC"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path("tool-install.json").read_text(encoding="utf-8"))
+          installation = result["external_tool_installation"]
+          assert installation["status"] == "VERIFIED", installation
+          completed = set(installation.get("installed", [])) | set(installation.get("already_present", []))
+          assert completed == {"nmap", "gobuster", "sqlmap", "ffuf"}, installation
+          assert installation["network_accessed"] is True
+          PY
+      - name: Verify curated executables and run a loopback-only scanner smoke test
+        run: |
+          set -euo pipefail
+          whaxon doctor --verify --json > verified-tools.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("verified-tools.json").read_text(encoding="utf-8"))
+          states = {
+              item["id"]: item["status"]
+              for item in report["dependencies"]
+              if item["kind"] == "external-tool"
+          }
+          expected = {"nmap", "gobuster", "sqlmap", "ffuf"}
+          assert all(states.get(tool) == "READY" for tool in expected), states
+          PY
+          nmap -sn -n 127.0.0.1
+          python tests/smoke_external_tools.py
+
+  setup-homebrew-tool-smoke:
+    name: curated Homebrew tool installation smoke
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Confirm Homebrew and refresh formula metadata
+        run: |
+          set -euo pipefail
+          brew --version
+          brew update
+      - name: Build and install WHAXON wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m pip install dist/*.whl
+      - name: Preview and explicitly approve curated Homebrew tools
+        run: |
+          set -euo pipefail
+          whaxon setup --profile core --tool nmap --tool gobuster --tool sqlmap --tool ffuf --tool nuclei --json > tool-plan.json
+          PLAN_ID="$(python -c 'import json; print(json.load(open("tool-plan.json", encoding="utf-8"))["external_tool_plan"]["plan_id"])')"
+          set +e
+          whaxon setup --profile core --tool nmap --tool gobuster --tool sqlmap --tool ffuf --tool nuclei --install-tools --approve-tools "$PLAN_ID" --allow-system-changes --json > tool-install.json
+          INSTALL_RC=$?
+          set -e
+          if [[ "$INSTALL_RC" -ne 0 ]]; then
+            cat tool-install.json
+            echo "Installed scanner version outputs:"
+            for tool in nmap gobuster sqlmap ffuf nuclei; do
+              echo "===== $tool --version ====="
+              "$tool" --version 2>&1 || true
+              echo "===== $tool -version ====="
+              "$tool" -version 2>&1 || true
+            done
+            exit "$INSTALL_RC"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path("tool-install.json").read_text(encoding="utf-8"))
+          installation = result["external_tool_installation"]
+          assert installation["status"] == "VERIFIED", installation
+          completed = set(installation.get("installed", [])) | set(installation.get("already_present", []))
+          assert completed == {"nmap", "gobuster", "sqlmap", "ffuf", "nuclei"}, installation
+          assert installation["network_accessed"] is True
+          PY
+      - name: Verify installed tools and run local-only Nmap smoke test
+        run: |
+          set -euo pipefail
+          whaxon doctor --verify --json > verified-tools.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("verified-tools.json").read_text(encoding="utf-8"))
+          states = {
+              item["id"]: item["status"]
+              for item in report["dependencies"]
+              if item["kind"] == "external-tool"
+          }
+          expected = {"nmap", "gobuster", "sqlmap", "ffuf", "nuclei"}
+          assert all(states.get(tool) == "READY" for tool in expected), states
+          PY
+          nmap -sn -n 127.0.0.1
+          python tests/smoke_external_tools.py
+

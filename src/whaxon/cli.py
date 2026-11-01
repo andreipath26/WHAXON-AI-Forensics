@@ -13,7 +13,10 @@ def main() -> None:
         print(f"  Launch the {mode} interface. No arguments accepted.")
         return
 
-    if mode == "gui":
+    if mode == "setup":
+        from .interfaces.cli.setup_cmd import main as setup_main
+        raise SystemExit(setup_main(args))
+    elif mode == "gui":
         from .interfaces.gui.app import main as gui_main
         gui_main(args)
     elif mode == "web":
@@ -98,7 +101,7 @@ def main() -> None:
         from .interfaces.tui.app import main as tui_main
         tui_main(args)
     elif mode in ("--help", "-h"):
-        print("Usage: whaxon [doctor|init|up|down|serve|web|tui|gui|msf|scope|install|suggest|burp-import|evidence|report|run|findings|lookup|cve|vulndb|validate|retest|coverage|bounty|state|jobs|ai]")
+        print("Usage: whaxon [setup|doctor|init|up|down|serve|web|tui|gui|msf|scope|install|suggest|burp-import|evidence|report|run|findings|lookup|cve|vulndb|validate|retest|coverage|bounty|state|jobs|ai]")
     else:
         print(f"Unknown mode: {mode}. Use 'tui', 'gui', 'web', or 'serve'.")
         sys.exit(2)

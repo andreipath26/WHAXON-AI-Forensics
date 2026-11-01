@@ -2,9 +2,11 @@
 
 ## Scope and status
 
-This implementation adds dependency diagnostics, deterministic remediation planning, a tightly allowlisted Python-package installer, durable operation tracking, readiness history, authenticated web APIs, and the first UI integration in the existing Diagnostics page.
+This implementation adds dependency diagnostics, deterministic remediation planning, a tightly allowlisted Python-package installer, single-package and profile-batch operation tracking, readiness history, authenticated web APIs, and a first-run profile planner in the existing Diagnostics page.
 
-The Diagnostics page is the canonical entry point. Its four states are:
+The Diagnostics page is the canonical entry point. It supports Core, Standard, Full and Custom profiles. The operator can review a read-only plan, explicitly approve the complete eligible Python-package batch, and track the sequential operation through verification. Individual package review remains available. External-tool OS packages are not part of the Python profile batch. A separate CLI flow supports exact-plan-approved apt/Homebrew installation for Nmap, Gobuster, SQLmap and ffuf, plus Nuclei through Homebrew only; unsupported combinations remain manual.
+
+Its four states are:
 1. Environment overview.
 2. Dependency inventory.
 3. Guided fix / plan review.
@@ -26,7 +28,7 @@ whaxon doctor --snapshot
 whaxon doctor --drift
 ```
 
-The versioned JSON report includes runtime details, active interpreter and virtual-environment state, required Python package metadata/import checks, optional extras, and external executable discovery from the packaged tool catalog.
+The versioned JSON report includes runtime details, active interpreter and virtual-environment state, required Python package metadata/import checks, optional extras, and external executable discovery from the packaged tool catalog. Mandatory packaged validation payloads are checked for presence and non-empty contents. External executable records include the selected path, distinct PATH candidates, a local filesystem-metadata identity fingerprint, and a PATH-ambiguity flag. This fingerprint helps detect a changed local file; it is not a publisher signature, content hash, or supply-chain attestation.
 
 `--verify` runs only manifest-curated, bounded external-tool version probes. It does not run arbitrary tool commands or target scans.
 
@@ -36,7 +38,8 @@ The versioned JSON report includes runtime details, active interpreter and virtu
 - `MISSING`: a distribution or executable could not be found.
 - `INCOMPATIBLE`: an installed package or Python runtime is below the declared minimum.
 - `BROKEN`: package metadata/import or a required packaged resource could not be read.
-- `DETECTED`: an external executable resolves on PATH but has not passed a trusted version probe.
+- `DETECTED`: an external executable resolves on PATH but has not passed a trusted version probe. Multiple distinct PATH candidates are explicitly flagged for operator review.
+- `BROKEN`: an executable resolves but its filesystem identity cannot be inspected; WHAXON will not run its version probe.
 
 An overall `BLOCKED` result means a required runtime/package/resource is not READY. `DEGRADED` means optional integrations or external tools are missing or unverified. Optional tools do not block unrelated core functionality.
 
@@ -46,7 +49,7 @@ Diagnostics themselves do not install software, invoke package managers, access 
 
 The packaged source of truth is `src/whaxon/data/dependencies.json`. It records the Python runtime, core packages, optional extras, profiles, curated external-tool probes and installation policy.
 
-Automatic installation is enabled only for manifest-listed `python-package` dependencies. External security tools remain manual-only until their platform-specific installation sources and functional verification contracts are curated. The installer independently enforces the manifest policy; the UI cannot override it.
+Python automatic installation is enabled only for manifest-listed `python-package` dependencies. External-tool installation uses a separate fixed package allowlist in `setup_installers.py`, exact-plan approval, explicit system-change consent, separate non-interactive elevation consent, shell-free package-manager invocation and trusted post-install version probes. The mapping is intentionally limited to apt on Debian/Ubuntu/Kali and Homebrew on supported macOS architectures; Windows package managers are detected for diagnostics only and remain manual because native Windows package IDs have not passed acceptance. Unsupported architectures and distributions remain manual even if a package manager binary is present. The UI cannot override the Python installer policy.
 
 ## Remediation preview
 
@@ -90,13 +93,14 @@ The authenticated API exposes:
 - `GET /api/dependencies` — read-only diagnostics.
 - `POST /api/dependencies/verify` — explicit curated version probes.
 - `POST /api/dependencies/plan` — read-only plan preview.
-- `POST /api/dependencies/install` — queues an exact plan-ID-approved package operation and returns an operation ID.
+- `POST /api/dependencies/install` — queues an exact plan-ID-approved single-package operation and returns an operation ID.
+- `POST /api/dependencies/install-batch` — queues an exact plan-ID-approved profile batch, restricted to manifest-allowlisted Python packages, and returns an operation ID.
 - `GET /api/dependencies/install/<operation-id>` — operation state, progress and verification result.
 - `POST /api/dependencies/install/<operation-id>/cancel` — request cancellation.
 - `POST /api/dependencies/snapshots` and `GET /api/dependencies/history` — local readiness history.
 - `GET /api/dependencies/drift` — compare current readiness with the latest snapshot.
 
-Operation state is stored under `<data-dir>/.whaxon/dependency-operations/` with restrictive permissions where supported. Per-dependency locks prevent concurrent installs; periodic progress updates support stale-worker detection. Cancellation terminates the package-manager process where possible.
+Operation state is stored under `<data-dir>/.whaxon/dependency-operations/` with restrictive permissions where supported. Per-dependency locks prevent concurrent installs, including conflicts between single-package and profile-batch operations; periodic progress updates support stale-worker detection. Cancellation terminates the package-manager process where possible.
 
 The worker currently runs as a background thread in the web process. A process crash can interrupt an install; the persisted operation will be marked interrupted after its heartbeat expires. This is not a distributed job queue and does not guarantee survival across process restarts.
 
@@ -111,11 +115,11 @@ A failed, timed-out or interrupted pip operation may have partially changed the 
 ## Remaining deployment gates
 
 This feature is not considered production-deployable until all of the following are verified:
-- Full CI passes on Python 3.11, 3.12 and 3.13: Ruff, mypy, full pytest, browser tests, distribution build, metadata validation and clean-wheel smoke test.
+- **Completed 2026-11-01:** [CI run #41307525558](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41307525558) passed Ruff, mypy, full pytest and distribution build/metadata validation on Python 3.11, 3.12 and 3.13. The clean Python 3.12 wheel smoke test ran `whaxon doctor --json`, asserted zero required blockers and READY validation payloads; the sdist check verified the dependency manifest, tool catalog and payload files.
 - The manifest, tool catalog and required payload resources are present in both wheel and sdist.
 - Clean installation and operation are tested on Windows, macOS and supported Linux distributions, including no-root and offline cases.
 - Every external-tool readiness claim is backed by a curated version and functional smoke-test contract.
-- Resource paths, conflicting binaries, writable locations and package-manager availability are checked without weakening read-only diagnostics.
+- Writable installation destinations, resource integrity/hashes, and complete package-manager/no-root/offline behavior still require clean-machine acceptance. Read-only diagnostics now check packaged validation-resource presence, executable filesystem identity, PATH ambiguity, and curated manager/OS/architecture support.
 - Installation artifacts and transitive dependencies have a documented integrity/pinning strategy before any claim of reproducible or high-assurance installation.
 - Responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows pass browser regression tests.
 - Worker restart behavior, concurrent operations, lock recovery, cancellation and partial-install recovery are validated under realistic deployment process models.
@@ -135,6 +139,6 @@ For dependency readiness, the audit lifecycle must cover:
 - Recovery: trigger, diagnosis, actions recommended or taken, operator decision, resulting state and follow-up verification.
 - Exceptional paths: denied approval, stale/changed plan, audit failure, worker crash/interruption, lock recovery and partial installation.
 
-Events must share stable plan, approval, operation and dependency identifiers so an auditor can reconstruct the complete sequence. Store append-only records with restrictive access, secret redaction and minimal personal data. Add a verifiable integrity mechanism (for example, a hash chain with a documented trust anchor); append-only JSONL and filesystem permissions alone do not prove tamper-evidence. Provide an integrity-check/export path. Never report a consequential operation as fully successful when required evidence could not be persisted or verified.
+Events must share stable plan, approval, operation and dependency identifiers so an auditor can reconstruct the complete sequence. Profile batches additionally record acceptance of the exact parent profile plan and a terminal batch outcome; each child package operation retains its own plan/action evidence. Store append-only records with restrictive access, secret redaction and minimal personal data. Add a verifiable integrity mechanism (for example, a hash chain with a documented trust anchor); append-only JSONL and filesystem permissions alone do not prove tamper-evidence. Provide an integrity-check/export path. Never report a consequential operation as fully successful when required evidence could not be persisted or verified.
 
 **Current implementation boundary:** the installer now records plan creation, plan-ID approval submission, action start and terminal outcomes in a sequenced SHA-256-linked local JSONL chain. The chain is checked before appending and can be verified through `GET /api/dependencies/audit`; corruption fails closed. This is tamper-evident against partial modification or reordering, not immutable against an attacker who can rewrite the complete file. The current web/CLI interface does not provide a verified human identity or cryptographic proof that the plan was displayed and understood. The chain has no independently stored trust anchor, and writers are serialized with a cross-process file lock. The lack of an independently stored trust anchor remains a deployment blocker for stronger audit assurance; do not describe the ledger as tamper-proof or complete.

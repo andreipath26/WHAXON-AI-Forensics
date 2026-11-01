@@ -22,6 +22,13 @@ def _save_scope(page, scope):
     )
 
 
+def _restore_scope(page, scope):
+    payload = dict(scope)
+    if payload.get("enabled") is False:
+        payload["confirm_disable"] = True
+    return _save_scope(page, payload)
+
+
 def _wait_loaded(page):
     page.wait_for_function(
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
@@ -307,32 +314,55 @@ def test_scope_edit_invalidates_previous_preflight_result(page, live_server):
 
 
 def test_scope_import_requires_confirmation_before_disabling_enforcement(page, live_server):
+    # Stub the initial scope read so parallel browser workers cannot race this
+    # confirmation test by mutating the shared live-server configuration.
+    initial_scope = {
+        "engagement": "Authorized assessment",
+        "enabled": True,
+        "in_scope": ["127.0.0.1"],
+        "out_of_scope": [],
+        "notes": "",
+    }
+    writes = []
+    page.route(
+        "**/api/scope",
+        lambda route: (
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(initial_scope))
+            if route.request.method == "GET"
+            else (
+                writes.append(route.request.method),
+                route.fulfill(
+                    status=200,
+                    content_type="application/json",
+                    body=route.request.post_data or json.dumps(initial_scope),
+                ),
+            )[1]
+        ),
+    )
     page.goto(f"{live_server}/ui-v2/scope")
     _wait_loaded(page)
-    before = _read_scope(page)
-    assert before["enabled"] is True
     imported = {
-        **before,
+        **initial_scope,
         "enabled": False,
         "engagement": "Confirmed enforcement disable",
     }
-    try:
-        page.locator("#openImportDrawerBtn").click()
-        page.locator("#importDrawer textarea").fill(json.dumps(imported))
-        page.once("dialog", lambda dialog: dialog.dismiss())
-        page.locator("#executeImportBtn").click()
-        assert _read_scope(page)["enabled"] is True
-        assert page.locator("#importDrawer").is_visible()
+    page.locator("#openImportDrawerBtn").click()
+    page.locator("#importDrawer textarea").fill(json.dumps(imported))
 
-        page.once("dialog", lambda dialog: dialog.accept())
-        page.locator("#executeImportBtn").click()
-        page.wait_for_function(
-            "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
-            timeout=5000,
-        )
-        assert _read_scope(page)["enabled"] is False
-    finally:
-        _save_scope(page, before)
+    page.once("dialog", lambda dialog: dialog.dismiss())
+    page.locator("#executeImportBtn").click()
+    page.wait_for_timeout(100)
+    assert "POST" not in writes
+    assert page.locator("#importDrawer").is_visible()
+
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.locator("#executeImportBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Scope saved')",
+        timeout=5000,
+    )
+    assert "POST" in writes
+
 
 
 def test_scope_preflight_verdict_is_cleared_when_checked_target_changes(page, live_server):
@@ -469,7 +499,14 @@ def test_scope_enforcement_toggle_requires_confirmation_to_disable_and_can_reena
     page.goto(f"{live_server}/ui-v2/scope")
     _wait_loaded(page)
     before = _read_scope(page)
-    assert before["enabled"] is True
+    # Earlier browser tests share this worker's live server. Re-establish the
+    # enabled precondition explicitly, then restore the original state below.
+    if before["enabled"] is not True:
+        result = _save_scope(page, {**before, "enabled": True})
+        assert result["status"] == 200
+        page.reload()
+        _wait_loaded(page)
+    assert _read_scope(page)["enabled"] is True
     toggle = page.locator("#toggleScopeEnforcementBtn")
     assert toggle.is_enabled()
     assert toggle.inner_text() == "Disable enforcement"
@@ -499,34 +536,48 @@ def test_scope_enforcement_toggle_requires_confirmation_to_disable_and_can_reena
         assert _read_scope(page)["enabled"] is True
         assert toggle.inner_text() == "Disable enforcement"
     finally:
-        _save_scope(page, before)
+        _restore_scope(page, before)
 
 
 def test_scope_enforcement_toggle_is_locked_during_save(page, live_server):
     page.goto(f"{live_server}/ui-v2/scope")
     _wait_loaded(page)
-    page.evaluate("""() => {
-      const originalFetch = window.fetch.bind(window);
-      window.fetch = (url, options = {}) => {
-        if (url === "/api/scope" && options.method === "POST") {
-          const payload = JSON.parse(options.body);
-          return new Promise(resolve => {
-            window.__resolveScopeToggle = () => resolve(new Response(JSON.stringify(payload), {
-              status: 200,
-              headers: {"Content-Type": "application/json"}
-            }));
-          });
-        }
-        return originalFetch(url, options);
-      };
-    }""")
-    page.once("dialog", lambda dialog: dialog.accept())
-    page.locator("#toggleScopeEnforcementBtn").click()
-    page.wait_for_function("() => typeof window.__resolveScopeToggle === 'function'", timeout=5000)
-    assert page.locator("#toggleScopeEnforcementBtn").is_disabled()
-    page.evaluate("() => window.__resolveScopeToggle()")
-    page.wait_for_function(
-        "() => document.querySelector('#scopeStatusLabel')?.textContent === 'Enforcement disabled'",
-        timeout=5000,
-    )
-    assert page.locator("#toggleScopeEnforcementBtn").is_enabled()
+    before = _read_scope(page)
+    # The live server is shared within a worker; do not assume another test
+    # left enforcement enabled.
+    if before["enabled"] is not True:
+        result = _save_scope(page, {**before, "enabled": True})
+        assert result["status"] == 200
+        page.reload()
+        _wait_loaded(page)
+
+    try:
+        page.evaluate("""() => {
+          const originalFetch = window.fetch.bind(window);
+          window.__restoreScopeFetch = () => { window.fetch = originalFetch; };
+          window.fetch = (url, options = {}) => {
+            if (url === "/api/scope" && options.method === "POST") {
+              const payload = JSON.parse(options.body);
+              return new Promise(resolve => {
+                window.__resolveScopeToggle = () => resolve(new Response(JSON.stringify(payload), {
+                  status: 200,
+                  headers: {"Content-Type": "application/json"}
+                }));
+              });
+            }
+            return originalFetch(url, options);
+          };
+        }""")
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("#toggleScopeEnforcementBtn").click()
+        page.wait_for_function("() => typeof window.__resolveScopeToggle === 'function'", timeout=5000)
+        assert page.locator("#toggleScopeEnforcementBtn").is_disabled()
+        page.evaluate("() => window.__resolveScopeToggle()")
+        page.wait_for_function(
+            "() => document.querySelector('#scopeStatusLabel')?.textContent === 'Enforcement disabled'",
+            timeout=5000,
+        )
+        assert page.locator("#toggleScopeEnforcementBtn").is_enabled()
+    finally:
+        page.evaluate("() => window.__restoreScopeFetch?.()")
+        _restore_scope(page, before)

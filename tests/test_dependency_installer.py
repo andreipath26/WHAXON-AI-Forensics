@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from whaxon.core.installer import apply_approved_dependency_plan
+from whaxon.core.installer import apply_approved_dependency_batch, apply_approved_dependency_plan
 from whaxon.core.remediation import build_remediation_plan
 
 
@@ -300,3 +300,75 @@ def test_dependency_audit_chain_serializes_concurrent_writers(tmp_path, monkeypa
     result = installer.verify_dependency_audit(path)
     assert result["valid"] is True
     assert result["events_checked"] == 40
+
+
+def test_profile_batch_audits_parent_approval_and_terminal_result(monkeypatch):
+    import whaxon.core.installer as installer
+    import whaxon.core.remediation as remediation
+
+    monkeypatch.setattr(
+        remediation,
+        "build_remediation_plan",
+        lambda **kwargs: {
+            "plan_id": "plan-0123456789abcdef",
+            "unknown_dependency_ids": [],
+            "actions": [{
+                "dependency_id": "textual",
+                "options": [{"kind": "python-package", "automated_execution_supported": True}],
+            }],
+        },
+    )
+    events = []
+    monkeypatch.setattr(installer, "_append_audit", lambda record: events.append(record))
+    monkeypatch.setattr(
+        installer,
+        "apply_approved_dependency_plan",
+        lambda dependency_id, plan_id, **kwargs: {"status": "VERIFIED", "dependency_id": dependency_id},
+    )
+    result = apply_approved_dependency_batch(
+        ["textual"], "plan-0123456789abcdef"
+    )
+    assert result["status"] == "VERIFIED"
+    assert [item["event_type"] for item in events] == [
+        "PROFILE_BATCH_APPROVAL_ACCEPTED",
+        "PROFILE_BATCH_FINISHED",
+    ]
+    assert events[0]["plan_id"] == "plan-0123456789abcdef"
+    assert events[0]["dependency_ids"] == ["textual"]
+
+
+def test_profile_batch_audit_failure_never_claims_verified(monkeypatch):
+    import whaxon.core.installer as installer
+    import whaxon.core.remediation as remediation
+
+    monkeypatch.setattr(
+        remediation,
+        "build_remediation_plan",
+        lambda **kwargs: {
+            "plan_id": "plan-0123456789abcdef",
+            "unknown_dependency_ids": [],
+            "actions": [{
+                "dependency_id": "textual",
+                "options": [{"kind": "python-package", "automated_execution_supported": True}],
+            }],
+        },
+    )
+    calls = {"count": 0}
+
+    def audit(_record):
+        calls["count"] += 1
+        if calls["count"] == 2:
+            raise OSError("disk full")
+
+    monkeypatch.setattr(installer, "_append_audit", audit)
+    monkeypatch.setattr(
+        installer,
+        "apply_approved_dependency_plan",
+        lambda dependency_id, plan_id, **kwargs: {"status": "VERIFIED", "dependency_id": dependency_id},
+    )
+    result = apply_approved_dependency_batch(
+        ["textual"], "plan-0123456789abcdef"
+    )
+    assert result["status"] == "AUDIT_FAILED"
+    assert result["original_status"] == "VERIFIED"
+    assert "audit event could not be persisted" in result["recovery"]
