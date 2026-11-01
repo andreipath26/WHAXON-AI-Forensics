@@ -341,7 +341,9 @@ jobs:
           assert completed == {"nmap", "gobuster", "sqlmap", "ffuf", "nuclei"}, installation
           assert installation["network_accessed"] is True
           PY
-      - name: Verify installed tools and run local-only Nmap smoke test
+      - name: Verify installed tools and run loopback-only scanner smoke tests
+        env:
+          WHAXON_REQUIRE_NUCLEI: "1"
         run: |
           set -euo pipefail
           whaxon doctor --verify --json > verified-tools.json

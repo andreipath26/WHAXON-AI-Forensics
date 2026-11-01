@@ -6,6 +6,8 @@ All scanner targets bind to and resolve to 127.0.0.1.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -96,9 +98,43 @@ def main() -> None:
                 sqlmap_requests = [path for path in requests if path.startswith("/search?")]
             assert sqlmap_requests, "SQLmap did not send an HTTP request to the loopback fixture"
 
+            nuclei = shutil.which("nuclei")
+            if os.environ.get("WHAXON_REQUIRE_NUCLEI") == "1" and not nuclei:
+                raise AssertionError("Homebrew acceptance requires the installed Nuclei executable")
+            if nuclei:
+                template = root / "whaxon-loopback-smoke.yaml"
+                template.write_text(
+                    """id: whaxon-loopback-smoke
+info:
+  name: WHAXON loopback smoke
+  author: whaxon-ci
+  severity: info
+  description: Confirms a local HTTP fixture responds with the expected status
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/admin"
+    matchers:
+      - type: status
+        status:
+          - 200
+""",
+                    encoding="utf-8",
+                )
+                nuclei_output = root / "nuclei.jsonl"
+                run([
+                    nuclei, "-u", base_url, "-t", str(template),
+                    "-duc", "-no-interactsh", "-silent", "-jsonl",
+                    "-timeout", "3", "-retries", "0",
+                    "-o", str(nuclei_output),
+                ], timeout=60)
+                output = nuclei_output.read_text(encoding="utf-8")
+                assert "whaxon-loopback-smoke" in output, output
+
         print(
             "Loopback scanner smoke passed: Nmap TCP discovery, Gobuster directory "
-            "enumeration, ffuf content discovery, and SQLmap HTTP parameter testing."
+            "enumeration, ffuf content discovery, SQLmap HTTP parameter testing"
+            + (", and Nuclei template matching." if shutil.which("nuclei") else ".")
         )
     finally:
         server.shutdown()

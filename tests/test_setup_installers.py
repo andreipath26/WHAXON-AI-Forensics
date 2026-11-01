@@ -531,3 +531,51 @@ def test_bounded_package_runner_terminates_child_on_keyboard_interrupt(monkeypat
             stderr=installers.subprocess.PIPE, text=True, timeout=10,
         )
     assert process.terminated is True
+
+
+
+def test_offline_host_without_package_manager_gets_manual_plan_without_side_effects(monkeypatch):
+    host = {
+        "system": "Linux",
+        "architecture": "x86_64",
+        "distribution_id": "debian",
+        "package_managers": [],
+        "support_status": "linux-manual",
+        "supported_installers": [],
+        "wsl": False,
+        "safety": {
+            "read_only": True,
+            "commands_executed": False,
+            "network_accessed": False,
+            "privilege_escalation_attempted": False,
+        },
+    }
+    monkeypatch.setattr(installers, "detect_setup_environment", lambda **kwargs: host)
+    monkeypatch.setattr(
+        installers, "collect_dependency_report",
+        lambda **kwargs: _report("MISSING"),
+    )
+    events = []
+    monkeypatch.setattr(
+        "whaxon.core.installer.record_dependency_install_event",
+        lambda event: events.append(event),
+    )
+    plan = installers.build_external_tool_plan(
+        ["nmap"], which=lambda _name: None,
+    )
+    assert plan["actions"] == []
+    assert plan["manual"][0]["tool_id"] == "nmap"
+    assert "No curated package mapping" in plan["manual"][0]["reason"]
+    assert plan["safety"] == {
+        "read_only": True,
+        "commands_executed": False,
+        "network_accessed": False,
+        "privilege_escalation_attempted": False,
+    }
+    with pytest.raises(ValueError, match="unsupported manual installations"):
+        installers.apply_approved_external_tool_plan(
+            ["nmap"], plan["plan_id"], allow_system_changes=True,
+            runner=lambda *_args, **_kwargs: pytest.fail("offline plan must not execute"),
+            which=lambda _name: None,
+        )
+    assert events == []
