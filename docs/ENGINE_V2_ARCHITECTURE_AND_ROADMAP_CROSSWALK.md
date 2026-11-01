@@ -230,3 +230,21 @@ At E0, record evidence-backed decisions on: persistence transaction/lease/outbox
 Architecture is implementation-ready when current paths and permission boundaries are inventoried; contracts/state machines are versioned; customer/bounty isolation is testable; manifests and typed transports cover current and future provider classes; scheduler/recovery semantics are specified; evidence/verification/coverage/audit are end-to-end defined; clients share services; roadmap crosswalk and §0 gates are reconciled; threat model, migration, rollback and acceptance tests are reviewed.
 
 Engine v2 is done only when it executes a versioned, policy-checked, capability-resolved task graph across supported transports; persists and recovers safely; preserves and independently verifies evidence; exposes truthful progress/coverage through shared clients; and passes security, compatibility and operational acceptance. Future capabilities must be addable through provider/contracts without rewriting mission, policy, scheduler or evidence foundations.
+
+
+---
+
+## Metasploit and Armitage — complete capability integration
+
+The Metasploit integration is a first-class Engine v2 provider and a substantial product capability, not a narrow adapter. The complete architecture, Framework coverage, Armitage patterns, security requirements, implementation gates and acceptance matrix are specified in `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md`.
+
+Architecture decisions:
+- Metasploit Framework is a dynamically discovered execution provider; WHAXON remains mission, policy, scheduler, evidence and verification authority.
+- Discover the connected Framework's real version and RPC/API surface. Do not hard-code module totals or assume identical APIs across versions/editions.
+- Cover module intelligence and all supported module families, structured jobs/consoles, payloads/handlers, shell and Meterpreter sessions, Framework database/loot, plugins and route/pivot lifecycle.
+- Adopt Armitage's attack-surface/session graph, Find Attacks recommendations, contextual session workflows, pivot awareness and future deconfliction concepts. Do not clone its UI or make it a runtime dependency.
+- Build explainable, evidence-backed module recommendations and independent vulnerability verification; module matches and module checks are not proof by themselves.
+- AI proposals become typed tasks and pass deterministic authorization, policy, approval, budget and runtime checks. Replace fixed MSF auto-chain behavior with independently authorized declarative transitions.
+- Support headless execution and truthful optional-dependency/readiness reporting.
+- Follow Engine v2 E1–E9 sequencing; E1 security/recovery blockers precede broad capability expansion; E6 retains supplied UI design and visibility gates.
+

@@ -3383,3 +3383,76 @@ E0 did not run tests or inspect latest remote CI status. CI configuration define
 **Engine implementation order:** E1 critical correctness/security and regression tests → E2 versioned contracts/compatibility façade → E3 durable leases/scheduler/state machine → E4 capability manifests and declarative follow-ups → E5 shared services/headless runtime → E6 solo v1.0/UI acceptance → E7 autonomy and isolated bounty → E8/E9 multi-target and selective platform expansion. This sequence is subordinate to §0 and does not bypass the UI-first/release gates.
 
 E0 is a static inventory of principal paths, not a line-by-line security audit of all repository files. See the report for execution maps, component disposition, gaps, test inventory and limitations.
+
+
+---
+
+# 51. METASPLOIT AND ARMITAGE — FULL FRAMEWORK INTEGRATION
+
+**Status:** Required Engine v2 architecture and roadmap scope; not yet implemented.  
+**Detailed design:** `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md`.  
+**Engine crosswalk:** `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md`, section “Metasploit and Armitage — complete capability integration”.  
+**Baseline:** `docs/ENGINE_V2_BASELINE_INVENTORY.md`, E0 supplemental Metasploit finding.
+
+## 51.1 Objective and ownership
+
+Make the installed Metasploit Framework a first-class, version-aware, dynamically discovered Engine v2 provider. WHAXON must leverage the Framework's supported capabilities rather than only launching a small subset of exploit/auxiliary/post modules and executing basic session commands.
+
+Metasploit owns its native modules, Framework jobs, consoles, sessions, payload/handler mechanisms, plugins and native data. WHAXON owns mission intent, scope, deterministic authorization, customer/bounty policy, approvals, task graphs, scheduling, budgets, evidence, verification, reporting and operator experience.
+
+Armitage is a workflow reference, not a runtime dependency or a UI to clone. Metasploit Pro-only features must not be represented as Framework features; detect actual edition/API capabilities and build WHAXON-native equivalents only when justified.
+
+## 51.2 Complete capability scope
+
+The provider must dynamically discover version, edition where determinable, API namespaces, module families and optional capabilities. Required coverage includes:
+
+1. **Module intelligence:** search and metadata for auxiliary, exploit, post, payload, encoder, NOP and evasion modules where available; descriptions, references, rank, options, targets, platform/architecture, check support, compatible payloads/sessions and prerequisites.
+2. **Recommendation and validation:** Armitage-inspired Find Attacks workflow correlating WHAXON asset/service/version evidence to candidate modules, compatibility and safe checks; explain confidence, limitations, impact and missing data. A match or module check is not proof of vulnerability.
+3. **Execution lifecycle:** structured dispatch, job list/info/stop, progress/output, terminal outcomes, deadlines, cancellation and restart reconciliation. Fixed sleeps and console text scraping are not the normal lifecycle.
+4. **Consoles:** explicit ownership and bounded create/read/write/interact/detach/destroy lifecycle; console fallback must not become unrestricted AI command execution.
+5. **Payloads and handlers:** compatibility, staged/single semantics, handler start/stop/cleanup and correlation to task/job/session; separately authorize deployment and listeners.
+6. **Sessions and Meterpreter:** durable Framework/session identity, type/platform/architecture/peer/tunnel/origin metadata; discover session extensions and typed filesystem, process, system, network, channel and interactive capabilities; distinguish Meterpreter APIs from shell commands.
+7. **Framework data:** supported workspace, host, service, vulnerability, credential, loot and notes synchronization with source provenance, idempotency, secret references and evidence integrity.
+8. **Plugins:** discover installed plugins and supported capabilities; loading/installing is an explicit administrative action with trust/version controls.
+9. **Pivot and maneuver:** unified route/port-forward/SOCKS model, session ancestry, reachability and health; scope authorization at route creation and every use.
+10. **Events and evidence:** correlate modules, jobs, handlers, sessions, loot, routes and observations to mission/task/attempt IDs.
+11. **Multiple Framework instances:** provider selection, independent credentials/version/capability snapshots and isolation; later scale gate.
+12. **Headless operation:** no desktop or GUI requirement; truthful optional dependency and readiness diagnostics.
+
+## 51.3 Armitage patterns to incorporate
+
+- Unified host/service/session/route graph and table projections using WHAXON's canonical asset data.
+- Find Attacks-style module recommendations, enhanced with confidence, provenance, compatibility, safe checks, impact and independent verification.
+- Contextual session operations based on actual session type and discovered capabilities.
+- Pivot-aware reachability visualization, while explicitly separating network reachability from authorization.
+- Future collaboration/deconfliction through session leases/locks, operation ownership, serialization where required and shared event streams.
+
+These patterns must integrate into the supplied WHAXON UI without redesign, duplicate UI, mock controls or legacy UI changes. Unimplemented functionality remains hidden.
+
+## 51.4 Policy, authorization and safety
+
+Every module and operation requires a side-effect/risk classification. Distinguish passive discovery, safe checks, intrusive auxiliary activity, exploit attempts, payload/handler deployment, post-exploitation collection, credential access, file/process/system modification, persistence, destructive actions and pivot changes.
+
+Before each operation, validate scope, exclusions, engagement/bounty policy, target and live session identity, route ancestry, rate/time/resource/impact budgets and approval. Unknown impact defaults to deny or human review. Exploit, payload/handler, credential, persistence, destructive and pivot operations require explicit eligibility and appropriate approval.
+
+AI may propose typed tasks, never bypass the provider through raw RPC, unrestricted console, shell or Meterpreter commands. Bind approval to immutable plan/task digest, target, parameters, Framework version, policy version, impact and expiry. Replace `WHAXON_MSF_AUTOCHAIN` and fixed module lists with declarative, evidence-driven transitions; each follow-up is independently authorized. Customer and bounty policies remain separate.
+
+Remove weak default RPC credentials, verify TLS certificates/hostnames by default, protect secrets, restrict remote RPC, enforce least privilege and audit every action. Reconcile real Framework state before retrying uncertain jobs or sessions.
+
+## 51.5 Integration with Engine v2 stages
+
+- **E1:** fix RPC TLS/auth defaults, live session-host/route authorization, scope/DNS/pivot checks, blocking/fixed-wait correctness and regression coverage.
+- **E2:** versioned Framework/module/option/job/console/handler/session/route/loot/secret/readiness contracts and compatibility negotiation.
+- **E3:** durable Framework job/session/handler ownership, leases, heartbeats, events, cancellation, idempotency and restart reconciliation.
+- **E4:** dynamic capability discovery, typed provider services, module intelligence and declarative transitions without scheduler-specific code.
+- **E5:** shared CLI/API/UI/headless services and Framework data/evidence synchronization.
+- **E6:** expose only implemented capabilities in the supplied UI and meet solo v1.0 acceptance.
+- **E7:** explainable Find Attacks recommendations, safe verification, playbooks and bounded autonomy after policy/evidence/adversarial gates.
+- **E8/E9:** multiple Framework instances, multi-target orchestration and collaboration/deconfliction only after measured isolation/concurrency acceptance.
+
+Broad feature implementation must not precede E1 security/recovery gates or bypass the roadmap's UI/release gates.
+
+## 51.6 Acceptance
+
+Use the detailed 18-point acceptance matrix in `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md`. At minimum prove dynamic version/API/module discovery; metadata and compatibility; structured job/handler/session lifecycle; typed Meterpreter operations; Framework database/loot synchronization; route scope enforcement; restart reconciliation without duplicate dispatch; customer-vs-bounty policy isolation; TLS and secret handling; headless operation; supplied UI fidelity; and provider extensibility without changing mission/scheduler/evidence core.
+
