@@ -377,3 +377,22 @@ def test_workflow_task_ids_are_scoped_to_their_plan(tmp_path):
     assert second["id"] == "recon"
     with pytest.raises(ValueError, match="ambiguous"):
         store.start_task_attempt("ambiguous", "scan", 1)
+
+
+def test_reconcile_recovers_legacy_running_attempt_without_fence(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "legacy-running-attempt.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("scan", "tool.nmap", "192.0.2.10"),)),
+    )
+    store.claim_ready_workflow_task("p", "old-worker")
+    conn = store._conn()
+    try:
+        conn.execute("UPDATE workflow_tasks SET active_attempt_id=NULL")
+    finally:
+        conn.close()
+    assert store.reconcile_workflow_attempts() == 1
+    assert store.list_workflow_tasks("p")[0]["status"] == "uncertain"

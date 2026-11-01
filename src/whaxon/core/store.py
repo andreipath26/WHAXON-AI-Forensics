@@ -955,7 +955,8 @@ class JobStore:
                     c.execute(
                         "UPDATE workflow_tasks SET status='uncertain', error=?, "
                         "active_attempt_id=NULL, updated_at=? "
-                        "WHERE id=? AND status='running' AND active_attempt_id=?",
+                        "WHERE id=? AND status='running' "
+                        "AND (active_attempt_id=? OR active_attempt_id IS NULL)",
                         (error, now, row["task_id"], row["id"]),
                     )
                 c.execute("COMMIT")
