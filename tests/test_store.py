@@ -189,19 +189,23 @@ def test_get_session_returns_dispatch_authorization_context(tmp_path):
 
 def test_finished_job_retains_fencing_token_until_explicit_release(tmp_path):
     store = JobStore(tmp_path / "lease-finish.db")
-    store.create("job-1")
-    store.set_started("job-1", "nmap", "127.0.0.1", lease_token="token-1")
-    assert store.owns_lease("job-1", "token-1")
-    assert store.set_finished("job-1", 0, 0.1, lease_token="token-1")
-    assert store.owns_lease("job-1", "token-1")
-    assert store.release_lease("job-1", "token-1")
-    assert not store.owns_lease("job-1", "token-1")
+    store.create_pending("job-1", "nmap", "127.0.0.1")
+    lease = store.claim_pending(worker_id="test-worker")
+    assert lease is not None
+    token = lease["lease_token"]
+    assert store.owns_lease("job-1", token)
+    assert store.set_finished("job-1", 0, 0.1, lease_token=token)
+    assert store.owns_lease("job-1", token)
+    assert store.release_lease("job-1", token)
+    assert not store.owns_lease("job-1", token)
 
 
 def test_release_lease_rejects_wrong_token_and_nonterminal_job(tmp_path):
     store = JobStore(tmp_path / "lease-release.db")
-    store.create("job-2")
-    store.set_started("job-2", "nmap", "127.0.0.1", lease_token="token-2")
+    store.create_pending("job-2", "nmap", "127.0.0.1")
+    lease = store.claim_pending(worker_id="test-worker")
+    assert lease is not None
+    token = lease["lease_token"]
     assert not store.release_lease("job-2", "wrong-token")
-    assert not store.release_lease("job-2", "token-2")
-    assert store.owns_lease("job-2", "token-2")
+    assert not store.release_lease("job-2", token)
+    assert store.owns_lease("job-2", token)
