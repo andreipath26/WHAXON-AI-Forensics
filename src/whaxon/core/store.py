@@ -843,6 +843,7 @@ class JobStore:
     def save_workflow_plan(self, plan_id, plan):
         """Persist an immutable validated plan with plan-local task identifiers."""
         import uuid
+
         from .workflow import WorkflowPlan
         if isinstance(plan, dict):
             plan = WorkflowPlan.from_dict(plan)
