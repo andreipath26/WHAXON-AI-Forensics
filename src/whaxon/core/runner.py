@@ -201,6 +201,7 @@ class ToolRunner:
         env: dict[str, str] | None = None,
         allow_out_of_scope: bool = False,
         phase: str = "",
+        lease_token: str | None = None,
     ) -> str:
         """High-level: run a catalog tool against a target.
 
@@ -265,6 +266,7 @@ class ToolRunner:
                 timeout_s=timeout_s,
                 outfile=outfile,
                 phase=phase,
+                lease_token=lease_token,
             )
         finally:
             if outdir is not None:
@@ -610,10 +612,11 @@ class ToolRunner:
         timeout_s: float | None = None,
         outfile: Path | None = None,
         phase: str = "",
+        lease_token: str | None = None,
     ) -> str:
         if job_id is None:
             job_id = uuid.uuid4().hex[:12]
-        self._bus.publish(JobStarted(job_id=job_id, tool_id=tool_id, target=target))
+        self._bus.publish(JobStarted(job_id=job_id, tool_id=tool_id, target=target, lease_token=lease_token))
         start = time.monotonic()
 
         try:
@@ -633,7 +636,7 @@ class ToolRunner:
                 kind="binary_missing", detail=str(e),
                 phase=phase,
             ))
-            self._bus.publish(JobFailed(job_id=job_id, error=f"tool not found: {e}"))
+            self._bus.publish(JobFailed(job_id=job_id, error=f"tool not found: {e}", lease_token=lease_token))
             raise
 
         self._procs[job_id] = proc
@@ -658,7 +661,7 @@ class ToolRunner:
                     f"and {captured['bytes']} bytes"
                 )
                 self._lines_by_job[job_id].append((name, marker))
-                self._bus.publish(JobOutput(job_id=job_id, stream=name, line=marker))
+                self._bus.publish(JobOutput(job_id=job_id, stream=name, line=marker, lease_token=lease_token))
                 return
             captured["lines"] += 1
             captured["bytes"] += len(raw)
@@ -666,7 +669,7 @@ class ToolRunner:
                 raw = raw[:max_line_bytes] + b" ...[line truncated]"
             text = raw.decode(errors="replace").rstrip("\r")
             self._lines_by_job[job_id].append((name, text))
-            self._bus.publish(JobOutput(job_id=job_id, stream=name, line=text))
+            self._bus.publish(JobOutput(job_id=job_id, stream=name, line=text, lease_token=lease_token))
 
         async def pump(stream: asyncio.StreamReader | None, name: str) -> None:
             if stream is None:
@@ -717,7 +720,7 @@ class ToolRunner:
                 kind="timeout", detail="exceeded timeout_s",
                 phase=phase,
             ))
-            self._bus.publish(JobFailed(job_id=job_id, error="timeout"))
+            self._bus.publish(JobFailed(job_id=job_id, error="timeout", lease_token=lease_token))
             self._procs.pop(job_id, None)
             self._lines_by_job.pop(job_id, None)
             return job_id
@@ -727,6 +730,7 @@ class ToolRunner:
             job_id=job_id,
             exit_code=proc.returncode or 0,
             duration_s=time.monotonic() - start,
+            lease_token=lease_token,
         ))
         if outfile is not None and not outfile.exists():
             import sys as _sys
@@ -750,6 +754,7 @@ class ToolRunner:
         argv: Sequence[str] = (),
         target: str = "",
         outfile: Path | None = None,
+        lease_token: str | None = None,
     ) -> None:
         findings = []
         # Try adapter first (richer output)
@@ -777,6 +782,7 @@ class ToolRunner:
             self._bus.publish(JobFindings(
                 job_id=job_id,
                 findings=tuple(resolved),
+                lease_token=lease_token,
             ))
 
     @staticmethod

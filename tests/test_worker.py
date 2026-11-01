@@ -27,7 +27,11 @@ def test_claim_pending_moves_to_running(tmp_path: Path) -> None:
     s = _store(tmp_path)
     s.create_pending("j1", "nikto", "host:80")
     row = s.claim_pending()
-    assert row == {"id": "j1", "tool": "nikto", "target": "host:80"}
+    assert row["id"] == "j1"
+    assert row["tool"] == "nikto"
+    assert row["target"] == "host:80"
+    assert row["lease_token"]
+    assert row["lease_owner"] == "worker"
     assert s.list_pending() == []
 
 

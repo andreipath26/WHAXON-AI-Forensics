@@ -116,14 +116,17 @@ class Core:
         """Subscribe the store to every job event so history persists."""
         def _on_started(e):
             self.store.create(e.job_id)
-            self.store.set_started(e.job_id, e.tool_id, e.target)
+            self.store.set_started(e.job_id, e.tool_id, e.target, lease_token=e.lease_token)
         def _on_output(e):
-            self.store.append_line(e.job_id, e.stream, e.line)
+            if self.store.owns_lease(e.job_id, e.lease_token):
+                self.store.append_line(e.job_id, e.stream, e.line)
         def _on_finished(e):
-            self.store.set_finished(e.job_id, e.exit_code, e.duration_s)
+            self.store.set_finished(e.job_id, e.exit_code, e.duration_s, lease_token=e.lease_token)
         def _on_failed(e):
-            self.store.set_failed(e.job_id, e.error)
+            self.store.set_failed(e.job_id, e.error, lease_token=e.lease_token)
         def _on_findings(e):
+            if not self.store.owns_lease(e.job_id, e.lease_token):
+                return
             for i, f in enumerate(e.findings):
                 self.store.append_finding(e.job_id, f, i)
         self.bus.subscribe(JobStarted, _on_started)

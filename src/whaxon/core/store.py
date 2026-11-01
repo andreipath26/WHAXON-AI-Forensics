@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, tool TEXT DEFAULT '', target TEXT DEFAULT '', status TEXT DEFAULT 'starting', exit_code INTEGER, error TEXT, started_at REAL, finished_at REAL, duration_s REAL);
+CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, tool TEXT DEFAULT '', target TEXT DEFAULT '', status TEXT DEFAULT 'starting', exit_code INTEGER, error TEXT, started_at REAL, finished_at REAL, duration_s REAL, lease_owner TEXT, lease_token TEXT, heartbeat_at REAL);
 CREATE TABLE IF NOT EXISTS lines (job_id TEXT, seq INTEGER, stream TEXT, text TEXT, PRIMARY KEY (job_id, seq));
 CREATE TABLE IF NOT EXISTS findings (job_id TEXT, seq INTEGER, kind TEXT, severity TEXT, source TEXT, data_json TEXT, raw_line TEXT, enrichment_json TEXT DEFAULT '{}', verification_status TEXT DEFAULT 'candidate', verified_by TEXT DEFAULT 'engine', verification_reason TEXT DEFAULT '', PRIMARY KEY (job_id, seq));
 CREATE TABLE IF NOT EXISTS coverage (job_id TEXT, seq INTEGER, tool_id TEXT, target TEXT, kind TEXT, detail TEXT, phase TEXT DEFAULT '', at REAL, PRIMARY KEY (job_id, seq));
@@ -96,6 +96,16 @@ class JobStore:
         c = self._conn()
         try:
             c.executescript(SCHEMA)
+            # Durable worker leases. Existing databases are upgraded in place.
+            for column, definition in (
+                ("lease_owner", "TEXT"),
+                ("lease_token", "TEXT"),
+                ("heartbeat_at", "REAL"),
+            ):
+                try:
+                    c.execute(f"ALTER TABLE jobs ADD COLUMN {column} {definition}")
+                except sqlite3.OperationalError:
+                    pass
             # Migration: add phase column to ai_runs if absent (step 2 of the
             # agent-architecture migration plan). Idempotent: SQLite raises
             # if the column exists, which we swallow.
@@ -164,72 +174,118 @@ class JobStore:
             c = self._conn()
             try: c.execute("INSERT OR IGNORE INTO jobs (id, started_at) VALUES (?, ?)", (job_id, time.time()))
             finally: c.close()
-    def set_started(self, job_id, tool, target):
-        with self._lock:
-            c = self._conn()
-            try: c.execute("UPDATE jobs SET status='running', tool=?, target=?, started_at=? WHERE id=?", (tool, target, time.time(), job_id))
-            finally: c.close()
-    def create_pending(self, job_id, tool, target):
-        """Queue a job for a worker to run. status stays 'pending' until
-        claim_pending() moves it to 'running'. Durable: the row survives
-        the process that created it."""
+    def set_started(self, job_id, tool, target, lease_token=None):
         with self._lock:
             c = self._conn()
             try:
-                c.execute("INSERT OR IGNORE INTO jobs (id, tool, target, status) VALUES (?, ?, ?, 'pending')", (job_id, tool, target))
-            finally: c.close()
+                now = time.time()
+                if lease_token:
+                    cur = c.execute(
+                        "UPDATE jobs SET status='running', tool=?, target=?, started_at=?, heartbeat_at=? "
+                        "WHERE id=? AND status='running' AND lease_token=?",
+                        (tool, target, now, now, job_id, lease_token),
+                    )
+                else:
+                    cur = c.execute(
+                        "UPDATE jobs SET status='running', tool=?, target=?, started_at=? WHERE id=?",
+                        (tool, target, now, job_id),
+                    )
+                return cur.rowcount == 1
+            finally:
+                c.close()
+
+    def create_pending(self, job_id, tool, target):
+        """Queue a job durably; it remains pending until atomically leased."""
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute(
+                    "INSERT OR IGNORE INTO jobs (id, tool, target, status) VALUES (?, ?, ?, 'pending')",
+                    (job_id, tool, target),
+                )
+            finally:
+                c.close()
 
     def list_pending(self):
         c = self._conn()
         try:
-            rows = c.execute("SELECT id, tool, target FROM jobs WHERE status='pending' ORDER BY started_at").fetchall()
+            rows = c.execute(
+                "SELECT id, tool, target FROM jobs WHERE status='pending' ORDER BY started_at"
+            ).fetchall()
             return [dict(r) for r in rows]
-        finally: c.close()
+        finally:
+            c.close()
 
-    def claim_pending(self, *, exclude_ids=None):
-        """Atomically claim one eligible pending row, or None.
+    def claim_pending(self, *, exclude_ids=None, worker_id=None):
+        """Atomically lease one pending job and return its fencing token."""
+        import secrets
 
-        exclude_ids lets one-shot callers leave jobs from earlier processes
-        untouched while draining only work created during the current run.
-        """
         excluded = tuple(exclude_ids or ())
+        owner = str(worker_id or "worker")
+        token = secrets.token_urlsafe(32)
+        now = time.time()
         with self._lock:
             c = self._conn()
             try:
+                where = "status='pending'"
+                params = []
                 if excluded:
                     placeholders = ",".join("?" for _ in excluded)
-                    row = c.execute(
-                        "UPDATE jobs SET status='running', started_at=? "
-                        "WHERE id=(SELECT id FROM jobs WHERE status='pending' "
-                        f"AND id NOT IN ({placeholders}) ORDER BY started_at LIMIT 1) "
-                        "RETURNING id, tool, target",
-                        (time.time(), *excluded),
-                    ).fetchone()
-                else:
-                    row = c.execute(
-                        "UPDATE jobs SET status='running', started_at=? "
-                        "WHERE id=(SELECT id FROM jobs WHERE status='pending' "
-                        "ORDER BY started_at LIMIT 1) RETURNING id, tool, target",
-                        (time.time(),),
-                    ).fetchone()
+                    where += f" AND id NOT IN ({placeholders})"
+                    params.extend(excluded)
+                row = c.execute(
+                    "UPDATE jobs SET status='running', started_at=?, lease_owner=?, "
+                    "lease_token=?, heartbeat_at=? WHERE id=(SELECT id FROM jobs WHERE "
+                    + where + " ORDER BY started_at, id LIMIT 1) "
+                    "RETURNING id, tool, target, lease_owner, lease_token, heartbeat_at",
+                    (now, owner, token, now, *params),
+                ).fetchone()
                 return dict(row) if row else None
             finally:
                 c.close()
 
-    def reconcile_stale(self, older_than_s=60.0):
-        """Mark jobs left 'running' by a dead process as failed. A job is
-        stale when it started more than older_than_s ago and no worker is
-        touching it. Called at startup before any worker drains."""
-        cutoff = time.time() - older_than_s
+    def heartbeat_job(self, job_id, lease_token):
+        """Renew a worker lease; false means ownership has been lost."""
         with self._lock:
             c = self._conn()
             try:
-                n = c.execute(
-                    "UPDATE jobs SET status='failed', error='process exited before completion', finished_at=? WHERE status='running' AND (started_at IS NULL OR started_at<?)",
-                    (time.time(), cutoff),
-                ).rowcount
-                return n
-            finally: c.close()
+                cur = c.execute(
+                    "UPDATE jobs SET heartbeat_at=? WHERE id=? AND status='running' AND lease_token=?",
+                    (time.time(), job_id, lease_token),
+                )
+                return cur.rowcount == 1
+            finally:
+                c.close()
+
+    def owns_lease(self, job_id, lease_token):
+        if not lease_token:
+            return True
+        c = self._conn()
+        try:
+            return c.execute(
+                "SELECT 1 FROM jobs WHERE id=? AND status='running' AND lease_token=?",
+                (job_id, lease_token),
+            ).fetchone() is not None
+        finally:
+            c.close()
+
+    def reconcile_stale(self, older_than_s=120.0):
+        """Fail expired running jobs without replaying uncertain side effects."""
+        cutoff = time.time() - older_than_s
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                cur = c.execute(
+                    "UPDATE jobs SET status='failed', "
+                    "error='worker lease expired; execution outcome requires reconciliation', "
+                    "finished_at=?, lease_owner=NULL, lease_token=NULL, heartbeat_at=NULL "
+                    "WHERE status='running' AND COALESCE(heartbeat_at, started_at) < ?",
+                    (now, cutoff),
+                )
+                return cur.rowcount
+            finally:
+                c.close()
 
     def append_line(self, job_id, stream, text):
         with self._lock:
@@ -312,16 +368,45 @@ class JobStore:
             return [dict(r) for r in rows]
         finally: c.close()
 
-    def set_finished(self, job_id, exit_code, duration_s):
+    def set_finished(self, job_id, exit_code, duration_s, lease_token=None):
         with self._lock:
             c = self._conn()
-            try: c.execute("UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? WHERE id=?", (exit_code, duration_s, time.time(), job_id))
-            finally: c.close()
-    def set_failed(self, job_id, error):
+            try:
+                if lease_token:
+                    cur = c.execute(
+                        "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=?, "
+                        "lease_owner=NULL, lease_token=NULL, heartbeat_at=NULL "
+                        "WHERE id=? AND status='running' AND lease_token=?",
+                        (exit_code, duration_s, time.time(), job_id, lease_token),
+                    )
+                else:
+                    cur = c.execute(
+                        "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? WHERE id=?",
+                        (exit_code, duration_s, time.time(), job_id),
+                    )
+                return cur.rowcount == 1
+            finally:
+                c.close()
+
+    def set_failed(self, job_id, error, lease_token=None):
         with self._lock:
             c = self._conn()
-            try: c.execute("UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=?", (error, time.time(), job_id))
-            finally: c.close()
+            try:
+                if lease_token:
+                    cur = c.execute(
+                        "UPDATE jobs SET status='failed', error=?, finished_at=?, "
+                        "lease_owner=NULL, lease_token=NULL, heartbeat_at=NULL "
+                        "WHERE id=? AND status='running' AND lease_token=?",
+                        (error, time.time(), job_id, lease_token),
+                    )
+                else:
+                    cur = c.execute(
+                        "UPDATE jobs SET status='failed', error=?, finished_at=? WHERE id=?",
+                        (error, time.time(), job_id),
+                    )
+                return cur.rowcount == 1
+            finally:
+                c.close()
     def add_evidence(self, job_id, kind, name, path=None, note=None):
         with self._lock:
             c = self._conn()

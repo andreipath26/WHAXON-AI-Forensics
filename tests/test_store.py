@@ -142,3 +142,35 @@ def test_findings_by_target_preserves_conflicting_path_observations(store):
     assert by_source["ffuf"]["status"] is None
     assert by_source["gobuster"]["status"] == 403
     assert by_source["gobuster"]["size"] == 289
+
+
+def test_worker_lease_heartbeat_prevents_stale_reconciliation(store):
+    store.create_pending("leased", "nikto", "host:80")
+    row = store.claim_pending(worker_id="worker-a")
+    assert row is not None
+    assert store.heartbeat_job("leased", row["lease_token"]) is True
+    import sqlite3
+    c = sqlite3.connect(store.path)
+    c.execute("UPDATE jobs SET started_at=? WHERE id='leased'", (time.time() - 3600,))
+    c.commit()
+    c.close()
+    assert store.reconcile_stale(older_than_s=60) == 0
+    assert store.get("leased")["status"] == "running"
+
+
+def test_worker_lease_fences_stale_completion(store):
+    store.create_pending("fenced", "nikto", "host:80")
+    first = store.claim_pending(worker_id="worker-a")
+    assert first is not None
+    # Simulate lease expiry and a recovery/administrative reset to pending.
+    import sqlite3
+    c = sqlite3.connect(store.path)
+    c.execute("UPDATE jobs SET status='pending', lease_owner=NULL, lease_token=NULL, heartbeat_at=NULL WHERE id='fenced'")
+    c.commit()
+    c.close()
+    second = store.claim_pending(worker_id="worker-b")
+    assert second is not None
+    assert second["lease_token"] != first["lease_token"]
+    assert store.set_finished("fenced", 0, 1.0, lease_token=first["lease_token"]) is False
+    assert store.get("fenced")["status"] == "running"
+    assert store.owns_lease("fenced", second["lease_token"]) is True
