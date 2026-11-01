@@ -68,7 +68,7 @@ def test_reconcile_on_init_marks_old_running_failed(tmp_path: Path) -> None:
     store.claim_pending()  # now running
     import time
     c = sqlite3.connect(_db(data))
-    c.execute("UPDATE jobs SET started_at=? WHERE id='zombie'", (time.time() - 3600,))
+    c.execute("UPDATE jobs SET started_at=?, heartbeat_at=NULL WHERE id='zombie'", (time.time() - 3600,))
     c.commit(); c.close()
     del store
 

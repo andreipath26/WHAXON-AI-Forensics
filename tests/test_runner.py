@@ -405,7 +405,7 @@ async def test_tool_output_uses_private_random_directory_and_is_cleaned(tmp_path
     runner, _, _ = _runner(tools=[tool])
     observed = {}
 
-    def capture(_tool_id, _job_id, _lines, *, argv=(), target="", outfile=None):
+    def capture(_tool_id, _job_id, _lines, *, argv=(), target="", outfile=None, lease_token=None):
         observed["argv"] = list(argv)
         observed["outfile"] = outfile
         observed["exists_during_parse"] = bool(outfile and outfile.is_file())

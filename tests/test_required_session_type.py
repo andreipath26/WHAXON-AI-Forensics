@@ -34,9 +34,10 @@ def test_runner_rejects_wrong_session_type() -> None:
          'required_session_type': 'meterpreter'},
     ])
     r = ToolRunner(EventBus(), catalog=cat)
+    r.bind_session_lookup(lambda sid: {"id": sid, "host": "127.0.0.1", "status": "open"})
     fake = MagicMock()
     fake.is_up.return_value = True
-    fake.sessions.return_value = {'1': {'type': 'shell'}}
+    fake.sessions.return_value = {'1': {'type': 'shell', 'session_host': '127.0.0.1'}}
     with patch('whaxon.core.msf.MSFClient', return_value=fake), pytest.raises(ValueError, match='requires'):
             asyncio.run(r.run_in_session('msf_sysinfo', '1'))
 
@@ -50,7 +51,7 @@ def test_runner_allows_matching_session_type() -> None:
     r = ToolRunner(EventBus(), catalog=cat)
     fake = MagicMock()
     fake.is_up.return_value = True
-    fake.sessions.return_value = {'1': {'type': 'meterpreter'}}
+    fake.sessions.return_value = {'1': {'type': 'meterpreter', 'session_host': '127.0.0.1'}}
     fake.session_exec.return_value = 'Computer: test\n'
     with patch('whaxon.core.msf.MSFClient', return_value=fake):
         jid = asyncio.run(r.run_in_session('msf_sysinfo', '1', job_id='j1'))
