@@ -99,6 +99,7 @@ def test_capability_registry_persists_and_reloads_manifests(tmp_path):
 
 def test_store_rejects_manifest_version_mutation(tmp_path):
     import pytest
+
     from whaxon.core.store import JobStore
 
     store = JobStore(tmp_path / "capability-immutable.db")

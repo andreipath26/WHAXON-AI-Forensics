@@ -4,8 +4,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
-from typing import Any
 from collections.abc import Callable
+from typing import Any
 
 from .workflow import WorkflowTask
 
@@ -86,6 +86,12 @@ class WorkflowScheduler:
                     attempt_id, "uncertain", error="task timed out; reconcile before retry",
                 )
                 outcomes.append({"task_id": task.id, "status": "uncertain"})
+            except asyncio.CancelledError:
+                self.store.finish_task_attempt(
+                    attempt_id, "uncertain",
+                    error="scheduler cancelled while task was active; reconcile before retry",
+                )
+                raise
             except asyncio.CancelledError:
                 self.store.finish_task_attempt(
                     attempt_id, "uncertain",
