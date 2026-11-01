@@ -97,8 +97,7 @@ An exhibitor announcement confirms the organization, not that its CEO, founder o
 ### Priority C — external funding prospects; attendance not verified
 
 - Auriga Cyber Ventures
-- IRDI Capital Investissement
-- Bpifrance
+- IRDI Capital Investissement- Bpifrance
 - Other investors identified through Occitanie Invest and the regional financing ecosystem
 
 Do not book travel or spend money solely to pursue an unconfirmed external prospect. Start with email/online outreach and request an introduction.
@@ -198,7 +197,6 @@ Each brief gives the objective, likely fit, what to say, what to ask, what to av
 **Opening:**
 
 > Hello Mr. Voisin. I'm building WHAXON, a local-first security assessment platform intended for authorized operator-led engagements. I'm looking for a partner who understands both cybersecurity delivery and the infrastructure needed to deploy a dependable tool. I would like your view on whether a small technical pilot or deployment partnership could make sense.
-
 **Ask:**
 
 1. Would CHEOPS consider WHAXON as an internal tool, a complementary service capability or a partner product?
@@ -297,7 +295,6 @@ Each brief gives the objective, likely fit, what to say, what to ask, what to av
 **Desired outcome:** two warm introductions and one possible SME pilot.
 
 ---
-
 ### 4.7 Occitanie Angels — financing route, with eligibility caveat
 
 **Attendance evidence:** no public evidence found that Occitanie Angels as an organization or a particular member is confirmed to attend CBC. Treat this as pre-event outreach, not a confirmed convention meeting.
@@ -398,7 +395,6 @@ Its published average submission-to-closing timeline is 3–6 months.
 **Official site:** https://www.bpifrance.fr/
 
 **Objective:** identify financing/support mechanisms suitable for product development and commercialization, including the correct regional contact and eligibility conditions. Do not assume a grant is automatically available to an individual.
-
 **Say:**
 
 > I'm an independent developer in Occitanie with a working cybersecurity software product and a clear commercialization objective. Before creating a company or committing to a financing structure, I need to identify which innovation and founder-support mechanisms are genuinely available at this stage and what prerequisites apply.
@@ -498,7 +494,6 @@ The demonstration must be real and repeatable. Do not rely on screenshots alone 
 - Have a known-good report already generated in case the live demo fails.
 - Do not run scans against an exhibitor, event network, public IP or another attendee's device without explicit written authorization.
 - If a capability fails, say so plainly and show the last verified state. Do not improvise a claim.
-
 ### Questions to ask the prospect during the demo
 
 - Which part of this workflow is most valuable to your team?
@@ -647,8 +642,7 @@ Do not offer free indefinite development or unlimited customization. Define a ti
 
 ### C. CHEOPS — infrastructure / cyberdefense
 
-**Route:** CBC appointment platform or stand 55; address Jérémy Voisin's team.  
-**Subject:** CBC 2026 — WHAXON deployment and cyberdefense partnership discussion
+**Route:** CBC appointment platform or stand 55; address Jérémy Voisin's team.  **Subject:** CBC 2026 — WHAXON deployment and cyberdefense partnership discussion
 
 > Hello Mr. Voisin,
 >
@@ -797,8 +791,7 @@ Do not sign an NDA, exclusivity, IP assignment, reseller agreement, investment t
 
 ### If they requested a demo
 
-> Hello [Name],
->
+> Hello [Name],>
 > Following our CBC discussion, I would like to schedule the WHAXON technical demonstration around [use case]. I suggest we use a controlled lab and evaluate [two or three agreed criteria].
 >
 > Would [date/time option] work for you?
@@ -944,3 +937,225 @@ Do not measure success by the number of stands visited or cards collected.
 **Make WHAXON the reason someone wants to meet you; make the commercial opportunity the reason they agree to a next step.**
 
 Be specific, demonstrate what works, be candid about limitations, protect your IP and authorization boundaries, and leave every serious conversation with a named owner and a dated action.
+
+---
+
+## 19. Founder positioning and the commercial reality
+
+### The honest position
+
+WHAXON is the most mature project and the immediate commercial opportunity. Present it as a technically developed product approaching commercial validation—not as an established startup, and not as a product with proven market traction.
+
+The founder is currently an independent, solo developer and is not yet incorporated. There are no paying customers or established commercial deployments. Public GitHub/PyPI traction is limited. Be transparent if asked, but do not lead the conversation with a list of weaknesses or apologize for the current stage.
+
+The strongest posture is:
+
+> I'm an independent technical founder. I've built the technical foundation of WHAXON and brought it to the point where I'm preparing its commercial validation. I'm now looking for an experienced cybersecurity partner who can help validate it against real operational requirements, identify the right market and establish the first commercial use cases.
+
+This is more credible than pretending to represent an established company. The value proposition is direct founder access: the person who designed and built the product is available to discuss its architecture, limitations and technical requirements without a sales layer in between.
+
+### Acknowledge the solo-founder risk without becoming defensive
+
+A prospective partner may reasonably ask about continuity, support capacity, security maintenance and delivery risk. Do not dismiss those concerns.
+
+> I'm currently the primary developer, so I can work directly on technical questions and product issues. I recognize that a commercial deployment needs more than one person over time. That's one reason I'm looking for the right strategic partner: to establish the engineering, infrastructure and support arrangements required for dependable deployment rather than promise a service level I cannot yet guarantee.
+
+Do not promise enterprise support, response times, 24/7 coverage or long-term continuity unless there is a funded and operational plan to deliver them.
+
+### Keep the portfolio in the background
+
+WHAXON should be the reason someone wants to meet. KILN, Aletheia, SYBIL and ZALMOXIS can demonstrate broader technical ambition only if the other party asks about the portfolio. They are separate, longer-term directions—not WHAXON modules, integrations or current capabilities. Do not dilute the pitch by presenting all projects as one platform.
+
+### What not to disclose as a sales argument
+
+Do not lead with personal financial hardship, lack of savings or urgency. Frame the resource requirement around the product and its next milestones:
+- additional engineering capacity and code review;
+- controlled test and deployment infrastructure;
+- independent security and reliability evaluation;
+- packaging, installation and operational hardening;
+- first customer pilots and evidence of repeatable value;
+- commercial development, customer discovery and support planning.
+
+Answer direct questions about personal or company circumstances honestly. Do not invent a company, team, customer, revenue, partnership or investment commitment.
+
+---
+
+## 20. The CBC partnership strategy: seek a founding commercial relationship
+
+### The three outcomes to pursue
+
+Prioritize these forms of support, in this order of practical value:
+
+1. **Commercial validation:** a first design partner, pilot customer, service provider or authorized test environment.
+2. **Strategic execution support:** engineering, infrastructure, deployment expertise, distribution, customer access or an experienced operational partner.
+3. **Financing:** a realistic route to runway once the first two are clearer, whether through non-dilutive support, an eligible founder programme, angels or investment.
+
+Do not ask every company for investment. A services provider willing to sponsor a controlled pilot and introduce the product to customers may be substantially more valuable at this stage than an investor who likes the idea but cannot fund an unincorporated project.
+
+### Target-specific objective
+
+| Target | Primary objective | Concrete ask |
+|---|---|---|
+| Advens | First design partner / commercial pilot | Identify a technical evaluator and scope a controlled assessment-workflow pilot |
+| ITrust | Technical and channel/services partnership | Introduce the R&D and alliances owners; agree what proof a partner evaluation requires |
+| CHEOPS Technology | Deployment, infrastructure and customer access | Arrange a cyberdefense/engineering discussion and identify a lab or customer team |
+| Cyber'Occ | Regional ecosystem access | Two warm introductions to relevant service providers, SMEs or CISOs |
+| Digital 113 | Commercial access through regional members | Identify members with an actual assessment workflow and a pilot owner |
+| Orange Cyberdefense | Senior industry advice and referral | Ask which buyer to validate with first and request one relevant introduction |
+| Occitanie Angels | Funding-readiness guidance | Confirm incorporation, traction, team and round requirements; request an earlier-stage referral |
+| Bpifrance / regional support | Pre-creation and non-dilutive route | Identify the correct advisor, programme, legal prerequisites and next milestone |
+| Other exhibitors | Selective qualification | Find the person who owns a real complementary workflow, customer relationship or technical evaluation |
+
+### Conversation strategy: qualify before pitching
+
+Use this sequence rather than delivering the entire pitch to everyone:
+
+1. Ask what the person is responsible for and what their team is trying to improve.
+2. Listen for a specific pain involving assessment execution, tool orchestration, evidence collection, validation, retesting or reporting.
+3. Connect only the relevant WHAXON capability to that pain.
+4. Show one real workflow that proves the point.
+5. Ask what would prevent adoption and what evidence would change their mind.
+6. Establish who owns technical evaluation, who can authorize a pilot and what the approval process requires.
+7. Agree one next step with a named owner and date.
+
+If there is no relevant pain, no decision-maker and no route to a pilot or introduction, thank them and move on. Do not spend equal time at every stand.
+
+### The core message to repeat
+
+> I've built the product. Now I want to find the right people to prove its commercial value and build the business around it.
+
+A slightly fuller version:
+
+> I'm deliberately looking for a strategic relationship rather than simply trying to raise money around an idea. The next step is to validate WHAXON with an experienced cybersecurity team, establish where it creates measurable value and build the right commercial and operational structure around that evidence.
+
+---
+
+## 21. A founding design-partner pilot
+
+Use this as the concrete offer to Advens, ITrust, CHEOPS or another qualified provider. It is a proposal to scope together, not a promise that every capability is already complete.
+
+### Pilot shape
+
+- **Partner:** one cybersecurity services provider or end-user organization with a named technical owner.
+- **Environment:** one lab, staging environment or customer environment with explicit written authorization and rules of engagement.
+- **Scope:** one agreed workflow and a limited set of currently supported tools and finding types.
+- **Duration:** time-boxed; agree the period and review date before starting. A 2–4 week evaluation is a discussion starting point, not a fixed commitment.
+- **Developer contribution:** product access under agreed terms, direct technical support within an agreed availability window, documentation, and only those adaptations explicitly included in the scope.
+- **Partner contribution:** a real use case, technical evaluator, practitioner feedback, test environment or authorization, and access to the people who decide whether the workflow has value.
+- **Outputs:** evaluation notes, evidence/report samples, a list of gaps and a joint decision on whether to proceed to a paid pilot, deployment or partnership.
+- **Success criteria:** agree measurable criteria in advance, such as workflow completion, evidence completeness, reproducibility of selected findings, retest usefulness, analyst time saved and report acceptance.
+- **Commercial decision:** set a review date and decide whether the next phase is paid, supported by a partner, or stopped.
+
+### Suggested wording
+
+> I'd like to propose a small founding design-partner evaluation. We choose one controlled, authorized environment and one assessment workflow that matters to your team. We agree in advance what success looks like, run the evaluation together, review the evidence and decide whether there's a commercial reason to continue. I want this to be useful to both sides, with a defined scope and time commitment—not an open-ended free-development arrangement.
+
+### Boundaries
+
+- No production or third-party testing without explicit written authorization and agreed rules of engagement.
+- No unlimited free development, indefinite support or unpriced customization.
+- No broad exclusivity in exchange for vague promises of exposure or future introductions.
+- No source-code transfer, IP assignment or unrestricted access to proprietary implementation as a condition of an informal meeting.
+- Do not grant customer-data access or retain sensitive test data without agreed security, privacy and retention terms.
+- Do not sign an NDA, exclusivity, IP assignment, reseller agreement, investment term sheet or customer contract on the spot. Take time to review it and obtain appropriate legal advice.
+
+---
+
+## 22. Difficult questions: prepared, honest answers
+
+### “Do you have customers?”
+
+> Not yet. I'm at the stage of moving from technical development into commercial validation. That's precisely why I'm looking for a small number of experienced partners to evaluate the product against real workflows.
+
+### “Why haven't you created a company?”
+
+> I've concentrated my available resources on developing the product before committing to a company structure. I'm now evaluating the right commercial and legal structure alongside the first potential partnerships.
+
+Do not imply that this is a legal exemption from obligations. Before signing or invoicing for a pilot, confirm the appropriate legal and tax framework.
+
+### “Why should we trust a product developed by one person?”
+
+> That's a legitimate concern. I don't expect a company to trust WHAXON based on a presentation. I want to demonstrate it, let your technical people evaluate it and agree on a controlled pilot with measurable criteria.
+
+### “How will you support it?”
+
+> I'm currently the primary developer, so I can work directly on technical issues. For commercial deployment, I want to establish the appropriate engineering, infrastructure and support arrangements rather than promise a level of service I cannot yet guarantee.
+
+### “What are you looking for?”
+
+> Primarily a strategic partner who can help take WHAXON from a technically developed product to a commercially validated one. That could involve a pilot, engineering support, infrastructure, customer access or financing.
+
+### “Why should we work with you instead of an established vendor?”
+
+> I wouldn't ask you to replace an established tool or process without evidence. The proposal is to test whether WHAXON adds measurable value to one specific workflow. If it doesn't, we should establish that quickly and honestly.
+
+### “What is the product's traction?”
+
+> Public GitHub and package-index traction is still limited, and I don't have paying customers yet. I'm not presenting those signals as proof of market demand. The next milestone is a credible evaluation with a relevant provider and a repeatable use case.
+
+---
+
+## 23. France: pre-incorporation support and legal sequencing
+
+The fact that the founder is not yet incorporated should be treated as a structuring question to resolve—not concealed and not automatically treated as disqualifying for every support route.
+
+### Route to investigate
+
+- Ask Bpifrance Création or the relevant regional advisor which support and accompaniment mechanisms can be accessed by a project holder before company registration.
+- Ask whether a **CAPE (Contrat d'appui au projet d'entreprise)** through an eligible support organization could provide a legitimate framework to test the activity, receive accompaniment and clarify the transition toward incorporation. Availability and conditions depend on the accompanying structure and the individual's situation.
+- Ask Cyber'Occ, AD'OCC and regional entrepreneurship networks for pre-creation support, innovation programmes and introductions to a suitable incubator or technical partner.
+- For Occitanie Angels and conventional investment funds, establish the incorporation and traction prerequisites before spending time on a formal application.
+- Before any paid pilot, invoice, employment arrangement, equity negotiation or transfer/licensing of IP, obtain advice on the correct legal, tax, social and contractual framework for the founder's situation.
+
+### Questions for Bpifrance / regional support advisers
+
+1. Which programmes can support a project holder before incorporation?
+2. Is a CAPE or another supported pre-creation framework appropriate and available in this situation?
+3. Which grants, advances or innovation-support mechanisms require an incorporated company, matching funds or a defined R&D status?
+4. What evidence should be prepared before creating the company?
+5. Which regional advisor can assess WHAXON's eligibility and introduce the right support structure?
+
+### Source links to recheck
+
+- Bpifrance Création — accompaniment: https://bpifrance-creation.fr/accompagnement
+- Bpifrance Création — CAPE: https://bpifrance-creation.fr/encyclopedie/differentes-facons-dentreprendre/entreprendre-autrement/contrat-dappui-au-projet
+- Service Public — CAPE: https://www.service-public.gouv.fr/particuliers/vosdroits/F11299
+- Service Public — business creation support networks: https://entreprendre.service-public.gouv.fr/vosdroits/F35939
+
+These are routes to investigate, not a guarantee of eligibility or funding. Confirm current rules with the relevant organization and a qualified adviser.
+
+---
+
+## 24. The founder's event-day checklist
+
+### Before each meeting
+
+- [ ] Know the person's role and why their organization is relevant.
+- [ ] Have one tailored opening sentence and one specific ask.
+- [ ] Be ready to state accurately: independent developer, not yet incorporated, no paying customers yet.
+- [ ] Lead with WHAXON's actual capabilities and the prospect's workflow—not personal circumstances or the entire project portfolio.
+- [ ] Have a real, short CLI demonstration available if requested.
+- [ ] Know the capability boundary: working, partial, environment-dependent, unverified or unsupported.
+
+### During each meeting
+
+- [ ] Ask about their responsibilities before pitching.
+- [ ] Identify one operational pain.
+- [ ] Connect one relevant capability to that pain.
+- [ ] Ask who would evaluate it technically.
+- [ ] Ask what authorization, security, procurement and legal steps a pilot requires.
+- [ ] Propose a bounded next step rather than an open-ended partnership.
+- [ ] Record the person's name, role, exact feedback, requested evidence and agreed date.
+
+### After each meeting
+
+- [ ] Send only the material requested.
+- [ ] Confirm the agreed next action in writing.
+- [ ] Update the contact tracker.
+- [ ] Do not start custom work until scope, responsibilities and terms are clear.
+- [ ] Prioritize prospects by actual commitment, not seniority or enthusiasm alone.
+
+### The outcome to optimize
+
+A successful CBC is not necessarily an investment cheque. It is a concrete path from a working product to a credible first deployment: a named technical evaluator, an authorized use case, agreed success criteria, a partner contribution and a scheduled decision point.
+
