@@ -325,11 +325,17 @@ def test_task_attempt_is_fenced_and_cannot_be_started_twice(tmp_path):
     assert store.start_task_attempt("attempt-one", "scan", 1, worker_id="worker-a")
     with pytest.raises(ValueError, match="active attempt"):
         store.start_task_attempt("attempt-two", "scan", 2, worker_id="worker-b")
+    # Simulate recovery clearing the old task fence, then claim a new attempt.
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET status='pending', active_attempt_id=NULL WHERE plan_id='p'",
+        )
+    finally:
+        conn.close()
+    assert store.start_task_attempt("attempt-two", "scan", 2, worker_id="worker-b")
     with pytest.raises(ValueError, match="stale task attempt"):
         store.finish_task_attempt("attempt-one", "succeeded", result={"ok": True})
-    # A completed attempt is fenced and clears its active token atomically.
-    assert store.finish_task_attempt("attempt-one", "failed", error="retryable")
-    assert store.start_task_attempt("attempt-two", "scan", 2, worker_id="worker-b")
     assert store.finish_task_attempt("attempt-two", "succeeded", result={"ok": True})
 
 

@@ -926,6 +926,9 @@ class JobStore:
                 "created_at, updated_at FROM workflow_tasks WHERE plan_id=? ORDER BY rowid",
                 (plan_id,),
             ).fetchall()
+            task_keys = {
+                row["task_ref"]: row["id"] for row in rows
+            }
             result = []
             for row in rows:
                 value = dict(row)
@@ -935,6 +938,11 @@ class JobStore:
                 ):
                     raw = value.pop(column)
                     value[key] = json.loads(raw) if raw else (None if key == "result" else [])
+                if key == "result":
+                    value["depends_on"] = [
+                        task_keys.get(task_ref, task_ref)
+                        for task_ref in value["depends_on"]
+                    ]
                 result.append(value)
             return result
         finally:

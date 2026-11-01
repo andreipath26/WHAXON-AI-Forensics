@@ -1,3 +1,5 @@
+import pytest
+
 from whaxon.core.workflow import (
     ApprovalBinding,
     WorkflowPlan,
@@ -87,6 +89,7 @@ def test_approval_binding_is_invalidated_by_any_bound_change():
     )
 
 
+@pytest.mark.asyncio
 async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_path):
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
@@ -110,6 +113,7 @@ async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_
     assert result["complete"] is True
 
 
+@pytest.mark.asyncio
 async def test_scheduler_blocks_dependants_after_policy_denial(tmp_path):
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
@@ -156,6 +160,7 @@ def test_workflow_task_rejects_non_finite_timeout():
         WorkflowTask("bad", "cap", "host", timeout_s=math.nan)
 
 
+@pytest.mark.asyncio
 async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
     import time
 
@@ -183,6 +188,7 @@ async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
 
 
 
+@pytest.mark.asyncio
 async def test_scheduler_runs_independent_tasks_concurrently(tmp_path):
     import asyncio
 
@@ -228,6 +234,7 @@ async def test_scheduler_runs_independent_tasks_concurrently(tmp_path):
     ]
 
 
+@pytest.mark.asyncio
 async def test_scheduler_respects_max_concurrency_and_task_budget(tmp_path):
     import asyncio
 

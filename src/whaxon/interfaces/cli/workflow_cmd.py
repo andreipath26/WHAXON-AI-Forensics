@@ -6,10 +6,35 @@ import asyncio
 import json
 import os
 import sys
+import threading
 from pathlib import Path
 
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan
+
+
+def _run_async(coroutine):
+    """Run an async command from both ordinary and event-loop-hosted callers."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+
+    result = []
+    failure = []
+
+    def _runner():
+        try:
+            result.append(asyncio.run(coroutine))
+        except BaseException as exc:
+            failure.append(exc)
+
+    thread = threading.Thread(target=_runner, name="whaxon-workflow-cli")
+    thread.start()
+    thread.join()
+    if failure:
+        raise failure[0]
+    return result[0]
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -87,7 +112,7 @@ def main(args: list[str] | None = None) -> int:
                     max_concurrency=options.max_concurrency,
                 )
 
-            workflow_result = asyncio.run(execute())
+            workflow_result = _run_async(execute())
             print(json.dumps(workflow_result, indent=2, sort_keys=True))
             return 0 if workflow_result["complete"] and all(
                 task["status"] == "succeeded" for task in workflow_result["tasks"]
