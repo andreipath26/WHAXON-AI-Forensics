@@ -140,6 +140,9 @@ Optimise verified end-to-end lead time, early blocker discovery, low integration
 38. v1.0 Release Blockers and acceptance checklist
 39. Tooling portfolio review and integration gates
 45. Bug Bounty Intelligence & Autonomous Research subsystem
+46. Autonomous WHAXON campaigns
+47. First-run setup, dependency readiness and guided installation
+48. Capability inventory, headless operation and deployment acceptance
 
 ---
 
@@ -2984,3 +2987,195 @@ Close and regression-test these observed defects:
 10. Complete reporting, knowledge and integrations in coordination with the existing bug-bounty roadmap.
 
 **Definition of done:** each capability has implementation evidence, automated tests and controlled end-to-end results. No feature is marked complete merely because a design, route, mock or AI prompt exists. Existing v1.0 release blockers remain in force.
+
+
+---
+
+# 47. FIRST-RUN SETUP, DEPENDENCY READINESS AND GUIDED INSTALLATION
+
+**Status:** Approved product requirement — implementation and cross-platform acceptance must be evidenced separately. A diagnostic command or Python-only installer is not sufficient.
+
+## 47.1 Product outcome
+
+A person with a clean machine and no developer/sysadmin knowledge must be able to install WHAXON, understand what is available, and reach a verified usable capability profile. First run must guide the user from environment discovery through dependency resolution, installation or manual remediation, verification and readiness reporting.
+
+The experience must not assume Python packages are the only dependencies. It must detect and explain missing, incompatible, ambiguous or inaccessible Python packages, external security tools, operating-system packages, optional integrations and runtime capabilities. It must distinguish a missing dependency from an installed-but-broken tool, an unsupported platform, a permission problem, an ambiguous executable, an unavailable network/package source and a capability that is intentionally not installed.
+
+The same underlying readiness and installation services must be usable from the CLI and web UI. A headless server must not require a desktop or browser to diagnose, configure and operate WHAXON.
+
+## 47.2 Environment discovery and readiness doctor
+
+On first run and on demand, inspect and report:
+
+- Operating system, distribution/version, architecture, WSL/container/virtualized context where detectable, Python implementation/version, environment and package-manager availability.
+- Required and optional Python dependencies, version constraints, importability and compatibility.
+- External security-tool discovery, executable path, duplicate installations, ambiguous paths, permissions, version and a safe functional/version probe where supported.
+- Relevant system libraries, runtime components, integration credentials/configuration presence (never reveal secret values), writable directories, storage, network/package-source reachability and required permissions.
+- Optional integrations and plugins, whether configured, reachable and usable, and which capabilities depend on them.
+- Tool and adapter compatibility, supported transports and platform-specific limitations.
+
+The doctor must produce a human-readable and machine-readable readiness report with each dependency/capability classified as ready, missing, incompatible, ambiguous, inaccessible, unavailable/offline, unsupported, optional-not-configured or failed-verification. Explain the practical consequence: which WHAXON features are available, degraded, blocked or unavailable and why. Never label a capability ready merely because a package or executable exists.
+
+## 47.3 Guided installation profiles
+
+Provide user-selectable **Core**, **Standard**, **Full** and **Custom** profiles. Explain the capabilities and additional dependencies each profile enables before the user chooses. Custom setup must permit selecting individual tools/integrations and show dependency relationships and installation impact.
+
+Resolve dependencies in a deterministic order. Present an actionable plan before changing the machine: exact packages/tools, source, version constraints, commands or package-manager operations, privilege requirements, disk/network impact, affected paths, expected capabilities, and any manual steps. The plan must be reviewable and approval-bound.
+
+Profiles are starting points, not promises that every tool can be installed on every OS. Report unsupported or unavailable components explicitly and allow the user to continue with a truthful reduced capability profile.
+
+## 47.4 Supported platform and package-manager behavior
+
+Detect Linux distributions and available package managers, macOS with Homebrew where available, Windows and WSL separately. Use curated, version-aware package mappings only; do not construct arbitrary shell commands from model output, tool output, user-controlled strings or untrusted package metadata.
+
+Known mapping examples to validate and maintain include Nmap, Gobuster, SQLmap and ffuf through supported APT/Homebrew packages, and Nuclei through Homebrew where available. Other tools may require a verified upstream installation method or manual guidance. The roadmap must not imply that every catalog tool has an automated installer.
+
+For Windows, provide native diagnostics and accurate guided/manual installation instructions until native automated installation is implemented and verified. Do not silently treat WSL support as native Windows support. Detect package-manager absence, unsupported distributions and package-name/version differences rather than guessing.
+
+## 47.5 Consent, privilege and execution safety
+
+No installation or system mutation may occur without explicit, informed approval. Approval must bind to the exact reviewed plan, package identities and versions, source, commands/operations, privilege level, affected paths, expected impact and expiry. A profile selection is not blanket consent.
+
+- Never use blind sudo, silently elevate, or assume administrator/root access.
+- Never run arbitrary shell commands. Use fixed, curated package-manager operations and narrowly defined installation adapters with validated arguments.
+- Explain why a privilege is required and what it will change; request it only for the specific approved operation.
+- Prefer user-local/virtual-environment installation when technically appropriate; do not pollute or overwrite unrelated Python environments.
+- Revalidate the plan if package metadata, environment, version, privilege, path or requested operation changes after approval.
+- Keep secrets out of logs, plans, process output and audit records.
+
+## 47.6 Installation lifecycle, progress and recovery
+
+Provide a guided lifecycle: inspect → resolve → present plan → obtain approval → execute bounded operations → verify → publish capability/readiness report. Show per-step progress, current operation, logs safe for display, success/failure, cancellation and next action. Support CLI and web clients without duplicating installation logic.
+
+Installation must be cancellable and idempotent where possible. Record a durable operation identifier and state; survive web-client disconnects and service restarts; reconcile in-flight package operations before retry; do not blindly replay non-idempotent operations. Detect partial completion and dependency drift. Preserve pre-install state/snapshots where feasible and provide safe compensating recovery or precise manual repair instructions. Never promise rollback where the underlying package manager cannot guarantee it: disclose that limitation before approval and report exactly what changed after a partial failure.
+
+A failed or interrupted installation must not leave WHAXON reporting the affected capability as ready. Re-run verification after repair, upgrade, removal or environment drift.
+
+## 47.7 Verification and capability activation
+
+Verify actual behavior after installation, not just installer exit status or executable presence. Use safe, bounded version and functional smoke probes appropriate to each tool; do not run intrusive scans or contact arbitrary targets as an installation test. Verify adapter parsing/normalization where fixtures or controlled local targets are available. Record the verification method, version, timestamp, environment, result and limitations.
+
+Only activate a capability when all required dependencies and checks pass. Clearly distinguish installed, configured, executable, smoke-tested, lab-validated and end-to-end-verified. Missing optional tools must not break unrelated workflows. A user must be able to review and change the selected profile later.
+
+## 47.8 Audit, diagnostics and maintenance
+
+Record environment discovery, proposed plans, exact approvals/denials, package operations, privilege decisions, progress, cancellation, partial effects, verification, recovery and subsequent drift. Use the platform's evidence/audit principles: stable operation IDs, attributable timestamps, integrity protection, secret redaction and exportable diagnostics.
+
+Provide re-check, repair, update and uninstall guidance. Detect when a previously verified executable changes path/version or becomes unusable. Explain which capabilities are affected and require a fresh plan/approval for consequential changes. Diagnostics must be usable without exposing credentials or sensitive target data.
+
+## 47.9 First-run acceptance gates
+
+The feature is not DONE until all of the following are demonstrated:
+
+1. Fresh, isolated Linux, macOS and native Windows environments are tested independently; WSL is a separate test target.
+2. Core, Standard, Full and Custom profiles resolve correctly and produce truthful capability reports.
+3. Missing, incompatible, duplicate and ambiguous Python packages/tools are detected; PATH and permission errors are explained.
+4. A clean installation can complete with explicit approval and no blind privilege escalation or arbitrary shell execution.
+5. No-admin and restricted-permission environments degrade safely and provide useful local/manual paths.
+6. Offline or unreachable package sources are detected before execution where possible; the user receives a clear plan for unavailable dependencies.
+7. Package-manager failure, cancellation, process crash, network interruption and partial installation are exercised; recovery does not falsely report success or duplicate unsafe operations.
+8. Every installed tool is independently verified; at least one controlled functional check per supported tool/adapter family proves more than executable presence.
+9. CLI and guided web setup use the same service contracts and produce consistent results.
+10. The setup process works on a headless host and survives browser disconnect/reconnect and service restart.
+11. Audit records cover success, rejection, cancellation, failure, partial effects, recovery and verification.
+12. Documentation describes tested platform/tool combinations and explicitly lists unsupported or unverified combinations.
+
+---
+
+# 48. CAPABILITY INVENTORY, HEADLESS OPERATION AND DEPLOYMENT ACCEPTANCE
+
+**Status:** Mandatory integration and release gate. This section captures the 1 November requirement to assess WHAXON as a complete product, not as a list of modules or isolated pull requests.
+
+## 48.1 Evidence-based capability inventory
+
+Maintain one repository-backed capability inventory covering at least:
+
+- Tool catalog, adapters, installation/readiness and actual tool execution.
+- CLI commands and workflows.
+- Orchestrator, Automator, job queue, follow-up scheduling/draining, workers, cancellation, history and recovery.
+- Scope/authorization enforcement and rules-of-engagement handling.
+- Reconnaissance, discovery, enumeration, validation and retesting.
+- Findings lifecycle, normalization, deduplication/correlation, triage and status transitions.
+- Raw evidence, request/response capture, evidence provenance, independent verification and report generation/export.
+- AI providers, planning, bounded autonomy, approvals, budgets, pause/resume and failure handling.
+- Sessions, transport adapters, SSH, SMB, WMI and Metasploit, including route/pivot reachability and context.
+- Plugins and external integrations, including configuration, permission grants, availability and costs.
+- Web UI pages/routes, APIs, background jobs and event/progress delivery.
+- Dependency diagnostics, installation profiles and platform compatibility.
+- Headless runtime, persistence, service management, observability, security and deployment packaging.
+
+Inventory each capability with an explicit state: **implemented**, **integrated**, **partial**, **planned**, **unverified**, **unsupported** or **blocked**. These labels are not interchangeable. For each entry record the source paths/contracts, user-visible entry point, dependencies, permission/scope boundary, tests and latest observed result, known limitations, and whether it is safe to advertise as supported. A class, route, adapter registration, catalog entry, mock, test fixture or documentation statement alone does not establish a working capability.
+
+Reconcile discrepancies between documentation, catalog counts, route counts and the actual repository. The 1 November review discussed a web surface with 22 routes and a CLI surface with 22 subcommands; treat those as inventory prompts to verify against the current source, not immutable counts. Do not perpetuate stale counts when the source changes. In particular, distinguish registered tools from installed tools, installed tools from verified tools, and verified adapters from complete end-to-end workflows.
+
+## 48.2 End-to-end product workflows
+
+For each advertised workflow, trace the complete path from user entry point through API/service, authorization, orchestration, worker/tool, parser, findings/evidence store and report/UI. Verify that:
+
+- A requested run starts the correct bounded job and reports its real state.
+- Automator follow-up work is drained or durably scheduled and is not abandoned when the initiating CLI command exits.
+- Web jobs continue independently of the browser connection, expose truthful progress and terminal state, and recover safely after process/service restart.
+- Cancellation reaches the worker and underlying tool where supported; partial results and uncertain outcomes are preserved and labelled.
+- Findings are published only from real tool/validation results; no mock, demo or fabricated evidence appears in production paths.
+- Scope/authorization is checked at every consequential execution boundary, including follow-up jobs, redirects, DNS, pivots, validation and child processes.
+- Evidence, verification status, confidence, coverage and report content remain consistent across CLI, web and API.
+- Errors, timeouts, parser failures and unavailable tools are surfaced honestly and do not become false successful runs.
+
+## 48.3 Headless server support
+
+WHAXON must operate as a first-class headless service on a server without a desktop session, monitor, interactive browser or TUI. The browser is an optional remote client, not a runtime dependency. All core setup, diagnostics, campaign/job control, status inspection and administration must have a CLI/API path suitable for remote and automated operation.
+
+Support and document the deployment forms that are actually verified:
+
+1. Foreground server process for development and supervised operation.
+2. Background/daemon operation with controlled lifecycle.
+3. Linux systemd service with least-privilege service account, explicit environment/configuration, restart policy, logs and graceful shutdown.
+4. Docker/container deployment with documented image/build, volumes, network boundaries, health checks, resource limits, secrets handling and persistent state.
+
+Do not imply Kubernetes or other orchestration support unless separately implemented and tested. Headless deployment must not require launching a local browser, opening a desktop session, or using TUI. A remote web UI may connect to the service when enabled and properly authenticated.
+
+## 48.4 Service/runtime requirements
+
+- Separate HTTP/API serving from durable background execution so a web request or browser disconnect cannot own the lifetime of a consequential job.
+- Persist job/campaign state, task graph, approvals, progress, logs, findings and evidence references; recover after process restart.
+- Use bounded worker pools, per-job and global concurrency/resource ceilings, timeouts, retry policies, idempotency keys and safe in-flight reconciliation.
+- Provide health/readiness checks that distinguish process liveness from dependency readiness and worker availability.
+- Provide structured logs and operational events with correlation IDs; redact credentials and sensitive data.
+- Support graceful shutdown: stop accepting new work, signal/cancel or safely checkpoint active work, flush audit/evidence, and report jobs that remain uncertain.
+- Store configuration and secrets outside source control; document permissions, rotation and backup/restore of required persistent state.
+- Enforce authentication, authorization, CSRF/origin protections as applicable, TLS/reverse-proxy guidance and least privilege.
+- Make API/event-stream behavior explicit, versioned and observable. A client reconnect must recover current job state without starting duplicate work.
+- Ensure package installation and diagnostics can run in headless mode without requiring GUI interaction.
+
+## 48.5 UI and API integration
+
+The approved new UI remains the intended default web interface and must be wired to real backend behavior. Preserve the supplied web ui files and rendering assets and the existing visual design exactly; no redesign, substitute screens, placeholder flows or fabricated data. Do not alter the deprecated UI as a shortcut. Keep unavailable pages/components hidden or disabled in the live interface without deleting their supplied source/reference assets. Do not expose a control until its backend operation, authorization and error/recovery behavior exist.
+
+Inventory all actual routes/pages and map each to its backend contract, permission requirements, data source, state transitions and acceptance test. The 22-route inventory discussed on 1 November must be reconciled against current code. A route rendering successfully is not proof that its workflow is functional. Test browser navigation, refresh, empty/loading/error states, responsive behavior, live updates, reconnect/recovery and consistency with CLI/API results.
+
+## 48.6 Transport, sessions and pivot verification
+
+For SSH, SMB, WMI and Metasploit, distinguish adapter registration, command construction, connection success, live tool execution, output parsing, session continuity and end-to-end validated behavior. Test supported paths against controlled authorized targets on the relevant native operating systems. WMI and native Windows support must not be advertised as fully verified until tested on Windows; a Linux/WSL test is not a substitute.
+
+Verify session persistence, timeouts, connection loss, partial output, cancellation, cleanup, credential handling and error propagation. For pivoting, demonstrate actual route/reachability-aware execution through a controlled multi-host lab; a route resolver or stored session alone is not proof that tools use the pivot. Preserve authorization checks and evidence at every transition.
+
+## 48.7 Consolidated release acceptance
+
+The product is deployment-ready only when the integrated repository passes the relevant gates together:
+
+- Fresh-machine first-run and dependency setup on supported platforms.
+- CLI, API, web and headless workflows using the same underlying service contracts.
+- Functional verification of each advertised tool/adapter and its parser.
+- Complete orchestration and Automator follow-up execution, including the known whaxon run draining defect.
+- Durable web/worker job recovery after browser disconnect, process crash and restart.
+- Correct scope enforcement for initial and follow-up actions, pivots and validation.
+- Findings/evidence/report integrity, including independent verification and no fabricated production data.
+- Real SSH/SMB/WMI/Metasploit and native Windows test evidence for every claimed support combination.
+- Foreground, daemon, systemd and Docker deployment tests where those modes are advertised.
+- Security, permission, secrets, audit, resource-limit, cancellation and failure-recovery checks.
+- Browser interaction and visual regression checks for the supplied new UI, with unsupported controls hidden.
+- Full regression across supported Python versions/platforms and documented test limitations.
+
+The release record must list the exact commit, environment, commands/workflows, test and CI run identifiers, results, known failures, unsupported combinations and remaining risks. Do not describe a PR as complete because it is merged, or the product as deployment-ready because CI passed: deployment readiness requires the end-to-end gates above. Keep related implementation changes consolidated into a substantial integration commit where practical; avoid a stream of trivial commits, but do not defer necessary verification.
+
+**Definition of done:** a clean-machine user can install and configure a truthful capability profile; the same installation can run on a headless server; the user can operate real supported workflows through CLI/API and the approved web UI; background work, evidence and approvals survive interruption; and every advertised capability is backed by current repository evidence and end-to-end acceptance. Unsupported or unverified capabilities are clearly identified rather than implied to work.
