@@ -223,7 +223,9 @@ class Core:
         except Exception:
             pass
         try:
-            self.store.reconcile_workflow_attempts()
+            # Do not steal a live worker's attempt when another CLI/daemon
+            # process starts. Workflow workers renew this lease while executing.
+            self.store.reconcile_workflow_attempts(stale_after_s=60.0)
         except Exception:
             # Startup remains available, but an unreconciled workflow task
             # cannot be reclaimed by the scheduler; operators can inspect it.

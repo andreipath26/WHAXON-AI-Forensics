@@ -29,6 +29,21 @@ class WorkflowScheduler:
         self.dispatch = dispatch
         self.worker_id = worker_id
 
+    async def _heartbeat(self, attempt_id: str, interval: float, lost: asyncio.Event) -> None:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                renewed = await asyncio.to_thread(
+                    self.store.heartbeat_workflow_attempt, attempt_id,
+                )
+            except Exception:
+                _log.exception("workflow lease heartbeat failed for attempt %s", attempt_id)
+                lost.set()
+                return
+            if not renewed:
+                lost.set()
+                return
+
     async def _execute(self, row: dict[str, Any]) -> dict[str, str]:
         task = WorkflowTask(
             id=row["id"], capability_id=row["capability_id"], target=row["target"],
@@ -37,6 +52,11 @@ class WorkflowScheduler:
             timeout_s=row["timeout_s"], idempotency_key=row["idempotency_key"],
         )
         attempt_id = row["attempt_id"]
+        lease_lost = asyncio.Event()
+        heartbeat_interval = min(10.0, max(0.1, task.timeout_s / 3.0))
+        heartbeat = asyncio.create_task(
+            self._heartbeat(attempt_id, heartbeat_interval, lease_lost),
+        )
         try:
             try:
                 authorized = self.authorize(task)
@@ -48,6 +68,8 @@ class WorkflowScheduler:
                     error=f"policy authorization failed closed: {type(exc).__name__}",
                 )
                 return {"task_id": task.id, "status": "blocked"}
+            if lease_lost.is_set():
+                return {"task_id": task.id, "status": "uncertain"}
             if authorized is not True:
                 self.store.finish_task_attempt(
                     attempt_id, "blocked", error="deterministic policy denied task",
@@ -67,25 +89,35 @@ class WorkflowScheduler:
                 if remaining <= 0:
                     raise TimeoutError
                 result = await asyncio.wait_for(result, timeout=remaining)
+            if lease_lost.is_set():
+                return {"task_id": task.id, "status": "uncertain"}
             self.store.finish_task_attempt(attempt_id, "succeeded", result=result)
             return {"task_id": task.id, "status": "succeeded"}
         except TimeoutError:
+            if lease_lost.is_set():
+                return {"task_id": task.id, "status": "uncertain"}
             self.store.finish_task_attempt(
                 attempt_id, "uncertain", error="task timed out; reconcile before retry",
             )
             return {"task_id": task.id, "status": "uncertain"}
         except asyncio.CancelledError:
-            self.store.finish_task_attempt(
+            if not lease_lost.is_set():
+                self.store.finish_task_attempt(
                 attempt_id, "uncertain",
-                error="scheduler cancelled while task was active; reconcile before retry",
-            )
+                    error="scheduler cancelled while task was active; reconcile before retry",
+                )
             raise
         except Exception as exc:
+            if lease_lost.is_set():
+                return {"task_id": task.id, "status": "uncertain"}
             _log.exception("workflow task %s failed", task.id)
             self.store.finish_task_attempt(
                 attempt_id, "failed", error=f"{type(exc).__name__}: {exc}",
             )
             return {"task_id": task.id, "status": "failed"}
+        finally:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
 
     async def run(self, plan_id: str, *, max_tasks: int = 100,
                   max_attempts: int = 2, max_concurrency: int = 4) -> dict[str, Any]:

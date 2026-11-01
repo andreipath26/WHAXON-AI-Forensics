@@ -396,3 +396,43 @@ def test_reconcile_recovers_legacy_running_attempt_without_fence(tmp_path):
         conn.close()
     assert store.reconcile_workflow_attempts() == 1
     assert store.list_workflow_tasks("p")[0]["status"] == "uncertain"
+
+
+
+def test_workflow_lease_heartbeat_preserves_live_attempt_during_startup_recovery(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-live-lease.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("scan", "cap.scan", "192.0.2.10"),)),
+    )
+    row = store.claim_ready_workflow_task("p", "worker-live")
+    assert row is not None
+    assert store.heartbeat_workflow_attempt(row["attempt_id"]) is True
+    assert store.reconcile_workflow_attempts(stale_after_s=60) == 0
+    assert store.list_workflow_tasks("p")[0]["status"] == "running"
+
+
+def test_workflow_recovery_only_marks_expired_leases_uncertain(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-expired-lease.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("scan", "cap.scan", "192.0.2.10"),)),
+    )
+    row = store.claim_ready_workflow_task("p", "worker-dead")
+    assert row is not None
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE task_attempts SET heartbeat_at=? WHERE id=?",
+            (0, row["attempt_id"]),
+        )
+    finally:
+        conn.close()
+    assert store.reconcile_workflow_attempts(stale_after_s=60) == 1
+    assert store.list_workflow_tasks("p")[0]["status"] == "uncertain"

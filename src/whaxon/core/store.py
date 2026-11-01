@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS capability_manifests (capability_id TEXT NOT NULL, pr
 CREATE TABLE IF NOT EXISTS task_attempts (
     id TEXT PRIMARY KEY, task_id TEXT NOT NULL, attempt_no INTEGER NOT NULL,
     status TEXT NOT NULL, worker_id TEXT NOT NULL DEFAULT '', idempotency_key TEXT NOT NULL DEFAULT '',
-    started_at REAL NOT NULL, finished_at REAL, result_json TEXT, error TEXT,
+    started_at REAL NOT NULL, heartbeat_at REAL, finished_at REAL, result_json TEXT, error TEXT,
     UNIQUE(task_id, attempt_no)
 );
 CREATE INDEX IF NOT EXISTS idx_task_attempts_task ON task_attempts(task_id, attempt_no);
@@ -124,6 +124,10 @@ class JobStore:
         try:
             c.executescript(SCHEMA)
             # Durable worker leases. Existing databases are upgraded in place.
+            try:
+                c.execute("ALTER TABLE task_attempts ADD COLUMN heartbeat_at REAL")
+            except sqlite3.OperationalError:
+                pass
             for column, definition in (
                 ("lease_owner", "TEXT"),
                 ("lease_token", "TEXT"),
@@ -936,16 +940,42 @@ class JobStore:
         finally:
             c.close()
 
-    def reconcile_workflow_attempts(self):
-        """Mark orphaned running attempts uncertain; never replay unknown side effects."""
+    def heartbeat_workflow_attempt(self, attempt_id):
+        """Renew a running workflow-attempt lease; false means ownership was lost."""
+        with self._lock:
+            c = self._conn()
+            try:
+                cur = c.execute(
+                    "UPDATE task_attempts SET heartbeat_at=? "
+                    "WHERE id=? AND status='running'",
+                    (time.time(), attempt_id),
+                )
+                return cur.rowcount == 1
+            finally:
+                c.close()
+
+    def reconcile_workflow_attempts(self, stale_after_s=None):
+        """Mark orphaned attempts uncertain; optionally preserve fresh worker leases."""
         now = time.time()
+        if stale_after_s is not None:
+            stale_after_s = float(stale_after_s)
+            if stale_after_s <= 0:
+                raise ValueError("stale_after_s must be positive")
+            stale_before = now - stale_after_s
         with self._lock:
             c = self._conn()
             try:
                 c.execute("BEGIN IMMEDIATE")
-                rows = c.execute(
-                    "SELECT id, task_id FROM task_attempts WHERE status='running'"
-                ).fetchall()
+                if stale_after_s is None:
+                    rows = c.execute(
+                        "SELECT id, task_id FROM task_attempts WHERE status='running'"
+                    ).fetchall()
+                else:
+                    rows = c.execute(
+                        "SELECT id, task_id FROM task_attempts "
+                        "WHERE status='running' AND COALESCE(heartbeat_at, started_at) < ?",
+                        (stale_before,),
+                    ).fetchall()
                 for row in rows:
                     error = "worker stopped before recording an outcome; reconcile before retry"
                     c.execute(
@@ -1035,9 +1065,9 @@ class JobStore:
                         continue
                     c.execute(
                         "INSERT INTO task_attempts "
-                        "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at) "
-                        "VALUES (?, ?, ?, 'running', ?, ?, ?)",
-                        (attempt_id, row["id"], attempt_no, worker_id, row["idempotency_key"], now),
+                        "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at, heartbeat_at) "
+                        "VALUES (?, ?, ?, 'running', ?, ?, ?, ?)",
+                        (attempt_id, row["id"], attempt_no, worker_id, row["idempotency_key"], now, now),
                     )
                     value = dict(row)
                     value.update({
