@@ -3299,3 +3299,53 @@ The product is deployment-ready only when the integrated repository passes the r
 The release record must list the exact commit, environment, commands/workflows, test and CI run identifiers, results, known failures, unsupported combinations and remaining risks. Do not describe a PR as complete because it is merged, or the product as deployment-ready because CI passed: deployment readiness requires the end-to-end gates above. Keep related implementation changes consolidated into a substantial integration commit where practical; avoid a stream of trivial commits, but do not defer necessary verification.
 
 **Definition of done:** a clean-machine user can install and configure a truthful capability profile; the same installation can run on a headless server; the user can operate real supported workflows through CLI/API and the approved web UI; background work, evidence and approvals survive interruption; and every advertised capability is backed by current repository evidence and end-to-end acceptance. Unsupported or unverified capabilities are clearly identified rather than implied to work.
+
+
+---
+
+# 49. ENGINE V2 — CAPABILITY-DRIVEN EXECUTION ARCHITECTURE
+
+**Status:** Architecture specification recorded; implementation not started or implied.  
+**Specification:** `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md`  
+**Authority:** Subordinate to §0; this section does not reorder roadmap gates.
+
+Engine v2 is a capability-driven, durable mission/task-graph execution platform. Tools are interchangeable providers of typed capabilities, not hard-coded orchestration branches. The engine compiles typed plans, resolves versioned providers and readiness, applies deterministic authorization, schedules bounded durable work, preserves raw evidence, independently verifies results and supports safe pause, cancellation, recovery and replanning.
+
+Mandatory boundaries: (1) mission/campaign lifecycle; (2) typed plan compiler and bounded task graph; (3) capability registry/provider resolver; (4) separate customer-engagement and bug-bounty policy engines; (5) exact-digest approval service; (6) durable scheduler/leases/budgets/retries/idempotency/recovery; (7) typed local-process, session/transport, API, browser, cloud-SDK and local-analysis adapters as individually implemented and tested; (8) evidence/finding/verification/coverage services; (9) typed events and tamper-evident audit; (10) shared CLI/API/web/headless application services.
+
+Required versioned contracts: Mission, AuthorizationContext, Plan, Task, TaskAttempt, CapabilityManifest, ProviderRegistration, PolicyDecision, Approval, BudgetLedger, ExecutionContext, Observation, Finding, VerificationRun, EvidenceArtifact, AuditEvent and ReadinessSnapshot. Manifests declare target/protocol/platform/auth compatibility, typed I/O, dependencies, execution kind, side effects/impact, permissions, resource/rate/concurrency limits, timeout/cancellation, idempotency/reconciliation, evidence/parser versions and verified readiness. Metadata never grants permission.
+
+Invariants: AI proposes only; authorization is rechecked at each consequential boundary; fail closed; exact plan-bound consent; customer/bounty policy and state isolated; all work bounded and auditable; durable recovery reconciles before retry; no exactly-once external-effects assumption; raw evidence/provenance retained; uncertainty and coverage gaps reported honestly; no client owns long-running jobs.
+
+Migration: inventory all current paths and checks; close follow-up draining, Nikto parsing, scope and evidence defects; introduce compatibility façades and versioned contracts; bridge existing adapters to truthful manifests without gratuitous parser rewrites; add durable task graph/scheduler; migrate Automator to evidence/capability-driven follow-up; adapt AI proposals; integrate shared services, readiness and headless operation; meet solo v1.0/UI gates; only then expand autonomy, bounty and multi-target work. Retire old paths only after parity, rollback and no-bypass tests.
+
+Roadmap crosswalk:
+- §0 and foundational principles: dependency-first gates, consent, deterministic execution, bounds, verification and recovery.
+- §§1–6, 13–15: preserve completed foundations/exclusions and inventory existing behavior.
+- §7, §39: capability manifests, provider resolution, adapters, tool substitutions, readiness and impact tiers.
+- §§8–9: platform compatibility and typed cloud/local execution.
+- §10: AI proposal boundary and four campaign interaction modes.
+- §§11–12: historical sequencing remains subordinate to §0.
+- §16: optional integrations, never permission authorities or mandatory runtime dependencies.
+- §§17–18: actor/tenant/team/delegated-approval seams, delivered only at gates.
+- §§19, 41, 44, 48.5: versioned UI/API contracts, durable progress, readiness/programme services; supplied UI design unchanged and unsupported controls hidden.
+- §20: extension seams for PTaaS, remediation, ASM, compliance, threat intelligence, training, cloud posture, APIs, air-gap and mobile.
+- §§21, 25: evidence-backed findings and reporting contracts.
+- §§22, 24: historical triage is not live execution state.
+- §23: session/reachability-aware task graphs and adversarial safety tests.
+- §26, 45: independent bounty policy, source-backed programme rules, activation, asset/investigation graph, evidence vault and approval-gated disclosure.
+- §§32–34, 38: solo v1.0, Trust Layer, validation/reproduction, retest and integrated release acceptance.
+- §35, 37: stable external integration and future Fact-Intent Graph/RAG/multi-agent consumer seams, not alternate execution authority.
+- §36: passive/active recon tasks, provenance, asset normalization and bounded enrichment.
+- §40, 47: readiness snapshots, dependency/install tasks, exact consent, post-install verification and recovery.
+- §42: per-target authorization, bounded fan-out, rate/concurrency, failure isolation and partial aggregation.
+- §43: benchmarkable execution, coverage/verification metrics and seeded-lab evidence.
+- §44: preserve UI-first and §0 sequencing gates.
+- §46: manual/guided/supervised/autonomous campaigns, separated policies, durable recovery and stateful chains.
+- §48: machine-readable capability inventory, shared services, headless/systemd/container acceptance and deployment verification.
+
+Engine-specific gates, subordinate to §0: E0 baseline inventory; E1 correctness/security blockers; E2 stable contracts; E3 durable execution; E4 adapter/capability migration; E5 shared services/readiness/headless; E6 solo v1.0 and supplied UI acceptance; E7 bounded autonomy and isolated bounty; E8 multi-target and measurement; E9 selective platform expansion.
+
+Acceptance must test graph/schema validity, provider resolution, policy isolation and fail-closed behavior, exact approvals, worker/lease recovery, idempotency, cancellation, adapter safety, evidence/audit integrity, independent verification, honest coverage, tenant isolation, headless operation, compatibility and adversarial attack cases. Zero unauthorized/out-of-scope actions is a release blocker.
+
+Architecture documentation is not implementation completion. No roadmap item becomes DONE until its own acceptance evidence exists.
