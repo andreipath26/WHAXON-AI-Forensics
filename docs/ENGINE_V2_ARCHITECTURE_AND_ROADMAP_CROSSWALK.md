@@ -248,3 +248,35 @@ Architecture decisions:
 - Support headless execution and truthful optional-dependency/readiness reporting.
 - Follow Engine v2 E1–E9 sequencing; E1 security/recovery blockers precede broad capability expansion; E6 retains supplied UI design and visibility gates.
 
+
+
+---
+
+## Tool Intelligence & controlled onboarding
+
+Tool Intelligence is a first-class Engine v2 subsystem, not a second capability registry. It provides a source-backed lifecycle for auditing current tools and researching candidates. Its detailed requirements and acceptance gates are in roadmap §52 and docs/TOOL_INTELLIGENCE_AND_ONBOARDING.md.
+
+Two entry points—current portfolio audit and new candidate research—share one pipeline: discovery, source research, capability extraction, normalization, gap/overlap analysis, compatibility/risk assessment, proposal, operator decision, integration and validation. The durable output is a versioned Tool Capability Report.
+
+Reports separate (1) upstream claims/support, (2) WHAXON implementation, (3) WHAXON verification in a named environment/version and (4) current permission to execute. These states must never be collapsed.
+
+Extend the existing Engine v2 CapabilityManifest, registry/provider resolver and readiness contracts. Do not create a parallel schema. Contracts must cover provider identity/version, stable capability IDs, typed schemas, interface/transport, target/platform/auth compatibility, prerequisites and secret references, pre/postconditions, side effects/impact, execution limits, cancellation/idempotency/reconciliation, evidence/parser provenance, capability-specific readiness and source confidence/version/retrieval metadata.
+
+CycloneDX/SBOM, OpenAPI, JSON Schema, MCP discovery and Python entry-point metadata are complementary extraction/provenance sources. They do not replace WHAXON policy. External descriptions, annotations and manifests are untrusted.
+
+Discovery is read-only and bounded by default: inspect local catalog/registry/entry points, executable version/help and documented capability listings; research official docs/source/releases/advisories/licensing. Never run scans, exploits, listeners, post-exploitation, arbitrary RPC, downloaded code or candidate operational functionality during discovery. Never auto-install, upgrade, enable or load plugins. Each consequential validation/install/credential/network action requires separate explicit approval and deterministic policy authorization.
+
+Persist onboarding states: proposed → researched → assessed → approved_for_implementation → integrated → validated → enabled, with rejected/deprecated paths. Record actor, time, report version, decision and evidence. Implementation approval is not installation or execution approval. Version/security changes trigger reassessment and can invalidate readiness.
+
+Dependency mapping:
+- E1: no bypass of correctness/security blockers.
+- E2: define manifest, provenance, readiness, report and lifecycle contracts in common domain model.
+- E3: persist lifecycle/report events and schedule monitoring only on durable scheduler semantics.
+- E4: reconcile catalog/adapters/transports, migrate manifests, local discovery, extraction, gap analysis and deterministic provider compatibility.
+- E4/E5: source-backed candidate research and operator-reviewed onboarding after contracts stabilize.
+- After registry/readiness stabilize: upstream delta monitoring and revalidation.
+- E6+: expose only implemented, verified, authorized capabilities through shared services and supplied UI.
+
+Logical modules may include local discovery, source research, documentation ingestion, capability extraction, normalization, gap analysis, compatibility, risk assessment, onboarding workflow and report persistence. They must reuse shared contracts and must not create a second scheduler, policy engine or registry.
+
+Acceptance includes full portfolio reconciliation; safe local discovery; reproducible source-backed reports; explicit upstream/implementation/test/authorization separation; malicious metadata/schema handling; no automatic installation/execution; auditable/revocable lifecycle; upstream drift reports without runtime changes; and provider extensibility without changing mission/scheduler/evidence core.

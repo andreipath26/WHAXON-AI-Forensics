@@ -3456,3 +3456,120 @@ Broad feature implementation must not precede E1 security/recovery gates or bypa
 
 Use the detailed 18-point acceptance matrix in `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md`. At minimum prove dynamic version/API/module discovery; metadata and compatibility; structured job/handler/session lifecycle; typed Meterpreter operations; Framework database/loot synchronization; route scope enforcement; restart reconciliation without duplicate dispatch; customer-vs-bounty policy isolation; TLS and secret handling; headless operation; supplied UI fidelity; and provider extensibility without changing mission/scheduler/evidence core.
 
+
+
+---
+
+## 52. TOOL INTELLIGENCE, CAPABILITY AUDIT AND CONTROLLED ONBOARDING
+
+**Status: QUEUED — first-class Engine v2 subsystem.** This section defines the permanent process WHAXON uses to understand tools it already supports and evaluate tools proposed for future integration. It is not a one-time research exercise or a tool-count expansion target.
+
+### 52.1 Mission and entry points
+
+Implement one shared Tool Intelligence pipeline with two entry points:
+
+1. **Installed/integrated tool audit:** inspect every catalog entry, adapter/provider, executable and registered integration. Determine what is installed, what WHAXON can invoke, which upstream capabilities exist, which are exposed, which are tested, and where gaps remain.
+2. **Candidate-tool research:** accept a proposed tool/provider and research official documentation, source, releases, API/plugin ecosystem, platform support, licensing, maintenance, security and evidence formats. Compare it with existing WHAXON capabilities and identify distinct value and overlap.
+
+Both use: discovery → source-backed research → capability extraction → normalization → gap/overlap analysis → compatibility/risk assessment → integration proposal → operator review → implementation → validation.
+
+### 52.2 Versioned Tool Capability Report
+
+Every audit or candidate assessment produces a durable, versioned report containing:
+
+- Identity: canonical tool/provider ID, publisher, upstream repository/docs, detected or researched version, release/channel and assessment timestamp.
+- Provenance: source URLs, source type, retrieval time, applicable version, extracted claim, confidence and conflicting/unknown evidence. Prefer official sources; label secondary/community evidence.
+- Upstream capability inventory: stable capability IDs, module/command/API families, target/protocol/platform support, interfaces and version/edition constraints.
+- WHAXON implementation inventory: catalog registration, provider/adapter, callable operation, schemas, parser/normalizer, evidence handling, interface exposure and actual test coverage.
+- Gap matrix: upstream-supported but absent; implemented but not exposed; exposed but unverified; partial; incompatible; deprecated; duplicate/overlapping; intentionally excluded.
+- Integration requirements: dependencies, credentials, permissions, transport, data models, parser work, persistence, scheduling, UI visibility and migration impact.
+- Risk/authorization: network exposure, privilege, secrets, data collection, side effects, impact class, destructive potential, supply-chain/plugin risks and policy requirements.
+- Validation plan: unit, contract, adapter, integration, security, compatibility, controlled-lab and regression tests, including negative/failure cases.
+- Recommendation: integrate, extend existing provider, replace, defer, reject or gather evidence—with rationale, dependencies, effort and acceptance criteria.
+
+Reports must distinguish **upstream capability**, **WHAXON implementation**, **WHAXON verification/readiness**, and **permission to execute**. These are independent facts. Discovery never makes a capability implemented, tested, ready or authorized.
+
+### 52.3 Canonical capability and provenance model
+
+Reuse and extend the Engine v2 versioned CapabilityManifest and registry/provider contracts in the architecture crosswalk. Do not create a parallel manifest format.
+
+Represent:
+- Stable capability ID independent of tool name; provider identity/version.
+- Typed input/output schemas and schema versions.
+- Interfaces: CLI, library, API/REST/OpenAPI, RPC, MCP, plugin, session or other transport.
+- Target, protocol, platform, architecture, authentication and session compatibility.
+- Prerequisites, dependencies, permissions and credential references.
+- Preconditions, postconditions, state changes, external effects and impact classification.
+- Authorization requirements; the manifest never grants permission.
+- Timeout, cancellation, concurrency, resource/rate limits, idempotency and reconciliation.
+- Raw output/evidence formats, parser/normalizer identity/version, provenance and retention/redaction.
+- Capability-specific readiness, verification evidence and environment.
+- Upstream provenance, supported version range, source confidence, retrieval time and deprecation state.
+
+Suggested readiness: discovered, researched, installed, registered, smoke-tested, lab-validated, verified, degraded and unsupported. Readiness is capability- and environment-specific, not one global tool boolean. Do not promote readiness without recorded evidence.
+
+CycloneDX/SBOM may complement dependency provenance. OpenAPI, JSON Schema, MCP discovery and Python entry-point metadata may inform extraction. None replaces WHAXON authorization or evidence contracts. Third-party metadata and annotations are untrusted until validated.
+
+### 52.4 Discovery and research safety
+
+Default discovery is read-only and bounded:
+- Inspect local catalog/registry/entry-point metadata and executable identity/version.
+- Use allowlisted introspection such as version, help, module listing and schema/capability listing, with time/output/resource limits.
+- Research public official documentation, source, release notes, advisories and licensing without executing candidate functionality.
+- Record unknowns and confidence rather than guessing.
+
+Do not scan targets, open listeners, invoke exploits or post-exploitation, contact arbitrary endpoints, load plugins, use credentials, install/upgrade packages, alter system state, or execute downloaded code as part of discovery. Each later install, plugin load, credential use, networked integration test or consequential validation requires separate explicit approval and deterministic policy authorization.
+
+Treat remote metadata, MCP annotations, descriptions, generated manifests and AI-extracted content as untrusted input. Validate schemas and enforce policy independently. A separately approved controlled-lab validation must be isolated and bounded; results cannot be generalized to untested versions/platforms.
+
+### 52.5 Existing-tool inventory and reconciliation
+
+The first audit reconciles:
+- data/tools.json catalog entries;
+- built-in adapters and Python entry-point adapters in adapters/registry.py;
+- adapter contracts in adapters/base.py;
+- actual executable/dependency checks and runner dispatch;
+- session transports, RPC providers and integrations not represented as ordinary CLI tools;
+- CLI/API/UI exposure, parser/evidence paths and tests.
+
+Report catalog-only entries, adapter-only entries, duplicate IDs, missing executables, unsupported transports, stale metadata, unreachable providers, parser gaps and advertised-but-unverified operations. Do not silently drop definitions or break compatibility. Preserve ToolCatalog, existing adapters and runner behavior behind a migration bridge until manifest-backed contracts pass regression tests.
+
+### 52.6 Candidate onboarding lifecycle
+
+Persist explicit states:
+1. **Proposed** — candidate and evaluation reason recorded.
+2. **Researched** — sources, version, licensing, maintenance and capabilities captured.
+3. **Assessed** — overlap, gaps, compatibility, risk and value compared.
+4. **Approved for implementation** — operator accepts a bounded proposal; this is not permission to install or execute.
+5. **Integrated** — code, schemas, provider/adapter and parser/evidence path implemented.
+6. **Validated** — declared tests pass in named environments with evidence.
+7. **Enabled** — provider is selectable, while each operation remains subject to engagement policy and runtime authorization.
+8. **Deprecated/Rejected** — rationale, migration/replacement and history recorded.
+
+Transitions record actor, timestamp, report version, decision and evidence. Approval can be revoked. Upstream version/security changes trigger reassessment and can invalidate readiness. Research status is never implementation approval or execution authorization.
+
+### 52.7 Continuous upstream monitoring
+
+After provenance, manifests and registry contracts stabilize, provide on-demand and scheduled checks for new releases/modules/commands/APIs/plugins/output formats; deprecations and schema changes; advisories; maintenance/licensing changes; and platform support changes.
+
+Monitoring creates a versioned delta report and suggested manifest/adapter/parser/test updates. It must not automatically update dependencies, change provider selection, load plugins, enable capabilities or execute operations. Material changes invalidate affected readiness until revalidated.
+
+### 52.8 Engine integration and dependency order
+
+Governed by roadmap §0 and Engine v2 E1–E9:
+- **Architecture now:** define pipeline, report, trust boundaries and acceptance; no broad runtime expansion.
+- **E1:** close correctness/security blockers first. Intelligence cannot bypass scope, DNS, session, RPC/TLS, recovery or evidence controls.
+- **E2:** define versioned manifest, provenance, capability, readiness, report and onboarding-state contracts in the common domain model.
+- **E3:** persist report/lifecycle events and schedule monitoring only after durable scheduler guarantees.
+- **E4:** reconcile current catalog/providers, migrate truthful manifests, implement local discovery, extraction, gap analysis and deterministic compatibility.
+- **E4/E5:** bounded upstream research and operator-reviewed onboarding after contracts stabilize.
+- **After registry/readiness stabilize:** upstream monitoring and revalidation.
+- **E6 onward:** expose only implemented, authorized, readiness-qualified capabilities through the supplied UI.
+
+Do not bypass E1/E2/E3, create a competing manifest/scheduler, or pull deferred expansion ahead of solo v1.0 gates.
+
+### 52.9 Acceptance criteria
+
+Prove that: all current catalog/adapters/transports/providers are reconciled; mismatches and duplicates are detected; local discovery does not run operational functionality or mutate the system; candidate reports are reproducible and source-backed; upstream support is distinguishable from implementation/testing/authorization; compatibility, licensing and maintenance risks are reported; malicious metadata cannot grant permission or execute code; no install/upgrade/plugin/credential/operation occurs without separate approval; lifecycle is auditable/revocable; monitoring reports deltas without runtime changes; new providers do not require scheduler changes; and existing regressions remain green.
+
+**Definition of done:** an operator can audit the portfolio or evaluate a candidate and receive a reproducible capability/gap/risk report and controlled implementation proposal. Approved providers use the same versioned Engine v2 contracts as existing and future tools.
