@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS workflow_plans (
 );
 CREATE INDEX IF NOT EXISTS idx_workflow_plans_mission ON workflow_plans(mission_id, created_at);
 CREATE TABLE IF NOT EXISTS workflow_tasks (
-    id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, capability_id TEXT NOT NULL,
+    id TEXT PRIMARY KEY, task_key TEXT NOT NULL, plan_id TEXT NOT NULL, capability_id TEXT NOT NULL,
     target TEXT NOT NULL, inputs_json TEXT NOT NULL, depends_on_json TEXT NOT NULL,
     permissions_json TEXT NOT NULL, impact TEXT NOT NULL, timeout_s REAL NOT NULL,
     idempotency_key TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'pending',
@@ -192,6 +192,11 @@ class JobStore:
                 c.execute("ALTER TABLE workflow_tasks ADD COLUMN active_attempt_id TEXT")
             except sqlite3.OperationalError:
                 pass
+            try:
+                c.execute("ALTER TABLE workflow_tasks ADD COLUMN task_key TEXT")
+            except sqlite3.OperationalError:
+                pass
+            c.execute("UPDATE workflow_tasks SET task_key=id WHERE task_key IS NULL")
             c.execute("CREATE TABLE IF NOT EXISTS approvals (run_id TEXT, seq INTEGER, user TEXT, answer TEXT, note TEXT, at REAL, PRIMARY KEY (run_id, seq))")
         finally: c.close()
     def _conn(self):
@@ -836,7 +841,8 @@ class JobStore:
             c.close()
 
     def save_workflow_plan(self, plan_id, plan):
-        """Persist an immutable validated WorkflowPlan and its DAG nodes atomically."""
+        """Persist an immutable validated plan with plan-local task identifiers."""
+        import uuid
         from .workflow import WorkflowPlan
         if isinstance(plan, dict):
             plan = WorkflowPlan.from_dict(plan)
@@ -845,6 +851,10 @@ class JobStore:
         if not plan_id or not str(plan_id).strip():
             raise ValueError("plan_id is required")
         encoded = json.dumps(plan.to_dict(), sort_keys=True, separators=(",", ":"))
+        task_refs = {
+            task.id: uuid.uuid5(uuid.NAMESPACE_URL, f"whaxon:{plan_id}:{task.id}").hex
+            for task in plan.tasks
+        }
         now = time.time()
         with self._lock:
             c = self._conn()
@@ -869,14 +879,15 @@ class JobStore:
                 for task in plan.tasks:
                     c.execute(
                         "INSERT INTO workflow_tasks "
-                        "(id, plan_id, capability_id, target, inputs_json, depends_on_json, "
+                        "(id, task_key, plan_id, capability_id, target, inputs_json, depends_on_json, "
                         "permissions_json, impact, timeout_s, idempotency_key, created_at, updated_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (
-                            task.id, plan_id, task.capability_id, task.target,
+                            task_refs[task.id], task.id, plan_id, task.capability_id, task.target,
                             json.dumps(task.inputs, sort_keys=True),
-                            json.dumps(task.depends_on), json.dumps(task.permissions),
-                            task.impact, task.timeout_s, task.idempotency_key, now, now,
+                            json.dumps([task_refs[dep] for dep in task.depends_on]),
+                            json.dumps(task.permissions), task.impact, task.timeout_s,
+                            task.idempotency_key, now, now,
                         ),
                     )
                 c.execute("COMMIT")
@@ -904,7 +915,8 @@ class JobStore:
         c = self._conn()
         try:
             rows = c.execute(
-                "SELECT * FROM workflow_tasks WHERE plan_id=? ORDER BY rowid", (plan_id,)
+                "SELECT *, task_key AS id FROM workflow_tasks WHERE plan_id=? ORDER BY rowid",
+                (plan_id,),
             ).fetchall()
             result = []
             for row in rows:
@@ -914,7 +926,7 @@ class JobStore:
                     ("permissions_json", "permissions"), ("result_json", "result"),
                 ):
                     raw = value.pop(column)
-                    value[key] = json.loads(raw) if raw else (None if key == "result" else {})
+                    value[key] = json.loads(raw) if raw else (None if key == "result" else [])
                 result.append(value)
             return result
         finally:
@@ -953,7 +965,7 @@ class JobStore:
                 c.close()
 
     def claim_ready_workflow_task(self, plan_id, worker_id, max_attempts=3):
-        """Atomically claim the next DAG node whose dependencies all succeeded."""
+        """Atomically claim a DAG node using plan-scoped task references."""
         import uuid
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
@@ -963,7 +975,7 @@ class JobStore:
                 c.execute("BEGIN IMMEDIATE")
                 candidates = c.execute(
                     "SELECT * FROM workflow_tasks WHERE plan_id=? AND status IN ('pending','failed') "
-                    "ORDER BY created_at, id", (plan_id,),
+                    "ORDER BY created_at, task_key", (plan_id,),
                 ).fetchall()
                 for row in candidates:
                     count = c.execute(
@@ -971,24 +983,27 @@ class JobStore:
                     ).fetchone()["n"]
                     if count >= max_attempts:
                         continue
-                    dependencies = json.loads(row["depends_on_json"] or "[]")
-                    if dependencies:
-                        marks = ",".join("?" for _ in dependencies)
+                    dependency_refs = json.loads(row["depends_on_json"] or "[]")
+                    dependencies = []
+                    if dependency_refs:
+                        marks = ",".join("?" for _ in dependency_refs)
                         states = c.execute(
-                            f"SELECT id, status FROM workflow_tasks WHERE id IN ({marks})",
-                            tuple(dependencies),
+                            f"SELECT id, task_key, status FROM workflow_tasks WHERE id IN ({marks})",
+                            tuple(dependency_refs),
                         ).fetchall()
-                        if len(states) != len(dependencies):
+                        if len(states) != len(dependency_refs):
                             continue
+                        state_by_ref = {item["id"]: item for item in states}
                         failed_terminal = False
-                        for dependency in states:
+                        for dependency_ref in dependency_refs:
+                            dependency = state_by_ref[dependency_ref]
                             if dependency["status"] in ("blocked", "cancelled", "uncertain"):
                                 failed_terminal = True
                                 break
                             if dependency["status"] == "failed":
                                 dep_attempts = c.execute(
                                     "SELECT COUNT(*) AS n FROM task_attempts WHERE task_id=?",
-                                    (dependency["id"],),
+                                    (dependency_ref,),
                                 ).fetchone()["n"]
                                 if dep_attempts >= max_attempts:
                                     failed_terminal = True
@@ -1000,8 +1015,9 @@ class JobStore:
                                 (time.time(), row["id"]),
                             )
                             continue
-                        if any(x["status"] != "succeeded" for x in states):
+                        if any(state_by_ref[ref]["status"] != "succeeded" for ref in dependency_refs):
                             continue
+                        dependencies = [state_by_ref[ref]["task_key"] for ref in dependency_refs]
                     attempt_no = count + 1
                     attempt_id = uuid.uuid4().hex
                     now = time.time()
@@ -1022,6 +1038,7 @@ class JobStore:
                     value.update({
                         "attempt_id": attempt_id, "attempt_no": attempt_no,
                         "worker_id": worker_id, "status": "running",
+                        "task_ref": row["id"], "id": row["task_key"],
                         "inputs": json.loads(row["inputs_json"] or "{}"),
                         "depends_on": dependencies,
                         "permissions": json.loads(row["permissions_json"] or "[]"),
@@ -1037,18 +1054,34 @@ class JobStore:
             finally:
                 c.close()
 
-    def start_task_attempt(self, attempt_id, task_id, attempt_no, worker_id="", idempotency_key=""):
-        """Create a durable attempt and atomically move its task to running."""
+    def start_task_attempt(
+        self, attempt_id, task_id, attempt_no, worker_id="", idempotency_key="", plan_id=None,
+    ):
+        """Create one fenced attempt; task_id may be plan-local when unambiguous."""
         now = time.time()
         with self._lock:
             c = self._conn()
             try:
                 c.execute("BEGIN IMMEDIATE")
-                task = c.execute(
-                    "SELECT status, idempotency_key FROM workflow_tasks WHERE id=?", (task_id,)
-                ).fetchone()
-                if task is None:
+                if plan_id is None:
+                    matches = c.execute(
+                        "SELECT id FROM workflow_tasks WHERE id=? OR task_key=? LIMIT 2",
+                        (task_id, task_id),
+                    ).fetchall()
+                    if len(matches) > 1:
+                        raise ValueError("task id is ambiguous; supply plan_id")
+                    task_ref = matches[0]["id"] if matches else None
+                else:
+                    match = c.execute(
+                        "SELECT id FROM workflow_tasks WHERE plan_id=? AND (id=? OR task_key=?)",
+                        (plan_id, task_id, task_id),
+                    ).fetchone()
+                    task_ref = match["id"] if match else None
+                if task_ref is None:
                     raise ValueError(f"unknown workflow task: {task_id}")
+                task = c.execute(
+                    "SELECT status, idempotency_key FROM workflow_tasks WHERE id=?", (task_ref,)
+                ).fetchone()
                 if task["status"] in ("succeeded", "cancelled", "blocked", "uncertain"):
                     raise ValueError(f"task is terminal: {task_id}")
                 if task["status"] == "running":
@@ -1061,12 +1094,12 @@ class JobStore:
                     "INSERT INTO task_attempts "
                     "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at) "
                     "VALUES (?, ?, ?, 'running', ?, ?, ?)",
-                    (attempt_id, task_id, int(attempt_no), worker_id, idempotency_key, now),
+                    (attempt_id, task_ref, int(attempt_no), worker_id, idempotency_key, now),
                 )
                 cur = c.execute(
                     "UPDATE workflow_tasks SET status='running', active_attempt_id=?, "
                     "error=NULL, updated_at=? WHERE id=? AND status IN ('pending','failed')",
-                    (attempt_id, now, task_id),
+                    (attempt_id, now, task_ref),
                 )
                 if cur.rowcount != 1:
                     raise ValueError(f"task is already claimed: {task_id}")
