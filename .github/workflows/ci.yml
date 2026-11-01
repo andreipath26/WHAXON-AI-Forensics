@@ -222,6 +222,106 @@ jobs:
           assert (root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")).is_file()
           PY
 
+
+  headless-server-smoke:
+    name: headless Linux server (no display)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build and install WHAXON web wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+          python -m pip install "dist/$(ls dist/*.whl | xargs basename)[web]"
+      - name: Exercise CLI setup and doctor with all display/session variables removed
+        env:
+          DISPLAY: ""
+          WAYLAND_DISPLAY: ""
+          XDG_SESSION_TYPE: ""
+          QT_QPA_PLATFORM: "offscreen"
+          TERM: "dumb"
+        run: |
+          set -euo pipefail
+          unset DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE
+          whaxon --help
+          whaxon setup --profile core --json > headless-plan.json
+          whaxon doctor --core-only --json > headless-doctor.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          plan = json.loads(Path("headless-plan.json").read_text(encoding="utf-8"))
+          doctor = json.loads(Path("headless-doctor.json").read_text(encoding="utf-8"))
+          assert plan["execution"]["commands_executed"] is False
+          assert plan["execution"]["network_accessed"] is False
+          assert doctor["schema_version"] == 1
+          assert doctor["summary"]["required_blockers"] == 0, doctor["summary"]
+          PY
+      - name: Start production Waitress server without a TTY or display
+        env:
+          DISPLAY: ""
+          WAYLAND_DISPLAY: ""
+          XDG_SESSION_TYPE: ""
+          QT_QPA_PLATFORM: "offscreen"
+          TERM: "dumb"
+        run: |
+          unset DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE
+          python - <<'PY'
+          import os
+          import shutil
+          import socket
+          import subprocess
+          import time
+          import urllib.error
+          import urllib.request
+
+          executable = shutil.which("whaxon")
+          assert executable, "whaxon console script is not installed"
+          with socket.socket() as probe:
+              probe.bind(("127.0.0.1", 0))
+              port = probe.getsockname()[1]
+          env = os.environ.copy()
+          env.pop("DISPLAY", None)
+          env.pop("WAYLAND_DISPLAY", None)
+          env.pop("XDG_SESSION_TYPE", None)
+          env["WHAXON_DATA"] = os.path.abspath(".headless-whaxon-data")
+          process = subprocess.Popen(
+              [executable, "serve", "--host", "127.0.0.1", "--port", str(port), "--threads", "2"],
+              env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT, text=True,
+          )
+          try:
+              deadline = time.monotonic() + 20
+              response = None
+              last_error = None
+              while time.monotonic() < deadline:
+                  if process.poll() is not None:
+                      output = process.stdout.read() if process.stdout else ""
+                      raise AssertionError(f"headless Waitress server exited {process.returncode}: {output}")
+                  try:
+                      response = urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=2)
+                      break
+                  except urllib.error.HTTPError as exc:
+                      response = exc
+                      break
+                  except (OSError, TimeoutError) as exc:
+                      last_error = exc
+                      time.sleep(0.25)
+              assert response is not None, f"headless server did not accept HTTP: {last_error}"
+              assert response.status in (200, 302, 401), response.status
+              print(f"Headless Waitress server returned HTTP {response.status}.")
+          finally:
+              process.terminate()
+              try:
+                  process.wait(timeout=10)
+              except subprocess.TimeoutExpired:
+                  process.kill()
+                  process.wait(timeout=5)
+          PY
+
   setup-external-tool-smoke:
     name: curated apt tool installation smoke
     runs-on: ubuntu-latest

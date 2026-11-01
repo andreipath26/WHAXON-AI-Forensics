@@ -226,3 +226,8 @@ whaxon setup --profile core --install --approve PLAN_ID
 Only missing, manifest-allowlisted Python packages can execute through this path. The installer requires the active virtual environment, uses the existing bounded pip transaction, verifies installed versions/imports and records audit events. Cancellation or failure stops the batch; already completed package operations are not rolled back. A failed batch must be followed by `whaxon doctor`.
 
 **Not yet implemented:** broad package coverage for the full tool catalog, Windows package-manager mappings, consent-based network preflight, offline recovery flows, independent audit trust anchoring, durable worker recovery across process restarts, and full clean-machine acceptance beyond Linux/macOS/Windows wheel-and-venv smoke checks. Package-manager detection alone does not imply those operating systems are deployment-supported. The PR remains draft until the deployment gates above are met.
+
+
+### Headless Linux server acceptance
+
+The CLI setup and doctor paths do not require a TTY, X11, Wayland, Qt, or a desktop session. The production WSGI entry point is `whaxon serve` (Waitress); the headless CI gate installs the web extra, removes display/session variables, runs setup preview and doctor, then starts Waitress and performs an HTTP request against loopback. This verifies a no-GUI/no-TTY server process, not a hardened public deployment. Remote deployments must configure explicit non-default authentication credentials and a protected data directory; do not expose the development `whaxon web` server or default credentials.
