@@ -47,6 +47,7 @@ class Core:
         # SQLite-backed persistence for all UIs
         state_path = self.data_dir / "whaxon.db"
         self.store = JobStore(state_path)
+        self.runner.bind_session_lookup(self.store.get_session)
         # Subscribe the persister FIRST so every other JobFindings consumer
         # (correlator, suggester, automator) sees findings already in the store.
         self._wire_store()

@@ -50,13 +50,13 @@ def test_reconcile_stale_marks_running_failed(tmp_path: Path) -> None:
     import sqlite3
     import time
     c = sqlite3.connect(s.path)
-    c.execute("UPDATE jobs SET started_at=? WHERE id='j1'", (time.time() - 3600,))
+    c.execute("UPDATE jobs SET started_at=?, heartbeat_at=NULL WHERE id='j1'", (time.time() - 3600,))
     c.commit(); c.close()
     n = s.reconcile_stale(older_than_s=60)
     assert n == 1
     job = s.get("j1")
     assert job["status"] == "failed"
-    assert "process exited" in job["error"]
+    assert "lease expired" in job["error"]
 
 
 def test_reconcile_leaves_fresh_running_alone(tmp_path: Path) -> None:

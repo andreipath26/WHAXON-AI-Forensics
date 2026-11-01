@@ -564,3 +564,25 @@ def test_build_argv_rejects_positional_alternate_target(extra_args):
 
     with pytest.raises(ValueError, match=r"alternate targets|second target"):
         runner.build_argv("nmap", "10.0.0.5", extra_args=extra_args)
+
+
+async def test_msf_session_dispatch_rechecks_persisted_scope_before_rpc():
+    from whaxon.core.catalog import Tool
+    class DenyScope:
+        def check(self, target):
+            class Match:
+                allowed = False
+                reason = "not in engagement"
+                matched_rule = ""
+            return Match()
+
+    tool = Tool(
+        id="session_test", name="Session test", category="session",
+        binary="", transport="msf_session", command="getuid",
+    )
+    runner, _, _ = _runner(tools=[tool], scope=DenyScope())
+    runner.bind_session_lookup(lambda sid: {
+        "id": sid, "host": "203.0.113.10", "status": "open",
+    })
+    with pytest.raises(OutOfScopeError):
+        await runner.run_in_session("session_test", "4")

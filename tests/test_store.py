@@ -174,3 +174,14 @@ def test_worker_lease_fences_stale_completion(store):
     assert store.set_finished("fenced", 0, 1.0, lease_token=first["lease_token"]) is False
     assert store.get("fenced")["status"] == "running"
     assert store.owns_lease("fenced", second["lease_token"]) is True
+
+
+def test_get_session_returns_dispatch_authorization_context(tmp_path):
+    store = JobStore(tmp_path / "sessions.db")
+    store.upsert_session("7", "10.0.0.7", "meterpreter", {"arch": "x64"})
+    session = store.get_session("7")
+    assert session is not None
+    assert session["host"] == "10.0.0.7"
+    assert session["status"] == "open"
+    assert session["info"]["arch"] == "x64"
+    assert store.get_session("missing") is None

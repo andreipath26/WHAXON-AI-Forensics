@@ -36,6 +36,7 @@ class ToolRunner:
         self._scope = scope  # optional ScopeManager
         self._route_resolver = route_resolver  # optional callable(target_host) -> Route | None
         self._vulndb = vulndb  # optional VulnDB, used to resolve severity from CVSS
+        self._session_lookup = None
         self._procs: dict[str, asyncio.subprocess.Process] = {}
         self._lines_by_job: dict[str, list[tuple[str, str]]] = {}
 
@@ -56,6 +57,32 @@ class ToolRunner:
     def bind_catalog(self, catalog) -> None:
         """Wire the catalog after construction (Core does this)."""
         self._catalog = catalog
+
+    def bind_session_lookup(self, lookup) -> None:
+        """Bind persisted session metadata used for dispatch-time authorization."""
+        self._session_lookup = lookup
+
+    @staticmethod
+    def _session_host(value: object) -> str:
+        """Extract a host from an MSF peer/host field without retaining its port."""
+        host = str(value or "").strip()
+        if host.startswith("[") and "]" in host:
+            return host[1:host.index("]")]
+        if host.count(":") == 1:
+            name, port = host.rsplit(":", 1)
+            if port.isdigit():
+                return name
+        return host
+
+    def _authorize_session_host(self, value: object, *, source: str) -> str:
+        host = self._session_host(value)
+        if not host:
+            raise ValueError(f"cannot authorize Metasploit session: {source} host is missing")
+        if self._scope is not None:
+            match = self._scope.check(host)
+            if not match.allowed:
+                raise OutOfScopeError(host, match.reason, match.matched_rule)
+        return host
 
     def has_tool(self, tool_id: str) -> bool:
         """True if tool_id is in the bound catalog. False if no catalog."""
@@ -286,6 +313,9 @@ class ToolRunner:
                 f"session {session_id} not found (have: {sorted(sessions)})"
             )
         info = sessions[str(session_id)] or {}
+        # Re-check the live RPC peer at dispatch; the stored host may be stale.
+        live_host = info.get("target_host") or info.get("session_host") or info.get("tunnel_peer") or info.get("peer_host")
+        self._authorize_session_host(live_host, source="live RPC")
         actual_type = info.get("type") or ""
         required = getattr(self, '_required_session_type', "") or ""
         if required and actual_type and actual_type != required:
@@ -539,6 +569,12 @@ class ToolRunner:
         target_label = f"session:{session_id}"
 
         if transport == "msf_session":
+            if self._session_lookup is None:
+                raise RuntimeError("Metasploit session dispatch requires persisted session authorization context")
+            stored = self._session_lookup(str(session_id))
+            if not stored or stored.get("status") != "open":
+                raise ValueError(f"session {session_id} is not an open persisted session")
+            self._authorize_session_host(stored.get("host"), source="stored")
             self._required_session_type = getattr(tool, 'required_session_type', "") or ""
             output = self._run_msf_session(session_id, command, timeout_s)
         elif transport == "smb":
@@ -741,7 +777,7 @@ class ToolRunner:
 
         self._publish_findings(
             tool_id, job_id, self._lines_by_job.pop(job_id, []),
-            argv=argv, target=target, outfile=outfile,
+            argv=argv, target=target, outfile=outfile, lease_token=lease_token,
         )
         return job_id
 

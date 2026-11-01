@@ -481,6 +481,30 @@ class JobStore:
             finally:
                 c.close()
 
+    def get_session(self, session_id):
+        """Return one persisted session, including its authorization context."""
+        import json as _json
+        c = self._conn()
+        try:
+            row = c.execute(
+                "SELECT id, host, type, info_json, opened_at, last_seen, status "
+                "FROM sessions WHERE id=?",
+                (str(session_id),),
+            ).fetchone()
+            if row is None:
+                return None
+            try:
+                info = _json.loads(row["info_json"] or "{}")
+            except (TypeError, ValueError):
+                info = {}
+            return {
+                "id": row["id"], "host": row["host"], "type": row["type"],
+                "info": info, "opened_at": row["opened_at"],
+                "last_seen": row["last_seen"], "status": row["status"],
+            }
+        finally:
+            c.close()
+
     def list_sessions(self, include_closed=False):
         import json as _json
         c = self._conn()

@@ -77,3 +77,14 @@ def test_multiple_sessions(tmp_path):
     store.close_session("2")
     assert len(store.list_sessions()) == 2
     assert len(store.list_sessions(include_closed=True)) == 3
+
+
+def test_msf_config_has_no_insecure_builtin_password(monkeypatch):
+    monkeypatch.delenv("WHAXON_MSF_PASS", raising=False)
+    assert MSFConfig.from_env().password == ""
+
+
+def test_client_refuses_missing_rpc_password():
+    client = MSFClient(MSFConfig(host="127.0.0.1", port=65530, password=""))
+    with pytest.raises(MSFUnavailableError, match="WHAXON_MSF_PASS"):
+        client.connect()

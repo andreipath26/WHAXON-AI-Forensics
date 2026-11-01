@@ -65,8 +65,13 @@ async def drain_async(
                 await heartbeat
             except asyncio.CancelledError:
                 pass
-        # Let event subscribers persist the result and enqueue follow-up work.
+        # Let event subscribers persist the result and enqueue follow-up work
+        # before dropping the fencing token used to accept final findings.
         await asyncio.sleep(0)
+        try:
+            store.release_lease(job_id, token)
+        except Exception:
+            _log.exception("could not release completed job lease: %s", job_id)
         ran += 1
     return ran
 

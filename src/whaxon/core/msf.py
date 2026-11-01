@@ -5,7 +5,7 @@ Reads configuration from environment variables:
     WHAXON_MSF_HOST      default 127.0.0.1
     WHAXON_MSF_PORT      default 55553
     WHAXON_MSF_USER      default msf
-    WHAXON_MSF_PASS      default test123
+    WHAXON_MSF_PASS      required; no built-in default
     WHAXON_MSF_SSL       default "0" (use "1" or "true" to enable)
 
 The client is lazy: it doesn't connect until first use. If the daemon
@@ -28,7 +28,7 @@ class MSFConfig:
     host: str = "127.0.0.1"
     port: int = 55553
     user: str = "msf"
-    password: str = "test123"
+    password: str = ""
     ssl: bool = False
     timeout: float = 5.0
 
@@ -40,7 +40,7 @@ class MSFConfig:
             host=os.environ.get("WHAXON_MSF_HOST", "127.0.0.1"),
             port=int(os.environ.get("WHAXON_MSF_PORT", "55553")),
             user=os.environ.get("WHAXON_MSF_USER", "msf"),
-            password=os.environ.get("WHAXON_MSF_PASS", "test123"),
+            password=os.environ.get("WHAXON_MSF_PASS", ""),
             ssl=_bool(os.environ.get("WHAXON_MSF_SSL", "0")),
             timeout=float(os.environ.get("WHAXON_MSF_TIMEOUT", "5")),
         )
@@ -69,6 +69,10 @@ class MSFClient:
         if self._client is not None:
             return self._client
 
+        if not self.config.password:
+            raise MSFUnavailableError(
+                "WHAXON_MSF_PASS is not configured; refusing Metasploit RPC authentication"
+            )
         self._probe_or_raise()
 
         try:
@@ -111,9 +115,11 @@ class MSFClient:
 
         try:
             if self.config.ssl:
-                ctx = _ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = _ssl.CERT_NONE
+                ca_bundle = os.environ.get("WHAXON_MSF_CA_BUNDLE") or None
+                ctx = _ssl.create_default_context(cafile=ca_bundle)
+                # Keep hostname and certificate verification enabled. For a
+                # private CA, configure WHAXON_MSF_CA_BUNDLE instead of
+                # silently disabling TLS authentication.
                 try:
                     ctx.wrap_socket(sock, server_hostname=self.config.host)
                 except (_ssl.SSLError, TimeoutError, OSError) as e:
