@@ -1,150 +1,206 @@
-# Repository-wide documentation reconciliation
+# WHAXON repository disposition and retirement register
 
-**Review date:** 2026-11-02  
-**Repository:** `andreipath26/WHAXON-AI-Forensics`  
-**Branch reviewed:** `main`  
-**Baseline before this reconciliation:** `e9b2f02`  
-**Inventory:** 102 Markdown files in the recursive Git tree at that baseline.
+**Review date:** 2026-11-02
+**Repository:** `andreipath26/WHAXON-AI-Forensics` · **Inspected main:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`
+**Scope:** removal due diligence and retirement prerequisites, subordinate to the master roadmap P0–P8 and §38. **Execution update:** Batches A and B (23 non-runtime files) have now been removed after hash/reference checks. Runtime behavior, protected designs, Git history and branch refs are unchanged; Batch C and migration retirements remain pending.
 
-## Executive result
+## 1. Decision and evidence boundary
 
-This repository's Markdown inventory is not a single coherent set of current product documentation. It mixes current operator guides with roadmap proposals, historical implementation plans, research evidence, generated sample reports, vendored payload references, legal records and imported GitHub-page captures. A substantial portion was carried forward from earlier WHAXON development or collected as research artifacts. Their presence must not be mistaken for current implementation or release evidence.
+The baseline identified **26 specific file candidates**: 23 non-runtime artifacts and three no-consumer runtime/research files. These are candidates for bounded cleanup, not evidence that all obsolete material has been found or that every candidate is interchangeable with its replacement. Ten of the 26 are exact loose UI duplicates; they alone occupy **3,594,129 bytes**. The root tool catalog, legacy interface, old execution paths, distinct UI variants, legal notices and proof records are **not safe unconditional deletions**.
 
-The documentation index now classifies these sources. The unissued v1.0.0 release-note draft has been replaced with a clear disclaimer; older roadmap and web-page captures are explicitly archival. Current operator instructions are separated from implementation records and proposed designs.
+The inspected tree contains **534 tracked files, 82 Markdown files, 294 Python files, 147 `tests/test_*.py` modules, 23 UI-v2 test modules, 32 supplied HTML files and 32 PNG files**. The HTML count includes five loose duplicate copies. No tracked `.db` file is present. Counts describe this baseline, not future HEADs.
 
-This is a **documentation status and truthfulness reconciliation**, not a declaration that the product has passed v1.0 acceptance. The root roadmap §38 remains the controlling release gate and remains OPEN.
+Evidence used: tracked-file inventory; SHA-256/byte comparisons; source, test, script, configuration and documentation reference searches; Python/Flask entry points and template/resource loading; packaging configuration; current branch comparisons; exact-baseline CI. CI [#41488450899](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41488450899) passed all nine jobs; each Python 3.11/3.12/3.13 job reported **1,408 passed, 14 skipped**. This review did not rerun the runtime suite locally; its dependencies were absent. Existing green CI does not test a future deletion.
 
-## Source-of-truth hierarchy
+“No consumer found” means no reference was identified in this repository's inspected callers, scripts, packaging entry points and tests. It does not prove that an external user never imports a shipped module or requests a template through custom code. Recheck dynamic/plugin/external contracts before removing shipped resources. A filename, old version suffix, historical label or passing route is not removal proof.
 
-1. **Current behavior:** source code and tests on the exact `main` commit being reviewed.
-2. **Release acceptance and work order:** root `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, especially §0 and §38. A DONE marker elsewhere does not close §38.
-3. **Operator instructions:** root `README.md` and the current guides linked under [docs/README.md](README.md).
-4. **Dated status:** [STATE.md](STATE.md), which must cite exact commits and CI runs.
-5. **Historical evidence/design:** useful for provenance and rationale only; never use it as proof of current behavior.
+Source of truth: current source/tests establish behavior; the master roadmap establishes sequence and acceptance; operator guides explain use. Historical captures, screenshots and designs do not establish implementation. This register replaces the older 102-file classification snapshot, which incorrectly described an experiment archive absent from current main.
 
-No roadmap, design document, screenshot, sample report, payload file, old changelog entry or imported web capture independently proves a shipped capability.
+## 2. Batch A — exact duplicate UI files
 
-## Source-checked product facts
+All paths in this table are relative to `web ui files and rendering/`. Remove only the loose copy in the first column, retaining the named original unchanged. Each row's two files have the full SHA-256 shown. No runtime/test/script/build consumer of the loose-copy names or this reference directory was found. These reference assets are outside the configured wheel package and sdist include set.
 
-| Area | Current repository evidence | Required claim boundary |
+| Removal candidate | Named original to retain | Bytes | SHA-256 (both files) |
+|---|---|---:|---|
+| `code (copy 1).html` | `scope_targets/code.html` | 43,686 | `6c9fba82500e833f13f05e9087d4b9398642fdc80cb6dbdbb4b7ad553a6c168d` |
+| `code (copy 2).html` | `run_tool_orchestration/code.html` | 40,358 | `54ace752fc75383dbd3b6b742af6b5481a43e04351902ebda3f5602abe3da3ba` |
+| `code (copy 3).html` | `ptes_coverage_reports/code.html` | 45,975 | `bbc764431bcc752db65ee93ec478e630d567b801d1eaecf6865a4ce3604f2321` |
+| `code (copy 4).html` | `ptes_coverage_reports/code.html` | 45,975 | `bbc764431bcc752db65ee93ec478e630d567b801d1eaecf6865a4ce3604f2321` |
+| `code.html` | `trust_layer_verified_findings/code.html` | 42,120 | `756ecac819afbe482a24e177746b335ff8900c7efccc3a6d502542cb9249202b` |
+| `screen (copy 1).png` | `scope_targets/screen.png` | 503,099 | `b10ed7fe5a0371004a173a019d4919dbf05ec5e78319c86500dbc2434c5f714e` |
+| `screen (copy 2).png` | `run_tool_orchestration/screen.png` | 706,696 | `39c560c4c4ea538419c32fcb0dc8ae2eee7de3a7624be4784fc93a4de8c28b7f` |
+| `screen (copy 3).png` | `ptes_coverage_reports/screen.png` | 717,113 | `b5ee04b15262de992cf83831571e3be76b21983212b48b48c9f9063fe187f14f` |
+| `screen (copy 4).png` | `ptes_coverage_reports/screen.png` | 717,113 | `b5ee04b15262de992cf83831571e3be76b21983212b48b48c9f9063fe187f14f` |
+| `screen.png` | `trust_layer_verified_findings/screen.png` | 731,994 | `df2cd7e0210a692c4735f69f1572cb9d34c7727d5b848ad2bda0c974989d6904` |
+
+**Deletion condition:** refresh both hashes at the candidate revision, repair any documentation/bookmark references, and verify every named original remains. Keep supplied design and visual-baseline choices unchanged. Confirm the wheel/sdist resource set is unchanged. This removes ten copies, not ten product screens or ten distinct designs.
+
+## 3. Batch B — non-runtime stale artifacts
+
+These files have no operational/build/test consumer found. Documentation references are real dependencies and must be repaired in the same cleanup. Retain the inspected baseline in Git; do not add a second bulky archive to the working tree.
+
+| Exact candidate or set | Evidence and disposition | Deletion condition |
 |---|---|---|
-| Package/release identity | `pyproject.toml`: package `whaxon`, version `0.11.16`, Python `>=3.11`, Beta classifier. | Do not call v1.0.0 released. Roadmap §38 remains OPEN. |
-| Interfaces | CLI dispatcher in `src/whaxon/cli.py`; optional TUI, GUI and web extras in `pyproject.toml`; Flask and Waitress entry points in `src/whaxon/interfaces/web/`. | Optional dependencies and host requirements apply. Interface presence does not mean every workflow is accepted. |
-| Browser UI | Root route redirects to `/ui-v2`; 22 `ui_v2_*.html` templates exist. The former `/ui` is retained as legacy/reference. | UI implementation and browser tests do not equal visual, accessibility, parity or production acceptance. |
-| Setup | `src/whaxon/interfaces/cli/setup_cmd.py` supports Core/Standard/Full/Custom preview, optional venv creation, exact-plan Python package approval, and a separate curated OS-tool installation flow. | Profile preview is read-only. Python and OS package installation are separate consent-bound operations; this is not a general-purpose package manager. |
-| Web serving | `whaxon web` starts Flask in the foreground with debug and reloader disabled. `whaxon serve` uses Waitress in the foreground; POSIX daemon mode is also implemented. Root `whaxon.service` exists. | Do not describe `whaxon web` as the production WSGI server. Follow remote-authentication and reverse-proxy requirements. |
-| Execution and orchestration | Shared catalog/runner, persistent job store, event-driven follow-up automation, worker/scheduler and Engine v2 mission/task primitives exist. | Do not imply exactly-once execution, complete Engine v2 migration, full durable recovery guarantees or broad provider coverage without separate evidence. |
-| Scope | Scope manager and guarded runner paths perform application-level checks; tests cover fail-closed behavior. | Scope preflight is not a firewall, DNS pin or guarantee against redirects/secondary requests by external tools. |
-| Findings and validation | Normalized adapter findings and deterministic validators exist for selected finding types/request shapes; retest distinguishes fixed/still-vulnerable/inconclusive. | A candidate is not verified; a verified result is limited to its specific check. Payload-library presence does not mean a validator supports every technique. |
-| Reporting | Job and engagement report paths and Markdown/HTML/PDF/JSON outputs exist in report source and CLI/API. | Output completeness and appendix selection differ by format. Do not claim every format contains identical evidence or all finding severities in the detailed appendix. |
-| Bug bounty | Review-oriented ingestion/parsing and policy-related primitives exist. | The broader differential-session, workflow-inference and autonomous programme subsystem in `docs/bounty-addon.md` is a design, not a shipped end-to-end capability. |
-| Metasploit | RPC, module, session, adapter and pivot-related components exist. | The full integration matrix in `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md` is not wholly implemented or accepted. |
-| Engine v2 | Versioned contracts, persistence, scheduler/recovery primitives and an initial provider slice are present. | Engine v2 remains partially implemented; use roadmap §§49–52 and the crosswalk for open gates. It is not a generally accepted production mission engine. |
-| Licensing | Root `LICENSE` is AGPL-3.0-or-later; commercial licensing is separately discussed. | Do not imply an enterprise edition, support commitment or commercial agreement exists without a signed agreement. |
+| `commit_history.txt` | Static history export starts with old development commits; Git is the maintained history. No runtime/script/build consumer found | Remove stale links; history remains available through Git |
+| `source_files.txt` | Static source listing includes the old GUI module and duplicates `git ls-files`; no runtime/script/build consumer found | Replace any inventory instructions with generated commands |
+| `web ui files and rendering/whaxon_road_map_whats_next_full_scope.md` | Explicitly superseded copied roadmap, not the root authority | Repair the UI reference README and docs index; retain only the active root trajectory |
+| `web ui files and rendering/whaxon_v1.0.0_deployment_release_notes.md` | Current file is a disclaimer for an unissued, misleading release draft—not a release artifact | Keep the “v1.0 not accepted/released” statement in current state/release records; repair links before removal |
+| Nine imported captures listed below | Raw GitHub-page snapshots; explicitly archival, not implementation inputs. `whaxon.md` and `whaxon_2.md` are themselves exact duplicates | Remove capture links/classification rows rather than presenting dead links; keep unique product/design requirements in maintained sources |
 
-## Complete Markdown inventory classification
+The nine capture candidates, all under `web ui files and rendering/`, are:
 
-The 102 Markdown files at the baseline are classified below. These classifications describe the role of each file, not a guarantee that every sentence in a dated record has been independently revalidated.
+- `extracted_text_from_https_github.com_andreipath26_whaxon.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_1.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_2.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_ai_forensics.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_ai_forensics_commits.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_ai_forensics_tree_main.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_blob_main_docs.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_commit.md`
+- `extracted_text_from_https_github.com_andreipath26_whaxon_commits_main.md`
 
-### Current public/operator guidance and maintained references
+These nine captures have been removed; their provenance remains in Git. Do not treat removal of imported page text as permission to remove supplied `code.html`, PNG or `obsidian_kinetic/DESIGN.md` inputs.
 
-- `README.md`, `CONTRIBUTING.md`, `SECURITY.md`
-- `docs/README.md`, `docs/STATE.md`, `docs/CHANGELOG.md`
-- `docs/getting-started.md`, `docs/dependency-readiness.md`, `docs/troubleshooting.md`
-- `docs/scope.md`, `docs/tools.md`, `docs/adapters.md`, `docs/findings.md`
-- `docs/reports-and-evidence.md`, `docs/interfaces.md`, `docs/api.md`, `docs/deployment.md`
-- `docs/ai.md`, `docs/architecture.md`, `docs/DATA_RETENTION.md`, `docs/plugins.md`
-- `docs/editions.md`, `docs/licensing.md`, `docs/commercial-licensing.md`
-- `docs/ENGINEERING_EXECUTION_MODEL.md` (engineering process, not a product feature description)
+## 4. Batch C — no-consumer code/template/research candidates
 
-### Roadmap, proposed architecture or dated acceptance records
+| Candidate | Evidence | Packaging/compatibility risk and required check |
+|---|---|---|
+| `src/whaxon/interfaces/gui/main_window.py` | Old native Qt `MainWindow`; current `whaxon-gui` entry point is `interfaces.gui.app:main`, whose own `MainWindow` embeds the web view. No import of `gui.main_window` found in source/tests/scripts/entry points | Shipped Python module. Check documented/public imports and downstream use; remove only with GUI import/startup/navigation regression and clean-wheel install. Keep `gui/app.py` and `gui/embed.py` |
+| `src/whaxon/interfaces/web/templates/report.html` | No template rendering/inheritance/include reference found. Actual standalone report reads `core/report.html`; UI report uses `ui_v2_report.html` | Shipped template. Check dynamic/custom consumers; run report API/export and legacy/new web template regressions plus wheel resource checks. Keep `core/report.html`, print CSS, chart helpers and UI-v2 report templates |
+| `data/tool_registry.json` | Separate 55-entry research list; no source/test/script/config consumer found. Packaged runtime catalog has 24 entries | Not an executable runtime registry. Reconcile unique candidate/license/source notes into controlled onboarding decisions before discarding research; do not enable the listed tools or alter the maintained catalog |
 
-These files may define intended future behavior or track work, but must not be represented as implemented solely because they are present:
+Exact baseline identities for these candidates:
 
-- Root `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` (authoritative plan; not itself proof of implementation).
-- Root `WHAXON Competitor Capability and Remediation Roadmap Addendum.md` (queued direction).
-- `docs/NEW_UI_INTERACTION_AUDIT.md` (current dated UI implementation/acceptance audit; open gates remain).
-- `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md` (target architecture plus dated implementation updates).
-- `docs/TOOL_INTELLIGENCE_AND_ONBOARDING.md` (proposed subsystem design).
-- `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md` (broader integration design; partial implementation only).
-- `docs/bounty-addon.md` (draft add-on; not a shipped full bug-bounty subsystem).
-- `docs/first-run-installation-redesign.md` (implementation/acceptance record; operator guide is `docs/dependency-readiness.md`).
-- `docs/CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md` (date-sensitive commercial/funding research; reverify external facts before use).
+| Path | Bytes | SHA-256 |
+|---|---:|---|
+| `src/whaxon/interfaces/gui/main_window.py` | 13,858 | `34b9e41c339238e9285d0210afe2428076782712cb2994146ece81a62598e390` |
+| `src/whaxon/interfaces/web/templates/report.html` | 3,193 | `7eabe0b090ba64eafccd1b9771523a653cdbc8724d701efaade596c5bc9737dc` |
+| `data/tool_registry.json` | 17,223 | `649ad1ad946e8adafcbc29575e257ba91e99aaf9fd07365783c2fa26157a159f` |
 
-### Historical or superseded engineering/design records
+These are strong removal candidates after their checks, not permission to delete active GUI/report functionality. The three Batch C files remain present; no runtime test was performed locally. Batches A/B remove only non-runtime artifacts.
 
-- `docs/agent-architecture.md`
-- `docs/autonomous-loop.md`
-- `docs/session-execution.md`
-- `docs/business-impact.md`
-- `docs/report-redesign.md`
-- `docs/report-visual-design.md`
-- `docs/ENGINE_V2_BASELINE_INVENTORY.md`
-- `docs/WEB_UI_INTERACTION_AUDIT.md`
-- `AI_USAGE_AUDIT.md` (author's dated disclosure, not a continuously updated provenance log)
+## 5. Batch D — migrate consumers before removing anything
 
-### Dated research and experiment archive — preserve as evidence, not current product truth
+| Material | Why immediate removal is unsafe | Retirement/migration gate |
+|---|---|---|
+| Root `data/tools.json` | Exact duplicate of packaged `src/whaxon/data/tools.json` (6,581 bytes; SHA-256 `84a97b7c21137685e75c5a5ff50d8029f107cc4fe04a28c8c9c8204a0f6dc2c7`). `tests/conftest.py`, `test_autochain_durable.py`, `test_smb_ls_template.py` directly read it; run/findings/TUI/report fixtures also copy it. TUI defaults to checkout-root `data`, so its runtime catalog is at this path | Make the packaged catalog the sole maintained seed; migrate all tests/default data-path handling; test fresh and existing workspaces, TUI/CLI/API, wheel/sdist and custom catalog preservation. Delete the tracked seed only after compatibility is proved. Never delete an operator's runtime catalog |
+| Legacy web route/assets: `/ui`, `templates/base.html`, `templates/index.html`, `static/app.js`, `static/style.css` | `/ui` still renders `index.html`; desktop `gui/embed.py` still sets `URL` to `/ui`. New web root uses `/ui-v2`. User/roadmap explicitly require legacy design source unchanged | P4: migrate/test desktop entry point first; inventory existing consumers and define route compatibility. Source preservation remains mandatory; a route/package retirement decision does not authorize erasing reference source |
+| Existing `core/worker.py`, `automation.py`, AI agent/executor/bridge, old job state | Live callers remain. Core attaches Automator; CLI run drains worker jobs; CLI/web AI use `build_executor`. Engine v2 is a partial migration, not a replacement of every caller/state path | P2: shared lifecycle, persisted-state upgrade, follow-up equivalence, approvals/scope, cancellation/recovery/parity/no-bypass tests and rollback. Migrate caller by caller; no wholesale deletion |
+| Distinct supplied `_forensics_hardened`, `_v0.11.16` and other named UI alternatives | Names overlap but file contents are distinct; current production mapping and visual-acceptance choice must be established. They are protected design inputs | P4: canonical screen/variant mapping, difference review, unique-content preservation and visual acceptance. Do not infer supersession from suffix or date |
+| Historical design/implementation documents | Several still carry useful rationale, schemas, assumptions or links from maintained source/guides | Consolidate active requirements/rationale and repair incoming references first; preserve unique history, then remove obsolete execution instructions or relocate only where useful |
 
-- `docs/WHAXON_EXPERIMENT_AUDIT_2026-10-25.md`
-- `whaxon-experiment-2026-10-25/docs/environment-report.md`
-- `whaxon-experiment-2026-10-25/docs/findings.md`
-- `whaxon-experiment-2026-10-25/docs/limitations.md`
-- `whaxon-experiment-2026-10-25/docs/literature-review.md`
-- `whaxon-experiment-2026-10-25/docs/privilege-boundary-assessment.md`
-- `whaxon-experiment-2026-10-25/docs/research-contribution.md`
-- `whaxon-experiment-2026-10-25/docs/research-gaps.md`
-- `whaxon-experiment-2026-10-25/docs/research-hypotheses.md`
-- `whaxon-experiment-2026-10-25/docs/research-map.md`
-- `whaxon-experiment-2026-10-25/docs/scope-and-rules.md`
-- `whaxon-experiment-2026-10-25/docs/test-plan.md`
-- `whaxon-experiment-2026-10-25/docs/verification-results.md`
-- `whaxon-experiment-2026-10-25/logs/decision-log.md`
-- `whaxon-experiment-2026-10-25/logs/errors-and-blockers.md`
-- `whaxon-experiment-2026-10-25/logs/experiment-index.md`
-- `whaxon-experiment-2026-10-25/logs/hypothesis-ledger.md`
-- `whaxon-experiment-2026-10-25/logs/publication-log.md`
-- `whaxon-experiment-2026-10-25/logs/research-journal.md`
-- `whaxon-experiment-2026-10-25/logs/tool-inventory.md`
-- `whaxon-experiment-2026-10-25/logs/trace-availability.md`
-- `whaxon-experiment-2026-10-25/logs/verification-log.md`
-- `whaxon-experiment-2026-10-25/research/whaxon_execution_evidence.md`
+Historical document candidates are `docs/agent-architecture.md`, `autonomous-loop.md`, `session-execution.md`, `report-redesign.md`, `report-visual-design.md`, `business-impact.md`, `ENGINE_V2_BASELINE_INVENTORY.md`, plus `WEB_UI_INTERACTION_AUDIT.md` as an explicitly preserved legacy audit. They are not a blanket deletion list. Examples of live references: scope guide and AI modules cite agent architecture; route/session tests cite session design; severity/core cite report redesign; print CSS cites visual design; `reports-and-evidence.md` points to business-impact cost sources. Preserve required source attribution and any unique decision rationale. The legacy audit/source must remain unchanged under the current user constraint.
 
-The experiment records are intentionally dated and preserved. Their target-specific findings, environment observations and test totals do not automatically describe current WHAXON behavior. Git history may retain earlier sensitive blobs even when the current tree has been sanitized.
+### Dependency footprint and dormant helpers — conditional retirement
 
-### Imported GitHub page captures and old copied documents
+| Item | Actual usage found | Decision / coordinated retirement condition |
+|---|---|---|
+| `qasync` | Declared in GUI extra and dependency manifest/profile; no application/test import found. Current GUI uses Qt signals/timers and the embedded web server | Candidate to remove from GUI requirements only after clean GUI startup/navigation tests and synchronized extra, readiness/profile and notice updates. Metadata is still a consumer; not an isolated one-line deletion |
+| `textual-image` | Declared in TUI extra/manifest/profile. Only code import is inside `tui/screens/splash.py`, behind `HAVE_IMAGE = False`; the TUI app does not mount that splash | Retire the disabled image path/requirement together after confirming intended TUI behavior, clean TUI tests and synchronized manifest/profile/notices. Preserve required legacy design/reference source; do not re-enable a known-disabled path just to justify a dependency |
+| `interfaces/gui/splash.py` | `make_splash` has no source/test caller found; current desktop shell starts without it | Dormant helper retirement candidate, subject to shipped/public-module compatibility and GUI smoke checks; not counted among the 26 primary file candidates above |
+| `gunicorn` | Actual production consumers in `Dockerfile` and `whaxon.service`; deployment guide documents it. `whaxon serve` separately uses Waitress | **Retain.** Multiple WSGI options are not proof of obsolescence. Removal requires a deliberate tested migration of Docker/systemd commands and documentation; Waitress presence alone does not supersede Gunicorn |
 
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_1.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_2.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_ai_forensics.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_ai_forensics_commits.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_ai_forensics_tree_main.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_blob_main_docs.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_commit.md`
-- `web ui files and rendering/extracted_text_from_https_github.com_andreipath26_whaxon_commits_main.md`
-- `web ui files and rendering/whaxon_road_map_whats_next_full_scope.md` (old copied roadmap, superseded).
-- `web ui files and rendering/whaxon_v1.0.0_deployment_release_notes.md` (unissued draft; replaced by a disclaimer, not a release record).
-- `web ui files and rendering/obsidian_kinetic/DESIGN.md` (supplied visual design reference; not runtime acceptance evidence).
+Removing an optional dependency changes install/readiness contracts and legal inventories; update those records as applicable without erasing historical attribution. No dependency declarations or helpers are changed in this documentation batch.
 
-### Generated sample reports, payload references and legal/provenance records
+## 6. Retain — evidence, legal records and active resources
 
-- `data/proof-dvwa/README.md`, `data/proof-dvwa/engagement.md`, `data/proof-dvwa/job-137b9002ee9a.md`, `data/proof-dvwa/job-3fec9011c57f.md`, `data/proof-dvwa/job-d76244691d83.md`, `data/proof-dvwa/job-deaa28ed3bcf.md` — dated generated sample evidence, not a current benchmark.
-- `src/whaxon/ai/prompts/planner_v1.md` — runtime prompt resource, not operator documentation.
-- `src/whaxon/data/payloads/ATTRIBUTION.md`, `command_injection.md`, `crlf.md`, `lfi_rfi.md`, `sql_injection.md`, `ssrf.md`, `xss.md` — vendored reference/payload material; not a validator support matrix.
-- `assets/README.md`, `docs/assets/README.md` — asset inventories and screenshot provenance.
-- `CLA.md`, `LICENSE-COMMERCIAL.md`, `LICENSE-ENTERPRISE.md`, `THIRD_PARTY_NOTICES.md`, `THIRD_PARTY_LICENSES/README.md`, `TRADEMARK.md` — legal, licensing and third-party notices; not feature descriptions.
+- Keep `src/whaxon/data/tools.json`, `dependencies.json`, payloads and attribution, `ai/prompts/planner_v1.md`, active report renderer/CSS/charts, parsers and tests. Prompt and payload Markdown files are runtime resources, not stale operator docs.
+- Keep legal/license/CLA/trademark/third-party notices. Overlapping subject matter is not proof that a notice can be discarded; preserve attribution and applicable license obligations.
+- Keep `data/proof-dvwa/` generated reports and their provenance pending an explicit evidence-retention decision. They are historical examples, not current acceptance. The identical `data/proof-cloud/tools.json` and `data/proof-testphp/tools.json` are separate snapshot contexts; deduplicating evidence is not the same as removing loose UI copies.
+- Keep named supplied UI HTML/PNG originals and `obsidian_kinetic/DESIGN.md`. Historical screenshots may be excluded from active marketing without erasing protected reference assets.
+- Keep TUI and current desktop shell unless a product retirement is explicitly decided. Optional extras and entry points still advertise these surfaces; old appearance alone is not dead-code evidence.
+- Keep first-run/Engine v2/Metasploit/onboarding/bounty designs where they contain approved future contracts; their deferred state must be explicit. A proposed subsystem is not an obsolete subsystem merely because it has not shipped.
 
-## CI and release evidence at review time
+**Absent material:** `whaxon-experiment-2026-10-25/` and `docs/WHAXON_EXPERIMENT_AUDIT_2026-10-25.md` are absent from this baseline. Earlier documentation described them as present; repair those claims and links. Do not create placeholder files or count a nonexistent archive as a removal saving. No tracked proof database exists, so the old “remove committed proof databases” task is already satisfied in the current tree.
 
-The pre-reconciliation documentation baseline `e9b2f02` had workflow run [#41452761676](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41452761676). Python 3.13 reported **1 failed, 1,369 passed, 14 skipped**. The failure was `tests/test_web_ui_v2_auxiliary_pages.py::test_approvals_refresh_queue_and_halt_use_live_apis[chromium]`: clicking Refresh queue did not cause the additional `/api/ai/pending` request expected by the test. Other jobs in that run passed. This failure remains an open verification item and is not attributed to documentation edits without further diagnosis.
+## 7. Branch retirement due diligence
 
-The reconciliation itself is committed as `f0773d5` (18 files changed). Its exact-commit CI run [#41456487674](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41456487674) was queued when this register was written; do not describe that commit as CI-green until the run completes. A prior green run on a different commit is not a green result for the current HEAD. Before financing or release, record the exact candidate SHA, full CI result, unresolved failures and the evidence for each material product claim.
+There are **56 branch refs including main** at inspection. Comparing every other tip against the exact main baseline yields **10 strictly behind and 45 diverged**. No branch is deleted here. Ancestry containment proves reachable commit history, not that a historical effect is still enabled; it is sufficient to rule out unique commits on a contained tip but not external workflow/bookmark dependencies. Refresh tip SHA and compare before retirement; retain the table's SHA as the recovery identity.
 
-## Remaining reconciliation and due-diligence controls
+### Ancestry-contained tips — eligible after reference checks
 
-- Keep operator instructions in the current guides; do not copy steps from old captures or design proposals.
-- When a code change alters behavior, update the relevant current guide, tests and changelog in the same change.
-- Mark new proposals as proposed/draft and identify the source/test evidence required to promote them to implemented.
-- Keep experiment evidence immutable; correct interpretation in a separate current audit rather than rewriting the original record.
-- Recheck date-sensitive funding, event, vendor, dependency and external-tool information before presenting it externally.
-- Never describe a roadmap DONE marker, route/template, payload list, screenshot, sample report or historic CI run as proof of v1.0 release acceptance.
+| Branch | Inspected tip SHA | Commits ahead / behind main |
+|---|---|---|
+| `docs/installation-diagnostics-guide` | `a6990952e1cd5ffe752a1935e6a2f6642cf6b820` | 0 / 263 |
+| `feat/campaign-autonomy-foundation` | `31a09b524b330ec546b581338d4d179c205867bc` | 0 / 86 |
+| `fix/ui-settings-no-mock-success-2026-10-29` | `8f94e18044d2c286e45a73d924766d02d61871da` | 0 / 273 |
+| `fix/ui-v2-scope-acceptance-2026-10-30` | `c589caf0c67864c93d82518f6b7c6818fcf4839d` | 0 / 111 |
+| `publish/whaxon-experiment-2026-10-25` | `889e9c0e30c82198d481de1993a9a3a599583be1` | 0 / 448 |
+| `ui/ai-strategy-actions-2026-10-29` | `e6a83ad16f20223a37ea85d918053cc615cb5e1c` | 0 / 297 |
+| `ui/approvals-actions-2026-10-29` | `7535748996f5786c470d049dc31d279f65c85547` | 0 / 290 |
+| `ui/dashboard-actions-2026-10-29` | `8606cd3ce779f8832d035494d8dc5d187bd9b2a8` | 0 / 295 |
+| `ui/dashboard-live-actions-2026-10-29` | `883d57ec507bda25d54778fc2e334b5e688c39b5` | 0 / 288 |
+| `ui/threat-intel-live-actions-2026-10-29` | `883d57ec507bda25d54778fc2e334b5e688c39b5` | 0 / 288 |
+
+Check open PRs, automation/default-branch references and owner intent before deleting a ref; do not merge these tips back into main. Preserve a recoverable ref/SHA record. A branch naming an old experiment is not proof that the experiment directory remains in current main.
+
+### Diverged tips — not certified safe to delete
+
+These 45 tips need content-level reconciliation against merged PRs/current source, including squash/cherry-pick effects. Ahead counts do not mean their work is missing from main; merged PR metadata alone does not prove every branch-only change is superseded. The review has **not** claimed patch equivalence or zero unique work for these branches.
+
+| Branch | Inspected tip SHA | Ahead / behind |
+|---|---|---|
+| `docs/competitor-capability-remediation-roadmap` | `4015df14e7a7dc72c32da2a25ecfa401ab83cc76` | 2 / 270 |
+| `docs/engineering-execution-rule` | `844bd30beda56d16bfe8e272ee699c7c08f21caa` | 3 / 267 |
+| `docs/link-remediation-roadmap-addendum` | `be9a4fd73d40bc740ac1db94b60e78b6dd39d2e2` | 1 / 269 |
+| `docs/readme-current-project-state` | `066e61dd218e312bd175da46aaedba1b1228112b` | 2 / 266 |
+| `feat/first-run-install-manager` | `6001a2460027fa7d62c74edc8f71b357d053fd40` | 3 / 88 |
+| `feature/bug-bounty-ingestion-stage1` | `b221ad781912da5152323e93ff94a215901ac7ba` | 36 / 268 |
+| `feature/dependency-readiness-guided-install` | `f9149a77060bbd30bbc9f0d28e3e097a563359f0` | 188 / 267 |
+| `roadmap/dependency-readiness-bounty-ingestion` | `5212b768e2ec21ed3ae3e894ed648c8c8bdbf403` | 2 / 272 |
+| `roadmap/multi-target-subnet-orchestration` | `964b31b3aa3ae0e7849648e600146d4553db13b4` | 3 / 271 |
+| `ui/adapters-actions-2026-10-29` | `a42e8a7f4870796ea148599ed999dd79fcf6200f` | 2 / 296 |
+| `ui/adapters-live-actions-2026-10-29` | `c9942268026778ae5235bd4f0253c08dcef90903` | 3 / 288 |
+| `ui/ai-scope-claim-truthfulness-2026-10-29` | `306797d803d20bbaaaec68c8328dd1c2a1819145` | 2 / 273 |
+| `ui/ai-strategy-live-actions-2026-10-29` | `cb9c741e8f25ae0097f8836c11111837e6bae377` | 3 / 288 |
+| `ui/approvals-header-actions-2026-10-29` | `96b91d376c42d95045096e02c949d50e93513623` | 2 / 289 |
+| `ui/attack-chains-actions-2026-10-29` | `a652de34b0825ca864d1e2614429f6d3898bf825` | 3 / 297 |
+| `ui/attack-chains-live-actions-2026-10-29` | `545374e54d478838c68d68ae06cdbc1160607c85` | 2 / 286 |
+| `ui/audit-header-actions-2026-10-29` | `5b3eda07600e067371bbdfdbe10de603ffef25f7` | 3 / 301 |
+| `ui/audit-live-scope-2026-10-29` | `1930fd1551fd0212ab04d75c7df5d365afb3b256` | 2 / 278 |
+| `ui/bas-actions-2026-10-29` | `2f9eb3bae794a839293b47c79c4eb03af2377722` | 4 / 294 |
+| `ui/bug-bounty-actions-2026-10-29` | `e09bf6da9774ef6bc819538cd435908f7066ea9e` | 4 / 294 |
+| `ui/compliance-header-actions-2026-10-29` | `f32a2f68d3da5d58963f62a5a49ccddd817233fb` | 3 / 299 |
+| `ui/dashboard-live-state-2026-10-29` | `457f5f4d496814f4f89aea6577232143a4dba330` | 5 / 286 |
+| `ui/dashboard-wiring-2026-10-28` | `5b5faadb6f99eea705302ab21968022f62605df5` | 249 / 304 |
+| `ui/diagnostics-live-action-audit-2026-10-29` | `d60f4b30bba08eae74b4fb496eb06b9981495f9b` | 3 / 303 |
+| `ui/diagnostics-live-actions-2026-10-29` | `95a5d1a46f7ffab4c48c1a209d5dd6dfa495b65c` | 9 / 290 |
+| `ui/evidence-header-actions-2026-10-29` | `e61d5de1faad1ce2230ce80978ac326b9df93e75` | 2 / 300 |
+| `ui/findings-complete-2026-10-30` | `932e2a8f6fa920210ace25269f7cf5902b5d8e15` | 1 / 87 |
+| `ui/findings-live-actions-2026-10-29` | `2ad22dbbe30530c869c16cf60a01f785a5770e64` | 1 / 288 |
+| `ui/findings-live-kpis-and-scope-2026-10-29` | `966802e16147463bb068f40febf9dd059db2e1a9` | 7 / 274 |
+| `ui/history-live-filters-2026-10-29` | `fc19edde78ce0ef718a52c53dd9c05fde45ec5a9` | 3 / 283 |
+| `ui/monitoring-actions-2026-10-29` | `bc064f1b932d7bdf4819076c8a812b73527eb87d` | 6 / 295 |
+| `ui/ptaas-actions-2026-10-29` | `d36290b7ee8667492597ac3a82146a224529038c` | 2 / 292 |
+| `ui/report-scope-status-2026-10-29` | `672cd8fe42cb14f2b77e1688a33e41cf99381c46` | 2 / 281 |
+| `ui/reports-controls-2026-10-29` | `0279e4b6956c124c1f0d1af95df6f9dfd026216e` | 2 / 288 |
+| `ui/retest-actions-2026-10-29` | `c5e95022b95bd8ab5fd23d5bdda126ad12f977d0` | 2 / 291 |
+| `ui/run-live-scope-header-2026-10-29` | `e4ccedf2b7649c62138e794c782ccba0c9e18619` | 4 / 279 |
+| `ui/run-orchestration-complete-2026-10-30` | `9e2f103ab351fb8c723148ce34275576ef3e2a43` | 4 / 89 |
+| `ui/run-planner-toggle-safety-2026-10-29` | `a6b1338137dffc05a0b931825b8b4d0b34be7191` | 4 / 283 |
+| `ui/scope-enforcement-label-truth-2026-10-29` | `4532d1930c95b843d45ef375956bff5d52e51a9c` | 2 / 281 |
+| `ui/scope-targets-complete-2026-10-30` | `73645de58ed4d5cbf2e0d3689c264fc7551c0604` | 3 / 90 |
+| `ui/scope-workflow-verification-2026-10-29` | `746f13be1672789579d81d2acf6a7e6a82728705` | 1 / 285 |
+| `ui/settings-header-actions-2026-10-29` | `f0587586fdbaf9fe145487793931005bb87b4426` | 2 / 302 |
+| `ui/settings-live-scope-2026-10-29` | `009734711aef718fc8fe30d8684b2f862ffe8fd2` | 3 / 278 |
+| `ui/threat-intel-browser-verification-2026-10-29` | `55e2e2ae6836407b4f4de3aefe2d07ad122185e8` | 2 / 277 |
+| `ui/threat-intel-header-actions-2026-10-29` | `fc5df7ff959d25f835bdd61ca4f7325db5435522` | 4 / 298 |
+
+For each diverged ref: identify associated PRs and merged/superseded decisions; compare branch-only changed paths/hunks against current main; classify retained, replaced, deliberately rejected or still unique work; preserve required work in a targeted change; record the decision and recovery SHA. Never remerge an entire stale UI branch to recover one useful hunk. This content review is a remaining retirement task, not silently completed due diligence.
+
+## 8. Implementation batches, validation and rollback
+
+| Batch | Scope | Required validation before merge |
+|---|---|---|
+| A — removed | Ten exact loose UI copies | Fresh hashes, named-original inventory, links, no design/template change, distribution resource comparison |
+| B — removed | Thirteen stale non-runtime artifacts (nine captures, copied roadmap, release disclaimer, two exports) | Incoming-link repair, maintained authority/release statement retained, no runtime/package/resource delta |
+| C | Three no-consumer files | Public/dynamic-consumer review, GUI/report regressions for affected resources, catalog/research reconciliation, clean wheel/sdist inspection |
+| D1 | Root catalog consolidation | Migrate every consumer, preserve existing/custom runtime data, fresh CLI/TUI/API startup and relevant fixture/packaging regressions |
+| D2 | UI route/desktop retirement | Accepted `/ui-v2` desktop default, compatibility contract, route/navigation/browser tests; protected legacy source unchanged |
+| D3 | Execution-path consolidation | State migration, equivalent authorization/follow-ups, cancellation/crash/restart and parity/no-bypass tests; keep rollback until accepted |
+| D4 | Historical documentation | Unique requirements/rationale/attribution preserved, all incoming links updated, removed schedules no longer presented as live work |
+| R | Branch retirement | Fresh SHA/ancestry, workflow/PR references, full divergent-content disposition where needed, recoverable SHA/ref record |
+
+Use isolated reviewable commits; apply dependent migrations before their removals. Record exact candidate, checks/results and any untested external-compatibility assumptions. After runtime or packaging deletions run affected tests, build/inspect wheel and sdist, install a clean wheel, then required CI once at the integration boundary. Documentation-only changes need link/content/diff checks; they do not justify claiming runtime acceptance.
+
+Rollback: revert the bounded cleanup commit to restore tracked files; restore a branch from its recorded SHA while the object remains reachable, using a retained archival ref when required. Do not rewrite Git history. This register authorizes no live data removal and is not an automatic deletion script. Revalidate every candidate after main moves.

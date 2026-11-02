@@ -1,73 +1,52 @@
-# WHAXON — Project State
+# WHAXON — Project state
 
-**Last reviewed:** 2026-11-02  
-**Repository:** `andreipath26/WHAXON-AI-Forensics`  
-**Branch:** `main`  
-**Source of truth:** current source, tests, CI results and the master roadmap. This file is a dated status snapshot, not a replacement for those records.
+**Reviewed:** 2026-11-02
+**Repository / inspected branch:** `andreipath26/WHAXON-AI-Forensics` / `main`
+**Source baseline:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`
+**Authority:** [Product trajectory](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md), especially P0–P5 and §38. This is a dated summary; [the baseline register](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) holds detailed evidence.
 
-## 1. Release identity
+## Release and verification
 
-- Runtime package version: **0.11.16** (`src/whaxon/__init__.py`).
-- Latest published PyPI version verified for this snapshot: **0.11.16**, published 2026-10-23.
-- Package metadata in `pyproject.toml` is synchronized to 0.11.16 and the Beta classifier. The repository's main branch may be ahead of the published wheel.
-- **WHAXON v1.0.0 is not declared released here.** Master roadmap §38 remains OPEN until every required acceptance item has evidence and the tag, build and publication state are verified.
+The package is **0.11.16, Beta** in source and metadata. **v1.0 acceptance is OPEN.** Package-index/tag publication was not independently rechecked for this review; do not repeat an old publication claim as a current verification.
 
-## 2. Recorded engineering verification
+Exact-baseline [CI #41488450899](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41488450899) passed all nine jobs. Python 3.11, 3.12 and 3.13 each reported **1,408 passed, 14 skipped**, with Ruff, mypy and distribution builds passing. Python 3.12 also passed sdist-resource and clean-wheel checks. Ubuntu/macOS/Windows setup smoke, headless Linux Waitress startup and curated apt/Homebrew installation/scanner smoke passed.
 
-The master roadmap records earlier passing CI runs, including [#41307525558](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41307525558) and the scheduler-test harness correction [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) on commit `1cefb99276b8db0bae697b17ca8f781d0c754147`. Those runs are historical evidence for their respective commits only.
+This certifies those checks on that SHA. It does not certify every external tool, platform, transport, deployment mode, UI control or v1.0 release criterion. No local runtime/browser tests were executed for this documentation review; future commits require their own CI evidence.
 
-**Current documentation HEAD:** `5640ce66b68b8eef2258a377de3e63da1eff9f6d` (2026-11-02). Exact-commit GitHub Actions run [#41456804756](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41456804756) completed successfully: all nine jobs passed, including Python 3.11, 3.12 and 3.13 test suites, Ubuntu/macOS/Windows setup smoke checks, headless Linux server startup, and curated apt/Homebrew installation smoke checks. This is CI evidence for this documentation HEAD, not v1.0 release acceptance. The earlier baseline run [#41452761676](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41452761676) had one Python 3.13 browser-test failure (1,369 passed, 14 skipped, 1 failed); that historical result is superseded for current-HEAD CI status by the successful exact-commit run above. The master roadmap §38 remains OPEN.
+The old `Route.session_host` collection failure is fixed in current source and covered by the passing matrix. The earlier approvals Refresh-queue failure is historical, not the current CI state. Preserve the session identity guards; do not reopen resolved defects because an old document still lists them.
 
-## 3. Current product surfaces
+## What exists
 
-- CLI, TUI, desktop and Flask web service remain available through their documented entry points.
-- The root web route redirects to `/ui-v2`. The supplied Obsidian Kinetic implementation contains 22 page routes/templates. The former `/ui` interface is retained as a legacy/reference surface.
-- The new UI is implemented and has page-specific browser tests, but the acceptance audit and roadmap §38 still leave visual regression, complete control inventory, accessibility, service parity and deployment-asset checks open. Do not call the UI fully accepted or production-ready.
-- Dependency diagnostics and allowlisted installation planning/approval workflows are implemented. Their broader deployment and recovery acceptance remains open; see [Dependency readiness](dependency-readiness.md) and [the implementation/acceptance record](first-run-installation-redesign.md).
-- Engine v2 has versioned mission/task contracts, persistence, scheduler/recovery primitives and an initial read-only scanner-provider integration slice. E1 security acceptance, remaining E3 production guarantees, broader E4 reconciliation, E5 shared lifecycle/headless integration, E6 UI acceptance and full end-to-end deployment acceptance remain open. See [Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md).
+- Shared Core/runner, SQLite job/finding/session persistence, adapter registry, 24 packaged catalog entries and guarded command/session execution.
+- Reconnaissance, normalized findings, request-context handling, deterministic supported validation/observation/blind checks, retest and coverage/report paths. POST/state-changing context replay is refused; do not imply arbitrary authenticated replay support.
+- Engine v2 immutable contracts/digests/manifests, persisted missions/tasks/attempts, scheduler leases/retries/deadlines/fencing, bounded per-run concurrency/task limits and an initial constrained provider bridge.
+- Doctor/setup profiles, deterministic plans, explicit approval-bound Python installation, curated apt/Homebrew tools and diagnostics/operation/history UI/API paths. Native Windows external-tool installation remains manual.
+- Supplied UI with 22 production page templates/destinations and 23 UI-v2 test modules. Web root redirects to `/ui-v2`; desktop `gui/embed.py` still loads legacy `/ui` and needs migration. Legacy design source remains preserved unchanged.
 
-## 4. Release blockers and open acceptance
+Code and tests demonstrate substantial implementation. Registered/installed/verified/authorized are separate states; component presence does not equal full product acceptance.
 
-The controlling checklist is master roadmap §38. It remains OPEN. The principal gates include:
+## Immediate correctness issue and remaining gates
 
-1. Evidence-backed framework-to-roadmap crosswalk.
-2. Independent validation and retest semantics, including inconclusive outcomes.
-3. Honest persisted coverage and non-testing disclosure.
-4. Complete supplied-UI interaction, visual, accessibility and parity acceptance.
-5. Scope, authorization, DNS/pivot and cancellation security regressions.
-6. Clean wheel/sdist installation, packaged resources and upgrade checks.
-7. Green required CI on the exact release candidate.
-8. Matching version, tag, release workflow and PyPI publication.
-9. This state record and supporting audits refreshed with actual evidence.
+**P1 priority:** `coverage`, `validate`, `retest` and `recon` call `Core.initialize()` with its default queue draining enabled. They can dispatch unrelated older pending jobs before their own action; `run` and `workflow` explicitly use `drain=False`. This is a source-confirmed startup side-effect risk, not an executed exploit demonstration. Add per-command no-unrelated-dispatch tests and repair the contract while preserving intentional worker/follow-up behavior.
 
-The roadmap is authoritative for the full list and acceptance criteria. A past green CI run or a version string does not close these gates.
+Remaining trajectory:
 
-## 5. Documentation reconciliation status
+| Gate | Current position |
+|---|---|
+| P0 baseline/cleanup | Evidence and principal paths refreshed; exhaustive capability/control inventory remains open |
+| P1 correctness/Trust Layer | Substantial guards and validators exist; startup issue and integrated authorization/evidence/retest/coverage acceptance remain open |
+| P2 shared durable lifecycle | Scheduler primitives exist; durable mission-wide budgets/cancellation/audit/reconciliation and CLI/API/UI parity remain open |
+| P3 install/headless | CI smoke passes; clean-platform/upgrade/offline/partial-failure/restart, backup/restore and advertised service-mode acceptance remain open |
+| P4 supplied UI | Integration exists; complete control inventory, visual/responsive/accessibility/parity, external assets and desktop default remain open |
+| P5 release | Controlled-lab end-to-end proof and §38 G01–G10 acceptance remain open |
+| P6–P8 expansion | Full bounty autonomy, multi-target/competition, broad providers, vulnerability patch application and enterprise remain gated/deferred |
 
-A repository-wide inventory identified 102 Markdown files on `main`. They are not all active product documentation. The tree contains current operator guides, the authoritative roadmap, dated implementation/acceptance records, proposed architecture, superseded design notes, an immutable experiment archive, generated sample reports, vendored payload references, legal notices and raw imported GitHub-page captures.
+## Repository simplification
 
-The [documentation reconciliation register](DOCUMENTATION_RECONCILIATION.md) and [documentation index](README.md) classify these materials and define which sources establish current behavior. In particular:
+The tracked baseline has **534 files, including 82 Markdown files**. The old 102-file count and claims that an experiment archive remains in the current tree are stale. [Due diligence](DOCUMENTATION_RECONCILIATION.md) distinguishes exact duplicate/no-consumer removals from dependency-bound retirement and retained design/evidence/legal resources. Cleanup now removes the 23 verified non-runtime superseded files; runtime and branch retirements remain gated.
 
-- The root README and operator guides are aligned to the current package identity, CLI setup/doctor behavior, web entry points, interface routes, scope limitations and documented capability boundaries.
-- Historical agent, autonomy, session, report and UI design records are not current implementation specifications.
-- The old `WHAXON` repository captures and copied roadmap are archival inputs only; they do not define `WHAXON-AI-Forensics`.
-- The file named `whaxon_v1.0.0_deployment_release_notes.md` is an unissued draft, not evidence of a v1.0.0 release.
-- The experiment folder and generated DVWA reports remain dated evidence artifacts. They are not current product acceptance results.
+The 56 remote branches include main, ten other tips strictly behind it and 45 diverged tips. Retire only after exact-tip/reference checks; divergence needs content/PR reconciliation. Old branch tips are not merge instructions.
 
-This classification is a documentation correction, not a declaration that every v1.0 or Engine v2 acceptance gate is closed. The master roadmap §38 remains OPEN. Current source/tests and CI on the exact candidate commit remain mandatory for due diligence.
+Scope remains application-level preflight, not a network firewall or connection-time DNS pin. External tool requests/redirects require deployment-specific egress controls. Installation changes are not generally rolled back; hash chains without an independent trust anchor are not immutable. AI proposes and explains; it neither authorizes operations nor determines verification.
 
-## 6. Known operational limitations
-
-- Scope checks are application-level preflight controls, not a network firewall or connection-time DNS pin. External tools may follow redirects or make secondary requests. Enforce egress restrictions independently for real engagements.
-- Dependency installation is allowlisted and approval-gated, but completed package changes are not generally rolled back. Audit-chain limitations and the absence of an independently stored trust anchor are documented in the installation design.
-- Registered catalog tools are not automatically installed, licensed, platform-compatible or fully tested. Check tool readiness and adapter support individually.
-- AI output is a proposal, not authorization, execution evidence or a verification verdict.
-
-## 7. How to resume work
-
-1. Read the master roadmap from §0 and the OPEN release checklist in §38.
-2. Check current `main`, exact CI status and the latest UI/Engine v2 acceptance records.
-3. Work on the highest-priority unmet dependency; do not restart completed work from historical session notes.
-4. Update this file only when new evidence exists, including commit/run references and explicit limitations.
-
-Historical session logs and old estimates belong in the changelog and roadmap history; they are not current remaining-work estimates.
+Resume from current main/CI and the trajectory's next unmet gate. Do not restart completed implementation from historical notes or infer a global completion percentage from tests/pages.
