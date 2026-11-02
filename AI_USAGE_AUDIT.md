@@ -1,3 +1,5 @@
+> **Historical disclosure (2026-10-02):** This statement records the author's described AI-tool usage through the date shown. It is not a continuously maintained provenance log, a guarantee that no other tooling was used later, or a substitute for reviewing commit history and the actual contribution process for a specific financing, licensing or legal representation.
+
 # AI Usage Audit
 
 **Date:** 2026-10-02

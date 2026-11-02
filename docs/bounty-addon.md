@@ -1,3 +1,5 @@
+> **Status (2026-11-02): DESIGN / DRAFT — NOT A SHIPPED BUG-BOUNTY SUBSYSTEM.** This document specifies a broader programme-policy, differential-analysis and workflow-inference add-on. Existing review-only programme ingestion or policy primitives do not mean this complete design is implemented. Treat the tables and ship gates below as proposed requirements; verify current code in `src/whaxon/core/bounty_ingest.py`, `bounty_parse.py` and `program_policy.py` for the narrower implemented surface. The master roadmap controls sequencing and acceptance.
+
 
 
 **File:** docs/bounty-addon.md

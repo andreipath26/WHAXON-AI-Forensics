@@ -1,7 +1,7 @@
 # Agent Architecture
 
 **Status (2026-11-02): HISTORICAL DESIGN RECORD.** This proposal predates the current agent and Engine v2 implementation. The module table below is an older snapshot; statements describing the agent as one-step-only, unable to resume, or otherwise unimplemented must not be treated as current without checking `src/whaxon/ai/`, `src/whaxon/core/` and their tests. Current delivery status is governed by the master roadmap and [Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md).
-**Scope:** The autonomous driving layer described in `whaxon_vision.md`.
+**Historical scope:** An early autonomous-driving proposal. The referenced `whaxon_vision.md` is not part of the current repository tree.
 **Non-goals:** Anything that changes the pipeline, the executor's deterministic boundary, or the adapter layer.
 
 ## 1. Purpose
@@ -18,7 +18,7 @@ them, react to results, and hand control to the human whenever it needs
 to. **The human stays in charge at all times.** The agent proposes; the
 executor disposes; the human decides what the executor is allowed to do.
 
-## 2. What exists today (factual)
+## 2. What existed in the original design snapshot
 
 Verified by reading the source, not from memory.
 
@@ -32,7 +32,7 @@ Verified by reading the source, not from memory.
 | `whaxon/ai/executor.py` | `Executor.run()` — the loop. Validates each Action against catalog, scope, target_lock, dedup. Bounds: `ExecutorLimits(max_steps, max_wall_seconds, min_confidence)`. Halts on 2 consecutive failures. |
 | `whaxon/core/ai_bridge.py` | The single sanctioned import point from `core/` into `whaxon/ai/`. Everything else in `core/` and `adapters/` is forbidden from importing `whaxon.ai` (enforced by `tests/test_ai_boundary.py` and CI). |
 
-**Critical current limitation:** `Executor.run()` returns the moment an
+**Historical limitation at the time of this design:** `Executor.run()` returns the moment an
 `ask_human` Action is emitted. There is no resume. The loop cannot pause
 and continue in a later process.
 

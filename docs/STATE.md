@@ -14,9 +14,9 @@
 
 ## 2. Recorded engineering verification
 
-The master roadmap §47 records CI run [#41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) on 2026-11-01 as passing Ruff, mypy, 1,322 tests (14 skipped), and wheel/sdist metadata validation on Python 3.11, 3.12 and 3.13. It also records clean-wheel diagnostics and selected Ubuntu/macOS/Windows setup and scanner smoke checks. The scheduler-test harness correction subsequently passed in run [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) on commit `1cefb99276b8db0bae697b17ca8f781d0c754147`.
+The master roadmap records earlier passing CI runs, including [#41307525558](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41307525558) and the scheduler-test harness correction [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) on commit `1cefb99276b8db0bae697b17ca8f781d0c754147`. Those runs are historical evidence for their respective commits only.
 
-These are specific recorded CI results, **not a claim that every later commit or the current HEAD has passed CI**. Check Actions for the exact candidate commit before release.
+**Latest checked pre-audit documentation commit:** `e9b2f02` (2026-11-02). The repository-wide documentation reconciliation is committed as `f0773d5` (18 files changed); its exact-commit CI run [#41456487674](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41456487674) was queued at the time of this review and has no result recorded here. Its workflow run [#41452761676](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41452761676) completed with a Python 3.13 test failure: 1,369 passed, 14 skipped, 1 failed. The failing test is `tests/test_web_ui_v2_auxiliary_pages.py::test_approvals_refresh_queue_and_halt_use_live_apis[chromium]`; the Refresh queue action did not produce the additional `/api/ai/pending` request expected by the test. Other jobs in that run passed. This failure is not attributed to the documentation changes, but the current commit is **not green**. Check Actions for the exact candidate commit before release.
 
 ## 3. Current product surfaces
 
@@ -42,11 +42,19 @@ The controlling checklist is master roadmap §38. It remains OPEN. The principal
 
 The roadmap is authoritative for the full list and acceptance criteria. A past green CI run or a version string does not close these gates.
 
-## 5. Documentation remediation status
+## 5. Documentation reconciliation status
 
-The README and core operator/engineering documentation were reconciled against the current repository identity, package release identity, route structure, source-backed capabilities and open Engine v2/v1.0 acceptance gates. The 2026-11-02 follow-up pass documented the actual `whaxon setup` CLI profile planner and approval commands alongside `whaxon doctor`, corrected the local Flask versus Waitress production-server guidance, clarified report-format completeness, and removed duplicated sections from historical agent/session design notes. Canonical documentation links were checked against the repository tree. The legacy UI audit and point-in-time architecture inventory remain explicitly historical. The master roadmap remains the authoritative execution order; this status file is not a substitute for source or passing tests.
+A repository-wide inventory identified 102 Markdown files on `main`. They are not all active product documentation. The tree contains current operator guides, the authoritative roadmap, dated implementation/acceptance records, proposed architecture, superseded design notes, an immutable experiment archive, generated sample reports, vendored payload references, legal notices and raw imported GitHub-page captures.
 
-The CLI follow-up drain and Nikto 2.6.1 parser defects were fixed in source and have regression tests on `main`. Their documentation/roadmap entries must be treated as implemented, while CI verification of the latest scheduler-test harness remains pending until the exact current-head run completes.
+The [documentation reconciliation register](DOCUMENTATION_RECONCILIATION.md) and [documentation index](README.md) classify these materials and define which sources establish current behavior. In particular:
+
+- The root README and operator guides are aligned to the current package identity, CLI setup/doctor behavior, web entry points, interface routes, scope limitations and documented capability boundaries.
+- Historical agent, autonomy, session, report and UI design records are not current implementation specifications.
+- The old `WHAXON` repository captures and copied roadmap are archival inputs only; they do not define `WHAXON-AI-Forensics`.
+- The file named `whaxon_v1.0.0_deployment_release_notes.md` is an unissued draft, not evidence of a v1.0.0 release.
+- The experiment folder and generated DVWA reports remain dated evidence artifacts. They are not current product acceptance results.
+
+This classification is a documentation correction, not a declaration that every v1.0 or Engine v2 acceptance gate is closed. The master roadmap §38 remains OPEN. Current source/tests and CI on the exact candidate commit remain mandatory for due diligence.
 
 ## 6. Known operational limitations
 

@@ -1,3 +1,5 @@
+> **Current-head CI correction (2026-11-02):** The documentation commit `e9b2f02` has workflow run [#41452761676](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41452761676), which failed one Python 3.13 browser test: `test_approvals_refresh_queue_and_halt_use_live_apis[chromium]` expected Refresh queue to trigger another `/api/ai/pending` request but observed no additional request. This is an unresolved test/product behavior until diagnosed. Earlier passing runs do not supersede this result; re-check CI for the exact candidate commit.
+
 # New Default Web UI — Interaction and Acceptance Audit
 
 **Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` (especially the repository reality check, §19, §32.12, §34.2 step 5, and §38).

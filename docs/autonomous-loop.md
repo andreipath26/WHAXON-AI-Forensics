@@ -3,12 +3,12 @@
 > **Historical design record (2026-11-02).** This document captures an early autonomy proposal and must not be used as a current implementation specification. Its factual snapshot explicitly refers to v0.8.0. Current behavior and delivery status are governed by `src/whaxon/ai/`, the Engine v2 crosswalk and master roadmap §49.
 
 **Status:** Historical proposal; implementation status has evolved since this document was written.
-**Scope:** Phase H of `whaxon_vision.md` — persistent, resumable, objective-driven autonomy.
+**Historical scope:** An early Phase H proposal from `whaxon_vision.md`, which is not present in the current repository tree.
 **Non-goals:** Multi-target engagements, cost budgets, rate limiting, anything that touches the executor boundary.
 
 ## 1. Purpose
 
-Today's `whaxon ai` loop is:
+At the time this proposal was written, the `whaxon ai` loop was described as:
 
 - **Interactive.** Every `ask_human` stops the process and waits for stdin.
 - **Single-process.** A paused run cannot be resumed by a fresh process without reconstructing state by hand.

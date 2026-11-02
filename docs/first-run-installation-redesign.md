@@ -1,6 +1,6 @@
 # Dependency readiness and guided installation
 
-**Status reviewed 2026-11-02:** implementation exists on `main`; this document records behavior and remaining acceptance requirements. CI run #41313223574 is a specific passing run from 2026-11-01, not a guarantee that every later commit or current HEAD passed. Deployment gates below remain open unless the master roadmap records closure with evidence.
+**Status reviewed 2026-11-02:** implementation exists on `main`; this is an implementation/acceptance record, not the primary operator guide. Use [dependency-readiness.md](dependency-readiness.md) for the maintained installation instructions. The acceptance requirements below remain open unless the master roadmap records closure with evidence. CI run #41313223574 is a specific passing run from 2026-11-01, not a guarantee that every later commit or current HEAD passed. Deployment gates below remain open unless the master roadmap records closure with evidence.
 
 ## Scope and status
 

@@ -1,3 +1,14 @@
+## 2026-11-02 — Repository-wide documentation classification and correction
+
+- Inventoried the 102 Markdown files present at the pre-audit baseline and separated current operator guidance from roadmap designs, historical engineering records, experiment evidence, generated reports, vendored payload references, legal notices and imported GitHub captures.
+- Added `docs/DOCUMENTATION_RECONCILIATION.md` as the file-status register and updated the documentation index to make the source-of-truth hierarchy explicit.
+- Replaced the unissued `v1.0.0-gold` deployment-release draft with a clear archival disclaimer; marked the copied roadmap and raw GitHub captures as non-authoritative.
+- Added explicit proposed/not-shipped status to the broad bug-bounty, Metasploit/Armitage and Tool Intelligence designs; strengthened historical status on older agent, autonomy and session records.
+- Removed hard-coded demo credentials from the screenshot capture instructions.
+- Recorded the latest known CI failure and the queued CI run for this documentation commit. No v1.0 release or acceptance gate is claimed.
+
+> **Documentation status correction (2026-11-02):** Earlier entries titled “Full documentation consistency pass” and “Operator documentation reconciliation” described limited subsets of the repository. They did **not** represent a complete review of all documentation. The repository-wide inventory and status classification are recorded in [DOCUMENTATION_RECONCILIATION.md](DOCUMENTATION_RECONCILIATION.md). Do not treat the earlier wording as evidence that every Markdown file had been reconciled.
+
 ## 2026-11-02 — Full documentation consistency pass
 
 - Documented the implemented `whaxon setup` CLI profile planner, exact-plan Python batch approval, separate external-tool consent path and virtual-environment bootstrap in the README, getting-started guide and dependency-readiness guide.

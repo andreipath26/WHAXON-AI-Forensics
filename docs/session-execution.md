@@ -12,9 +12,9 @@ A Metasploit session is a live connection to a compromised machine. Once you hav
 
 The runner has no concept of this. The AI planner has no concept of this. The catalog has no concept of this. That is the gap Phase E closes.
 
-**v1 scope: Metasploit sessions only.** SSH, SMB, and WMI are deferred — the abstraction should accommodate them, but the first implementation reads from and writes to `MSFClient` and nothing else.
+**Original design scope (historical): Metasploit sessions only.** SSH, SMB, and WMI are deferred — the abstraction should accommodate them, but the first implementation reads from and writes to `MSFClient` and nothing else.
 
-## 2. What exists today (factual)
+## 2. Implementation facts recorded in the historical design note
 
 Verified by reading the source, not from memory.
 
@@ -30,7 +30,7 @@ Verified by reading the source, not from memory.
 
 **Note (session 56):** This design doc was written in session 31 before the abstraction was built. The session-scoped path landed in sessions 32-35. The text below describes the state at design time. Read it as a historical snapshot, not the current state.
 
-**Critical current limitation (as of session 31):** the runner had no session-scoped path. Every tool invocation goes through `ToolRunner.run_tool(tool_id, target, ...)`, which builds an argv and calls `subprocess`. The MSF session-exec path is called **directly** by the `msf` adapter and by the web route `POST /api/msf/sessions/<id>/exec`. There is no catalog entry, no adapter contract, no AI planner visibility for "run a command in session N."
+**Historical limitation at the time of session 31 (superseded):** the runner had no session-scoped path. Every tool invocation goes through `ToolRunner.run_tool(tool_id, target, ...)`, which builds an argv and calls `subprocess`. The MSF session-exec path is called **directly** by the `msf` adapter and by the web route `POST /api/msf/sessions/<id>/exec`. There is no catalog entry, no adapter contract, no AI planner visibility for "run a command in session N."
 
 ## 3. The new abstraction: a session-scoped tool
 

@@ -1,3 +1,5 @@
+> **Status (2026-11-02): PROPOSED SUBSYSTEM DESIGN — NOT A SHIPPED TOOL-INTELLIGENCE PRODUCT.** This document defines a desired source-backed portfolio audit and candidate-onboarding workflow. Existing tool catalog, adapters, dependency diagnostics and capability contracts are foundations, not proof that the full discovery/research/reporting lifecycle exists. Use roadmap §52 and current source/tests for implementation status.
+
 # WHAXON Tool Intelligence & Controlled Onboarding
 
 **Status:** Architecture specification — implementation queued behind Engine v2 dependency gates  

@@ -1,3 +1,5 @@
+> **ARCHIVED ROADMAP COPY — NOT AUTHORITATIVE.** This is an imported, older roadmap snapshot retained for provenance. Its status tables, estimates, release claims and sequencing are stale and may describe the original `WHAXON` repository. The current and only authoritative roadmap for this repository is [`WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`](../../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md). Do not use this copy for financing, release or implementation decisions.
+
 <!--
 WHAXON — Consolidated Roadmap
 Status: Living document. Source of truth for project scope.

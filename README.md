@@ -262,6 +262,7 @@ Install the development dependencies and required browser-test tooling before ru
 - [Licensing](docs/licensing.md)
 - [Commercial licensing](docs/commercial-licensing.md)
 - [Documentation index](docs/README.md)
+- [Repository-wide documentation reconciliation and status register](docs/DOCUMENTATION_RECONCILIATION.md)
 
 ## Project direction
 

@@ -1,3 +1,5 @@
+> **Status (2026-11-02): PROPOSED INTEGRATION DESIGN — PARTIAL IMPLEMENTATION ONLY.** WHAXON currently contains Metasploit RPC, module/session, adapter and pivot-related code, but this document's broader module-family, payload/handler, data, collaboration and Engine v2 acceptance matrix is not a statement that all those capabilities are shipped or tested. Check current source/tests and roadmap §§49–51 for the exact implemented subset and remaining gates.
+
 # Metasploit and Armitage — Engine Integration Design
 
 **Status:** Architecture and roadmap requirement; design approved for implementation planning, not yet implemented.  

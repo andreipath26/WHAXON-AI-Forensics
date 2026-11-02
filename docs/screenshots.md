@@ -39,7 +39,8 @@ Wait for the embedded web view to load, then capture the whole window.
 
 ## PDF report capture
 
-    JID=$(curl -s -u whaxon:whaxon http://127.0.0.1:5001/api/history | python3 -c "import sys,json;print(json.load(sys.stdin)[0][chr(39)+chr(105)+chr(100)+chr(39)])")
+    # Loopback requests use the local-peer shortcut; configure credentials for remote access.
+    JID=$(curl -fsS http://127.0.0.1:5001/api/history | python3 -c "import sys,json;print(json.load(sys.stdin)[0][chr(39)+chr(105)+chr(100)+chr(39)])")
     whaxon report "$JID" --format pdf --out /tmp/report.pdf
     xdg-open /tmp/report.pdf
 
