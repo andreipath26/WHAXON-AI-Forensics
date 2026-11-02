@@ -1,8 +1,6 @@
 # Writing a WHAXON Plugin
 
-A WHAXON plugin is a pip-installable package that adds an adapter for a
-tool WHAXON doesn't ship. Once installed, the tool shows up alongside the
-built-in ones — no fork, no patch, no rebuild.
+A WHAXON plugin is a pip-installable package that registers an adapter through the `whaxon.adapters` entry-point group. This lets WHAXON parse output for that tool without modifying the WHAXON package. **The adapter alone does not add a runnable tool to the catalog:** to execute the tool, the operator must also add an authorized catalog entry and install/configure the executable.
 
 This doc is for the case: **you use a tool, WHAXON doesn't parse it,
 you want to fix that.** If you want to add an adapter to WHAXON itself
@@ -64,7 +62,7 @@ Finding(
     severity="info",               # required; critical/high/medium/low/info
     source="mytool",               # required; usually the tool id
     data={"port": 80},             # required; structured payload
-    raw_line="80/tcp open http",   # the original line, truncated
+    raw_line="80/tcp open http",   # original source line; no global truncation guarantee
     remediation="...",             # optional; human-readable fix
     impact="...",                  # optional; business impact
     cvss=5.3,                      # optional; CVSS 3.1 base score
