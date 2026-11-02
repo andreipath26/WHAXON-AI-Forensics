@@ -44,6 +44,12 @@ def _make_app(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_DATA", str(tmp_path))
     monkeypatch.delenv("WHAXON_AUTH_USER", raising=False)
     monkeypatch.delenv("WHAXON_AUTH_PASS_HASH", raising=False)
+    # Make the authorization boundary explicit instead of depending on the
+    # generated default policy in this endpoint test.
+    (tmp_path / "scope.json").write_text(
+        '{"enabled": true, "in_scope": ["10.0.0.9"], "out_of_scope": []}',
+        encoding="utf-8",
+    )
     core = Core(data_dir=tmp_path)
     fake_msf = _FakeMSF()
     monkeypatch.setattr(core, "msf", fake_msf)

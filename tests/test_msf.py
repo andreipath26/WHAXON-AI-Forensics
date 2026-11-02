@@ -168,6 +168,7 @@ def test_verified_rpc_transport_uses_default_certificate_validation(monkeypatch)
 
 def test_verified_rpc_transport_uses_configured_private_ca(monkeypatch):
     import requests
+
     from whaxon.core.msf import _verified_rpc_post
 
     captured = {}

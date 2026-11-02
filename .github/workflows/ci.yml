@@ -9,11 +9,11 @@ on:
 permissions:
   contents: read
 
-# Keep only the newest validation run for a branch/PR; rapid UI commits should
-# not leave several full Python-matrix runs competing for the same runners.
+# Preserve in-flight validation when commits arrive close together. Each
+# pushed commit must retain its own CI result; do not silently cancel it.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   test:
