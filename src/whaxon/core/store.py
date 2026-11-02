@@ -1442,7 +1442,9 @@ class JobStore:
             try:
                 cur = c.execute(
                     "UPDATE task_attempts SET heartbeat_at=? "
-                    "WHERE id=? AND status='running'",
+                    "WHERE id=? AND status='running' AND EXISTS ("
+                    "SELECT 1 FROM workflow_tasks t WHERE t.id=task_attempts.task_id "
+                    "AND t.status='running' AND t.active_attempt_id=task_attempts.id)",
                     (time.time(), attempt_id),
                 )
                 return cur.rowcount == 1
@@ -2640,12 +2642,22 @@ class JobStore:
             try:
                 c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
-                    "SELECT task_id, status FROM task_attempts WHERE id=?", (attempt_id,)
+                    "SELECT a.task_id, a.status, p.status AS plan_status "
+                    "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                    "JOIN workflow_plans p ON p.id=t.plan_id WHERE a.id=?",
+                    (attempt_id,),
                 ).fetchone()
                 if row is None:
                     raise ValueError(f"unknown task attempt: {attempt_id}")
                 if row["status"] != "running":
                     raise ValueError("task attempt is already terminal")
+                # The plan cancellation barrier and outcome must serialize in
+                # one write transaction. An external effect cannot be certified
+                # successful after cancellation was durably recorded.
+                if row["plan_status"] == "cancel_requested" and status in ("succeeded", "failed"):
+                    status = "uncertain"
+                    result = None
+                    error = "provider outcome after cancellation requires reconciliation"
                 encoded = json.dumps(result, sort_keys=True) if result is not None else None
                 c.execute(
                     "UPDATE task_attempts SET status=?, finished_at=?, result_json=?, error=? WHERE id=?",

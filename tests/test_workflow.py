@@ -1467,3 +1467,60 @@ def test_workflow_integrity_rejects_dependency_target_or_capability_tampering(tm
         with pytest.raises(ValueError, match="integrity verification failed"):
             store.claim_ready_workflow_task("p", "worker")
         assert store.count_workflow_task_attempts("p") == {}
+
+
+def test_heartbeat_cannot_refresh_attempt_that_lost_task_ownership(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "heartbeat-fence.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    claim = store.claim_ready_workflow_task("p", "worker")
+    assert store.heartbeat_workflow_attempt(claim["attempt_id"]) is True
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET active_attempt_id=NULL WHERE plan_id='p' AND task_key='recon'"
+        )
+    finally:
+        conn.close()
+    assert store.heartbeat_workflow_attempt(claim["attempt_id"]) is False
+
+
+def test_success_after_cancellation_is_recorded_uncertain_atomically(tmp_path):
+    from whaxon.core.store import JobStore
+
+    path = tmp_path / "cancel-completion-race.db"
+    store = JobStore(path)
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    claim = store.claim_ready_workflow_task("p", "worker")
+    assert store.mark_workflow_dispatch_started("p", claim["attempt_id"]) is True
+    JobStore(path).request_workflow_cancellation("p")
+    assert store.finish_task_attempt(
+        claim["attempt_id"], "succeeded", result={"unsafe": "success"},
+    ) is True
+    reopened = JobStore(path)
+    assert reopened.list_workflow_tasks("p")[0]["status"] == "uncertain"
+    assert reopened.list_workflow_attempts("p")[0]["status"] == "uncertain"
+    assert reopened.list_workflow_events("p")[-1]["event_type"] == "task_uncertain"
+
+
+@_run_async_test
+async def test_provider_failure_after_cancellation_is_uncertain(tmp_path):
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "cancel-provider-error.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+
+    async def dispatch(task):
+        store.request_workflow_cancellation("p")
+        raise RuntimeError("provider disconnected")
+
+    result = await WorkflowScheduler(
+        store, authorize=lambda task: True, dispatch=dispatch,
+    ).run("p")
+    assert result["tasks"][0]["status"] == "uncertain"
+    assert store.list_workflow_attempts("p")[0]["status"] == "uncertain"

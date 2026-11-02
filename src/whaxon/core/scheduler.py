@@ -86,6 +86,7 @@ class WorkflowScheduler:
             self._heartbeat(attempt_id, heartbeat_interval, lease_lost),
         )
         deadline = asyncio.get_running_loop().time() + task.timeout_s
+        dispatch_started = False
         try:
             try:
                 authorized = await self._invoke(self.authorize, task, deadline)
@@ -134,6 +135,7 @@ class WorkflowScheduler:
                     attempt_id, "cancelled", error="cancelled before provider dispatch",
                 )
                 return {"task_id": task.id, "status": "cancelled"}
+            dispatch_started = True
             result = await self._invoke(self.dispatch, task, deadline)
             if lease_lost.is_set():
                 return {"task_id": task.id, "status": "uncertain"}
@@ -165,10 +167,14 @@ class WorkflowScheduler:
             if lease_lost.is_set():
                 return {"task_id": task.id, "status": "uncertain"}
             _log.exception("workflow task %s failed", task.id)
+            # Once an external dispatch began, a later cancellation cannot
+            # prove whether the provider produced side effects.
+            cancelled = self.store.workflow_cancellation_requested(row["plan_id"])
+            outcome = "uncertain" if dispatch_started and cancelled else "failed"
             self.store.finish_task_attempt(
-                attempt_id, "failed", error=f"{type(exc).__name__}: {exc}",
+                attempt_id, outcome, error=f"{type(exc).__name__}: {exc}",
             )
-            return {"task_id": task.id, "status": "failed"}
+            return {"task_id": task.id, "status": outcome}
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)
