@@ -1082,3 +1082,42 @@ def test_durable_progress_does_not_mark_retryable_failure_complete(tmp_path):
     assert progress["counts"]["failed"] == 1
     assert progress["terminal_tasks"] == 0
     assert progress["complete"] is False
+
+
+def test_workflow_event_cursor_is_durable_monotone_and_plan_scoped(tmp_path):
+    from whaxon.core.store import JobStore
+
+    path = tmp_path / "workflow-cursor.db"
+    store = JobStore(path)
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    store.save_workflow_plan("p2", _plan())
+    one = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(one["attempt_id"], "succeeded")
+    events = store.list_unacknowledged_workflow_events("p", "reporter")
+    assert len(events) >= 2
+    first = events[0]["id"]
+    assert store.acknowledge_workflow_events("p", "reporter", first) == first
+    reloaded = JobStore(path)
+    assert reloaded.get_workflow_event_cursor("p", "reporter") == first
+    assert reloaded.get_workflow_event_cursor("p", "other") == 0
+    assert reloaded.list_unacknowledged_workflow_events("p", "reporter")[0]["id"] > first
+    with pytest.raises(ValueError, match="this workflow"):
+        reloaded.acknowledge_workflow_events("p2", "reporter", first)
+    assert reloaded.acknowledge_workflow_events("p", "reporter", events[-1]["id"]) == events[-1]["id"]
+    with pytest.raises(ValueError, match="backwards"):
+        reloaded.acknowledge_workflow_events("p", "reporter", first)
+    assert reloaded.list_unacknowledged_workflow_events("p", "reporter") == []
+
+
+def test_workflow_event_cursor_rejects_invalid_acknowledgements(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "workflow-invalid-cursor.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    for event_id in (0, -1, True, 1.5):
+        with pytest.raises(ValueError, match="event_id"):
+            store.acknowledge_workflow_events("p", "reporter", event_id)
+    with pytest.raises(ValueError, match="consumer_id"):
+        store.get_workflow_event_cursor("p", "")

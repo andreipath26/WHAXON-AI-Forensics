@@ -50,6 +50,12 @@ class _FakeCore:
     def workflow_progress(self, plan_id):
         return {"plan_id": plan_id, "complete": False, "counts": {"pending": 1}}
 
+    def workflow_event_inbox(self, plan_id, consumer_id, *, limit=100):
+        return [{"id": 7, "event_type": "task_claimed"}][:limit]
+
+    def acknowledge_workflow_event(self, plan_id, consumer_id, event_id):
+        return event_id
+
     def workflow_events(self, plan_id, after_id=0, limit=100):
         return [{"plan_id": plan_id, "id": after_id + 1, "event_type": "task_claimed"}][:limit]
 
@@ -241,3 +247,16 @@ def test_workflow_cli_approval_workflows(monkeypatch, capsys):
         "--approval-id", "approved-1", "--actor", "operator",
     ]) == 0
     assert json.loads(capsys.readouterr().out)["revoked"] is True
+
+
+def test_workflow_cli_event_inbox_and_checkpoint(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "event-inbox", "--id", "p", "--consumer", "reporter",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["id"] == 7
+    assert workflow_cmd.main([
+        "plan", "event-ack", "--id", "p", "--consumer", "reporter",
+        "--event-id", "7",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["last_event_id"] == 7

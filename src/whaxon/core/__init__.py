@@ -189,6 +189,17 @@ class Core:
         """Reconcile expired worker leases without repeating external effects."""
         return self.store.reconcile_workflow_plan(plan_id, stale_after_s=stale_after_s)
 
+    def workflow_event_cursor(self, plan_id: str, consumer_id: str):
+        return self.store.get_workflow_event_cursor(plan_id, consumer_id)
+
+    def workflow_event_inbox(self, plan_id: str, consumer_id: str, *, limit: int = 100):
+        return self.store.list_unacknowledged_workflow_events(
+            plan_id, consumer_id, limit=limit,
+        )
+
+    def acknowledge_workflow_event(self, plan_id: str, consumer_id: str, event_id: int):
+        return self.store.acknowledge_workflow_events(plan_id, consumer_id, event_id)
+
     def workflow_events(self, plan_id: str, *, after_id: int = 0, limit: int = 100):
         return self.store.list_workflow_events(plan_id, after_id, limit)
 

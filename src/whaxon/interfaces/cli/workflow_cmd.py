@@ -106,6 +106,14 @@ def _parser() -> argparse.ArgumentParser:
     events.add_argument("--id", required=True)
     events.add_argument("--after-id", type=int, default=0)
     events.add_argument("--limit", type=int, default=100)
+    inbox = plan_commands.add_parser("event-inbox", help="read consumer-specific unacknowledged events")
+    inbox.add_argument("--id", required=True)
+    inbox.add_argument("--consumer", required=True)
+    inbox.add_argument("--limit", type=int, default=100)
+    ack = plan_commands.add_parser("event-ack", help="persist processed event checkpoint")
+    ack.add_argument("--id", required=True)
+    ack.add_argument("--consumer", required=True)
+    ack.add_argument("--event-id", type=int, required=True)
     cancel = plan_commands.add_parser("cancel", help="persist workflow stop intent")
     cancel.add_argument("--id", required=True)
     recover = plan_commands.add_parser(
@@ -228,6 +236,22 @@ def main(args: list[str] | None = None) -> int:
                 core.workflow_events(options.id, after_id=options.after_id, limit=options.limit),
                 indent=2, sort_keys=True,
             ))
+            return 0
+        if options.command == "plan" and options.plan_command == "event-inbox":
+            print(json.dumps(
+                core.workflow_event_inbox(
+                    options.id, options.consumer, limit=options.limit,
+                ), indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "event-ack":
+            checkpoint = core.acknowledge_workflow_event(
+                options.id, options.consumer, options.event_id,
+            )
+            print(json.dumps({
+                "plan_id": options.id, "consumer_id": options.consumer,
+                "last_event_id": checkpoint,
+            }, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "cancel":
             cancelled = core.cancel_workflow_plan(options.id)

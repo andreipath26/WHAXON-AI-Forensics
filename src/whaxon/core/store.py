@@ -73,6 +73,13 @@ CREATE TABLE IF NOT EXISTS workflow_limits (
     max_total_attempts INTEGER NOT NULL,
     max_concurrency INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS workflow_event_cursors (
+    plan_id TEXT NOT NULL,
+    consumer_id TEXT NOT NULL,
+    last_event_id INTEGER NOT NULL DEFAULT 0,
+    updated_at REAL NOT NULL,
+    PRIMARY KEY (plan_id, consumer_id)
+);
 CREATE TABLE IF NOT EXISTS workflow_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     plan_id TEXT NOT NULL, task_ref TEXT, attempt_id TEXT,
@@ -1412,6 +1419,70 @@ class JobStore:
                 raise
             finally:
                 c.close()
+
+    def get_workflow_event_cursor(self, plan_id, consumer_id):
+        """Read a durable consumer checkpoint without consuming any event."""
+        if not isinstance(consumer_id, str) or not 1 <= len(consumer_id) <= 128:
+            raise ValueError("consumer_id must be a nonempty identifier up to 128 chars")
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            row = c.execute(
+                "SELECT last_event_id FROM workflow_event_cursors "
+                "WHERE plan_id=? AND consumer_id=?", (plan_id, consumer_id),
+            ).fetchone()
+            return row["last_event_id"] if row else 0
+        finally:
+            c.close()
+
+    def acknowledge_workflow_events(self, plan_id, consumer_id, event_id):
+        """Monotone, transactionally persisted checkpoint of a real plan event.
+
+        Consumers must process the event first, then explicitly acknowledge.
+        This does not guarantee exactly-once external message delivery.
+        """
+        if not isinstance(consumer_id, str) or not 1 <= len(consumer_id) <= 128:
+            raise ValueError("consumer_id must be a nonempty identifier up to 128 chars")
+        if isinstance(event_id, bool) or not isinstance(event_id, int) or event_id < 1:
+            raise ValueError("event_id must be a positive integer")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                if c.execute(
+                    "SELECT 1 FROM workflow_events WHERE plan_id=? AND id=?",
+                    (plan_id, event_id),
+                ).fetchone() is None:
+                    raise ValueError("event does not exist in this workflow")
+                old = c.execute(
+                    "SELECT last_event_id FROM workflow_event_cursors "
+                    "WHERE plan_id=? AND consumer_id=?", (plan_id, consumer_id),
+                ).fetchone()
+                if old is not None and event_id < old["last_event_id"]:
+                    raise ValueError("workflow event cursor cannot move backwards")
+                c.execute(
+                    "INSERT INTO workflow_event_cursors "
+                    "(plan_id, consumer_id, last_event_id, updated_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(plan_id, consumer_id) DO UPDATE SET "
+                    "last_event_id=excluded.last_event_id, updated_at=excluded.updated_at",
+                    (plan_id, consumer_id, event_id, time.time()),
+                )
+                c.execute("COMMIT")
+                return event_id
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def list_unacknowledged_workflow_events(self, plan_id, consumer_id, limit=100):
+        """Deliver durable event pages starting at the consumer's last checkpoint."""
+        after_id = self.get_workflow_event_cursor(plan_id, consumer_id)
+        return self.list_workflow_events(plan_id, after_id=after_id, limit=limit)
 
     def list_workflow_events(self, plan_id, after_id=0, limit=100):
         """Bounded, ordered, persisted Engine V2 lifecycle event feed."""
