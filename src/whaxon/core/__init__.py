@@ -328,13 +328,27 @@ class Core:
             return False
 
     def workflow_scheduler(
-        self, *, authorize=None, dispatch=None, worker_id: str = "workflow-worker",
+        self, *, plan_id: str | None = None, authorize=None, dispatch=None,
+        worker_id: str = "workflow-worker",
     ):
-        """Build a scheduler with fail-closed scope policy and real catalog providers."""
+        """Default to plan-bound authorization, never unbound scope approval.
+
+        Custom callbacks are explicit injection hooks for controlled callers;
+        production callers should use run_workflow_plan instead.
+        """
         from .scheduler import WorkflowScheduler
+
+        if authorize is None:
+            if not plan_id:
+                raise ValueError("plan_id required for default workflow authorization")
+
+            def authorize(task):
+                return self.authorize_workflow_task_for_plan(plan_id, task)
+
         return WorkflowScheduler(
-            self.store, authorize=authorize or self.authorize_workflow_task,
-            dispatch=dispatch or self.providers.dispatch, worker_id=worker_id,
+            self.store, authorize=authorize,
+            dispatch=dispatch if dispatch is not None else self.providers.dispatch,
+            worker_id=worker_id,
         )
 
     async def run_workflow_plan(
@@ -347,7 +361,7 @@ class Core:
             def authorize(task):
                 return self.authorize_workflow_task_for_plan(plan_id, task)
         scheduler = self.workflow_scheduler(
-            authorize=authorize, dispatch=dispatch, worker_id=worker_id,
+            plan_id=plan_id, authorize=authorize, dispatch=dispatch, worker_id=worker_id,
         )
         return await scheduler.run(
             plan_id, max_tasks=max_tasks, max_attempts=max_attempts,

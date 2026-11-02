@@ -290,3 +290,46 @@ def test_engine_v2_plan_authorization_rejects_tampered_sqlite_plan(tmp_path):
     finally:
         conn.close()
     assert core.authorize_workflow_task_for_plan("p", task) is False
+
+
+def test_engine_v2_scheduler_requires_plan_bound_policy_by_default(tmp_path):
+    from whaxon.core import Core
+    from whaxon.core.store import JobStore
+
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "scheduler-approval-default.db")
+    with pytest.raises(ValueError, match="plan_id required"):
+        core.workflow_scheduler()
+
+
+def test_engine_v2_scheduler_uses_plan_bound_approval_instead_of_scope_only(tmp_path):
+    import asyncio
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "scheduler-plan-approval.db")
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.fixture", provider_id="whaxon.adapter.fixture",
+        provider_version="catalog-v1", transports=("local_process",),
+        permissions=("network.scan",), impact="moderate",
+    ))
+    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    core.store.create_mission("m", "controlled lab")
+    task = WorkflowTask(
+        "scan", "tool.fixture", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    core.store.save_workflow_plan("p", WorkflowPlan("m", (task,)))
+    dispatched = []
+    scheduler = core.workflow_scheduler(
+        plan_id="p", dispatch=lambda task: dispatched.append(task.id),
+    )
+    result = asyncio.run(scheduler.run("p"))
+    assert dispatched == []
+    assert result["tasks"] == [{"id": "scan", "status": "blocked"}]
