@@ -48,17 +48,120 @@ def _parser() -> argparse.ArgumentParser:
 
     mission = commands.add_parser("mission", help="manage missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
+    mission_cost = mission_commands.add_parser(
+        "cost-limit", help="configure cumulative provider-reported mission cost cap (micro-USD)",
+    )
+    mission_cost.add_argument("--id", required=True)
+    mission_cost.add_argument("--max-cost-microusd", type=int, required=True)
+    cost_summary = mission_commands.add_parser(
+        "cost", help="inspect measured cost and incomplete reporting",
+    )
+    cost_summary.add_argument("--id", required=True)
+    attempt_cost = plan_commands.add_parser(
+        "record-cost", help="record evidence-backed final attempt cost",
+    )
+    attempt_cost.add_argument("--attempt-id", required=True)
+    attempt_cost.add_argument("--cost-microusd", required=True, type=int)
+    attempt_cost.add_argument("--source", required=True)
+    mission_deadline = mission_commands.add_parser(
+        "deadline", help="set a mission-wide absolute execution cutoff",
+    )
+    mission_deadline.add_argument("--id", required=True)
+    mission_deadline.add_argument("--unix-time", type=float, required=True)
+    mission_limits = mission_commands.add_parser(
+        "limits", help="configure mission-wide cumulative and concurrent attempt limits",
+    )
+    mission_limits.add_argument("--id", required=True)
+    mission_limits.add_argument("--max-total-attempts", type=int, required=True)
+    mission_limits.add_argument("--max-concurrency", type=int, required=True)
+    mission_status = mission_commands.add_parser(
+        "budget", help="show mission-wide usage and configured limits",
+    )
+    mission_status.add_argument("--id", required=True)
+    mission_list = mission_commands.add_parser("list", help="list durable missions")
+    mission_list.add_argument("--limit", type=int, default=100)
+    mission_list.add_argument("--after-created", type=float, default=0.0)
     create = mission_commands.add_parser("create", help="create a mission")
     create.add_argument("--id", required=True)
     create.add_argument("--objective", required=True)
+    mission_plans = mission_commands.add_parser(
+        "plans", help="list persisted plans for a mission",
+    )
+    mission_plans.add_argument("--id", required=True)
 
     plan = commands.add_parser("plan", help="manage persisted workflow plans")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
+    approval = plan_commands.add_parser(
+        "approval", help="inspect and manage attributable task approvals",
+    )
+    approval_commands = approval.add_subparsers(dest="approval_command", required=True)
+    approval_list = approval_commands.add_parser("list", help="list approvals")
+    approval_list.add_argument("--id", required=True, help="plan identifier")
+    approval_grant = approval_commands.add_parser("grant", help="persist bounded consent")
+    approval_grant.add_argument("--id", required=True)
+    approval_grant.add_argument("--task", required=True)
+    approval_grant.add_argument("--approval-id", required=True)
+    approval_grant.add_argument("--actor", required=True)
+    approval_grant.add_argument("--expires-at", type=float, required=True)
+    approval_revoke = approval_commands.add_parser("revoke", help="revoke task consent")
+    approval_revoke.add_argument("--id", required=True)
+    approval_revoke.add_argument("--approval-id", required=True)
+    approval_revoke.add_argument("--actor", required=True)
     save = plan_commands.add_parser("save", help="validate and persist a JSON workflow plan")
     save.add_argument("--id", required=True, help="immutable persisted plan identifier")
     save.add_argument("--file", required=True, type=Path, help="JSON file containing a WorkflowPlan")
     show = plan_commands.add_parser("show", help="show a plan and its durable task states")
     show.add_argument("--id", required=True)
+    reconcile_report = plan_commands.add_parser(
+        "reconciliation-report", help="show attempts requiring external effect reconciliation",
+    )
+    reconcile_report.add_argument("--id", required=True)
+    readiness = plan_commands.add_parser(
+        "readiness", help="check durable workflow completion and reconciliation gates",
+    )
+    readiness.add_argument("--id", required=True)
+    resources = plan_commands.add_parser(
+        "resources", help="show measured workflow utilization and unavailable metrics",
+    )
+    resources.add_argument("--id", required=True)
+    audit = plan_commands.add_parser("audit", help="verify persisted attempt/event consistency")
+    audit.add_argument("--id", required=True)
+    attempts = plan_commands.add_parser("attempts", help="inspect durable task attempts")
+    attempts.add_argument("--id", required=True)
+    attempts.add_argument("--after-started", type=float, default=0.0)
+    attempts.add_argument("--limit", type=int, default=100)
+    progress = plan_commands.add_parser("progress", help="show persisted workflow progress")
+    progress.add_argument("--id", required=True)
+    events = plan_commands.add_parser("events", help="read durable lifecycle events")
+    events.add_argument("--id", required=True)
+    events.add_argument("--after-id", type=int, default=0)
+    events.add_argument("--limit", type=int, default=100)
+    inbox = plan_commands.add_parser("event-inbox", help="read consumer-specific unacknowledged events")
+    inbox.add_argument("--id", required=True)
+    inbox.add_argument("--consumer", required=True)
+    inbox.add_argument("--limit", type=int, default=100)
+    ack = plan_commands.add_parser("event-ack", help="persist processed event checkpoint")
+    ack.add_argument("--id", required=True)
+    ack.add_argument("--consumer", required=True)
+    ack.add_argument("--event-id", type=int, required=True)
+    cancel = plan_commands.add_parser("cancel", help="persist workflow stop intent")
+    cancel.add_argument("--id", required=True)
+    recover = plan_commands.add_parser(
+        "reconcile", help="mark expired workflow attempts uncertain without replay",
+    )
+    recover.add_argument("--id", required=True)
+    recover.add_argument("--stale-after-seconds", type=float, default=60.0)
+    rate = plan_commands.add_parser("rate-limit", help="set a durable minimum claim interval")
+    rate.add_argument("--id", required=True)
+    rate.add_argument("--min-spacing-seconds", type=float, required=True)
+    deadline = plan_commands.add_parser("deadline", help="set a durable absolute cutoff")
+    deadline.add_argument("--id", required=True)
+    deadline.add_argument("--unix-time", type=float, required=True)
+    limits = plan_commands.add_parser("limits", help="tighten durable plan limits")
+    limits.add_argument("--id", required=True)
+    limits.add_argument("--max-total-attempts", type=int, required=True)
+    limits.add_argument("--max-concurrency", type=int, required=True)
+
     run = plan_commands.add_parser("run", help="execute a plan through scoped Core providers")
     run.add_argument("--id", required=True)
     run.add_argument("--max-tasks", type=int, default=100)
@@ -76,10 +179,69 @@ def main(args: list[str] | None = None) -> int:
             capability_result = [manifest.to_dict() for manifest in core.capabilities.list()]
             print(json.dumps(capability_result, indent=2, sort_keys=True))
             return 0
+        if options.command == "mission" and options.mission_command == "cost-limit":
+            core.configure_mission_cost_limit(
+                options.id, max_cost_microusd=options.max_cost_microusd,
+            )
+            print(json.dumps(core.mission_cost_summary(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "cost":
+            print(json.dumps(core.mission_cost_summary(options.id), sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "record-cost":
+            amount = core.record_workflow_attempt_cost(
+                options.attempt_id,
+                cost_microusd=options.cost_microusd, source=options.source,
+            )
+            print(json.dumps({"attempt_id": options.attempt_id, "cost_microusd": amount}))
+            return 0
+        if options.command == "mission" and options.mission_command == "deadline":
+            core.configure_mission_deadline(options.id, deadline_at=options.unix_time)
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "limits":
+            core.configure_mission_execution_limits(
+                options.id, max_total_attempts=options.max_total_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "budget":
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "list":
+            print(json.dumps(core.missions(
+                limit=options.limit, after_created=options.after_created,
+            ), indent=2, sort_keys=True))
+            return 0
         if options.command == "mission" and options.mission_command == "create":
             created = core.create_mission(options.id, options.objective)
             print(json.dumps({"mission_id": options.id, "created": bool(created)}))
             return 0
+        if options.command == "mission" and options.mission_command == "plans":
+            print(json.dumps(
+                core.mission_workflow_plans(options.id), indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "approval":
+            if options.approval_command == "list":
+                print(json.dumps(
+                    core.workflow_approvals(options.id), indent=2, sort_keys=True,
+                ))
+                return 0
+            if options.approval_command == "grant":
+                created = core.grant_workflow_approval(
+                    options.id, options.task, options.approval_id, options.actor,
+                    expires_at=options.expires_at,
+                )
+                print(json.dumps({"approval_id": options.approval_id, "created": created}))
+                return 0
+            if options.approval_command == "revoke":
+                revoked = core.revoke_workflow_approval(
+                    options.id, options.approval_id, actor=options.actor,
+                )
+                print(json.dumps({"approval_id": options.approval_id, "revoked": revoked}))
+                return 0
         if options.command == "plan" and options.plan_command == "save":
             raw = json.loads(options.file.read_text(encoding="utf-8"))
             workflow = WorkflowPlan.from_dict(raw)
@@ -98,6 +260,97 @@ def main(args: list[str] | None = None) -> int:
                 "plan": plan["plan"],
                 "tasks": core.store.list_workflow_tasks(options.id),
             }, indent=2, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "reconciliation-report":
+            print(json.dumps(
+                core.workflow_dispatch_reconciliation(options.id),
+                indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "readiness":
+            readiness = core.workflow_readiness(options.id)
+            print(json.dumps(readiness, indent=2, sort_keys=True))
+            return 0 if readiness["ready_to_report_success"] else 1
+        if options.command == "plan" and options.plan_command == "resources":
+            print(json.dumps(
+                core.workflow_resource_summary(options.id), indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "audit":
+            audit = core.workflow_audit_integrity(options.id)
+            print(json.dumps(audit, indent=2, sort_keys=True))
+            return 0 if audit["consistent"] else 1
+        if options.command == "plan" and options.plan_command == "attempts":
+            print(json.dumps(
+                core.workflow_attempts(
+                    options.id, after_started=options.after_started, limit=options.limit,
+                ),
+                indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "progress":
+            print(json.dumps(core.workflow_progress(options.id), indent=2, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "events":
+            print(json.dumps(
+                core.workflow_events(options.id, after_id=options.after_id, limit=options.limit),
+                indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "event-inbox":
+            print(json.dumps(
+                core.workflow_event_inbox(
+                    options.id, options.consumer, limit=options.limit,
+                ), indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "event-ack":
+            checkpoint = core.acknowledge_workflow_event(
+                options.id, options.consumer, options.event_id,
+            )
+            print(json.dumps({
+                "plan_id": options.id, "consumer_id": options.consumer,
+                "last_event_id": checkpoint,
+            }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "cancel":
+            cancelled = core.cancel_workflow_plan(options.id)
+            print(json.dumps({
+                "plan_id": options.id, "cancellation_requested": True,
+                "tasks_cancelled": cancelled,
+            }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "reconcile":
+            changed = core.reconcile_workflow_plan(
+                options.id, stale_after_s=options.stale_after_seconds,
+            )
+            print(json.dumps({
+                "plan_id": options.id, "attempts_marked_uncertain": changed,
+            }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "rate-limit":
+            core.configure_workflow_rate_limit(
+                options.id, min_spacing_s=options.min_spacing_seconds,
+            )
+            print(json.dumps({
+                "plan_id": options.id, "min_spacing_s": options.min_spacing_seconds,
+            }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "deadline":
+            core.configure_workflow_deadline(options.id, deadline_at=options.unix_time)
+            print(json.dumps({
+                "plan_id": options.id, "deadline_at": options.unix_time,
+            }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "limits":
+            core.configure_workflow_limits(
+                options.id, max_total_attempts=options.max_total_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            print(json.dumps({
+                "plan_id": options.id, "max_total_attempts": options.max_total_attempts,
+                "max_concurrency": options.max_concurrency,
+            }, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "run":
             if options.max_tasks < 1 or options.max_attempts < 1 or options.max_concurrency < 1:

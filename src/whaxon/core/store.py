@@ -49,6 +49,61 @@ CREATE TABLE IF NOT EXISTS workflow_tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_plan ON workflow_tasks(plan_id);
 CREATE TABLE IF NOT EXISTS capability_manifests (capability_id TEXT NOT NULL, provider_id TEXT NOT NULL, provider_version TEXT NOT NULL, fingerprint TEXT NOT NULL, manifest_json TEXT NOT NULL, registered_at REAL NOT NULL, PRIMARY KEY (capability_id, provider_id, provider_version));
+CREATE TABLE IF NOT EXISTS workflow_approvals (
+    approval_id TEXT PRIMARY KEY,
+    plan_id TEXT NOT NULL,
+    task_key TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    policy_version TEXT NOT NULL,
+    binding_json TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    revoked_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_approvals_plan ON workflow_approvals(plan_id, task_key);
+CREATE TABLE IF NOT EXISTS workflow_rate_limits (
+    plan_id TEXT PRIMARY KEY,
+    min_spacing_s REAL NOT NULL,
+    last_claimed_at REAL
+);
+CREATE TABLE IF NOT EXISTS workflow_deadlines (
+    plan_id TEXT PRIMARY KEY, deadline_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mission_cost_limits (
+    mission_id TEXT PRIMARY KEY, max_cost_microusd INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workflow_attempt_costs (
+    attempt_id TEXT PRIMARY KEY, cost_microusd INTEGER NOT NULL,
+    source TEXT NOT NULL, recorded_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_attempt_costs_attempt ON workflow_attempt_costs(attempt_id);
+CREATE TABLE IF NOT EXISTS mission_deadlines (
+    mission_id TEXT PRIMARY KEY,
+    deadline_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mission_execution_limits (
+    mission_id TEXT PRIMARY KEY,
+    max_total_attempts INTEGER NOT NULL,
+    max_concurrency INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workflow_limits (
+    plan_id TEXT PRIMARY KEY,
+    max_total_attempts INTEGER NOT NULL,
+    max_concurrency INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workflow_event_cursors (
+    plan_id TEXT NOT NULL,
+    consumer_id TEXT NOT NULL,
+    last_event_id INTEGER NOT NULL DEFAULT 0,
+    updated_at REAL NOT NULL,
+    PRIMARY KEY (plan_id, consumer_id)
+);
+CREATE TABLE IF NOT EXISTS workflow_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_id TEXT NOT NULL, task_ref TEXT, attempt_id TEXT,
+    event_type TEXT NOT NULL, detail_json TEXT NOT NULL DEFAULT '{}',
+    at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_events_plan ON workflow_events(plan_id, id);
 CREATE TABLE IF NOT EXISTS task_attempts (
     id TEXT PRIMARY KEY, task_id TEXT NOT NULL, attempt_no INTEGER NOT NULL,
     status TEXT NOT NULL, worker_id TEXT NOT NULL DEFAULT '', idempotency_key TEXT NOT NULL DEFAULT '',
@@ -930,6 +985,330 @@ class JobStore:
             finally:
                 c.close()
 
+    def grant_workflow_approval(
+        self, plan_id, task_key, approval_id, actor, *, expires_at,
+        policy_version="policy.v1",
+    ):
+        """Persist attributable consent bound to the immutable task and plan.
+
+        Recording consent does not grant execution permission. Scope and provider
+        policy are independently checked at each dispatch boundary.
+        """
+        import math
+        from dataclasses import asdict
+
+        from .workflow import ApprovalBinding, WorkflowPlan
+
+        for name, item in (
+            ("approval_id", approval_id), ("actor", actor),
+            ("policy_version", policy_version), ("task_key", task_key),
+        ):
+            if not isinstance(item, str) or not item.strip():
+                raise ValueError(f"{name} must be a nonempty string")
+        if (
+            isinstance(expires_at, bool) or not isinstance(expires_at, (int, float))
+            or not math.isfinite(expires_at) or expires_at <= time.time()
+        ):
+            raise ValueError("approval expiry must be finite and in the future")
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute(
+                    "SELECT p.plan_json, p.digest, p.status FROM workflow_plans p "
+                    "WHERE p.id=?", (plan_id,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                if row["status"] == "cancel_requested":
+                    raise ValueError("workflow cancellation requested")
+                plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+                matching = [task for task in plan.tasks if task.id == task_key]
+                if not matching:
+                    raise ValueError(f"unknown workflow task: {task_key}")
+                task = matching[0]
+                binding = ApprovalBinding(
+                    plan_digest=row["digest"], task_id=task_key,
+                    target=task.target, input_digest=ApprovalBinding.digest_inputs(task.inputs),
+                    policy_version=policy_version, expires_at=float(expires_at),
+                    permissions=task.permissions, impact=task.impact,
+                )
+                encoded = json.dumps(asdict(binding), sort_keys=True)
+                existing = c.execute(
+                    "SELECT plan_id, task_key, actor, policy_version, binding_json, revoked_at "
+                    "FROM workflow_approvals WHERE approval_id=?", (approval_id,),
+                ).fetchone()
+                if existing:
+                    if (
+                        existing["plan_id"] != plan_id
+                        or existing["task_key"] != task_key
+                        or existing["actor"] != actor
+                        or existing["policy_version"] != policy_version
+                        or existing["binding_json"] != encoded
+                        or existing["revoked_at"] is not None
+                    ):
+                        raise ValueError("approval id is immutable or has been revoked")
+                    c.execute("COMMIT")
+                    return False
+                c.execute(
+                    "INSERT INTO workflow_approvals "
+                    "(approval_id, plan_id, task_key, actor, policy_version, binding_json, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (approval_id, plan_id, task_key, actor, policy_version, encoded, now),
+                )
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id, task_ref, event_type, detail_json, at) "
+                    "VALUES (?, (SELECT id FROM workflow_tasks WHERE plan_id=? AND task_key=?), "
+                    "'approval_granted', ?, ?)",
+                    (plan_id, plan_id, task_key,
+                     json.dumps({"approval_id": approval_id, "actor": actor}), now),
+                )
+                c.execute("COMMIT")
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def revoke_workflow_approval(self, plan_id, approval_id, *, actor):
+        """Durably revoke a consent record; revocation is non-reversible."""
+        if not isinstance(actor, str) or not actor.strip():
+            raise ValueError("revoking actor is required")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                approval = c.execute(
+                    "SELECT task_key FROM workflow_approvals WHERE plan_id=? AND approval_id=?",
+                    (plan_id, approval_id),
+                ).fetchone()
+                if approval is None:
+                    raise ValueError(f"unknown workflow approval: {approval_id}")
+                now = time.time()
+                changed = c.execute(
+                    "UPDATE workflow_approvals SET revoked_at=? "
+                    "WHERE plan_id=? AND approval_id=? AND revoked_at IS NULL",
+                    (now, plan_id, approval_id),
+                )
+                if changed.rowcount:
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, task_ref, event_type, detail_json, at) "
+                        "VALUES (?, (SELECT id FROM workflow_tasks "
+                        "WHERE plan_id=? AND task_key=?), 'approval_revoked', ?, ?)",
+                        (plan_id, plan_id, approval["task_key"],
+                         json.dumps({"approval_id": approval_id, "actor": actor}), now),
+                    )
+                c.execute("COMMIT")
+                return changed.rowcount > 0
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def list_workflow_approvals(self, plan_id):
+        """List consent metadata without exposing bound task inputs."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT approval_id, task_key, actor, policy_version, "
+                "created_at, revoked_at, binding_json FROM workflow_approvals "
+                "WHERE plan_id=? ORDER BY created_at, approval_id", (plan_id,),
+            ).fetchall()
+            return [{
+                "approval_id": row["approval_id"], "task_key": row["task_key"],
+                "actor": row["actor"], "policy_version": row["policy_version"],
+                "created_at": row["created_at"], "revoked_at": row["revoked_at"],
+                "expires_at": json.loads(row["binding_json"])["expires_at"],
+            } for row in rows]
+        finally:
+            c.close()
+
+    def has_valid_workflow_approval(self, plan_id, task_key, *, policy_version="policy.v1"):
+        """Validate unrevoked, unexpired consent against current canonical plan."""
+        from .workflow import ApprovalBinding, WorkflowPlan
+
+        c = self._conn()
+        try:
+            row = c.execute(
+                "SELECT digest, plan_json, status FROM workflow_plans WHERE id=?", (plan_id,),
+            ).fetchone()
+            if row is None or row["status"] == "cancel_requested":
+                return False
+            plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+            task = next((task for task in plan.tasks if task.id == task_key), None)
+            if task is None:
+                return False
+            approvals = c.execute(
+                "SELECT binding_json FROM workflow_approvals "
+                "WHERE plan_id=? AND task_key=? AND policy_version=? AND revoked_at IS NULL",
+                (plan_id, task_key, policy_version),
+            ).fetchall()
+            for approval in approvals:
+                value = json.loads(approval["binding_json"])
+                value["permissions"] = tuple(value.get("permissions") or ())
+                binding = ApprovalBinding(**value)
+                if binding.is_valid(
+                    plan_digest=row["digest"], task=task,
+                    policy_version=policy_version, now=time.time(),
+                ):
+                    return True
+            return False
+        finally:
+            c.close()
+
+    def set_workflow_rate_limit(self, plan_id, *, min_spacing_s):
+        """Persist the minimum spacing between claims, without loosening bounds."""
+        import math
+
+        if (
+            isinstance(min_spacing_s, bool) or not isinstance(min_spacing_s, (int, float))
+            or not math.isfinite(min_spacing_s) or min_spacing_s <= 0
+        ):
+            raise ValueError("min_spacing_s must be finite and positive")
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                old = c.execute(
+                    "SELECT min_spacing_s FROM workflow_rate_limits WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                if old is not None and min_spacing_s < old["min_spacing_s"]:
+                    raise ValueError("workflow rate limit cannot be relaxed")
+                if old is None or old["min_spacing_s"] != min_spacing_s:
+                    c.execute(
+                        "INSERT INTO workflow_rate_limits (plan_id, min_spacing_s) VALUES (?, ?) "
+                        "ON CONFLICT(plan_id) DO UPDATE SET min_spacing_s=excluded.min_spacing_s",
+                        (plan_id, min_spacing_s),
+                    )
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, event_type, detail_json, at) VALUES (?, 'rate_limit_set', ?, ?)",
+                        (plan_id, json.dumps({"min_spacing_s": min_spacing_s}), now),
+                    )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def set_workflow_deadline(self, plan_id, *, deadline_at):
+        """Set a persistent absolute cutoff for new dispatch claims; only tighten."""
+        import math
+
+        if (
+            isinstance(deadline_at, bool)
+            or not isinstance(deadline_at, (int, float))
+            or not math.isfinite(deadline_at) or deadline_at <= 0
+        ):
+            raise ValueError("deadline_at must be a finite positive unix timestamp")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                old = c.execute(
+                    "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                if old is not None and deadline_at > old["deadline_at"]:
+                    raise ValueError("workflow deadline cannot be extended")
+                if old is None or deadline_at != old["deadline_at"]:
+                    c.execute(
+                        "INSERT INTO workflow_deadlines (plan_id, deadline_at) VALUES (?, ?) "
+                        "ON CONFLICT(plan_id) DO UPDATE SET deadline_at=excluded.deadline_at",
+                        (plan_id, deadline_at),
+                    )
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, event_type, detail_json, at) VALUES (?, 'deadline_set', ?, ?)",
+                        (plan_id, json.dumps({"deadline_at": deadline_at}), time.time()),
+                    )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_workflow_deadline(self, plan_id):
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            row = c.execute(
+                "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
+            ).fetchone()
+            return row["deadline_at"] if row else None
+        finally:
+            c.close()
+
+    def set_workflow_limits(self, plan_id, *, max_total_attempts, max_concurrency):
+        """Set conservative backend-enforced limits; never relax active limits."""
+        if (
+            isinstance(max_total_attempts, bool) or not isinstance(max_total_attempts, int)
+            or isinstance(max_concurrency, bool) or not isinstance(max_concurrency, int)
+            or max_total_attempts < 1 or max_concurrency < 1
+        ):
+            raise ValueError("workflow limits must be positive integers")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                old = c.execute(
+                    "SELECT max_total_attempts, max_concurrency FROM workflow_limits "
+                    "WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                if old is not None and (
+                    max_total_attempts > old["max_total_attempts"]
+                    or max_concurrency > old["max_concurrency"]
+                ):
+                    raise ValueError("workflow limits cannot be relaxed after configuration")
+                c.execute(
+                    "INSERT INTO workflow_limits "
+                    "(plan_id, max_total_attempts, max_concurrency) VALUES (?, ?, ?) "
+                    "ON CONFLICT(plan_id) DO UPDATE SET "
+                    "max_total_attempts=excluded.max_total_attempts, "
+                    "max_concurrency=excluded.max_concurrency",
+                    (plan_id, max_total_attempts, max_concurrency),
+                )
+                if old is None or (
+                    max_total_attempts != old["max_total_attempts"]
+                    or max_concurrency != old["max_concurrency"]
+                ):
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, event_type, detail_json, at) "
+                        "VALUES (?, 'limits_configured', ?, ?)",
+                        (plan_id, json.dumps({
+                            "max_total_attempts": max_total_attempts,
+                            "max_concurrency": max_concurrency,
+                        }), time.time()),
+                    )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
     def get_workflow_plan(self, plan_id):
         c = self._conn()
         try:
@@ -941,6 +1320,73 @@ class JobStore:
             return value
         finally:
             c.close()
+
+    def verify_workflow_plan_integrity(self, plan_id):
+        """Verify the immutable DAG snapshot against persisted executable rows.
+
+        The execution paths use the same check in their write transaction.
+        """
+        c = self._conn()
+        try:
+            return self._verify_workflow_plan_integrity_tx(c, plan_id)
+        finally:
+            c.close()
+
+    def _verify_workflow_plan_integrity_tx(self, c, plan_id):
+        import uuid
+
+        from .workflow import WorkflowPlan
+
+        row = c.execute(
+            "SELECT mission_id, schema_version, digest, plan_json FROM workflow_plans "
+            "WHERE id=?", (plan_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"unknown workflow plan: {plan_id}")
+        try:
+            plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+            if (
+                plan.digest != row["digest"]
+                or plan.mission_id != row["mission_id"]
+                or plan.schema_version != row["schema_version"]
+            ):
+                raise ValueError("immutable plan header mismatch")
+            expected_refs = {
+                task.id: uuid.uuid5(uuid.NAMESPACE_URL, f"whaxon:{plan_id}:{task.id}").hex
+                for task in plan.tasks
+            }
+            rows = c.execute(
+                "SELECT id, task_key, capability_id, target, inputs_json, depends_on_json, "
+                "permissions_json, impact, timeout_s, idempotency_key "
+                "FROM workflow_tasks WHERE plan_id=?", (plan_id,),
+            ).fetchall()
+            if len(rows) != len(plan.tasks):
+                raise ValueError("plan task count mismatch")
+            actual = {task["task_key"]: task for task in rows}
+            if len(actual) != len(rows) or set(actual) != set(expected_refs):
+                raise ValueError("plan task references mismatch")
+            for task in plan.tasks:
+                stored = actual[task.id]
+                if (
+                    stored["id"] != expected_refs[task.id]
+                    or stored["capability_id"] != task.capability_id
+                    or stored["target"] != task.target
+                    or json.loads(stored["inputs_json"]) != json.loads(
+                        json.dumps(task.inputs)
+                    )
+                    or json.loads(stored["depends_on_json"]) != [
+                        expected_refs[dependency] for dependency in task.depends_on
+                    ]
+                    or json.loads(stored["permissions_json"]) != list(task.permissions)
+                    or stored["impact"] != task.impact
+                    or stored["timeout_s"] != task.timeout_s
+                    or stored["idempotency_key"] != task.idempotency_key
+                ):
+                    raise ValueError(f"immutable task mismatch: {task.id}")
+        except (ValueError, KeyError, TypeError, OverflowError) as exc:
+            raise ValueError(f"workflow integrity verification failed: {exc}") from exc
+        return {"plan_id": plan_id, "valid": True, "digest": row["digest"],
+                "task_count": len(plan.tasks)}
 
     def list_workflow_tasks(self, plan_id):
         c = self._conn()
@@ -971,6 +1417,21 @@ class JobStore:
                     ]
                 result.append(value)
             return result
+        finally:
+            c.close()
+
+    def workflow_attempt_owned(self, attempt_id):
+        """Read ownership fencing state before invoking any provider."""
+        c = self._conn()
+        try:
+            row = c.execute(
+                "SELECT 1 FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE a.id=? AND a.status='running' "
+                "AND t.status='running' AND t.active_attempt_id=a.id",
+                (attempt_id,),
+            ).fetchone()
+            return row is not None
         finally:
             c.close()
 
@@ -1024,8 +1485,854 @@ class JobStore:
                         "AND (active_attempt_id=? OR active_attempt_id IS NULL)",
                         (error, now, row["task_id"], row["id"]),
                     )
+                    plan_row = c.execute(
+                        "SELECT plan_id FROM workflow_tasks WHERE id=?", (row["task_id"],)
+                    ).fetchone()
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
+                        "VALUES (?, ?, ?, 'task_uncertain', ?, ?)",
+                        (plan_row["plan_id"], row["task_id"], row["id"],
+                         json.dumps({"reason": "stale_worker_lease"}), now),
+                    )
                 c.execute("COMMIT")
                 return len(rows)
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_workflow_event_cursor(self, plan_id, consumer_id):
+        """Read a durable consumer checkpoint without consuming any event."""
+        if not isinstance(consumer_id, str) or not 1 <= len(consumer_id) <= 128:
+            raise ValueError("consumer_id must be a nonempty identifier up to 128 chars")
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            row = c.execute(
+                "SELECT last_event_id FROM workflow_event_cursors "
+                "WHERE plan_id=? AND consumer_id=?", (plan_id, consumer_id),
+            ).fetchone()
+            return row["last_event_id"] if row else 0
+        finally:
+            c.close()
+
+    def acknowledge_workflow_events(self, plan_id, consumer_id, event_id):
+        """Monotone, transactionally persisted checkpoint of a real plan event.
+
+        Consumers must process the event first, then explicitly acknowledge.
+        This does not guarantee exactly-once external message delivery.
+        """
+        if not isinstance(consumer_id, str) or not 1 <= len(consumer_id) <= 128:
+            raise ValueError("consumer_id must be a nonempty identifier up to 128 chars")
+        if isinstance(event_id, bool) or not isinstance(event_id, int) or event_id < 1:
+            raise ValueError("event_id must be a positive integer")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                if c.execute(
+                    "SELECT 1 FROM workflow_events WHERE plan_id=? AND id=?",
+                    (plan_id, event_id),
+                ).fetchone() is None:
+                    raise ValueError("event does not exist in this workflow")
+                old = c.execute(
+                    "SELECT last_event_id FROM workflow_event_cursors "
+                    "WHERE plan_id=? AND consumer_id=?", (plan_id, consumer_id),
+                ).fetchone()
+                if old is not None and event_id < old["last_event_id"]:
+                    raise ValueError("workflow event cursor cannot move backwards")
+                c.execute(
+                    "INSERT INTO workflow_event_cursors "
+                    "(plan_id, consumer_id, last_event_id, updated_at) VALUES (?, ?, ?, ?) "
+                    "ON CONFLICT(plan_id, consumer_id) DO UPDATE SET "
+                    "last_event_id=excluded.last_event_id, updated_at=excluded.updated_at",
+                    (plan_id, consumer_id, event_id, time.time()),
+                )
+                c.execute("COMMIT")
+                return event_id
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def list_unacknowledged_workflow_events(self, plan_id, consumer_id, limit=100):
+        """Deliver durable event pages starting at the consumer's last checkpoint."""
+        after_id = self.get_workflow_event_cursor(plan_id, consumer_id)
+        return self.list_workflow_events(plan_id, after_id=after_id, limit=limit)
+
+    def list_workflow_events(self, plan_id, after_id=0, limit=100):
+        """Bounded, ordered, persisted Engine V2 lifecycle event feed."""
+        if isinstance(after_id, bool) or not isinstance(after_id, int) or after_id < 0:
+            raise ValueError("after_id must be a non-negative integer")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT * FROM workflow_events WHERE plan_id=? AND id>? ORDER BY id LIMIT ?",
+                (plan_id, after_id, limit),
+            ).fetchall()
+            return [{**dict(row), "detail": json.loads(row["detail_json"])} for row in rows]
+        finally:
+            c.close()
+
+    def count_workflow_task_attempts(self, plan_id):
+        """Unpaginated database aggregation for scheduler correctness."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT t.task_key, COUNT(*) AS n "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=? GROUP BY t.task_key",
+                (plan_id,),
+            ).fetchall()
+            return {row["task_key"]: row["n"] for row in rows}
+        finally:
+            c.close()
+
+    def list_workflow_attempts(self, plan_id, *, after_started=0.0, limit=100):
+        """Inspect persisted attempts across restarts without exposing inputs or secrets."""
+        import math
+
+        if isinstance(after_started, bool) or not isinstance(after_started, (float, int)):
+            raise ValueError("after_started must be a finite nonnegative number")
+        if not math.isfinite(after_started) or after_started < 0:
+            raise ValueError("after_started must be a finite nonnegative number")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT a.id, t.task_key, a.attempt_no, a.status, a.worker_id, "
+                "a.started_at, a.heartbeat_at, a.finished_at, a.error "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=? AND a.started_at>? "
+                "ORDER BY a.started_at, a.id LIMIT ?",
+                (plan_id, after_started, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            c.close()
+
+    def list_missions(self, *, limit=100, after_created=0.0):
+        """Stable bounded mission discovery for headless clients."""
+        import math
+
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        if (
+            isinstance(after_created, bool)
+            or not isinstance(after_created, (int, float))
+            or not math.isfinite(after_created) or after_created < 0
+        ):
+            raise ValueError("after_created must be finite and nonnegative")
+        c = self._conn()
+        try:
+            rows = c.execute(
+                "SELECT id, objective, status, created_at, updated_at "
+                "FROM missions WHERE created_at>? ORDER BY created_at, id LIMIT ?",
+                (after_created, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            c.close()
+
+    def list_workflow_mission_plans(self, mission_id):
+        """List immutable plans and durable status for one existing mission."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            rows = c.execute(
+                "SELECT id, digest, schema_version, status, created_at "
+                "FROM workflow_plans WHERE mission_id=? ORDER BY created_at, id",
+                (mission_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            c.close()
+
+    def get_workflow_dispatch_reconciliation(self, plan_id):
+        """Separate in-flight or uncertain attempts with recorded external dispatch."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT a.id AS attempt_id, t.task_key, a.status, "
+                "EXISTS(SELECT 1 FROM workflow_events e "
+                "WHERE e.plan_id=t.plan_id AND e.attempt_id=a.id "
+                "AND e.event_type='dispatch_started') AS dispatch_recorded "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=? AND a.status IN ('running', 'uncertain') "
+                "ORDER BY a.started_at, a.id", (plan_id,),
+            ).fetchall()
+            return [
+                {
+                    "attempt_id": row["attempt_id"],
+                    "task_key": row["task_key"], "status": row["status"],
+                    "external_effect_possible": bool(row["dispatch_recorded"]),
+                    "manual_reconciliation_required": bool(row["dispatch_recorded"])
+                    or row["status"] == "uncertain",
+                }
+                for row in rows
+            ]
+        finally:
+            c.close()
+
+    def get_workflow_audit_integrity(self, plan_id):
+        """Check that every persisted attempt has exactly one claim event.
+
+        This is an internal consistency check, not a cryptographic trust anchor.
+        """
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            attempts = c.execute(
+                "SELECT a.id, a.status FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id WHERE t.plan_id=?",
+                (plan_id,),
+            ).fetchall()
+            events = c.execute(
+                "SELECT attempt_id, event_type FROM workflow_events "
+                "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
+            ).fetchall()
+            claims = {}
+            terminal = {}
+            for event in events:
+                if event["event_type"] == "task_claimed":
+                    claims[event["attempt_id"]] = claims.get(event["attempt_id"], 0) + 1
+                if event["event_type"] in (
+                    "task_succeeded", "task_failed", "task_cancelled",
+                    "task_blocked", "task_uncertain",
+                ):
+                    terminal[event["attempt_id"]] = terminal.get(event["attempt_id"], 0) + 1
+            missing_claims = sorted(
+                row["id"] for row in attempts if claims.get(row["id"], 0) != 1
+            )
+            missing_terminal = sorted(
+                row["id"] for row in attempts
+                if row["status"] != "running" and terminal.get(row["id"], 0) != 1
+            )
+            return {
+                "plan_id": plan_id, "attempts": len(attempts),
+                "missing_or_duplicate_claims": missing_claims,
+                "missing_or_duplicate_terminal_events": missing_terminal,
+                "consistent": not missing_claims and not missing_terminal,
+            }
+        finally:
+            c.close()
+
+    def get_workflow_readiness(self, plan_id):
+        """Fail-safe operational summary of outstanding reconciliation and controls."""
+        snapshot = self.get_workflow_progress(plan_id)
+        reconciliation = self.get_workflow_dispatch_reconciliation(plan_id)
+        audit = self.get_workflow_audit_integrity(plan_id)
+        deadline = self.get_workflow_deadline(plan_id)
+        blockers = []
+        if not audit["consistent"]:
+            blockers.append("workflow_audit_inconsistent")
+        if snapshot["counts"].get("uncertain", 0):
+            blockers.append("uncertain_task_outcomes")
+        if any(item["manual_reconciliation_required"] for item in reconciliation):
+            blockers.append("external_effect_reconciliation_required")
+        if snapshot["cancellation_requested"]:
+            blockers.append("cancellation_requested")
+        if deadline is not None and time.time() >= deadline and not snapshot["complete"]:
+            blockers.append("workflow_deadline_exceeded")
+        if snapshot["attempt_budget_exhausted"] and not snapshot["complete"]:
+            blockers.append("attempt_budget_exhausted")
+        return {
+            "plan_id": plan_id,
+            "complete": snapshot["complete"],
+            "all_succeeded": snapshot["complete"] and snapshot["total_tasks"] == (
+                snapshot["counts"].get("succeeded", 0)
+            ),
+            "audit_consistent": audit["consistent"],
+            "requires_manual_reconciliation": bool(reconciliation),
+            "blockers": sorted(set(blockers)),
+            "ready_to_report_success": not blockers and snapshot["complete"]
+            and snapshot["total_tasks"] == snapshot["counts"].get("succeeded", 0),
+        }
+
+    def get_workflow_resource_summary(self, plan_id):
+        """Durable, evidence-based utilization; no invented CPU or provider costs."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            row = c.execute(
+                "SELECT COUNT(*) AS attempts, "
+                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active, "
+                "COALESCE(SUM(CASE WHEN a.finished_at IS NOT NULL "
+                "THEN MAX(0, a.finished_at-a.started_at) ELSE 0 END), 0) AS elapsed_s "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=?", (plan_id,),
+            ).fetchone()
+            return {
+                "plan_id": plan_id, "attempts": row["attempts"],
+                "active_attempts": row["active"],
+                "completed_attempt_wall_seconds": row["elapsed_s"],
+                "cpu_seconds": None, "memory_peak_bytes": None, "cost_usd": None,
+                "cost_accounting_available": False,
+            }
+        finally:
+            c.close()
+
+    def get_workflow_progress(self, plan_id):
+        """Return a durable, consistent lifecycle snapshot from SQLite.
+
+        A cancellation request does not imply that already dispatched actions
+        have stopped. Those attempts remain visible in running or uncertain.
+        """
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            plan = c.execute(
+                "SELECT mission_id, status FROM workflow_plans WHERE id=?", (plan_id,)
+            ).fetchone()
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT status, COUNT(*) AS n FROM workflow_tasks "
+                "WHERE plan_id=? GROUP BY status", (plan_id,),
+            ).fetchall()
+            attempts = c.execute(
+                "SELECT COUNT(*) AS n FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=?", (plan_id,),
+            ).fetchone()["n"]
+            usage = c.execute(
+                "SELECT COUNT(*) AS total, "
+                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=?", (plan_id,),
+            ).fetchone()
+            limits = c.execute(
+                "SELECT max_total_attempts, max_concurrency FROM workflow_limits WHERE plan_id=?",
+                (plan_id,),
+            ).fetchone()
+            budget = limits["max_total_attempts"] if limits else 100
+            concurrency = limits["max_concurrency"] if limits else 4
+            counts = {row["status"]: row["n"] for row in rows}
+            total = sum(counts.values())
+            # A failed task may still be retryable; without the caller's retry
+            # policy persisted here it must never count as verified complete.
+            terminal = sum(counts.get(status, 0) for status in (
+                "succeeded", "blocked", "cancelled", "uncertain",
+            ))
+            return {
+                "plan_id": plan_id,
+                "mission_id": plan["mission_id"],
+                "status": plan["status"],
+                "cancellation_requested": plan["status"] == "cancel_requested",
+                "total_tasks": total,
+                "terminal_tasks": terminal,
+                "attempts": attempts,
+                "active_attempts": usage["active"],
+                "remaining_attempt_budget": max(0, budget - usage["total"]),
+                "max_total_attempts": budget,
+                "max_concurrency": concurrency,
+                "attempt_budget_exhausted": usage["total"] >= budget,
+                "counts": counts,
+                "complete": terminal == total,
+            }
+        finally:
+            c.close()
+
+    def reconcile_workflow_plan(self, plan_id, *, stale_after_s=60.0):
+        """Conservatively reconcile only expired attempts belonging to a plan.
+
+        Active leases are not stolen; uncertain external effects are not replayed.
+        """
+        if not isinstance(stale_after_s, (int, float)) or not 0 < stale_after_s < float("inf"):
+            raise ValueError("stale_after_s must be positive and finite")
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                rows = c.execute(
+                    "SELECT a.id, a.task_id FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id "
+                    "WHERE t.plan_id=? AND a.status='running' "
+                    "AND COALESCE(a.heartbeat_at,a.started_at) < ?",
+                    (plan_id, now - stale_after_s),
+                ).fetchall()
+                for row in rows:
+                    error = "stale worker lease; external outcome uncertain"
+                    c.execute(
+                        "UPDATE task_attempts SET status='uncertain', finished_at=?, error=? "
+                        "WHERE id=? AND status='running'", (now, error, row["id"]),
+                    )
+                    c.execute(
+                        "UPDATE workflow_tasks SET status='uncertain', error=?, "
+                        "active_attempt_id=NULL, updated_at=? "
+                        "WHERE id=? AND status='running' AND active_attempt_id=?",
+                        (error, now, row["task_id"], row["id"]),
+                    )
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
+                        "VALUES (?, ?, ?, 'task_uncertain', ?, ?)",
+                        (plan_id, row["task_id"], row["id"],
+                         json.dumps({"reason": "expired_lease"}), now),
+                    )
+                c.execute("COMMIT")
+                return len(rows)
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def set_mission_cost_limit(self, mission_id, *, max_cost_microusd):
+        """Set a non-relaxable cap on accounted USD micros for future claims."""
+        if (
+            isinstance(max_cost_microusd, bool) or not isinstance(max_cost_microusd, int)
+            or max_cost_microusd < 0
+        ):
+            raise ValueError("max_cost_microusd must be a nonnegative integer")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT max_cost_microusd FROM mission_cost_limits WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchone()
+                if old is not None and max_cost_microusd > old["max_cost_microusd"]:
+                    raise ValueError("mission cost cap cannot be relaxed")
+                c.execute(
+                    "INSERT INTO mission_cost_limits (mission_id, max_cost_microusd) VALUES (?, ?) "
+                    "ON CONFLICT(mission_id) DO UPDATE SET max_cost_microusd=excluded.max_cost_microusd",
+                    (mission_id, max_cost_microusd),
+                )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def record_workflow_attempt_cost(self, attempt_id, *, cost_microusd, source):
+        """Record provider-reported cost once, without guessing or overwriting it."""
+        if (
+            isinstance(cost_microusd, bool) or not isinstance(cost_microusd, int)
+            or cost_microusd < 0
+        ):
+            raise ValueError("cost_microusd must be a nonnegative integer")
+        if not isinstance(source, str) or not source.strip() or len(source) > 128:
+            raise ValueError("source must identify the provider cost evidence")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute(
+                    "SELECT t.plan_id, a.status FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id WHERE a.id=?", (attempt_id,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("unknown workflow attempt")
+                if row["status"] == "running":
+                    raise ValueError("cannot finalize cost for running attempt")
+                prior = c.execute(
+                    "SELECT cost_microusd, source FROM workflow_attempt_costs WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if prior is not None:
+                    if prior["cost_microusd"] != cost_microusd or prior["source"] != source:
+                        raise ValueError("conflicting attempt cost; corrections require audit reconciliation")
+                else:
+                    c.execute(
+                        "INSERT INTO workflow_attempt_costs "
+                        "(attempt_id, cost_microusd, source, recorded_at) VALUES (?, ?, ?, ?)",
+                        (attempt_id, cost_microusd, source.strip(), time.time()),
+                    )
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, attempt_id, event_type, detail_json, at) "
+                        "VALUES (?, ?, 'cost_recorded', ?, ?)",
+                        (row["plan_id"], attempt_id, json.dumps({
+                            "cost_microusd": cost_microusd, "source": source.strip(),
+                        }), time.time()),
+                    )
+                c.execute("COMMIT")
+                return cost_microusd
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_cost_summary(self, mission_id):
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            cap = c.execute(
+                "SELECT max_cost_microusd FROM mission_cost_limits WHERE mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            usage = c.execute(
+                "SELECT COALESCE(SUM(cost.cost_microusd), 0) AS spent, COUNT(cost.attempt_id) AS reported "
+                "FROM workflow_attempt_costs cost JOIN task_attempts a ON a.id=cost.attempt_id "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            unreported = c.execute(
+                "SELECT COUNT(*) AS n FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id "
+                "LEFT JOIN workflow_attempt_costs cost ON cost.attempt_id=a.id "
+                "WHERE p.mission_id=? AND cost.attempt_id IS NULL", (mission_id,),
+            ).fetchone()["n"]
+            return {
+                "mission_id": mission_id,
+                "cap_microusd": cap["max_cost_microusd"] if cap else None,
+                "accounted_cost_microusd": usage["spent"],
+                "reported_attempts": usage["reported"],
+                "unreported_attempts": unreported,
+                "exhausted": cap is not None and usage["spent"] >= cap["max_cost_microusd"],
+                "pre_dispatch_cost_reservations_available": False,
+                "full_cost_coverage": unreported == 0,
+            }
+        finally:
+            c.close()
+
+    def _mission_cost_allows_claim(self, c, plan_id):
+        cap = c.execute(
+            "SELECT l.max_cost_microusd FROM mission_cost_limits l "
+            "JOIN workflow_plans p ON p.mission_id=l.mission_id WHERE p.id=?", (plan_id,),
+        ).fetchone()
+        if cap is None:
+            return True
+        spent = c.execute(
+            "SELECT COALESCE(SUM(cost.cost_microusd), 0) AS n "
+            "FROM workflow_attempt_costs cost JOIN task_attempts a ON a.id=cost.attempt_id "
+            "JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id "
+            "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?)",
+            (plan_id,),
+        ).fetchone()["n"]
+        # Missing cost evidence means a hard upper bound cannot be guaranteed.
+        # Fail closed until every completed attempt has an explicit cost report.
+        missing = c.execute(
+            "SELECT COUNT(*) AS n FROM task_attempts a "
+            "JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id "
+            "LEFT JOIN workflow_attempt_costs cost ON cost.attempt_id=a.id "
+            "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?) "
+            "AND a.status!='running' AND cost.attempt_id IS NULL",
+            (plan_id,),
+        ).fetchone()["n"]
+        return spent < cap["max_cost_microusd"] and missing == 0
+
+    def set_mission_deadline(self, mission_id, *, deadline_at):
+        """A durable, mission-scoped cutoff that cannot be extended."""
+        import math
+
+        if (
+            isinstance(deadline_at, bool)
+            or not isinstance(deadline_at, (int, float))
+            or not math.isfinite(deadline_at) or deadline_at <= 0
+        ):
+            raise ValueError("mission deadline_at must be a finite positive unix timestamp")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?", (mission_id,),
+                ).fetchone()
+                if old is not None and deadline_at > old["deadline_at"]:
+                    raise ValueError("mission deadline cannot be extended")
+                c.execute(
+                    "INSERT INTO mission_deadlines (mission_id, deadline_at) VALUES (?, ?) "
+                    "ON CONFLICT(mission_id) DO UPDATE SET deadline_at=excluded.deadline_at",
+                    (mission_id, deadline_at),
+                )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_deadline(self, mission_id):
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            row = c.execute(
+                "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            return row["deadline_at"] if row else None
+        finally:
+            c.close()
+
+    def _mission_deadline_allows_dispatch(self, c, plan_id, now):
+        row = c.execute(
+            "SELECT d.deadline_at FROM mission_deadlines d "
+            "JOIN workflow_plans p ON p.mission_id=d.mission_id WHERE p.id=?",
+            (plan_id,),
+        ).fetchone()
+        return row is None or now < row["deadline_at"]
+
+    def set_mission_execution_limits(self, mission_id, *, max_total_attempts, max_concurrency):
+        """Tighten cumulative and concurrent budgets across every plan of a mission."""
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in (max_total_attempts, max_concurrency)
+        ):
+            raise ValueError("mission limits must be positive integers")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT max_total_attempts, max_concurrency FROM mission_execution_limits "
+                    "WHERE mission_id=?", (mission_id,),
+                ).fetchone()
+                if old is not None and (
+                    max_total_attempts > old["max_total_attempts"]
+                    or max_concurrency > old["max_concurrency"]
+                ):
+                    raise ValueError("mission limits cannot be relaxed")
+                c.execute(
+                    "INSERT INTO mission_execution_limits "
+                    "(mission_id, max_total_attempts, max_concurrency) VALUES (?, ?, ?) "
+                    "ON CONFLICT(mission_id) DO UPDATE SET "
+                    "max_total_attempts=excluded.max_total_attempts, "
+                    "max_concurrency=excluded.max_concurrency",
+                    (mission_id, max_total_attempts, max_concurrency),
+                )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_execution_limits(self, mission_id):
+        """Return configured mission caps and measured across-plan usage."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            limits = c.execute(
+                "SELECT max_total_attempts, max_concurrency FROM mission_execution_limits "
+                "WHERE mission_id=?", (mission_id,),
+            ).fetchone()
+            usage = c.execute(
+                "SELECT COUNT(*) AS attempts, "
+                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            deadline = c.execute(
+                "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?", (mission_id,),
+            ).fetchone()
+            return {
+                "mission_id": mission_id,
+                "deadline_at": deadline["deadline_at"] if deadline else None,
+                "deadline_exceeded": bool(deadline and time.time() >= deadline["deadline_at"]),
+                "max_total_attempts": limits["max_total_attempts"] if limits else None,
+                "max_concurrency": limits["max_concurrency"] if limits else None,
+                "attempts": usage["attempts"], "active_attempts": usage["active"],
+                "enforced": limits is not None,
+            }
+        finally:
+            c.close()
+
+    def _mission_budget_available(self, c, plan_id):
+        """Call inside BEGIN IMMEDIATE; serializes claims from different workers."""
+        limits = c.execute(
+            "SELECT l.max_total_attempts, l.max_concurrency FROM mission_execution_limits l "
+            "JOIN workflow_plans p ON p.mission_id=l.mission_id WHERE p.id=?",
+            (plan_id,),
+        ).fetchone()
+        if limits is None:
+            return True
+        usage = c.execute(
+            "SELECT COUNT(*) AS attempts, "
+            "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id "
+            "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?)",
+            (plan_id,),
+        ).fetchone()
+        return (
+            usage["attempts"] < limits["max_total_attempts"]
+            and usage["active"] < limits["max_concurrency"]
+        )
+
+    def get_workflow_limits(self, plan_id):
+        """Return effective backend limits, including defaults for old plans."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            row = c.execute(
+                "SELECT max_total_attempts, max_concurrency FROM workflow_limits "
+                "WHERE plan_id=?", (plan_id,),
+            ).fetchone()
+            return {
+                "max_total_attempts": row["max_total_attempts"] if row else 100,
+                "max_concurrency": row["max_concurrency"] if row else 4,
+            }
+        finally:
+            c.close()
+
+    def mark_workflow_dispatch_started(self, plan_id, attempt_id):
+        """Atomically record dispatch intent or reject a cancelled/stale attempt.
+
+        The recorded event makes crash recovery distinguish pre-dispatch claims
+        from attempts that may have produced external side effects.
+        """
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute(
+                    "SELECT a.task_id, a.status AS attempt_status, "
+                    "t.status AS task_status, t.active_attempt_id, p.status AS plan_status "
+                    "FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id "
+                    "JOIN workflow_plans p ON p.id=t.plan_id "
+                    "WHERE a.id=? AND t.plan_id=?", (attempt_id, plan_id),
+                ).fetchone()
+                self._verify_workflow_plan_integrity_tx(c, plan_id)
+                if row is None or row["attempt_status"] != "running" or (
+                    row["task_status"] != "running" or row["active_attempt_id"] != attempt_id
+                ):
+                    raise ValueError("stale workflow dispatch attempt")
+                if row["plan_status"] == "cancel_requested":
+                    c.execute("COMMIT")
+                    return False
+                deadline = c.execute(
+                    "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                if (
+                    (deadline is not None and now >= deadline["deadline_at"])
+                    or not self._mission_deadline_allows_dispatch(c, plan_id, now)
+                ):
+                    c.execute("COMMIT")
+                    return False
+                previous = c.execute(
+                    "SELECT 1 FROM workflow_events "
+                    "WHERE plan_id=? AND attempt_id=? AND event_type='dispatch_started'",
+                    (plan_id, attempt_id),
+                ).fetchone()
+                if previous is not None:
+                    raise ValueError("workflow dispatch already recorded")
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id, task_ref, attempt_id, event_type, at) "
+                    "VALUES (?, ?, ?, 'dispatch_started', ?)",
+                    (plan_id, row["task_id"], attempt_id, now),
+                )
+                c.execute("COMMIT")
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def workflow_cancellation_requested(self, plan_id):
+        """Read the durable stop-intent barrier for an execution boundary."""
+        c = self._conn()
+        try:
+            row = c.execute(
+                "SELECT status FROM workflow_plans WHERE id=?", (plan_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            return row["status"] == "cancel_requested"
+        finally:
+            c.close()
+
+    def request_workflow_cancellation(self, plan_id):
+        """Persist stop intent and cancel unclaimed work atomically.
+
+        Running attempts retain their leases and must be reconciled independently:
+        a cancellation request does not prove an external provider has stopped.
+        """
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                plan = c.execute(
+                    "SELECT status FROM workflow_plans WHERE id=?", (plan_id,)
+                ).fetchone()
+                if plan is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                if plan["status"] != "cancel_requested":
+                    c.execute(
+                        "UPDATE workflow_plans SET status='cancel_requested' WHERE id=?",
+                        (plan_id,),
+                    )
+                if plan["status"] != "cancel_requested":
+                    c.execute(
+                        "INSERT INTO workflow_events (plan_id, event_type, at) "
+                        "VALUES (?, 'cancellation_requested', ?)",
+                        (plan_id, now),
+                    )
+                cancelled = c.execute(
+                    "SELECT id FROM workflow_tasks "
+                    "WHERE plan_id=? AND status IN ('pending', 'failed')",
+                    (plan_id,),
+                ).fetchall()
+                cur = c.execute(
+                    "UPDATE workflow_tasks SET status='cancelled', "
+                    "error='workflow cancellation requested before dispatch', updated_at=? "
+                    "WHERE plan_id=? AND status IN ('pending', 'failed')",
+                    (now, plan_id),
+                )
+                for task in cancelled:
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, task_ref, event_type, at) "
+                        "VALUES (?, ?, 'task_cancelled', ?)",
+                        (plan_id, task["id"], now),
+                    )
+                c.execute("COMMIT")
+                return cur.rowcount
             except Exception:
                 if c.in_transaction:
                     c.execute("ROLLBACK")
@@ -1036,12 +2343,61 @@ class JobStore:
     def claim_ready_workflow_task(self, plan_id, worker_id, max_attempts=3):
         """Atomically claim a DAG node using plan-scoped task references."""
         import uuid
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be positive")
+        if (
+            isinstance(max_attempts, bool)
+            or not isinstance(max_attempts, int)
+            or max_attempts < 1
+        ):
+            raise ValueError("max_attempts must be a positive integer")
         with self._lock:
             c = self._conn()
             try:
                 c.execute("BEGIN IMMEDIATE")
+                plan = c.execute(
+                    "SELECT status FROM workflow_plans WHERE id=?", (plan_id,)
+                ).fetchone()
+                if plan is None or plan["status"] == "cancel_requested":
+                    c.execute("COMMIT")
+                    return None
+                self._verify_workflow_plan_integrity_tx(c, plan_id)
+                deadline = c.execute(
+                    "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                if (
+                    (deadline is not None and time.time() >= deadline["deadline_at"])
+                    or not self._mission_deadline_allows_dispatch(c, plan_id, time.time())
+                ):
+                    c.execute("COMMIT")
+                    return None
+                limit_row = c.execute(
+                    "SELECT max_total_attempts, max_concurrency FROM workflow_limits "
+                    "WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                max_total = limit_row["max_total_attempts"] if limit_row else 100
+                max_parallel = limit_row["max_concurrency"] if limit_row else 4
+                usage = c.execute(
+                    "SELECT COUNT(*) AS attempts, "
+                    "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+                    "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                    "WHERE t.plan_id=?", (plan_id,),
+                ).fetchone()
+                if (
+                    usage["attempts"] >= max_total
+                    or usage["active"] >= max_parallel
+                    or not self._mission_budget_available(c, plan_id)
+                    or not self._mission_cost_allows_claim(c, plan_id)
+                ):
+                    c.execute("COMMIT")
+                    return None
+                rate = c.execute(
+                    "SELECT min_spacing_s, last_claimed_at FROM workflow_rate_limits "
+                    "WHERE plan_id=?", (plan_id,),
+                ).fetchone()
+                if rate is not None and rate["last_claimed_at"] is not None and (
+                    time.time() < rate["last_claimed_at"] + rate["min_spacing_s"]
+                ):
+                    c.execute("COMMIT")
+                    return None
                 candidates = c.execute(
                     "SELECT * FROM workflow_tasks WHERE plan_id=? AND status IN ('pending','failed') "
                     "ORDER BY created_at, task_key", (plan_id,),
@@ -1078,10 +2434,18 @@ class JobStore:
                                     failed_terminal = True
                                     break
                         if failed_terminal:
+                            now = time.time()
                             c.execute(
                                 "UPDATE workflow_tasks SET status='blocked', "
                                 "error='dependency did not complete successfully', updated_at=? WHERE id=?",
-                                (time.time(), row["id"]),
+                                (now, row["id"]),
+                            )
+                            c.execute(
+                                "INSERT INTO workflow_events "
+                                "(plan_id, task_ref, event_type, detail_json, at) "
+                                "VALUES (?, ?, 'task_blocked', ?, ?)",
+                                (plan_id, row["id"],
+                                 json.dumps({"reason": "dependency_not_successful"}), now),
                             )
                             continue
                         if any(state_by_ref[ref]["status"] != "succeeded" for ref in dependency_refs):
@@ -1102,6 +2466,17 @@ class JobStore:
                         "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at, heartbeat_at) "
                         "VALUES (?, ?, ?, 'running', ?, ?, ?, ?)",
                         (attempt_id, row["id"], attempt_no, worker_id, row["idempotency_key"], now, now),
+                    )
+                    c.execute(
+                        "UPDATE workflow_rate_limits SET last_claimed_at=? WHERE plan_id=?",
+                        (now, plan_id),
+                    )
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
+                        "VALUES (?, ?, ?, 'task_claimed', ?, ?)",
+                        (plan_id, row["id"], attempt_id,
+                         json.dumps({"worker_id": worker_id, "attempt_no": attempt_no}), now),
                     )
                     value = dict(row)
                     value.update({
@@ -1148,6 +2523,41 @@ class JobStore:
                     task_ref = match["id"] if match else None
                 if task_ref is None:
                     raise ValueError(f"unknown workflow task: {task_id}")
+                plan_row = c.execute(
+                    "SELECT t.plan_id, p.status FROM workflow_tasks t "
+                    "JOIN workflow_plans p ON p.id=t.plan_id WHERE t.id=?",
+                    (task_ref,),
+                ).fetchone()
+                if plan_row["status"] == "cancel_requested":
+                    raise ValueError("workflow cancellation requested")
+                deadline = c.execute(
+                    "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?",
+                    (plan_row["plan_id"],),
+                ).fetchone()
+                if deadline is not None and time.time() >= deadline["deadline_at"]:
+                    raise ValueError("workflow deadline exceeded")
+                if not self._mission_deadline_allows_dispatch(c, plan_row["plan_id"], now):
+                    raise ValueError("mission deadline exceeded")
+                effective_plan = plan_row["plan_id"]
+                self._verify_workflow_plan_integrity_tx(c, effective_plan)
+                limits = c.execute(
+                    "SELECT max_total_attempts, max_concurrency FROM workflow_limits "
+                    "WHERE plan_id=?", (effective_plan,),
+                ).fetchone()
+                usage = c.execute(
+                    "SELECT COUNT(*) AS attempts, "
+                    "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+                    "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                    "WHERE t.plan_id=?", (effective_plan,),
+                ).fetchone()
+                if usage["attempts"] >= (limits["max_total_attempts"] if limits else 100):
+                    raise ValueError("workflow total attempt budget exhausted")
+                if usage["active"] >= (limits["max_concurrency"] if limits else 4):
+                    raise ValueError("workflow concurrency budget exhausted")
+                if not self._mission_budget_available(c, effective_plan):
+                    raise ValueError("mission execution budget exhausted")
+                if not self._mission_cost_allows_claim(c, effective_plan):
+                    raise ValueError("mission cost budget blocked or reporting incomplete")
                 task = c.execute(
                     "SELECT status, idempotency_key FROM workflow_tasks WHERE id=?", (task_ref,)
                 ).fetchone()
@@ -1159,6 +2569,34 @@ class JobStore:
                     raise ValueError(f"task is not claimable: {task_id}")
                 if task["idempotency_key"] and idempotency_key != task["idempotency_key"]:
                     raise ValueError("task attempt idempotency key mismatch")
+                dependencies_row = c.execute(
+                    "SELECT depends_on_json FROM workflow_tasks WHERE id=?", (task_ref,),
+                ).fetchone()
+                dependency_refs = json.loads(dependencies_row["depends_on_json"] or "[]")
+                if dependency_refs:
+                    marks = ",".join("?" for _ in dependency_refs)
+                    dep_rows = c.execute(
+                        f"SELECT id, status FROM workflow_tasks WHERE id IN ({marks})",
+                        tuple(dependency_refs),
+                    ).fetchall()
+                    if len(dep_rows) != len(dependency_refs) or any(
+                        item["status"] != "succeeded" for item in dep_rows
+                    ):
+                        raise ValueError("workflow dependencies are not succeeded")
+                rate = c.execute(
+                    "SELECT min_spacing_s, last_claimed_at FROM workflow_rate_limits "
+                    "WHERE plan_id=?", (effective_plan,),
+                ).fetchone()
+                if rate is not None and rate["last_claimed_at"] is not None and (
+                    now < rate["last_claimed_at"] + rate["min_spacing_s"]
+                ):
+                    raise ValueError("workflow rate budget exhausted")
+                previous = c.execute(
+                    "SELECT COALESCE(MAX(attempt_no), 0) AS n FROM task_attempts WHERE task_id=?",
+                    (task_ref,),
+                ).fetchone()["n"]
+                if isinstance(attempt_no, bool) or not isinstance(attempt_no, int) or attempt_no != previous + 1:
+                    raise ValueError("attempt number must be the next positive sequence")
                 c.execute(
                     "INSERT INTO task_attempts "
                     "(id, task_id, attempt_no, status, worker_id, idempotency_key, started_at) "
@@ -1172,6 +2610,17 @@ class JobStore:
                 )
                 if cur.rowcount != 1:
                     raise ValueError(f"task is already claimed: {task_id}")
+                c.execute(
+                    "UPDATE workflow_rate_limits SET last_claimed_at=? WHERE plan_id=?",
+                    (now, effective_plan),
+                )
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
+                    "VALUES (?, ?, ?, 'task_claimed', ?, ?)",
+                    (effective_plan, task_ref, attempt_id,
+                     json.dumps({"worker_id": worker_id, "attempt_no": attempt_no}), now),
+                )
                 c.execute("COMMIT")
                 return True
             except Exception:
@@ -1210,6 +2659,16 @@ class JobStore:
                 )
                 if cur.rowcount != 1:
                     raise ValueError("stale task attempt cannot update the workflow task")
+                plan_row = c.execute(
+                    "SELECT plan_id FROM workflow_tasks WHERE id=?", (row["task_id"],)
+                ).fetchone()
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (plan_row["plan_id"], row["task_id"], attempt_id,
+                     "task_" + status, json.dumps({"error": error}), now),
+                )
                 c.execute("COMMIT")
                 return True
             except Exception:

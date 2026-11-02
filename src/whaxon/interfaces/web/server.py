@@ -498,6 +498,206 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def health_simple():
         return {"ok": True, "tools": len(core.catalog.list())}
 
+    # Engine V2 read-only API. All operations use the same Core contracts
+    # consumed by the CLI; inherited application auth/rate gates apply.
+    @app.get("/api/v2/missions")
+    def workflow_v2_missions():
+        try:
+            limit = int(request.args.get("limit", "100"))
+            return jsonify(core.missions(limit=limit))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/v2/missions/<mission_id>/cost", methods=["GET", "POST"])
+    def workflow_v2_mission_cost(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict) or "max_cost_microusd" not in payload:
+                    return jsonify({"error": "max_cost_microusd required"}), 400
+                core.configure_mission_cost_limit(
+                    mission_id, max_cost_microusd=payload["max_cost_microusd"],
+                )
+            return jsonify(core.mission_cost_summary(mission_id))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 404 if "unknown mission" in str(exc) else 400
+
+    @app.post("/api/v2/workflows/attempts/<attempt_id>/cost")
+    def workflow_v2_attempt_cost(attempt_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or (
+            "cost_microusd" not in payload or "source" not in payload
+        ):
+            return jsonify({"error": "cost_microusd and source required"}), 400
+        try:
+            amount = core.record_workflow_attempt_cost(
+                attempt_id, cost_microusd=payload["cost_microusd"],
+                source=payload["source"],
+            )
+            return jsonify({"attempt_id": attempt_id, "cost_microusd": amount})
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.post("/api/v2/missions/<mission_id>/deadline")
+    def workflow_v2_mission_deadline(mission_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or "deadline_at" not in payload:
+            return jsonify({"error": "deadline_at required"}), 400
+        try:
+            core.configure_mission_deadline(
+                mission_id, deadline_at=payload["deadline_at"],
+            )
+            return jsonify(core.mission_execution_limits(mission_id))
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
+    @app.route("/api/v2/missions/<mission_id>/budget", methods=["GET", "POST"])
+    def workflow_v2_mission_budget(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict):
+                    return jsonify({"error": "JSON object required"}), 400
+                core.configure_mission_execution_limits(
+                    mission_id,
+                    max_total_attempts=payload["max_total_attempts"],
+                    max_concurrency=payload["max_concurrency"],
+                )
+            return jsonify(core.mission_execution_limits(mission_id))
+        except KeyError:
+            return jsonify({"error": "both mission limits required"}), 400
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
+    @app.get("/api/v2/missions/<mission_id>/plans")
+    def workflow_v2_mission_plans(mission_id):
+        try:
+            return jsonify(core.mission_workflow_plans(mission_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.post("/api/v2/workflows/<plan_id>/cancel")
+    def workflow_v2_cancel(plan_id):
+        """Persist stop intent; never imply already executing providers stopped."""
+        try:
+            cancelled = core.cancel_workflow_plan(plan_id)
+            return jsonify({
+                "plan_id": plan_id, "cancellation_requested": True,
+                "tasks_cancelled": cancelled,
+                "external_effects_stopped": False,
+            })
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/attempts")
+    def workflow_v2_attempts(plan_id):
+        try:
+            limit = int(request.args.get("limit", "100"))
+            after_started = float(request.args.get("after_started", "0"))
+            return jsonify(core.workflow_attempts(
+                plan_id, limit=limit, after_started=after_started,
+            ))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.get("/api/v2/workflows/<plan_id>/audit")
+    def workflow_v2_audit(plan_id):
+        try:
+            return jsonify(core.workflow_audit_integrity(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/resources")
+    def workflow_v2_resources(plan_id):
+        try:
+            return jsonify(core.workflow_resource_summary(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/limits")
+    def workflow_v2_limits(plan_id):
+        try:
+            return jsonify({
+                "plan_id": plan_id,
+                "limits": core.store.get_workflow_limits(plan_id),
+                "deadline_at": core.store.get_workflow_deadline(plan_id),
+            })
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.post("/api/v2/workflows/<plan_id>/limits")
+    def workflow_v2_set_limits(plan_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({"error": "JSON object required"}), 400
+        try:
+            core.configure_workflow_limits(
+                plan_id,
+                max_total_attempts=payload["max_total_attempts"],
+                max_concurrency=payload["max_concurrency"],
+            )
+            return jsonify({"plan_id": plan_id, "limits": core.store.get_workflow_limits(plan_id)})
+        except KeyError:
+            return jsonify({"error": "both limits are required"}), 400
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.post("/api/v2/workflows/<plan_id>/deadline")
+    def workflow_v2_set_deadline(plan_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or "deadline_at" not in payload:
+            return jsonify({"error": "deadline_at required"}), 400
+        try:
+            core.configure_workflow_deadline(plan_id, deadline_at=payload["deadline_at"])
+            return jsonify({
+                "plan_id": plan_id, "deadline_at": core.store.get_workflow_deadline(plan_id),
+            })
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.post("/api/v2/workflows/<plan_id>/rate-limit")
+    def workflow_v2_set_rate_limit(plan_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or "min_spacing_s" not in payload:
+            return jsonify({"error": "min_spacing_s required"}), 400
+        try:
+            core.configure_workflow_rate_limit(plan_id, min_spacing_s=payload["min_spacing_s"])
+            return jsonify({"plan_id": plan_id, "rate_limit_configured": True})
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.get("/api/v2/workflows/<plan_id>/progress")
+    def workflow_v2_progress(plan_id):
+        try:
+            return jsonify(core.workflow_progress(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/events")
+    def workflow_v2_events(plan_id):
+        try:
+            after_id = int(request.args.get("after_id", "0"))
+            limit = int(request.args.get("limit", "100"))
+            return jsonify(core.workflow_events(plan_id, after_id=after_id, limit=limit))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.get("/api/v2/workflows/<plan_id>/readiness")
+    def workflow_v2_readiness(plan_id):
+        try:
+            return jsonify(core.workflow_readiness(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/reconciliation")
+    def workflow_v2_reconciliation(plan_id):
+        try:
+            return jsonify(core.workflow_dispatch_reconciliation(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
     @app.get("/api/tools")
     def list_tools():
         import shutil

@@ -105,8 +105,45 @@ class WorkflowScheduler:
                 )
                 return {"task_id": task.id, "status": "blocked"}
 
+            # Cancellation can arrive while authorization is in progress.
+            # Refuse dispatch if the durable stop barrier has already been set.
+            if self.store.workflow_cancellation_requested(row["plan_id"]):
+                self.store.finish_task_attempt(
+                    attempt_id, "cancelled", error="cancelled before provider dispatch",
+                )
+                return {"task_id": task.id, "status": "cancelled"}
+            # Recheck the policy at the consequential dispatch boundary:
+            # authorization may expire or scope may change while queued.
+            try:
+                still_authorized = await self._invoke(self.authorize, task, deadline)
+            except Exception as exc:
+                self.store.finish_task_attempt(
+                    attempt_id, "blocked",
+                    error=f"dispatch-boundary authorization failed closed: {type(exc).__name__}",
+                )
+                return {"task_id": task.id, "status": "blocked"}
+            if still_authorized is not True:
+                self.store.finish_task_attempt(
+                    attempt_id, "blocked", error="dispatch-boundary policy denied task",
+                )
+                return {"task_id": task.id, "status": "blocked"}
+            if lease_lost.is_set() or not self.store.workflow_attempt_owned(attempt_id):
+                return {"task_id": task.id, "status": "uncertain"}
+            if not self.store.mark_workflow_dispatch_started(row["plan_id"], attempt_id):
+                self.store.finish_task_attempt(
+                    attempt_id, "cancelled", error="cancelled before provider dispatch",
+                )
+                return {"task_id": task.id, "status": "cancelled"}
             result = await self._invoke(self.dispatch, task, deadline)
             if lease_lost.is_set():
+                return {"task_id": task.id, "status": "uncertain"}
+            # A stop request during external dispatch cannot prove that side
+            # effects were cancelled. Do not report a clean post-stop success.
+            if self.store.workflow_cancellation_requested(row["plan_id"]):
+                self.store.finish_task_attempt(
+                    attempt_id, "uncertain",
+                    error="cancellation requested while provider was executing; outcome requires reconciliation",
+                )
                 return {"task_id": task.id, "status": "uncertain"}
             self.store.finish_task_attempt(attempt_id, "succeeded", result=result)
             return {"task_id": task.id, "status": "succeeded"}
@@ -138,10 +175,17 @@ class WorkflowScheduler:
 
     async def run(self, plan_id: str, *, max_tasks: int = 100,
                   max_attempts: int = 2, max_concurrency: int = 4) -> dict[str, Any]:
-        if max_tasks < 1 or max_attempts < 1 or max_concurrency < 1:
-            raise ValueError("max_tasks, max_attempts and max_concurrency must be positive")
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in (max_tasks, max_attempts, max_concurrency)
+        ):
+            raise ValueError("max_tasks, max_attempts and max_concurrency must be positive integers")
         if self.store.get_workflow_plan(plan_id) is None:
             raise ValueError(f"unknown workflow plan: {plan_id}")
+        # Caller-supplied values may tighten, but never loosen durable limits.
+        limits = self.store.get_workflow_limits(plan_id)
+        max_tasks = min(max_tasks, limits["max_total_attempts"])
+        max_concurrency = min(max_concurrency, limits["max_concurrency"])
 
         claimed = 0
         outcomes: list[dict[str, str]] = []
@@ -163,11 +207,22 @@ class WorkflowScheduler:
 
         await asyncio.gather(*(worker() for _ in range(min(max_concurrency, max_tasks))))
         tasks = self.store.list_workflow_tasks(plan_id)
+        # Failed attempts may still be retryable. Report completion only when
+        # every task has reached a terminal outcome under the attempt policy.
+        # Database counts avoid truncation of long-lived plans at API page limits.
+        attempts = self.store.count_workflow_task_attempts(plan_id)
+        counts = attempts
+        terminal = {"succeeded", "blocked", "cancelled", "uncertain"}
+        complete = all(
+            task["status"] in terminal
+            or (
+                task["status"] == "failed"
+                and counts.get(task["id"], 0) >= max_attempts
+            )
+            for task in tasks
+        )
         return {
             "plan_id": plan_id, "attempts": claimed, "outcomes": outcomes,
             "tasks": [{"id": task["id"], "status": task["status"]} for task in tasks],
-            "complete": all(
-                task["status"] in ("succeeded", "failed", "blocked", "cancelled", "uncertain")
-                for task in tasks
-            ),
+            "complete": complete,
         }

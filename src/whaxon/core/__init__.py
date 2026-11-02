@@ -156,6 +156,116 @@ class Core:
         """Create a durable Engine v2 mission through the shared Core service."""
         return self.store.create_mission(mission_id, objective, metadata)
 
+    def grant_workflow_approval(
+        self, plan_id: str, task_key: str, approval_id: str, actor: str,
+        *, expires_at: float, policy_version: str = "policy.v1",
+    ):
+        return self.store.grant_workflow_approval(
+            plan_id, task_key, approval_id, actor,
+            expires_at=expires_at, policy_version=policy_version,
+        )
+
+    def revoke_workflow_approval(self, plan_id: str, approval_id: str, *, actor: str):
+        return self.store.revoke_workflow_approval(plan_id, approval_id, actor=actor)
+
+    def workflow_approvals(self, plan_id: str):
+        return self.store.list_workflow_approvals(plan_id)
+
+    def configure_workflow_rate_limit(self, plan_id: str, *, min_spacing_s: float):
+        return self.store.set_workflow_rate_limit(plan_id, min_spacing_s=min_spacing_s)
+
+    def configure_workflow_deadline(self, plan_id: str, *, deadline_at: float):
+        return self.store.set_workflow_deadline(plan_id, deadline_at=deadline_at)
+
+    def configure_workflow_limits(
+        self, plan_id: str, *, max_total_attempts: int, max_concurrency: int,
+    ):
+        return self.store.set_workflow_limits(
+            plan_id, max_total_attempts=max_total_attempts,
+            max_concurrency=max_concurrency,
+        )
+
+    def reconcile_workflow_plan(self, plan_id: str, *, stale_after_s: float = 60.0):
+        """Reconcile expired worker leases without repeating external effects."""
+        return self.store.reconcile_workflow_plan(plan_id, stale_after_s=stale_after_s)
+
+    def workflow_event_cursor(self, plan_id: str, consumer_id: str):
+        return self.store.get_workflow_event_cursor(plan_id, consumer_id)
+
+    def workflow_event_inbox(self, plan_id: str, consumer_id: str, *, limit: int = 100):
+        return self.store.list_unacknowledged_workflow_events(
+            plan_id, consumer_id, limit=limit,
+        )
+
+    def acknowledge_workflow_event(self, plan_id: str, consumer_id: str, event_id: int):
+        return self.store.acknowledge_workflow_events(plan_id, consumer_id, event_id)
+
+    def workflow_events(self, plan_id: str, *, after_id: int = 0, limit: int = 100):
+        return self.store.list_workflow_events(plan_id, after_id, limit)
+
+    def configure_mission_cost_limit(self, mission_id: str, *, max_cost_microusd: int):
+        return self.store.set_mission_cost_limit(
+            mission_id, max_cost_microusd=max_cost_microusd,
+        )
+
+    def record_workflow_attempt_cost(
+        self, attempt_id: str, *, cost_microusd: int, source: str,
+    ):
+        return self.store.record_workflow_attempt_cost(
+            attempt_id, cost_microusd=cost_microusd, source=source,
+        )
+
+    def mission_cost_summary(self, mission_id: str):
+        return self.store.get_mission_cost_summary(mission_id)
+
+    def configure_mission_deadline(self, mission_id: str, *, deadline_at: float):
+        return self.store.set_mission_deadline(mission_id, deadline_at=deadline_at)
+
+    def mission_execution_limits(self, mission_id: str):
+        return self.store.get_mission_execution_limits(mission_id)
+
+    def configure_mission_execution_limits(
+        self, mission_id: str, *, max_total_attempts: int, max_concurrency: int,
+    ):
+        return self.store.set_mission_execution_limits(
+            mission_id, max_total_attempts=max_total_attempts,
+            max_concurrency=max_concurrency,
+        )
+
+    def missions(self, *, limit: int = 100, after_created: float = 0.0):
+        return self.store.list_missions(limit=limit, after_created=after_created)
+
+    def mission_workflow_plans(self, mission_id: str):
+        return self.store.list_workflow_mission_plans(mission_id)
+
+    def workflow_dispatch_reconciliation(self, plan_id: str):
+        return self.store.get_workflow_dispatch_reconciliation(plan_id)
+
+    def workflow_readiness(self, plan_id: str):
+        return self.store.get_workflow_readiness(plan_id)
+
+    def workflow_resource_summary(self, plan_id: str):
+        return self.store.get_workflow_resource_summary(plan_id)
+
+    def workflow_audit_integrity(self, plan_id: str):
+        return self.store.get_workflow_audit_integrity(plan_id)
+
+    def workflow_attempts(
+        self, plan_id: str, *, after_started: float = 0.0, limit: int = 100,
+    ):
+        """Expose read-only attempt diagnostics through the shared Core service."""
+        return self.store.list_workflow_attempts(
+            plan_id, after_started=after_started, limit=limit,
+        )
+
+    def workflow_progress(self, plan_id: str):
+        """Expose durable task/attempt progress to CLI, API and headless clients."""
+        return self.store.get_workflow_progress(plan_id)
+
+    def cancel_workflow_plan(self, plan_id: str) -> int:
+        """Durably halt future claims; in-flight provider effects remain uncertain."""
+        return self.store.request_workflow_cancellation(plan_id)
+
     def save_workflow_plan(self, plan_id: str, plan):
         """Validate and persist a versioned mission DAG."""
         return self.store.save_workflow_plan(plan_id, plan)
@@ -182,6 +292,21 @@ class Core:
         except Exception:
             return False
 
+    def authorize_workflow_task_for_plan(self, plan_id: str, task) -> bool:
+        """Enforce exact consent for moderate-impact tasks in persisted plans.
+
+        An approval is never a substitute for scope/provider policy. Revocation,
+        expiry, changed task bindings and missing approval all fail closed.
+        """
+        if not self.authorize_workflow_task(task):
+            return False
+        if task.impact in ("moderate", "high", "critical"):
+            try:
+                return bool(self.store.has_valid_workflow_approval(plan_id, task.id))
+            except (ValueError, TypeError, RuntimeError):
+                return False
+        return True
+
     def workflow_scheduler(
         self, *, authorize=None, dispatch=None, worker_id: str = "workflow-worker",
     ):
@@ -198,6 +323,9 @@ class Core:
         max_concurrency: int = 4,
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""
+        if authorize is None:
+            def authorize(task):
+                return self.authorize_workflow_task_for_plan(plan_id, task)
         scheduler = self.workflow_scheduler(
             authorize=authorize, dispatch=dispatch, worker_id=worker_id,
         )
