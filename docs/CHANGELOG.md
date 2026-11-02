@@ -10,7 +10,7 @@
 - These are source/test closures, not a claim that every Engine v2 deployment gate is closed. Latest scheduler-test CI is tracked separately below.
 
 ### CI status clarification
-- The scheduler test harness correction is on current main; CI run [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) was still in progress at the time of this documentation update. Do not describe it as passing until GitHub reports a successful conclusion.
+- The scheduler test harness correction passed CI on code commit `1cefb99276b8db0bae697b17ca8f781d0c754147`; run [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) completed successfully. The subsequent documentation commits have separate CI runs; verify the exact current HEAD before release.
 
 ## 2026-11-02 — Documentation and verification corrections
 
