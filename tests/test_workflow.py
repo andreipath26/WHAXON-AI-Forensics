@@ -1,4 +1,22 @@
+import asyncio
+
 import pytest
+
+
+def _run_async_test(test_function):
+    """Run an async test without competing pytest event-loop plugins.
+
+    pytest-playwright and pytest-asyncio both wrap coroutine tests when
+    asyncio_mode=auto. Keep these scheduler tests independent of browser
+    fixtures by exposing a synchronous pytest test that owns its loop.
+    """
+    def run(*args, **kwargs):
+        return asyncio.run(test_function(*args, **kwargs))
+
+    run.__name__ = test_function.__name__
+    run.__qualname__ = test_function.__qualname__
+    run.__doc__ = test_function.__doc__
+    return run
 
 from whaxon.core.workflow import (
     ApprovalBinding,
@@ -89,7 +107,7 @@ def test_approval_binding_is_invalidated_by_any_bound_change():
     )
 
 
-@pytest.mark.asyncio
+@_run_async_test
 async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_path):
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
@@ -113,7 +131,7 @@ async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_
     assert result["complete"] is True
 
 
-@pytest.mark.asyncio
+@_run_async_test
 async def test_scheduler_blocks_dependants_after_policy_denial(tmp_path):
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
@@ -160,7 +178,7 @@ def test_workflow_task_rejects_non_finite_timeout():
         WorkflowTask("bad", "cap", "host", timeout_s=math.nan)
 
 
-@pytest.mark.asyncio
+@_run_async_test
 async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
     import time
 
@@ -188,7 +206,7 @@ async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
 
 
 
-@pytest.mark.asyncio
+@_run_async_test
 async def test_scheduler_runs_independent_tasks_concurrently(tmp_path):
     import asyncio
 
@@ -234,7 +252,7 @@ async def test_scheduler_runs_independent_tasks_concurrently(tmp_path):
     ]
 
 
-@pytest.mark.asyncio
+@_run_async_test
 async def test_scheduler_respects_max_concurrency_and_task_budget(tmp_path):
     import asyncio
 

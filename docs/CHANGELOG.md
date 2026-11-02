@@ -2,6 +2,14 @@
 
 > Release identity: the latest published PyPI package recorded for this repository snapshot is **0.11.16** (2026-10-23). The former 1.0.0 heading did not establish a published v1.0.0 release. Master roadmap §38 remains OPEN; do not infer a release from this changelog heading or package metadata.
 
+## 2026-11-02 — Documentation and verification corrections
+
+- Corrected the package/release identity: 0.11.16 remains the published package version; v1.0.0 remains unreleased until roadmap §38 acceptance is complete.
+- Reconciled the active repository URL, safe first-run guidance, `/ui-v2` default, API/authentication descriptions, current tool catalog and Engine v2 status with main-branch source.
+- Replaced corrupted data-retention text and removed unsupported claims of automatic secret scrubbing or regulatory alignment.
+- Sanitized the exposed lab-password field in the current experiment evidence tree and updated the historical audit; this does not erase Git history or revoke a credential.
+- Fixed the async scheduler test harness so pytest-playwright and pytest-asyncio do not both attempt to own the same test event loop. CI on this commit is the acceptance check.
+
 **Validation correctness**
 - Request context now survives the SQLMap adapter, SQLite persistence, and web/CLI validation and retest paths. Older findings using the legacy `data["_request_context"]` shape remain supported.
 - CLI validation reports an unknown job cleanly instead of raising an exception.

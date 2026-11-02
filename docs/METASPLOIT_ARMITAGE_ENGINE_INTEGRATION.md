@@ -1,10 +1,10 @@
 # Metasploit and Armitage — Engine Integration Design
 
-**Status reviewed 2026-11-02:** Broader provider-level integration design and roadmap requirement; not fully implemented. A narrower Metasploit adapter, session operations and web API routes already exist on `main`. This document specifies the larger dynamic Framework/provider coverage and security guarantees; it must not be read as saying no Metasploit support exists.  
+**Status:** Architecture and roadmap requirement; design approved for implementation planning, not yet implemented.  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
 **Architecture parent:** `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md`  
 **Roadmap parent:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, §51  
-**Historical baseline:** E0 static inventory at commit `71c3e8c2b73bf7f05bd0e064fa77c4aa81113802`; current implementation status must be checked against main and roadmap §51.
+**Baseline:** E0 static inventory at commit `71c3e8c2b73bf7f05bd0e064fa77c4aa81113802`.
 
 ## 1. Product objective
 
