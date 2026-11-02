@@ -1345,3 +1345,63 @@ def test_mission_cost_ledger_rejects_bad_values_and_running_attempt(tmp_path):
             store.record_workflow_attempt_cost(
                 claim["attempt_id"], cost_microusd=bad, source="invoice",
             )
+
+
+def test_workflow_integrity_detects_persisted_plan_and_dag_tampering(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "integrity.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    proof = store.verify_workflow_plan_integrity("p")
+    assert proof["valid"] is True
+    assert proof["task_count"] == 2
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET target='192.0.2.99' "
+            "WHERE plan_id='p' AND task_key='recon'"
+        )
+    finally:
+        conn.close()
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        store.verify_workflow_plan_integrity("p")
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        store.claim_ready_workflow_task("p", "worker")
+    assert store.list_workflow_attempts("p") == []
+
+
+def test_workflow_integrity_prevents_postclaim_dispatch_after_tampering(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "dispatch-integrity.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    claimed = store.claim_ready_workflow_task("p", "worker")
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET depends_on_json='[]' "
+            "WHERE plan_id='p' AND task_key='web'"
+        )
+    finally:
+        conn.close()
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        store.mark_workflow_dispatch_started("p", claimed["attempt_id"])
+
+
+def test_workflow_integrity_rejects_mutated_plan_snapshot(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "plan-integrity.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_plans SET digest='corrupted' WHERE id='p'"
+        )
+    finally:
+        conn.close()
+    with pytest.raises(ValueError, match="integrity verification failed"):
+        store.claim_ready_workflow_task("p", "worker")

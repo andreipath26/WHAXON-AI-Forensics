@@ -1321,6 +1321,74 @@ class JobStore:
         finally:
             c.close()
 
+    def verify_workflow_plan_integrity(self, plan_id):
+        """Verify immutable DAG snapshot against the persisted executable rows.
+
+        Detects corruption or out-of-band edits before a provider can receive
+        a task. Call in the same transaction as claiming to avoid a TOCTOU gap.
+        """
+        c = self._conn()
+        try:
+            return self._verify_workflow_plan_integrity_tx(c, plan_id)
+        finally:
+            c.close()
+
+    def _verify_workflow_plan_integrity_tx(self, c, plan_id):
+        import uuid
+
+        from .workflow import WorkflowPlan
+
+        row = c.execute(
+            "SELECT mission_id, schema_version, digest, plan_json FROM workflow_plans "
+            "WHERE id=?", (plan_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"unknown workflow plan: {plan_id}")
+        try:
+            plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+            if (
+                plan.digest != row["digest"]
+                or plan.mission_id != row["mission_id"]
+                or plan.schema_version != row["schema_version"]
+            ):
+                raise ValueError("immutable plan header mismatch")
+            expected_refs = {
+                task.id: uuid.uuid5(uuid.NAMESPACE_URL, f"whaxon:{plan_id}:{task.id}").hex
+                for task in plan.tasks
+            }
+            rows = c.execute(
+                "SELECT id, task_key, capability_id, target, inputs_json, depends_on_json, "
+                "permissions_json, impact, timeout_s, idempotency_key "
+                "FROM workflow_tasks WHERE plan_id=?", (plan_id,),
+            ).fetchall()
+            if len(rows) != len(plan.tasks):
+                raise ValueError("plan task count mismatch")
+            actual = {task["task_key"]: task for task in rows}
+            if len(actual) != len(rows) or set(actual) != set(expected_refs):
+                raise ValueError("plan task references mismatch")
+            for task in plan.tasks:
+                stored = actual[task.id]
+                if (
+                    stored["id"] != expected_refs[task.id]
+                    or stored["capability_id"] != task.capability_id
+                    or stored["target"] != task.target
+                    or json.loads(stored["inputs_json"]) != json.loads(
+                        json.dumps(task.inputs)
+                    )
+                    or json.loads(stored["depends_on_json"]) != [
+                        expected_refs[dependency] for dependency in task.depends_on
+                    ]
+                    or json.loads(stored["permissions_json"]) != list(task.permissions)
+                    or stored["impact"] != task.impact
+                    or stored["timeout_s"] != task.timeout_s
+                    or stored["idempotency_key"] != task.idempotency_key
+                ):
+                    raise ValueError(f"immutable task mismatch: {task.id}")
+        except (ValueError, KeyError, TypeError, OverflowError) as exc:
+            raise ValueError(f"workflow integrity verification failed: {exc}") from exc
+        return {"plan_id": plan_id, "valid": True, "digest": row["digest"],
+                "task_count": len(plan.tasks)}
+
     def list_workflow_tasks(self, plan_id):
         c = self._conn()
         try:
@@ -2167,6 +2235,7 @@ class JobStore:
                     "JOIN workflow_plans p ON p.id=t.plan_id "
                     "WHERE a.id=? AND t.plan_id=?", (attempt_id, plan_id),
                 ).fetchone()
+                self._verify_workflow_plan_integrity_tx(c, plan_id)
                 if row is None or row["attempt_status"] != "running" or (
                     row["task_status"] != "running" or row["active_attempt_id"] != attempt_id
                 ):
@@ -2291,6 +2360,7 @@ class JobStore:
                 if plan is None or plan["status"] == "cancel_requested":
                     c.execute("COMMIT")
                     return None
+                self._verify_workflow_plan_integrity_tx(c, plan_id)
                 deadline = c.execute(
                     "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
                 ).fetchone()
@@ -2470,6 +2540,7 @@ class JobStore:
                 if not self._mission_deadline_allows_dispatch(c, plan_row["plan_id"], now):
                     raise ValueError("mission deadline exceeded")
                 effective_plan = plan_row["plan_id"]
+                self._verify_workflow_plan_integrity_tx(c, effective_plan)
                 limits = c.execute(
                     "SELECT max_total_attempts, max_concurrency FROM workflow_limits "
                     "WHERE plan_id=?", (effective_plan,),
