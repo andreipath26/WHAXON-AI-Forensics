@@ -537,6 +537,20 @@ class JobStore:
             finally:
                 c.close()
 
+    def touch_session(self, session_id, info=None):
+        """Refresh session telemetry without changing its original identity."""
+        with self._lock:
+            c = self._conn()
+            try:
+                cur = c.execute(
+                    "UPDATE sessions SET info_json=?, last_seen=? "
+                    "WHERE id=? AND status='open'",
+                    (json.dumps(info or {}), time.time(), str(session_id)),
+                )
+                return cur.rowcount == 1
+            finally:
+                c.close()
+
     def close_session(self, session_id):
         with self._lock:
             c = self._conn()

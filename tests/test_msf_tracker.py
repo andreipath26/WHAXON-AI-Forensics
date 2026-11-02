@@ -185,3 +185,38 @@ def test_loop_swallows_poll_exceptions(tmp_path):
     assert tracker._thread is not None
     assert tracker._thread.is_alive()
     tracker.stop()
+
+def test_poll_preserves_original_session_identity_on_host_drift(tmp_path):
+    live = {"1": {"target_host": "10.0.0.5", "type": "shell"}}
+    tracker, client, store, _ = _make(tmp_path, live_sessions=live)
+    tracker._poll()
+    client._sessions = {"1": {"target_host": "10.0.0.6", "type": "shell"}}
+    tracker._poll()
+
+    persisted = store.get_session("1")
+    assert persisted["host"] == "10.0.0.5"
+    assert persisted["info"]["target_host"] == "10.0.0.6"
+
+
+def test_tracker_restart_does_not_replace_open_session_identity(tmp_path):
+    live = {"1": {"target_host": "10.0.0.5", "type": "shell"}}
+    first, _, store, _ = _make(tmp_path, live_sessions=live)
+    first._poll()
+
+    # A fresh tracker has an empty in-memory known set, just like a service
+    # restart. A reused ID with a changed host must not overwrite the record.
+    restarted, client, _, _ = _make(tmp_path, live_sessions={
+        "1": {"target_host": "10.0.0.6", "type": "shell"}
+    })
+    restarted._store = store
+    restarted._poll()
+    assert store.get_session("1")["host"] == "10.0.0.5"
+
+
+def test_poll_uses_tunnel_peer_as_persisted_session_host(tmp_path):
+    tracker, _, store, _ = _make(
+        tmp_path,
+        live_sessions={"1": {"tunnel_peer": "10.0.0.7", "type": "meterpreter"}},
+    )
+    tracker._poll()
+    assert store.get_session("1")["host"] == "10.0.0.7"
