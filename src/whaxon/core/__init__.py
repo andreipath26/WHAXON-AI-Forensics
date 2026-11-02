@@ -252,6 +252,21 @@ class Core:
         except Exception:
             return False
 
+    def authorize_workflow_task_for_plan(self, plan_id: str, task) -> bool:
+        """Enforce exact consent for moderate-impact tasks in persisted plans.
+
+        An approval is never a substitute for scope/provider policy. Revocation,
+        expiry, changed task bindings and missing approval all fail closed.
+        """
+        if not self.authorize_workflow_task(task):
+            return False
+        if task.impact in ("moderate", "high", "critical"):
+            try:
+                return bool(self.store.has_valid_workflow_approval(plan_id, task.id))
+            except (ValueError, TypeError, RuntimeError):
+                return False
+        return True
+
     def workflow_scheduler(
         self, *, authorize=None, dispatch=None, worker_id: str = "workflow-worker",
     ):
@@ -268,6 +283,8 @@ class Core:
         max_concurrency: int = 4,
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""
+        if authorize is None:
+            authorize = lambda task: self.authorize_workflow_task_for_plan(plan_id, task)
         scheduler = self.workflow_scheduler(
             authorize=authorize, dispatch=dispatch, worker_id=worker_id,
         )

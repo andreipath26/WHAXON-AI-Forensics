@@ -142,3 +142,46 @@ def test_core_default_workflow_policy_requires_scope_permission_and_matching_imp
         "scan", "tool.nmap", "198.51.100.20",
         permissions=("network.scan",), impact="moderate",
     )) is False
+
+
+def test_core_plan_bound_policy_requires_exact_unrevoked_approval(tmp_path):
+    import time
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "policy-approval.db")
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.nmap",
+        provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v1",
+        transports=("local_process",),
+        permissions=("network.scan",),
+        impact="moderate",
+    ))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=target == "192.0.2.10"),
+    )
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    plan = WorkflowPlan("mission", (task,))
+    core.store.create_mission("mission", "controlled lab")
+    core.store.save_workflow_plan("p", plan)
+    assert core.authorize_workflow_task_for_plan("p", task) is False
+    core.store.grant_workflow_approval(
+        "p", "scan", "approval", "operator", expires_at=time.time() + 300,
+    )
+    assert core.authorize_workflow_task_for_plan("p", task) is True
+    assert core.authorize_workflow_task_for_plan("p", WorkflowTask(
+        "scan", "tool.nmap", "198.51.100.20",
+        permissions=("network.scan",), impact="moderate",
+    )) is False
+    core.store.revoke_workflow_approval("p", "approval", actor="operator")
+    assert core.authorize_workflow_task_for_plan("p", task) is False
