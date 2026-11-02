@@ -542,7 +542,9 @@ def test_plan_scoped_recovery_preserves_fresh_lease_and_other_plans(tmp_path):
     store = JobStore(path)
     store.create_mission("mission-1", "objective")
     store.save_workflow_plan("p", _plan())
-    store.save_workflow_plan("other", _plan())
+    store.save_workflow_plan("other", WorkflowPlan(
+        "mission-1", (WorkflowTask("other", "network.port_scan", "192.0.2.11"),),
+    ))
     old = store.claim_ready_workflow_task("p", "dead-worker")
     live = store.claim_ready_workflow_task("other", "live-worker")
     with sqlite3.connect(path) as db:
@@ -1091,7 +1093,9 @@ def test_workflow_event_cursor_is_durable_monotone_and_plan_scoped(tmp_path):
     store = JobStore(path)
     store.create_mission("mission-1", "objective")
     store.save_workflow_plan("p", _plan())
-    store.save_workflow_plan("p2", _plan())
+    store.save_workflow_plan("p2", WorkflowPlan(
+        "mission-1", (WorkflowTask("other", "network.port_scan", "192.0.2.11"),),
+    ))
     one = store.claim_ready_workflow_task("p", "worker")
     store.finish_task_attempt(one["attempt_id"], "succeeded")
     events = store.list_unacknowledged_workflow_events("p", "reporter")
