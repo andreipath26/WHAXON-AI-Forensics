@@ -68,6 +68,11 @@ CREATE TABLE IF NOT EXISTS workflow_rate_limits (
 CREATE TABLE IF NOT EXISTS workflow_deadlines (
     plan_id TEXT PRIMARY KEY, deadline_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mission_rate_limits (
+    mission_id TEXT PRIMARY KEY,
+    min_spacing_s REAL NOT NULL,
+    last_claimed_at REAL
+);
 CREATE TABLE IF NOT EXISTS mission_cost_limits (
     mission_id TEXT PRIMARY KEY, max_cost_microusd INTEGER NOT NULL
 );
@@ -1164,6 +1169,48 @@ class JobStore:
             return False
         finally:
             c.close()
+
+    def set_mission_rate_limit(self, mission_id, *, min_spacing_s):
+        """Enforce durable spacing across every plan sharing a mission."""
+        import math
+
+        if (
+            isinstance(min_spacing_s, bool)
+            or not isinstance(min_spacing_s, (int, float))
+            or not math.isfinite(min_spacing_s)
+            or min_spacing_s <= 0
+        ):
+            raise ValueError("mission min_spacing_s must be finite and positive")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT min_spacing_s FROM mission_rate_limits WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchone()
+                if old is not None and min_spacing_s < old["min_spacing_s"]:
+                    raise ValueError("mission rate limit cannot be relaxed")
+                if old is None or min_spacing_s != old["min_spacing_s"]:
+                    c.execute(
+                        "INSERT INTO mission_rate_limits (mission_id, min_spacing_s) "
+                        "VALUES (?, ?) ON CONFLICT(mission_id) DO UPDATE SET "
+                        "min_spacing_s=excluded.min_spacing_s",
+                        (mission_id, min_spacing_s),
+                    )
+                    self._audit_mission_execution_change(
+                        c, mission_id, "mission_rate_limit_set",
+                        {"min_spacing_s": min_spacing_s},
+                    )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
 
     def set_workflow_rate_limit(self, plan_id, *, min_spacing_s):
         """Persist the minimum spacing between claims, without loosening bounds."""
@@ -2467,6 +2514,16 @@ class JobStore:
                 ):
                     c.execute("COMMIT")
                     return None
+                mission_rate = c.execute(
+                    "SELECT r.min_spacing_s, r.last_claimed_at "
+                    "FROM mission_rate_limits r JOIN workflow_plans p "
+                    "ON p.mission_id=r.mission_id WHERE p.id=?", (plan_id,),
+                ).fetchone()
+                if mission_rate is not None and mission_rate["last_claimed_at"] is not None and (
+                    time.time() < mission_rate["last_claimed_at"] + mission_rate["min_spacing_s"]
+                ):
+                    c.execute("COMMIT")
+                    return None
                 rate = c.execute(
                     "SELECT min_spacing_s, last_claimed_at FROM workflow_rate_limits "
                     "WHERE plan_id=?", (plan_id,),
@@ -2547,6 +2604,11 @@ class JobStore:
                     )
                     c.execute(
                         "UPDATE workflow_rate_limits SET last_claimed_at=? WHERE plan_id=?",
+                        (now, plan_id),
+                    )
+                    c.execute(
+                        "UPDATE mission_rate_limits SET last_claimed_at=? WHERE mission_id="
+                        "(SELECT mission_id FROM workflow_plans WHERE id=?)",
                         (now, plan_id),
                     )
                     c.execute(

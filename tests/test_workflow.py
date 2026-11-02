@@ -1658,3 +1658,36 @@ def test_dispatch_rechecks_cost_cap_tightening_after_claim(tmp_path):
     assert store.mark_workflow_dispatch_started("p", first["attempt_id"]) is False
     assert not [event for event in store.list_workflow_events("p")
                 if event["event_type"] == "dispatch_started"]
+
+
+def test_mission_rate_limit_serializes_claims_across_plans_and_restart(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    db = tmp_path / "mission-rate.db"
+    store = JobStore(db)
+    store.create_mission("m", "controlled lab")
+    for plan_id, target in (("p1", "192.0.2.10"), ("p2", "192.0.2.11")):
+        store.save_workflow_plan(plan_id, WorkflowPlan(
+            "m", (WorkflowTask("scan", "fixture", target),),
+        ))
+    store.set_mission_rate_limit("m", min_spacing_s=3600)
+    assert store.claim_ready_workflow_task("p1", "worker-a") is not None
+    reopened = JobStore(db)
+    assert reopened.claim_ready_workflow_task("p2", "worker-b") is None
+    with pytest.raises(ValueError, match="cannot be relaxed"):
+        reopened.set_mission_rate_limit("m", min_spacing_s=1)
+    reopened.set_mission_rate_limit("m", min_spacing_s=7200)
+    assert reopened.claim_ready_workflow_task("p2", "worker-b") is None
+
+
+def test_mission_rate_limit_rejects_invalid_configuration(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "invalid-rate.db")
+    store.create_mission("m", "controlled lab")
+    for invalid in (True, False, 0, -1, float("nan"), float("inf"), "1"):
+        with pytest.raises(ValueError, match="min_spacing_s"):
+            store.set_mission_rate_limit("m", min_spacing_s=invalid)
+    with pytest.raises(ValueError, match="unknown mission"):
+        store.set_mission_rate_limit("missing", min_spacing_s=1)
