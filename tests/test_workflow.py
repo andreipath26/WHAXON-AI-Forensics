@@ -1039,3 +1039,29 @@ def test_workflow_approval_rejects_expired_and_cancelled_plan(tmp_path):
         store.grant_workflow_approval(
             "p", "recon", "approval-cancelled", "operator", expires_at=time.time() + 300,
         )
+
+
+@_run_async_test
+async def test_scheduler_does_not_claim_failed_retryable_workflow_complete(tmp_path):
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "retryable-completion.db")
+    store.create_mission("m", "controlled test")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.10"),
+    )))
+
+    def failing_dispatch(_task):
+        raise RuntimeError("fixture failure")
+
+    scheduler = WorkflowScheduler(
+        store, authorize=lambda _task: True, dispatch=failing_dispatch,
+    )
+    first = await scheduler.run("p", max_tasks=1, max_attempts=2)
+    assert first["attempts"] == 1
+    assert first["complete"] is False
+    second = await scheduler.run("p", max_tasks=1, max_attempts=2)
+    assert second["attempts"] == 1
+    assert second["complete"] is True

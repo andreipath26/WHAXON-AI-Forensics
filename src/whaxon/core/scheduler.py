@@ -204,11 +204,23 @@ class WorkflowScheduler:
 
         await asyncio.gather(*(worker() for _ in range(min(max_concurrency, max_tasks))))
         tasks = self.store.list_workflow_tasks(plan_id)
+        # Failed attempts may still be retryable. Report completion only when
+        # every task has reached a terminal outcome under the attempt policy.
+        attempts = self.store.list_workflow_attempts(plan_id, limit=1000)
+        counts = {}
+        for attempt in attempts:
+            counts[attempt["task_key"]] = counts.get(attempt["task_key"], 0) + 1
+        terminal = {"succeeded", "blocked", "cancelled", "uncertain"}
+        complete = all(
+            task["status"] in terminal
+            or (
+                task["status"] == "failed"
+                and counts.get(task["id"], 0) >= max_attempts
+            )
+            for task in tasks
+        )
         return {
             "plan_id": plan_id, "attempts": claimed, "outcomes": outcomes,
             "tasks": [{"id": task["id"], "status": task["status"]} for task in tasks],
-            "complete": all(
-                task["status"] in ("succeeded", "failed", "blocked", "cancelled", "uncertain")
-                for task in tasks
-            ),
+            "complete": complete,
         }
