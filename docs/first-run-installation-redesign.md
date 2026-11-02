@@ -117,17 +117,21 @@ A failed, timed-out or interrupted pip operation may have partially changed the 
 
 ## Remaining deployment gates
 
-This feature is not considered production-deployable until all of the following are verified:
-- **Recorded CI passed 2026-11-01:** [run #41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) passed Ruff, mypy, 1,322 tests (14 skipped) and wheel/sdist metadata checks on Python 3.11, 3.12 and 3.13. The clean Python 3.12 wheel smoke test verified `whaxon doctor --json`, zero required blockers, READY validation payloads, the seeded catalog, scope policy and a local HTTP observation. Ubuntu apt and Apple Silicon Homebrew install acceptance passed; Windows/macOS/Ubuntu setup preview and venv smoke checks passed.
-- The manifest, tool catalog and required payload resources are present in both wheel and sdist.
-- Clean wheel installation, setup preview and virtual-environment creation are tested on Ubuntu, macOS and Windows CI runners. Actual apt and Homebrew package installation is separately exercised on Ubuntu and Apple Silicon macOS. Restricted-host behavior is now regression-tested: without a package manager, planning stays read-only and installation fails closed to manual guidance; without `sudo`, apt plans are manual-only; missing elevation consent is rejected before audit or execution. These are deterministic policy tests, not a claim that a physically disconnected host was provisioned.
-- **CI now performs real Ubuntu apt and macOS Homebrew installation acceptance** of the curated Nmap, Gobuster, SQLmap, ffuf and Nuclei packages, then runs the trusted version probes and a loopback-only Nmap discovery smoke test. Loopback functional smoke tests now exercise Nmap TCP discovery, Gobuster directory enumeration, ffuf content discovery and SQLmap HTTP parameter testing. The Homebrew acceptance job also runs a local Nuclei template against the loopback fixture and requires a matching result.
-- Read-only checks now cover packaged payload presence, external executable filesystem identity, PATH ambiguity, and whether the detected manager/OS/architecture combination is in the curated installer support set. Writable destination checks, resource integrity hashes, and physical disconnected-host acceptance remain outstanding.
-- Installation artifacts and transitive dependencies have a documented integrity/pinning strategy before any claim of reproducible or high-assurance installation.
-- Responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows pass browser regression tests.
-- Worker restart behavior, concurrent operations, lock recovery, cancellation and partial-install recovery are validated under realistic deployment process models.
+**Recorded implementation and CI evidence (not full deployment acceptance):**
+- CI run [#41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) passed Ruff, mypy, 1,322 tests (14 skipped) and wheel/sdist metadata checks on Python 3.11, 3.12 and 3.13. Its clean Python 3.12 wheel smoke test exercised `whaxon doctor --json`, the packaged catalog/resources, scope policy and a local HTTP observation.
+- Setup preview and virtual-environment smoke checks run on Ubuntu, macOS and Windows CI runners. Actual curated package installation is exercised on Ubuntu/apt and Apple Silicon macOS/Homebrew for Nmap, Gobuster, SQLmap, ffuf and Nuclei, followed by trusted version probes and selected loopback functional checks.
+- Restricted-host tests cover no supported package manager, no sudo for apt, and missing elevation consent. These are policy tests, not proof of physical offline-host provisioning.
+- Read-only diagnostics cover packaged payload presence, executable filesystem identity, PATH ambiguity and curated manager/OS/architecture support.
 
-Until these gates pass, keep the pull request in draft and do not publish this feature as a finished product update.
+**Still open; do not advertise as accepted or production-deployable:**
+- Broader package mappings and clean-machine acceptance across explicitly supported Linux distributions, native Windows and WSL2 (which must be treated as a separate Linux environment).
+- Physical offline-host acceptance, writable destination validation, resource integrity hashes, and a complete artifact/transitive-dependency integrity and pinning strategy.
+- Complete functional verification for every advertised external tool; current loopback checks cover selected tools and scenarios only.
+- Durable worker restart/recovery. Installation work runs in a background thread in the web process; a crash can interrupt an operation. Persisted state detects interruption but does not guarantee execution survives process restarts.
+- Complete browser acceptance for responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and every UI-to-API flow.
+- Independent audit trust anchoring and realistic failure/recovery acceptance.
+
+These are roadmap/release gates, not an instruction to keep a pull request in draft. The repository currently has no open pull request for this work. Do not publish dependency readiness as a finished production feature until the outstanding gates are closed with evidence.
 
 
 ## Evidence principle and audit lifecycle (mandatory)

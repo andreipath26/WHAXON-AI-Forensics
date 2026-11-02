@@ -114,17 +114,21 @@ A failed, timed-out or interrupted pip operation may have partially changed the 
 
 ## Remaining deployment gates
 
-This feature is not considered production-deployable until all of the following are verified:
-- **Completed 2026-11-01:** [CI run #41307525558](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41307525558) passed Ruff, mypy, full pytest and distribution build/metadata validation on Python 3.11, 3.12 and 3.13. The clean Python 3.12 wheel smoke test ran `whaxon doctor --json`, asserted zero required blockers and READY validation payloads; the sdist check verified the dependency manifest, tool catalog and payload files.
-- The manifest, tool catalog and required payload resources are present in both wheel and sdist.
-- Clean installation and operation are tested on Windows, macOS and supported Linux distributions, including no-root and offline cases.
-- Every external-tool readiness claim is backed by a curated version and functional smoke-test contract.
-- Writable installation destinations, resource integrity/hashes, and complete package-manager/no-root/offline behavior still require clean-machine acceptance. Read-only diagnostics now check packaged validation-resource presence, executable filesystem identity, PATH ambiguity, and curated manager/OS/architecture support.
-- Installation artifacts and transitive dependencies have a documented integrity/pinning strategy before any claim of reproducible or high-assurance installation.
-- Responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows pass browser regression tests.
-- Worker restart behavior, concurrent operations, lock recovery, cancellation and partial-install recovery are validated under realistic deployment process models.
+**Verified implementation and CI evidence (not full deployment acceptance):**
+- CI run [#41307525558](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41307525558) passed Ruff, mypy, pytest and distribution build/metadata validation on Python 3.11, 3.12 and 3.13. Its clean Python 3.12 wheel smoke test exercised `whaxon doctor --json`; the sdist check verified the dependency manifest, tool catalog and payload files.
+- Setup preview and virtual-environment smoke checks run on Ubuntu, macOS and Windows CI runners. Actual curated external-tool installation is exercised on Ubuntu/apt and Apple Silicon macOS/Homebrew, with trusted version probes and loopback-only functional checks for the selected tools.
+- Restricted-host policy tests verify read-only planning when no supported package manager is present, manual-only apt plans without sudo, and rejection when elevation consent is missing.
+- The manifest, packaged tool catalog and required validation payload resources are checked in wheel/sdist workflows.
 
-Until these gates pass, keep the pull request in draft and do not publish this feature as a finished product update.
+**Still open; do not advertise as accepted or production-deployable:**
+- Full clean-machine acceptance for each explicitly supported OS/distribution/architecture, including native Windows and WSL2 as separate environments. Windows package managers are diagnostic-only; their package IDs are not enabled for automatic installation.
+- Physical offline-host acceptance, writable destination validation, resource integrity hashes, and a complete artifact/transitive-dependency integrity and pinning strategy.
+- Full functional verification coverage for every advertised external-tool capability; the existing loopback checks cover only the selected curated tools and scenarios.
+- Worker restart/recovery guarantees. The installer worker is a background thread in the web process; a process crash can interrupt an operation. Persisted state detects interruption but does not provide durable execution across restarts.
+- Complete browser acceptance for responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows.
+- Independent audit trust anchoring and realistic failure/recovery acceptance.
+
+These are roadmap/release gates, not an instruction to keep a pull request in draft. The repository currently has no open pull request for this work. Do not publish dependency readiness as a finished production feature until the outstanding gates are closed with evidence.
 
 
 ## Evidence principle and audit lifecycle (mandatory)
@@ -146,4 +150,4 @@ Events must share stable plan, approval, operation and dependency identifiers so
 
 ### Headless server support
 
-WHAXON's CLI setup/diagnostics and production `whaxon serve` entry point are designed to run without a desktop session or terminal interaction. The PR adds a Linux CI acceptance job that removes DISPLAY/Wayland/session variables, executes setup and doctor, starts the Waitress server with stdin detached, and confirms an HTTP response on loopback. This does not replace remote deployment hardening: configure explicit credentials, TLS/reverse proxy, firewall rules, backups and a persistent protected data directory before network exposure.
+WHAXON's CLI setup/diagnostics and production `whaxon serve` entry point are designed to run without a desktop session or terminal interaction. The Linux CI workflow removes DISPLAY/Wayland/session variables, executes setup and doctor, starts the Waitress server with stdin detached, and confirms an HTTP response on loopback. This does not replace remote deployment hardening: configure explicit credentials, TLS/reverse proxy, firewall rules, backups and a persistent protected data directory before network exposure.

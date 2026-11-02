@@ -89,11 +89,11 @@ These controls must remain disabled/hidden until a real backend implementation, 
 3. **Accessibility:** browser tests exist, but a full keyboard/focus-management/screen-reader/WCAG 1.4.1 acceptance pass is not evidenced by the current test names or contents reviewed. Add automated checks where practical and record manual checks separately.
 4. **All-control inventory:** the 22 pages have dedicated or shared browser tests, but a complete per-control inventory proving every visible control is wired, disabled or hidden has not yet been recorded. Continue page-by-page and extend tests for any uncovered controls.
 5. **Deployment dependencies:** the supplied pages load Tailwind and web fonts from external CDNs. Decide and test whether the supported deployment requires network-independent bundled assets; do not silently claim air-gapped readiness while external runtime assets remain.
-6. **Default route:** root redirect and legacy-route regression assertions were committed after baseline CI. Await and inspect the CI result for `aa8fcd2`.
+6. **Default route:** the current web server redirects `/` to `/ui-v2`; the current route matrix covers the new UI routes. The historical note about awaiting CI for `aa8fcd2` is obsolete; acceptance of the exact release candidate still requires its own current CI result.
 
 ## 7. Branch and PR reconciliation
 
-At audit time there were no open pull requests. The canonical UI integration PRs #37, #41 and #42, and the subsequent UI wiring/truthfulness PRs #43–#73, were already merged into `main`. The old full-wiring PR #16 was closed unmerged as a draft; its own description explicitly said not to merge because wiring and browser acceptance were incomplete. PRs #33–#36 were superseded by the later integrated UI work. Their old branch tips must not be blindly merged over newer main code.
+At the time of this audit there were no open pull requests; the repository was checked again on 2026-11-02 and still had none open. The canonical UI integration PRs #37, #41 and #42, and the subsequent UI wiring/truthfulness PRs #43–#73, were already merged into `main`. The old full-wiring PR #16 was closed unmerged as a draft; its own description explicitly said not to merge because wiring and browser acceptance were incomplete. PRs #33–#36 were superseded by the later integrated UI work. Their old branch tips must not be blindly merged over newer main code.
 
 No new branch or alternate UI was created for this audit. Stale historical branches are not merge candidates merely because they still exist.
 

@@ -27,7 +27,7 @@ This index is for the active repository: [andreipath26/WHAXON-AI-Forensics](http
 ## Current engineering and acceptance records
 
 - [New UI interaction and acceptance audit](NEW_UI_INTERACTION_AUDIT.md) — current route map and remaining UI gates.
-- [Engine v2 architecture and roadmap crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md)
+- [Engine v2 architecture and roadmap crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) — target architecture and implementation status crosswalk; architecture requirements are not claims that the full design is implemented.
 - [Experiment audit](WHAXON_EXPERIMENT_AUDIT_2026-10-25.md) — dated research evidence and limitations.
 - [Engineering execution model](ENGINEERING_EXECUTION_MODEL.md)
 - [Changelog](CHANGELOG.md)
