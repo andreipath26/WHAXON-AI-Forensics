@@ -1,0 +1,78 @@
+"""One-shot inspection/replay must not claim work queued by another invocation."""
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from whaxon.core import Core
+from whaxon.core.findings import Finding
+from whaxon.core.recon import ReconRunner
+from whaxon.core.runner import ToolRunner
+from whaxon.core.validator import Validator
+from whaxon.interfaces.cli import coverage_cmd, recon_cmd, retest_cmd, validate_cmd
+
+
+@pytest.mark.parametrize(
+    ("command", "outcome", "expected"),
+    [
+        (coverage_cmd, "normal", 0),
+        (coverage_cmd, "missing", 1),
+        (validate_cmd, "normal", 0),
+        (validate_cmd, "missing", 1),
+        (validate_cmd, "blocked", 4),
+        (retest_cmd, "normal", 0),
+        (retest_cmd, "missing", 1),
+        (retest_cmd, "blocked", 4),
+        (retest_cmd, "ineligible", 3),
+        (recon_cmd, "normal", 0),
+        (recon_cmd, "blocked", 1),
+    ],
+)
+def test_one_shot_preserves_unrelated_pending_jobs(
+    tmp_path, monkeypatch, command, outcome, expected,
+):
+    monkeypatch.chdir(tmp_path)
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "scope.json").write_text(json.dumps({
+        "enabled": True, "in_scope": ["127.0.0.1"], "out_of_scope": [],
+    }))
+    core = Core(data)
+    target = "203.0.113.9" if outcome == "blocked" else "127.0.0.1"
+    core.store.create("requested")
+    core.store.set_started("requested", "sqlmap", target)
+    core.store.append_finding("requested", Finding(
+        kind="sqli", severity="high", source="test", data={"parameter": "id"},
+    ), 0)
+    if outcome != "ineligible":
+        core.store.update_verification("requested", 0, "verified")
+    core.store.set_finished("requested", 0, 0.0)
+    core.store.create_pending("unrelated", "echo", "127.0.0.1")
+
+    dispatched = []
+
+    async def record_dispatch(self, *args, **kwargs):
+        dispatched.append(kwargs)
+
+    # Keep actual Core initialization, claims and SQLite state. Only the final
+    # external execution/replay is intercepted so this regression has no traffic.
+    monkeypatch.setattr(ToolRunner, "run_tool", record_dispatch)
+    monkeypatch.setattr(Validator, "validate", lambda *a, **k: ("candidate", "test"))
+    monkeypatch.setattr(Validator, "revalidate", lambda *a, **k: ("inconclusive", "test"))
+    monkeypatch.setattr(ReconRunner, "run", lambda *a, **k: None)
+
+    job_id = "missing" if outcome == "missing" else "requested"
+    if command is recon_cmd:
+        args = [target]
+    elif command is coverage_cmd:
+        args = [job_id]
+    else:
+        args = [job_id, "0"]
+
+    assert command.main(args) == expected
+    assert dispatched == []
+    assert core.store.list_pending() == [
+        {"id": "unrelated", "tool": "echo", "target": "127.0.0.1"},
+    ]
+    assert core.store.get("unrelated")["status"] == "pending"

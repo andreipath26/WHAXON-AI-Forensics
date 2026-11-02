@@ -46,7 +46,7 @@ def main(args: list[str] | None = None) -> int:
         return EXIT_USAGE
 
     core = Core(data_dir)
-    asyncio.run(core.initialize())
+    asyncio.run(core.initialize(drain=False))
 
     findings = core.store.get_findings(job_id)
     if not findings:

@@ -23,6 +23,8 @@ Source and tests on an exact commit establish implemented behavior. The [product
 
 Guides can describe supported subsets. Check current source and the capability register before assuming every tool, transport, platform or API workflow is implemented and accepted.
 
+- [UI source-control inventory](UI_CONTROL_INVENTORY.md): all 22 templates, source binding evidence and unresolved runtime/visual/accessibility checks.
+
 ## Detailed architecture and acceptance records
 
 These documents serve distinct purposes and remain subordinate to the trajectory's work order:

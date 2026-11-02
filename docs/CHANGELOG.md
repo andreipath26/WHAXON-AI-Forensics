@@ -1,3 +1,12 @@
+## 2026-11-02 — One-shot isolation, catalog consolidation and desktop default
+
+- Prevent coverage, validation, retest and reconnaissance commands from draining unrelated pending jobs during startup; add real-store normal/refusal regressions.
+- Use the packaged tool catalog as the single maintained seed; remove the duplicate tracked root seed after migrating tests. Preserve existing operator catalogs and verify clean-wheel bootstrap.
+- Remove unused qasync from GUI requirements and dependency profiles; retain protected legacy design sources and legal history.
+- Launch the desktop shell at the supplied `/ui-v2` destination while retaining `/ui` compatibility.
+- Add a 793-control source registry across all 22 supplied templates and a browser sidebar-destination contract. Runtime wiring, visual, accessibility and full service-parity acceptance remain open; no template redesign or fabricated visual baselines.
+- Local verification covers lint, types, builds, metadata, clean-wheel bootstrap and non-browser regressions. Browser execution is blocked by unavailable Chromium downloads; CI and native Qt/manual acceptance remain separate evidence.
+
 ## 2026-11-02 — Repository-wide documentation classification and correction
 
 - Inventoried the 102 Markdown files present at the pre-audit baseline and separated current operator guidance from roadmap designs, historical engineering records, experiment evidence, generated reports, vendored payload references, legal notices and imported GitHub captures.

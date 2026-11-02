@@ -34,10 +34,10 @@ from whaxon.interfaces.tui.screens.main import (
 async def _boot(tmp_path):
     """Return (app, pilot). Caller is responsible for exiting the context.
 
-    Copies the repo's data/tools.json into the temp dir so the catalog loads.
+    Copies the packaged src/whaxon/data/tools.json into the temp dir so the catalog loads.
     """
     import shutil
-    repo_data = Path(__file__).resolve().parents[1] / "data"
+    repo_data = Path(__file__).resolve().parents[1] / "src" / "whaxon" / "data"
     if (repo_data / "tools.json").exists():
         shutil.copy(repo_data / "tools.json", tmp_path / "tools.json")
     app = WhaxonApp(data_dir=tmp_path)

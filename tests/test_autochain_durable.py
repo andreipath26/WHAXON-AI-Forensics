@@ -30,7 +30,7 @@ def test_queue_then_drain_in_separate_process(tmp_path: Path) -> None:
     from whaxon.core.store import JobStore
     data = tmp_path / "data"
     data.mkdir()
-    (data / "tools.json").write_text((REPO / "data" / "tools.json").read_text())
+    (data / "tools.json").write_text((REPO / "src" / "whaxon" / "data" / "tools.json").read_text())
     (data / "scope.json").write_text(json.dumps({
         "engagement": "test", "enabled": True,
         "in_scope": ["127.0.0.1"], "out_of_scope": [],
@@ -58,7 +58,7 @@ def test_reconcile_on_init_marks_old_running_failed(tmp_path: Path) -> None:
     from whaxon.core.store import JobStore
     data = tmp_path / "data"
     data.mkdir()
-    (data / "tools.json").write_text((REPO / "data" / "tools.json").read_text())
+    (data / "tools.json").write_text((REPO / "src" / "whaxon" / "data" / "tools.json").read_text())
     (data / "scope.json").write_text(json.dumps({
         "engagement": "test", "enabled": True,
         "in_scope": ["127.0.0.1"], "out_of_scope": [],

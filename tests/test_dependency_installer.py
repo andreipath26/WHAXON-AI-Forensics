@@ -38,6 +38,9 @@ def test_audit_redaction():
 def test_install_refuses_non_virtual_environment(monkeypatch):
     from whaxon.core.installer import apply_approved_dependency_plan
 
+    # Bind approval to the same non-venv environment being tested.
+    monkeypatch.setattr(sys, "prefix", "/usr")
+    monkeypatch.setattr(sys, "base_prefix", "/usr")
     plan = build_remediation_plan()
     candidates = [action for action in plan["actions"]
                   if action["options"][0]["kind"] == "python-package"]
@@ -45,8 +48,6 @@ def test_install_refuses_non_virtual_environment(monkeypatch):
         pytest.skip("No missing Python package to install")
     dependency_id = candidates[0]["dependency_id"]
     focused = build_remediation_plan(dependency_ids=[dependency_id])
-    monkeypatch.setattr(sys, "prefix", "/usr")
-    monkeypatch.setattr(sys, "base_prefix", "/usr")
     with pytest.raises(ValueError, match="virtual environment"):
         apply_approved_dependency_plan(dependency_id, focused["plan_id"])
 

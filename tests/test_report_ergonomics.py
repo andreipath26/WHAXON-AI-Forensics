@@ -16,7 +16,7 @@ from whaxon.interfaces.cli import report_cmd
 
 
 def _seed(tmp_path: Path) -> None:
-    repo_data = Path(__file__).resolve().parents[1] / "data"
+    repo_data = Path(__file__).resolve().parents[1] / "src" / "whaxon" / "data"
     if (repo_data / "tools.json").exists():
         shutil.copy(repo_data / "tools.json", tmp_path / "tools.json")
 

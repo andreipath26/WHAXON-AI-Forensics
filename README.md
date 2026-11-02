@@ -63,11 +63,11 @@ Open [http://127.0.0.1:5001/](http://127.0.0.1:5001/). The root redirects to the
 
 `whaxon serve` provides the Waitress service entry point. Headless Linux startup has CI smoke coverage. Remote access requires explicit authentication and suitable reverse-proxy/TLS configuration; follow [deployment](docs/deployment.md). Foreground, daemon, systemd and Docker modes still need acceptance for each advertised deployment combination.
 
-Optional `tui` and `gui` extras provide terminal and desktop interfaces. **The desktop shell currently opens legacy `/ui`; its new-UI migration remains open.** Legacy reference assets are preserved. The supplied browser UI still depends on external assets; full air-gapped browser operation is not established.
+Optional `tui` and `gui` extras provide terminal and desktop interfaces. **The desktop shell now opens `/ui-v2`; actual Qt-window acceptance remains open.** Legacy reference assets are preserved. The supplied browser UI still depends on external assets; full air-gapped browser operation is not established.
 
 ## Current limitations and next work
 
-- **Initialization side effects:** `coverage`, `validate`, `retest` and `recon` currently initialize with pending-job draining enabled. They can dispatch unrelated queued work before their requested action. This source-confirmed issue is the immediate correctness priority; it is not fixed by the repository cleanup. Avoid invoking these commands against a workspace containing unrelated pending jobs until the initialization contract is repaired.
+- **One-shot isolation:** `coverage`, `validate`, `retest` and `recon` initialize without draining unrelated queued jobs. Dedicated regression tests cover successful and refused command paths; explicit worker/follow-up behavior remains supported.
 - Scope guards are application-level checks, not a firewall or connection-time DNS pin. External tools can make secondary requests; deployment egress controls remain necessary.
 - Evidence-chain, crash/restart, cancellation, budget and audit guarantees need integrated acceptance. Hash chaining without an independent trust anchor is not immutability.
 - Package installation can leave partial changes; completed installations are not generally rolled back. Setup smoke is not universal platform or full-tool acceptance.

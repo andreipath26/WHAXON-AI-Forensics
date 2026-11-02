@@ -88,18 +88,6 @@
       ]
     },
     {
-      "id": "qasync",
-      "name": "qasync",
-      "kind": "python-package",
-      "required": false,
-      "minimum_version": "0.27",
-      "import_name": "qasync",
-      "extra": "gui",
-      "capabilities": [
-        "gui"
-      ]
-    },
-    {
       "id": "flask",
       "name": "Flask",
       "kind": "python-package",
@@ -215,8 +203,7 @@
       "textual-image"
     ],
     "gui": [
-      "PySide6",
-      "qasync"
+      "PySide6"
     ],
     "web": [
       "flask",
