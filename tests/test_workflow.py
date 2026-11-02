@@ -1524,3 +1524,27 @@ async def test_provider_failure_after_cancellation_is_uncertain(tmp_path):
     ).run("p")
     assert result["tasks"][0]["status"] == "uncertain"
     assert store.list_workflow_attempts("p")[0]["status"] == "uncertain"
+
+
+@_run_async_test
+async def test_scheduler_outcome_reflects_cancellation_winning_finish_race(tmp_path):
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "cancel-finish-serialized.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    original_finish = store.finish_task_attempt
+
+    def racing_finish(attempt_id, status, result=None, error=""):
+        if status == "succeeded":
+            JobStore(store.path).request_workflow_cancellation("p")
+        return original_finish(attempt_id, status, result=result, error=error)
+
+    store.finish_task_attempt = racing_finish
+    result = await WorkflowScheduler(
+        store, authorize=lambda task: True,
+        dispatch=lambda task: {"ok": True},
+    ).run("p")
+    assert result["outcomes"][0]["status"] == "uncertain"
+    assert result["tasks"][0]["status"] == "uncertain"

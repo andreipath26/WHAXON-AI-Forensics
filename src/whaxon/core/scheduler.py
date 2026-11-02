@@ -148,7 +148,9 @@ class WorkflowScheduler:
                 )
                 return {"task_id": task.id, "status": "uncertain"}
             self.store.finish_task_attempt(attempt_id, "succeeded", result=result)
-            return {"task_id": task.id, "status": "succeeded"}
+            # Cancellation can win the commit after our last policy read.
+            committed = self.store.get_workflow_attempt_status(attempt_id)
+            return {"task_id": task.id, "status": committed}
         except TimeoutError:
             if lease_lost.is_set():
                 return {"task_id": task.id, "status": "uncertain"}
@@ -174,7 +176,8 @@ class WorkflowScheduler:
             self.store.finish_task_attempt(
                 attempt_id, outcome, error=f"{type(exc).__name__}: {exc}",
             )
-            return {"task_id": task.id, "status": outcome}
+            committed = self.store.get_workflow_attempt_status(attempt_id)
+            return {"task_id": task.id, "status": committed}
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)

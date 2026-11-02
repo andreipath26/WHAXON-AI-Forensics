@@ -2632,6 +2632,19 @@ class JobStore:
             finally:
                 c.close()
 
+    def get_workflow_attempt_status(self, attempt_id):
+        """Read the committed result, including cancellation-race fencing."""
+        c = self._conn()
+        try:
+            row = c.execute(
+                "SELECT status FROM task_attempts WHERE id=?", (attempt_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"unknown task attempt: {attempt_id}")
+            return row["status"]
+        finally:
+            c.close()
+
     def finish_task_attempt(self, attempt_id, status, result=None, error=""):
         """Record an attempt outcome and update its task in one transaction."""
         if status not in ("succeeded", "failed", "cancelled", "uncertain", "blocked"):
