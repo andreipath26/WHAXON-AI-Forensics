@@ -50,7 +50,6 @@ def test_plan_roundtrip_is_stable_and_digest_is_deterministic():
 
 
 def test_plan_rejects_missing_dependency_and_cycle():
-    import pytest
 
     with pytest.raises(ValueError, match="unknown dependencies"):
         WorkflowPlan("m", (WorkflowTask("a", "x", "host", depends_on=("missing",)),))
@@ -65,7 +64,6 @@ def test_plan_rejects_missing_dependency_and_cycle():
 
 
 def test_task_rejects_unsafe_or_invalid_contract_values():
-    import pytest
 
     with pytest.raises(ValueError, match="impact"):
         WorkflowTask("x", "cap", "host", impact="unbounded")
@@ -150,7 +148,6 @@ async def test_scheduler_blocks_dependants_after_policy_denial(tmp_path):
 
 
 def test_workflow_contract_nested_mappings_are_immutable():
-    import pytest
 
     inputs = {"options": {"ports": [80, 443]}}
     metadata = {"labels": ["approved"]}
@@ -170,7 +167,6 @@ def test_workflow_contract_nested_mappings_are_immutable():
 def test_workflow_task_rejects_non_finite_timeout():
     import math
 
-    import pytest
 
     with pytest.raises(ValueError, match="finite"):
         WorkflowTask("bad", "cap", "host", timeout_s=math.inf)
