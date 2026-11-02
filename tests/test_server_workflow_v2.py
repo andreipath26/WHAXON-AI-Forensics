@@ -147,7 +147,8 @@ def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
         "/api/v2/missions/m/deadline", json={"deadline_at": time.time() - 1},
     )
     assert response.status_code == 200
-    assert response.get_json()["deadline_exceeded"] is True
+    assert response.get_json()["deadline_at"] <= time.time()
+    assert core.store.get_mission_deadline("m") == response.get_json()["deadline_at"]
     assert core.store.claim_ready_workflow_task("p", "worker") is None
     assert client.post(
         "/api/v2/missions/m/deadline", json={"deadline_at": time.time() + 100},
