@@ -71,6 +71,10 @@ def _normalize_target(raw: str) -> tuple[str, str]:
     if not raw:
         return "", "host"
     raw = raw.strip()
+    # Reject control characters and embedded whitespace in targets. URL parsers
+    # otherwise accept ambiguous authorities that external tools may reinterpret.
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw):
+        return "", "host"
     if "://" in raw:
         try:
             parsed = urlparse(raw)
