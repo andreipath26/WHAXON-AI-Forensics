@@ -246,7 +246,7 @@ Install the development dependencies and required browser-test tooling before ru
 
 ## Project direction
 
-WHAXON's next architectural direction is documented in the [Engine v2 architecture and roadmap crosswalk](docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md). That document describes a target architecture and implementation contract; it is **not** a claim that Engine v2 is already implemented or ready for deployment. The current behavior remains defined by the code and tests on `main`.
+WHAXON Engine v2 is **partially implemented on `main`**, including versioned mission/task contracts, persistence, scheduler/recovery primitives and an initial read-only scanner-provider slice. It is not yet deployment-ready: security acceptance, production recovery guarantees, broader provider migration, shared CLI/API/headless lifecycle, supplied-UI integration and end-to-end release gates remain open. See the [Engine v2 architecture and roadmap crosswalk](docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md), [project state](docs/STATE.md) and master roadmap §49.
 
 WHAXON is developed in its own repository. Related projects such as [KILN](https://github.com/andreipath26/KILN) and [Aletheia Framework](https://github.com/andreipath26/aletheia-framework) are separate projects; do not assume they are integrated into WHAXON.
 
