@@ -247,3 +247,54 @@ def test_v2_api_run_submits_bounded_core_execution_without_claiming_success(
         headers={"Origin": "https://attacker.invalid"},
     ).status_code == 403
     assert len(captured) == 1
+
+
+def test_v2_api_approval_and_reconciliation_parity(tmp_path, monkeypatch):
+    import time
+
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10", impact="moderate"),
+    )))
+    assert client.post("/api/v2/workflows/p/approvals", json={
+        "task_key": "scan", "approval_id": "approval-1",
+        "actor": "operator", "expires_at": time.time() + 300,
+    }).status_code == 200
+    assert len(client.get("/api/v2/workflows/p/approvals").get_json()) == 1
+    assert client.post(
+        "/api/v2/workflows/p/approvals/approval-1/revoke",
+        json={"actor": "operator"},
+    ).status_code == 200
+    assert client.post(
+        "/api/v2/workflows/p/reconcile", json={"stale_after_s": 60},
+    ).status_code == 200
+    assert client.post(
+        "/api/v2/workflows/p/approvals", json={"task_key": "scan"},
+    ).status_code == 400
+    assert client.post(
+        "/api/v2/workflows/p/approvals", json={},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+
+
+def test_v2_api_event_consumer_parity_and_validation(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    assert client.get("/api/v2/workflows/p/event-inbox").status_code == 400
+    assert client.get(
+        "/api/v2/workflows/p/event-inbox?consumer=worker",
+    ).status_code == 200
+    assert client.post(
+        "/api/v2/workflows/p/event-ack", json={"consumer": "worker", "event_id": True},
+    ).status_code == 400
+    assert client.post(
+        "/api/v2/workflows/p/event-ack", json={"consumer": "worker", "event_id": 0},
+    ).status_code in (200, 400)
+    assert client.post(
+        "/api/v2/workflows/p/event-ack", json={"consumer": "worker", "event_id": 1},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403

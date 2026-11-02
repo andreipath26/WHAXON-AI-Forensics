@@ -681,6 +681,86 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @app.route("/api/v2/workflows/<plan_id>/approvals", methods=["GET", "POST"])
+    def workflow_v2_approvals(plan_id):
+        if request.method == "POST":
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict) or any(
+                name not in payload
+                for name in ("task_key", "approval_id", "actor", "expires_at")
+            ):
+                return jsonify({"error": "task_key, approval_id, actor and expires_at required"}), 400
+            try:
+                granted = core.grant_workflow_approval(
+                    plan_id, payload["task_key"], payload["approval_id"],
+                    payload["actor"], expires_at=payload["expires_at"],
+                )
+                return jsonify({"plan_id": plan_id, "granted": bool(granted)}), 200
+            except (ValueError, TypeError, KeyError) as exc:
+                return jsonify({"error": str(exc)}), 400
+        try:
+            return jsonify(core.workflow_approvals(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.post("/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke")
+    def workflow_v2_revoke_approval(plan_id, approval_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("actor"), str):
+            return jsonify({"error": "actor required"}), 400
+        try:
+            revoked = core.revoke_workflow_approval(
+                plan_id, approval_id, actor=payload["actor"],
+            )
+            return jsonify({"plan_id": plan_id, "approval_id": approval_id, "revoked": bool(revoked)})
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.post("/api/v2/workflows/<plan_id>/reconcile")
+    def workflow_v2_reconcile(plan_id):
+        payload = request.get_json(silent=True)
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            return jsonify({"error": "JSON object required"}), 400
+        try:
+            changed = core.reconcile_workflow_plan(
+                plan_id, stale_after_s=payload.get("stale_after_s", 60.0),
+            )
+            return jsonify({"plan_id": plan_id, "attempts_marked_uncertain": changed})
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.get("/api/v2/workflows/<plan_id>/event-inbox")
+    def workflow_v2_event_inbox(plan_id):
+        consumer = request.args.get("consumer", "")
+        if not consumer:
+            return jsonify({"error": "consumer required"}), 400
+        try:
+            limit = int(request.args.get("limit", "100"))
+            return jsonify(core.workflow_event_inbox(plan_id, consumer, limit=limit))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.post("/api/v2/workflows/<plan_id>/event-ack")
+    def workflow_v2_event_ack(plan_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("consumer"), str) or (
+            not payload["consumer"] or isinstance(payload.get("event_id"), bool)
+            or not isinstance(payload.get("event_id"), int)
+        ):
+            return jsonify({"error": "consumer and integer event_id required"}), 400
+        try:
+            checkpoint = core.acknowledge_workflow_event(
+                plan_id, payload["consumer"], payload["event_id"],
+            )
+            return jsonify({
+                "plan_id": plan_id, "consumer_id": payload["consumer"],
+                "last_event_id": checkpoint,
+            })
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
     @app.get("/api/v2/workflows/<plan_id>/attempts")
     def workflow_v2_attempts(plan_id):
         try:
