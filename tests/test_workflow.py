@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -12,7 +13,13 @@ def _run_async_test(test_function):
     fixtures by exposing a synchronous pytest test that owns its loop.
     """
     def run(*args, **kwargs):
-        return asyncio.run(test_function(*args, **kwargs))
+        # Some optional pytest plugins start an event loop in the worker
+        # thread even for synchronous tests. Own a separate thread so this
+        # test's asyncio loop can never collide with that loop.
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(
+                asyncio.run, test_function(*args, **kwargs)
+            ).result()
 
     # Preserve fixture discovery without exposing a coroutine function to
     # pytest-asyncio's auto mode (which would wrap it in a second event loop).
