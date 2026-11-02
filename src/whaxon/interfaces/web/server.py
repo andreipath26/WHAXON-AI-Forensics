@@ -538,6 +538,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @app.route("/api/v2/missions/<mission_id>/rate-limit", methods=["GET", "POST"])
+    def workflow_v2_mission_rate_limit(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict) or "min_spacing_s" not in payload:
+                    return jsonify({"error": "min_spacing_s required"}), 400
+                core.configure_mission_rate_limit(
+                    mission_id, min_spacing_s=payload["min_spacing_s"],
+                )
+            return jsonify(core.mission_rate_limit(mission_id))
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
     @app.post("/api/v2/missions/<mission_id>/deadline")
     def workflow_v2_mission_deadline(mission_id):
         payload = request.get_json(silent=True)

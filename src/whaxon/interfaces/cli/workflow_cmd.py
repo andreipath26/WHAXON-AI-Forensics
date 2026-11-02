@@ -57,6 +57,11 @@ def _parser() -> argparse.ArgumentParser:
         "cost", help="inspect measured cost and incomplete reporting",
     )
     cost_summary.add_argument("--id", required=True)
+    mission_rate = mission_commands.add_parser(
+        "rate-limit", help="set a durable rate limit shared by all mission plans",
+    )
+    mission_rate.add_argument("--id", required=True)
+    mission_rate.add_argument("--min-spacing-seconds", type=float, required=True)
     mission_deadline = mission_commands.add_parser(
         "deadline", help="set a mission-wide absolute execution cutoff",
     )
@@ -194,6 +199,12 @@ def main(args: list[str] | None = None) -> int:
                 cost_microusd=options.cost_microusd, source=options.source,
             )
             print(json.dumps({"attempt_id": options.attempt_id, "cost_microusd": amount}))
+            return 0
+        if options.command == "mission" and options.mission_command == "rate-limit":
+            core.configure_mission_rate_limit(
+                options.id, min_spacing_s=options.min_spacing_seconds,
+            )
+            print(json.dumps(core.mission_rate_limit(options.id), sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "deadline":
             core.configure_mission_deadline(options.id, deadline_at=options.unix_time)

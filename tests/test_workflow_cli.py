@@ -32,6 +32,12 @@ class _FakeCore:
     def record_workflow_attempt_cost(self, attempt_id, *, cost_microusd, source):
         return cost_microusd
 
+    def configure_mission_rate_limit(self, mission_id, *, min_spacing_s):
+        self.mission_rate = (mission_id, min_spacing_s)
+
+    def mission_rate_limit(self, mission_id):
+        return {"mission_id": mission_id, "min_spacing_s": self.mission_rate[1]}
+
     def configure_mission_deadline(self, mission_id, *, deadline_at):
         self.mission_deadline = (mission_id, deadline_at)
 
@@ -312,3 +318,12 @@ def test_mission_cost_commands_use_shared_core(monkeypatch, capsys):
         "--cost-microusd", "25", "--source", "invoice",
     ]) == 0
     assert json.loads(capsys.readouterr().out)["cost_microusd"] == 25
+
+
+def test_mission_rate_limit_cli_uses_shared_core(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "rate-limit", "--id", "m", "--min-spacing-seconds", "3.5",
+    ]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result == {"mission_id": "m", "min_spacing_s": 3.5}

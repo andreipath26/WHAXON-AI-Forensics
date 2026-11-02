@@ -165,3 +165,27 @@ def test_mission_cost_api_requires_explicit_cost_evidence(tmp_path, monkeypatch)
         "/api/v2/workflows/attempts/unknown/cost",
         json={"cost_microusd": 3, "source": "invoice"},
     ).status_code == 400
+
+
+def test_mission_rate_limit_api_shares_store_and_blocks_bypass(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    for plan_id, address in (("first", "192.0.2.1"), ("second", "192.0.2.2")):
+        core.save_workflow_plan(plan_id, WorkflowPlan(
+            "m", (WorkflowTask("scan", "fixture", address),),
+        ))
+    route = "/api/v2/missions/m/rate-limit"
+    assert client.get(route).get_json()["min_spacing_s"] is None
+    response = client.post(route, json={"min_spacing_s": 3600})
+    assert response.status_code == 200
+    assert response.get_json()["min_spacing_s"] == 3600
+    assert core.store.claim_ready_workflow_task("first", "worker-a") is not None
+    assert core.store.claim_ready_workflow_task("second", "worker-b") is None
+    assert client.post(route, json={"min_spacing_s": 1}).status_code == 400
+    assert client.post(route, json={"min_spacing_s": 7200}).status_code == 200
+    assert client.post(route, json={"min_spacing_s": True}).status_code == 400
+    assert client.get("/api/v2/missions/unknown/rate-limit").status_code == 404
+    assert client.post(
+        route, json={"min_spacing_s": 8000},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403

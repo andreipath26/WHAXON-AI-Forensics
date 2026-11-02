@@ -1170,6 +1170,24 @@ class JobStore:
         finally:
             c.close()
 
+    def get_mission_rate_limit(self, mission_id):
+        """Read effective mission-wide rate settings from persistent state."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            row = c.execute(
+                "SELECT min_spacing_s, last_claimed_at FROM mission_rate_limits "
+                "WHERE mission_id=?", (mission_id,),
+            ).fetchone()
+            return {
+                "mission_id": mission_id,
+                "min_spacing_s": row["min_spacing_s"] if row else None,
+                "last_claimed_at": row["last_claimed_at"] if row else None,
+            }
+        finally:
+            c.close()
+
     def set_mission_rate_limit(self, mission_id, *, min_spacing_s):
         """Enforce durable spacing across every plan sharing a mission."""
         import math
