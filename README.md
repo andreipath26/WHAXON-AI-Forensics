@@ -149,7 +149,6 @@ Useful commands:
 
 ```bash
 whaxon doctor
-whaxon tools --help
 whaxon run --help
 whaxon findings --help
 whaxon validate --help
@@ -187,7 +186,7 @@ See [Dependency readiness and guided installation](docs/dependency-readiness.md)
 The web service can run without a desktop session and be accessed through a browser:
 
 ```bash
-whaxon serve
+whaxon serve --daemon
 ```
 
 The default bind is loopback. For a remote deployment, configure non-default credentials, use a trusted reverse proxy for HTTPS, restrict network access and review the deployment requirements before exposing the service.
@@ -221,7 +220,6 @@ Install the development dependencies and required browser-test tooling before ru
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Getting started](docs/getting-started.md)
 - [Scope and authorization](docs/scope.md)
 - [Tools](docs/tools.md)
 - [Adapters](docs/adapters.md)
