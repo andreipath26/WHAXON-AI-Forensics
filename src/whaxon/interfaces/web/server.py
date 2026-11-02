@@ -533,6 +533,45 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 404 if "unknown mission" in str(exc) else 400
 
+    @app.post("/api/v2/workflows/<plan_id>/run")
+    def workflow_v2_run(plan_id):
+        """Queue a bounded run; clients poll durable progress for its outcome.
+
+        A 202 only acknowledges submission to this process, never completed
+        execution, scope approval, or guaranteed survival of a server crash.
+        """
+        payload = request.get_json(silent=True)
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            return jsonify({"error": "JSON object required"}), 400
+        fields = ("max_tasks", "max_attempts", "max_concurrency")
+        defaults = {"max_tasks": 100, "max_attempts": 2, "max_concurrency": 4}
+        bounds = {name: payload.get(name, defaults[name]) for name in fields}
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in bounds.values()
+        ):
+            return jsonify({"error": "execution limits must be positive integers"}), 400
+        try:
+            core.workflow_plan_details(plan_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+        def execute():
+            async def run():
+                await core.initialize(drain=False)
+                return await core.run_workflow_plan(plan_id, **bounds)
+
+            asyncio.run(run())
+
+        runner.submit(execute)
+        return jsonify({
+            "plan_id": plan_id, "execution_submitted": True,
+            "execution_completed": False,
+            "durable_progress_url": f"/api/v2/workflows/{plan_id}/progress",
+        }), 202
+
     @app.get("/api/v2/workflows/<plan_id>")
     def workflow_v2_plan_details(plan_id):
         try:

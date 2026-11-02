@@ -211,3 +211,39 @@ def test_v2_api_mission_rate_limit_shared_and_fail_closed(tmp_path, monkeypatch)
         "/api/v2/workflows", json={"id": "evil", "plan": {}},
         headers={"Origin": "https://attacker.invalid"},
     ).status_code == 403
+
+
+def test_v2_api_run_submits_bounded_core_execution_without_claiming_success(
+    tmp_path, monkeypatch,
+):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    captured = []
+    monkeypatch.setattr(
+        "whaxon.interfaces.web.server.AsyncRunner.submit",
+        lambda self, factory: captured.append(factory),
+    )
+    response = client.post(
+        "/api/v2/workflows/p/run",
+        json={"max_tasks": 1, "max_attempts": 1, "max_concurrency": 1},
+    )
+    assert response.status_code == 202
+    assert response.get_json()["execution_submitted"] is True
+    assert response.get_json()["execution_completed"] is False
+    assert response.get_json()["durable_progress_url"] == "/api/v2/workflows/p/progress"
+    assert len(captured) == 1
+    assert core.workflow_progress("p")["total_tasks"] == 1
+    assert client.post("/api/v2/workflows/missing/run", json={}).status_code == 404
+    for value in (True, 0, -1, "1", 1.5):
+        assert client.post(
+            "/api/v2/workflows/p/run", json={"max_tasks": value},
+        ).status_code == 400
+    assert len(captured) == 1
+    assert client.post(
+        "/api/v2/workflows/p/run", json={},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+    assert len(captured) == 1
