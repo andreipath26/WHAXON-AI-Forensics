@@ -65,7 +65,19 @@ def _signature_for(kind: str, data: dict) -> str:
     if kind == "open_port":
         return f"port:{data.get('port')}/{data.get('protocol', 'tcp')}"
     if kind == "web_issue":
-        return f"path:{data.get('path') or data.get('location') or ''}"
+        # A single URL/path can host multiple independent issues (for example,
+        # distinct Nikto plugin IDs). Preserve their identities while still
+        # aggregating repeat observations of the same issue across jobs.
+        path = data.get("path") or data.get("location") or ""
+        issue_id = (
+            data.get("nikto_id") or data.get("plugin_id")
+            or data.get("issue_id") or ""
+        )
+        message = " ".join(
+            str(data.get("message") or data.get("issue") or data.get("title") or "")
+            .lower().split()
+        )
+        return f"path:{path}|issue:{issue_id}|message:{message}"
     if kind == "found_path":
         # A path is not a single fact: different tools or runs can observe
         # different status codes and response sizes for the same URL. Include
