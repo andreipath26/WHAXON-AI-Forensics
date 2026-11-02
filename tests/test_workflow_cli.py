@@ -23,6 +23,15 @@ class _FakeCore:
         self.saved = (plan_id, plan)
         return True
 
+    def configure_mission_cost_limit(self, mission_id, *, max_cost_microusd):
+        self.cost_cap = (mission_id, max_cost_microusd)
+
+    def mission_cost_summary(self, mission_id):
+        return {"mission_id": mission_id, "accounted_cost_microusd": 0}
+
+    def record_workflow_attempt_cost(self, attempt_id, *, cost_microusd, source):
+        return cost_microusd
+
     def configure_mission_deadline(self, mission_id, *, deadline_at):
         self.mission_deadline = (mission_id, deadline_at)
 
@@ -290,3 +299,16 @@ def test_mission_deadline_cli(monkeypatch, capsys):
         "mission", "deadline", "--id", "m", "--unix-time", "2000000000",
     ]) == 0
     assert json.loads(capsys.readouterr().out)["mission_id"] == "m"
+
+
+def test_mission_cost_commands_use_shared_core(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "cost-limit", "--id", "m", "--max-cost-microusd", "99",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["mission_id"] == "m"
+    assert workflow_cmd.main([
+        "plan", "record-cost", "--attempt-id", "a",
+        "--cost-microusd", "25", "--source", "invoice",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["cost_microusd"] == 25

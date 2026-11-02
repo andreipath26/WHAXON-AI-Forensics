@@ -48,6 +48,21 @@ def _parser() -> argparse.ArgumentParser:
 
     mission = commands.add_parser("mission", help="manage missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
+    mission_cost = mission_commands.add_parser(
+        "cost-limit", help="configure cumulative provider-reported mission cost cap (micro-USD)",
+    )
+    mission_cost.add_argument("--id", required=True)
+    mission_cost.add_argument("--max-cost-microusd", type=int, required=True)
+    cost_summary = mission_commands.add_parser(
+        "cost", help="inspect measured cost and incomplete reporting",
+    )
+    cost_summary.add_argument("--id", required=True)
+    attempt_cost = plan_commands.add_parser(
+        "record-cost", help="record evidence-backed final attempt cost",
+    )
+    attempt_cost.add_argument("--attempt-id", required=True)
+    attempt_cost.add_argument("--cost-microusd", required=True, type=int)
+    attempt_cost.add_argument("--source", required=True)
     mission_deadline = mission_commands.add_parser(
         "deadline", help="set a mission-wide absolute execution cutoff",
     )
@@ -163,6 +178,22 @@ def main(args: list[str] | None = None) -> int:
         if options.command == "capabilities":
             capability_result = [manifest.to_dict() for manifest in core.capabilities.list()]
             print(json.dumps(capability_result, indent=2, sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "cost-limit":
+            core.configure_mission_cost_limit(
+                options.id, max_cost_microusd=options.max_cost_microusd,
+            )
+            print(json.dumps(core.mission_cost_summary(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "cost":
+            print(json.dumps(core.mission_cost_summary(options.id), sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "record-cost":
+            amount = core.record_workflow_attempt_cost(
+                options.attempt_id,
+                cost_microusd=options.cost_microusd, source=options.source,
+            )
+            print(json.dumps({"attempt_id": options.attempt_id, "cost_microusd": amount}))
             return 0
         if options.command == "mission" and options.mission_command == "deadline":
             core.configure_mission_deadline(options.id, deadline_at=options.unix_time)

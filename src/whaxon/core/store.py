@@ -68,6 +68,14 @@ CREATE TABLE IF NOT EXISTS workflow_rate_limits (
 CREATE TABLE IF NOT EXISTS workflow_deadlines (
     plan_id TEXT PRIMARY KEY, deadline_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mission_cost_limits (
+    mission_id TEXT PRIMARY KEY, max_cost_microusd INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS workflow_attempt_costs (
+    attempt_id TEXT PRIMARY KEY, cost_microusd INTEGER NOT NULL,
+    source TEXT NOT NULL, recorded_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_attempt_costs_attempt ON workflow_attempt_costs(attempt_id);
 CREATE TABLE IF NOT EXISTS mission_deadlines (
     mission_id TEXT PRIMARY KEY,
     deadline_at REAL NOT NULL
@@ -1829,6 +1837,153 @@ class JobStore:
             finally:
                 c.close()
 
+    def set_mission_cost_limit(self, mission_id, *, max_cost_microusd):
+        """Set a non-relaxable cap on accounted USD micros for future claims."""
+        if (
+            isinstance(max_cost_microusd, bool) or not isinstance(max_cost_microusd, int)
+            or max_cost_microusd < 0
+        ):
+            raise ValueError("max_cost_microusd must be a nonnegative integer")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT max_cost_microusd FROM mission_cost_limits WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchone()
+                if old is not None and max_cost_microusd > old["max_cost_microusd"]:
+                    raise ValueError("mission cost cap cannot be relaxed")
+                c.execute(
+                    "INSERT INTO mission_cost_limits (mission_id, max_cost_microusd) VALUES (?, ?) "
+                    "ON CONFLICT(mission_id) DO UPDATE SET max_cost_microusd=excluded.max_cost_microusd",
+                    (mission_id, max_cost_microusd),
+                )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def record_workflow_attempt_cost(self, attempt_id, *, cost_microusd, source):
+        """Record provider-reported cost once, without guessing or overwriting it."""
+        if (
+            isinstance(cost_microusd, bool) or not isinstance(cost_microusd, int)
+            or cost_microusd < 0
+        ):
+            raise ValueError("cost_microusd must be a nonnegative integer")
+        if not isinstance(source, str) or not source.strip() or len(source) > 128:
+            raise ValueError("source must identify the provider cost evidence")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute(
+                    "SELECT t.plan_id, a.status FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id WHERE a.id=?", (attempt_id,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("unknown workflow attempt")
+                if row["status"] == "running":
+                    raise ValueError("cannot finalize cost for running attempt")
+                prior = c.execute(
+                    "SELECT cost_microusd, source FROM workflow_attempt_costs WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if prior is not None:
+                    if prior["cost_microusd"] != cost_microusd or prior["source"] != source:
+                        raise ValueError("conflicting attempt cost; corrections require audit reconciliation")
+                else:
+                    c.execute(
+                        "INSERT INTO workflow_attempt_costs "
+                        "(attempt_id, cost_microusd, source, recorded_at) VALUES (?, ?, ?, ?)",
+                        (attempt_id, cost_microusd, source.strip(), time.time()),
+                    )
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, attempt_id, event_type, detail_json, at) "
+                        "VALUES (?, ?, 'cost_recorded', ?, ?)",
+                        (row["plan_id"], attempt_id, json.dumps({
+                            "cost_microusd": cost_microusd, "source": source.strip(),
+                        }), time.time()),
+                    )
+                c.execute("COMMIT")
+                return cost_microusd
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_cost_summary(self, mission_id):
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            cap = c.execute(
+                "SELECT max_cost_microusd FROM mission_cost_limits WHERE mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            usage = c.execute(
+                "SELECT COALESCE(SUM(cost.cost_microusd), 0) AS spent, COUNT(cost.attempt_id) AS reported "
+                "FROM workflow_attempt_costs cost JOIN task_attempts a ON a.id=cost.attempt_id "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            unreported = c.execute(
+                "SELECT COUNT(*) AS n FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id "
+                "LEFT JOIN workflow_attempt_costs cost ON cost.attempt_id=a.id "
+                "WHERE p.mission_id=? AND cost.attempt_id IS NULL", (mission_id,),
+            ).fetchone()["n"]
+            return {
+                "mission_id": mission_id,
+                "cap_microusd": cap["max_cost_microusd"] if cap else None,
+                "accounted_cost_microusd": usage["spent"],
+                "reported_attempts": usage["reported"],
+                "unreported_attempts": unreported,
+                "exhausted": cap is not None and usage["spent"] >= cap["max_cost_microusd"],
+                "pre_dispatch_cost_reservations_available": False,
+                "full_cost_coverage": unreported == 0,
+            }
+        finally:
+            c.close()
+
+    def _mission_cost_allows_claim(self, c, plan_id):
+        cap = c.execute(
+            "SELECT l.max_cost_microusd FROM mission_cost_limits l "
+            "JOIN workflow_plans p ON p.mission_id=l.mission_id WHERE p.id=?", (plan_id,),
+        ).fetchone()
+        if cap is None:
+            return True
+        spent = c.execute(
+            "SELECT COALESCE(SUM(cost.cost_microusd), 0) AS n "
+            "FROM workflow_attempt_costs cost JOIN task_attempts a ON a.id=cost.attempt_id "
+            "JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id "
+            "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?)",
+            (plan_id,),
+        ).fetchone()["n"]
+        # Missing cost evidence means a hard upper bound cannot be guaranteed.
+        # Fail closed until every completed attempt has an explicit cost report.
+        missing = c.execute(
+            "SELECT COUNT(*) AS n FROM task_attempts a "
+            "JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id "
+            "LEFT JOIN workflow_attempt_costs cost ON cost.attempt_id=a.id "
+            "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?) "
+            "AND a.status!='running' AND cost.attempt_id IS NULL",
+            (plan_id,),
+        ).fetchone()["n"]
+        return spent < cap["max_cost_microusd"] and missing == 0
+
     def set_mission_deadline(self, mission_id, *, deadline_at):
         """A durable, mission-scoped cutoff that cannot be extended."""
         import math
@@ -2161,6 +2316,7 @@ class JobStore:
                     usage["attempts"] >= max_total
                     or usage["active"] >= max_parallel
                     or not self._mission_budget_available(c, plan_id)
+                    or not self._mission_cost_allows_claim(c, plan_id)
                 ):
                     c.execute("COMMIT")
                     return None
@@ -2330,6 +2486,8 @@ class JobStore:
                     raise ValueError("workflow concurrency budget exhausted")
                 if not self._mission_budget_available(c, effective_plan):
                     raise ValueError("mission execution budget exhausted")
+                if not self._mission_cost_allows_claim(c, effective_plan):
+                    raise ValueError("mission cost budget blocked or reporting incomplete")
                 task = c.execute(
                     "SELECT status, idempotency_key FROM workflow_tasks WHERE id=?", (task_ref,)
                 ).fetchone()

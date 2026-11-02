@@ -1287,3 +1287,61 @@ def test_mission_deadline_blocks_dispatch_after_claim(tmp_path):
     claim = store.claim_ready_workflow_task("p", "worker")
     store.set_mission_deadline("m", deadline_at=time.time() - 1)
     assert store.mark_workflow_dispatch_started("p", claim["attempt_id"]) is False
+
+
+def test_mission_cost_ledger_is_durable_idempotent_and_fail_closed(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    path = tmp_path / "cost-ledger.db"
+    store = JobStore(path)
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+        WorkflowTask("b", "fixture", "192.0.2.2"),
+    )))
+    store.set_mission_cost_limit("m", max_cost_microusd=10)
+    claim = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(claim["attempt_id"], "succeeded")
+    assert JobStore(path).claim_ready_workflow_task("p", "worker") is None
+    assert store.get_mission_cost_summary("m")["unreported_attempts"] == 1
+    assert store.record_workflow_attempt_cost(
+        claim["attempt_id"], cost_microusd=4, source="provider-invoice",
+    ) == 4
+    assert store.record_workflow_attempt_cost(
+        claim["attempt_id"], cost_microusd=4, source="provider-invoice",
+    ) == 4
+    with pytest.raises(ValueError, match="conflicting"):
+        store.record_workflow_attempt_cost(
+            claim["attempt_id"], cost_microusd=7, source="provider-invoice",
+        )
+    assert JobStore(path).get_mission_cost_summary("m")["accounted_cost_microusd"] == 4
+    next_claim = JobStore(path).claim_ready_workflow_task("p", "worker")
+    assert next_claim is not None
+    store.finish_task_attempt(next_claim["attempt_id"], "succeeded")
+    store.record_workflow_attempt_cost(
+        next_claim["attempt_id"], cost_microusd=6, source="provider-invoice",
+    )
+    assert store.get_mission_cost_summary("m")["exhausted"] is True
+    assert store.get_mission_cost_summary("m")["pre_dispatch_cost_reservations_available"] is False
+
+
+def test_mission_cost_ledger_rejects_bad_values_and_running_attempt(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "bad-costs.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+    )))
+    claim = store.claim_ready_workflow_task("p", "worker")
+    with pytest.raises(ValueError, match="running"):
+        store.record_workflow_attempt_cost(
+            claim["attempt_id"], cost_microusd=1, source="invoice",
+        )
+    for bad in (True, -1, 1.5, "5"):
+        with pytest.raises(ValueError, match="nonnegative integer"):
+            store.record_workflow_attempt_cost(
+                claim["attempt_id"], cost_microusd=bad, source="invoice",
+            )

@@ -152,3 +152,16 @@ def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
     assert client.post(
         "/api/v2/missions/m/deadline", json={"deadline_at": time.time() + 100},
     ).status_code == 400
+
+
+def test_mission_cost_api_requires_explicit_cost_evidence(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    response = client.post("/api/v2/missions/m/cost", json={"max_cost_microusd": 100})
+    assert response.status_code == 200
+    assert response.get_json()["cap_microusd"] == 100
+    assert client.get("/api/v2/missions/m/cost").get_json()["reported_attempts"] == 0
+    assert client.post(
+        "/api/v2/workflows/attempts/unknown/cost",
+        json={"cost_microusd": 3, "source": "invoice"},
+    ).status_code == 400

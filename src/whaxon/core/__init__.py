@@ -203,6 +203,21 @@ class Core:
     def workflow_events(self, plan_id: str, *, after_id: int = 0, limit: int = 100):
         return self.store.list_workflow_events(plan_id, after_id, limit)
 
+    def configure_mission_cost_limit(self, mission_id: str, *, max_cost_microusd: int):
+        return self.store.set_mission_cost_limit(
+            mission_id, max_cost_microusd=max_cost_microusd,
+        )
+
+    def record_workflow_attempt_cost(
+        self, attempt_id: str, *, cost_microusd: int, source: str,
+    ):
+        return self.store.record_workflow_attempt_cost(
+            attempt_id, cost_microusd=cost_microusd, source=source,
+        )
+
+    def mission_cost_summary(self, mission_id: str):
+        return self.store.get_mission_cost_summary(mission_id)
+
     def configure_mission_deadline(self, mission_id: str, *, deadline_at: float):
         return self.store.set_mission_deadline(mission_id, deadline_at=deadline_at)
 

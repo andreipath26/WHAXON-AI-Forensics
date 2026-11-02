@@ -508,6 +508,36 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @app.route("/api/v2/missions/<mission_id>/cost", methods=["GET", "POST"])
+    def workflow_v2_mission_cost(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict) or "max_cost_microusd" not in payload:
+                    return jsonify({"error": "max_cost_microusd required"}), 400
+                core.configure_mission_cost_limit(
+                    mission_id, max_cost_microusd=payload["max_cost_microusd"],
+                )
+            return jsonify(core.mission_cost_summary(mission_id))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 404 if "unknown mission" in str(exc) else 400
+
+    @app.post("/api/v2/workflows/attempts/<attempt_id>/cost")
+    def workflow_v2_attempt_cost(attempt_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or (
+            "cost_microusd" not in payload or "source" not in payload
+        ):
+            return jsonify({"error": "cost_microusd and source required"}), 400
+        try:
+            amount = core.record_workflow_attempt_cost(
+                attempt_id, cost_microusd=payload["cost_microusd"],
+                source=payload["source"],
+            )
+            return jsonify({"attempt_id": attempt_id, "cost_microusd": amount})
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
     @app.post("/api/v2/missions/<mission_id>/deadline")
     def workflow_v2_mission_deadline(mission_id):
         payload = request.get_json(silent=True)
