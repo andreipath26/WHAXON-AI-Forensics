@@ -206,10 +206,9 @@ class WorkflowScheduler:
         tasks = self.store.list_workflow_tasks(plan_id)
         # Failed attempts may still be retryable. Report completion only when
         # every task has reached a terminal outcome under the attempt policy.
-        attempts = self.store.list_workflow_attempts(plan_id, limit=1000)
-        counts = {}
-        for attempt in attempts:
-            counts[attempt["task_key"]] = counts.get(attempt["task_key"], 0) + 1
+        # Database counts avoid truncation of long-lived plans at API page limits.
+        attempts = self.store.count_workflow_task_attempts(plan_id)
+        counts = attempts
         terminal = {"succeeded", "blocked", "cancelled", "uncertain"}
         complete = all(
             task["status"] in terminal

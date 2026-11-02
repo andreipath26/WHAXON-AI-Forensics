@@ -1502,6 +1502,22 @@ class JobStore:
         finally:
             c.close()
 
+    def count_workflow_task_attempts(self, plan_id):
+        """Unpaginated database aggregation for scheduler correctness."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT t.task_key, COUNT(*) AS n "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=? GROUP BY t.task_key",
+                (plan_id,),
+            ).fetchall()
+            return {row["task_key"]: row["n"] for row in rows}
+        finally:
+            c.close()
+
     def list_workflow_attempts(self, plan_id, *, after_started=0.0, limit=100):
         """Inspect persisted attempts across restarts without exposing inputs or secrets."""
         import math

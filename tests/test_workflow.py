@@ -1121,3 +1121,24 @@ def test_workflow_event_cursor_rejects_invalid_acknowledgements(tmp_path):
             store.acknowledge_workflow_events("p", "reporter", event_id)
     with pytest.raises(ValueError, match="consumer_id"):
         store.get_workflow_event_cursor("p", "")
+
+
+def test_attempt_aggregation_is_unpaginated_and_plan_scoped(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "attempt-aggregation.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+    )))
+    store.save_workflow_plan("other", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.2"),
+    )))
+    assert store.count_workflow_task_attempts("p") == {}
+    first = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(first["attempt_id"], "failed")
+    second = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(second["attempt_id"], "succeeded")
+    assert store.count_workflow_task_attempts("p") == {"a": 2}
+    assert store.count_workflow_task_attempts("other") == {}
