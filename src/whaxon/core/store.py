@@ -1906,6 +1906,20 @@ class JobStore:
             finally:
                 c.close()
 
+    @staticmethod
+    def _audit_mission_execution_change(c, mission_id, event_type, detail):
+        """Record mission-wide policy changes in every affected plan's audit feed."""
+        now = time.time()
+        plans = c.execute(
+            "SELECT id FROM workflow_plans WHERE mission_id=?", (mission_id,),
+        ).fetchall()
+        for plan in plans:
+            c.execute(
+                "INSERT INTO workflow_events (plan_id, event_type, detail_json, at) "
+                "VALUES (?, ?, ?, ?)",
+                (plan["id"], event_type, json.dumps(detail, sort_keys=True), now),
+            )
+
     def set_mission_cost_limit(self, mission_id, *, max_cost_microusd):
         """Set a non-relaxable cap on accounted USD micros for future claims."""
         if (
@@ -1930,6 +1944,11 @@ class JobStore:
                     "ON CONFLICT(mission_id) DO UPDATE SET max_cost_microusd=excluded.max_cost_microusd",
                     (mission_id, max_cost_microusd),
                 )
+                if old is None or old["max_cost_microusd"] != max_cost_microusd:
+                    self._audit_mission_execution_change(
+                        c, mission_id, "mission_cost_limit_set",
+                        {"max_cost_microusd": max_cost_microusd},
+                    )
                 c.execute("COMMIT")
             except Exception:
                 if c.in_transaction:
@@ -1945,8 +1964,9 @@ class JobStore:
             or cost_microusd < 0
         ):
             raise ValueError("cost_microusd must be a nonnegative integer")
-        if not isinstance(source, str) or not source.strip() or len(source) > 128:
+        if not isinstance(source, str) or not source.strip() or len(source.strip()) > 128:
             raise ValueError("source must identify the provider cost evidence")
+        source = source.strip()
         with self._lock:
             c = self._conn()
             try:
@@ -1970,14 +1990,14 @@ class JobStore:
                     c.execute(
                         "INSERT INTO workflow_attempt_costs "
                         "(attempt_id, cost_microusd, source, recorded_at) VALUES (?, ?, ?, ?)",
-                        (attempt_id, cost_microusd, source.strip(), time.time()),
+                        (attempt_id, cost_microusd, source, time.time()),
                     )
                     c.execute(
                         "INSERT INTO workflow_events "
                         "(plan_id, attempt_id, event_type, detail_json, at) "
                         "VALUES (?, ?, 'cost_recorded', ?, ?)",
                         (row["plan_id"], attempt_id, json.dumps({
-                            "cost_microusd": cost_microusd, "source": source.strip(),
+                            "cost_microusd": cost_microusd, "source": source,
                         }), time.time()),
                     )
                 c.execute("COMMIT")
@@ -2079,6 +2099,11 @@ class JobStore:
                     "ON CONFLICT(mission_id) DO UPDATE SET deadline_at=excluded.deadline_at",
                     (mission_id, deadline_at),
                 )
+                if old is None or old["deadline_at"] != deadline_at:
+                    self._audit_mission_execution_change(
+                        c, mission_id, "mission_deadline_set",
+                        {"deadline_at": deadline_at},
+                    )
                 c.execute("COMMIT")
             except Exception:
                 if c.in_transaction:
@@ -2138,6 +2163,15 @@ class JobStore:
                     "max_concurrency=excluded.max_concurrency",
                     (mission_id, max_total_attempts, max_concurrency),
                 )
+                if old is None or (
+                    old["max_total_attempts"] != max_total_attempts
+                    or old["max_concurrency"] != max_concurrency
+                ):
+                    self._audit_mission_execution_change(
+                        c, mission_id, "mission_execution_limits_set",
+                        {"max_total_attempts": max_total_attempts,
+                         "max_concurrency": max_concurrency},
+                    )
                 c.execute("COMMIT")
             except Exception:
                 if c.in_transaction:

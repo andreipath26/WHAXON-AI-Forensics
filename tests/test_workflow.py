@@ -1548,3 +1548,57 @@ async def test_scheduler_outcome_reflects_cancellation_winning_finish_race(tmp_p
     ).run("p")
     assert result["outcomes"][0]["status"] == "uncertain"
     assert result["tasks"][0]["status"] == "uncertain"
+
+
+def test_mission_control_changes_are_durable_audited_and_idempotent(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    path = tmp_path / "mission-control-audit.db"
+    store = JobStore(path)
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+    )))
+    store.set_mission_cost_limit("m", max_cost_microusd=500)
+    store.set_mission_execution_limits("m", max_total_attempts=5, max_concurrency=2)
+    deadline = time.time() + 300
+    store.set_mission_deadline("m", deadline_at=deadline)
+    expected = [
+        "mission_cost_limit_set", "mission_execution_limits_set", "mission_deadline_set",
+    ]
+    events = JobStore(path).list_workflow_events("p")
+    assert [item["event_type"] for item in events] == expected
+    store.set_mission_cost_limit("m", max_cost_microusd=500)
+    store.set_mission_execution_limits("m", max_total_attempts=5, max_concurrency=2)
+    store.set_mission_deadline("m", deadline_at=deadline)
+    assert [e["event_type"] for e in store.list_workflow_events("p")] == expected
+    with pytest.raises(ValueError, match="cannot be relaxed"):
+        store.set_mission_cost_limit("m", max_cost_microusd=501)
+    with pytest.raises(ValueError, match="cannot be relaxed"):
+        store.set_mission_execution_limits("m", max_total_attempts=6, max_concurrency=2)
+    with pytest.raises(ValueError, match="cannot be extended"):
+        store.set_mission_deadline("m", deadline_at=deadline + 10)
+
+
+def test_attempt_cost_source_is_canonical_for_idempotent_replays(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "normalized-invoice.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+    )))
+    claim = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(claim["attempt_id"], "succeeded")
+    store.record_workflow_attempt_cost(
+        claim["attempt_id"], cost_microusd=10, source="  provider-invoice  ",
+    )
+    store.record_workflow_attempt_cost(
+        claim["attempt_id"], cost_microusd=10, source="provider-invoice",
+    )
+    assert len([e for e in store.list_workflow_events("p")
+                if e["event_type"] == "cost_recorded"]) == 1
