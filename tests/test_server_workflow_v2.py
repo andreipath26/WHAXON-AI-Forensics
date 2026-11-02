@@ -316,3 +316,67 @@ def test_v2_api_mission_deadline_returns_persisted_cutoff_not_budget(tmp_path, m
     assert client.post(
         "/api/v2/missions/unknown/deadline", json={"deadline_at": 2000000000},
     ).status_code == 404
+
+
+def test_v2_evidence_api_links_actual_job_and_never_fabricates_findings(tmp_path, monkeypatch):
+    """An accepted workflow outcome is not automatically proof of scan evidence."""
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-evidence", "authorized lab")
+    core.save_workflow_plan("p-evidence", WorkflowPlan("m-evidence", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+    )))
+    empty = client.get("/api/v2/workflows/p-evidence/evidence")
+    assert empty.status_code == 200
+    assert empty.get_json()["all_evidence_recorded"] is False
+    assert empty.get_json()["attempts"] == []
+
+    attempt = core.store.claim_ready_workflow_task("p-evidence", "fixture-worker")
+    assert attempt is not None
+    core.store.finish_task_attempt(
+        attempt["attempt_id"], "succeeded",
+        result={"job_id": "job-1", "tool_id": "nmap", "target": "192.0.2.10"},
+    )
+    missing = client.get("/api/v2/workflows/p-evidence/evidence").get_json()
+    assert missing["attempts"][0]["evidence_status"] == "job_not_verified"
+    assert missing["all_evidence_recorded"] is False
+
+    # Insert a real persisted legacy job and normalized finding, as the
+    # existing ToolRunner event handlers would do after a successful scan.
+    with core.store._conn() as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, tool, target, status, exit_code) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("job-1", "nmap", "192.0.2.10", "finished", 0),
+        )
+        connection.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, "
+            "data_json, raw_line, verification_status, verification_reason) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("job-1", 0, "open_port", "info", "nmap",
+             '{"port": 80}', "80/tcp open http", "candidate", "not independently verified"),
+        )
+    recorded = client.get("/api/v2/workflows/p-evidence/evidence").get_json()
+    assert recorded["plan_digest"] == core.store.get_workflow_plan("p-evidence")["digest"]
+    assert recorded["all_evidence_recorded"] is True
+    assert recorded["attempts"][0]["finding_count"] == 1
+    assert recorded["attempts"][0]["findings"][0]["verification_status"] == "candidate"
+    assert recorded["attempts"][0]["findings"][0]["raw_line"] == "80/tcp open http"
+
+    # Contradictory target identity invalidates the evidence linkage.
+    with core.store._conn() as connection:
+        connection.execute("UPDATE jobs SET target=? WHERE id=?", ("192.0.2.99", "job-1"))
+    mismatch = client.get("/api/v2/workflows/p-evidence/evidence").get_json()
+    assert mismatch["all_evidence_recorded"] is False
+    assert mismatch["attempts"][0]["evidence_status"] == "job_not_verified"
+    assert mismatch["attempts"][0]["findings"] == []
+
+
+def test_v2_evidence_api_rejects_bad_bounds_and_unknown_plans(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    assert client.get("/api/v2/workflows/missing/evidence").status_code == 404
+    core.create_mission("m", "authorized")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+    )))
+    for limit in ("0", "-1", "1001", "invalid"):
+        assert client.get(f"/api/v2/workflows/p/evidence?limit={limit}").status_code == 400
