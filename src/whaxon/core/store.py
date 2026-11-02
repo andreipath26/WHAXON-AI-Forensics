@@ -1961,8 +1961,12 @@ class JobStore:
     def claim_ready_workflow_task(self, plan_id, worker_id, max_attempts=3):
         """Atomically claim a DAG node using plan-scoped task references."""
         import uuid
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be positive")
+        if (
+            isinstance(max_attempts, bool)
+            or not isinstance(max_attempts, int)
+            or max_attempts < 1
+        ):
+            raise ValueError("max_attempts must be a positive integer")
         with self._lock:
             c = self._conn()
             try:

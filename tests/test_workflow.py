@@ -1168,3 +1168,15 @@ async def test_scheduler_rejects_bool_and_fractional_execution_budgets(tmp_path)
     for budget in (True, 1.5, 0, -1):
         with pytest.raises(ValueError, match="positive integers"):
             await scheduler.run("missing", max_tasks=budget)
+
+
+def test_workflow_claim_rejects_noninteger_attempt_limits(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "invalid-claim-budget.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    for invalid in (True, False, 1.5, 0, -1, "2"):
+        with pytest.raises(ValueError, match="positive integer"):
+            store.claim_ready_workflow_task("p", "worker", max_attempts=invalid)
+    assert store.claim_ready_workflow_task("p", "worker", max_attempts=1) is not None
