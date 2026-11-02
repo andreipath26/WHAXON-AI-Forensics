@@ -56,12 +56,15 @@ check(target) returns a result with .allowed and .reason. Order:
 - POST /api/scope/check       - body: {target: ...} -> {allowed, reason}
 - POST /api/scope/override    - body: {target, reason} -> allow once, logged to data/scope_overrides.log
 
-## Escaping enforcement
+## Explicit scope overrides
 
-Two paths:
+The normal execution path rejects targets outside the configured scope. There are deliberately separate, explicit override paths:
 
-1. Set enabled: false - global opt-out. Only for labs.
-2. allow_out_of_scope=True on runner.run_tool(...) - per-call override, only available from code that can call the runner directly, not from the web API.
+- CLI: `whaxon run ... --allow-out-of-scope` requests a per-run override. Use only when the engagement authorization explicitly covers the target; review the command's output and persisted job record.
+- Web API: `POST /api/scope/override` records a target and reason for a one-time override. The subsequent run must use the matching recorded override; a request parameter alone cannot bypass scope.
+- Python integrations: the runner exposes a per-call `allow_out_of_scope=True` option to trusted calling code.
+
+These are not substitutes for authorization, and they do not provide network-level containment. Keep scope enforcement enabled by default. Setting `enabled: false` disables the application-level scope guard globally and should be reserved for deliberately isolated labs.
 
 ## AI scope expansion
 
@@ -86,8 +89,13 @@ The AI planner obeys the same fail-closed scope checker as everything else. `WHA
 
 ## Tests
 
-- tests/test_scope_failclosed.py - default scope covers IPv4 loopback CIDR and IPv6 (::1, fe80::/10, fc00::/7); 127.0.0.1 and RFC1918 allowed; external hosts denied.
-- tests/test_scope.py - out_of_scope precedence, wildcards, exact hosts, fail-closed on missing file.
+Scope behavior is covered by the `tests/test_scope*.py` suite and execution-boundary regressions, including default loopback/private ranges, IPv6 local ranges, out-of-scope precedence, malformed/missing configuration, DNS resolution failure, unsafe target arguments and explicit override handling. Run:
+
+```bash
+python -m pytest tests/test_scope*.py tests/test_validator_security_regressions.py -q
+```
+
+The test suite is evidence for the exercised cases only; it is not proof of connection-time network containment.
 
 ## Broad CIDR warning
 

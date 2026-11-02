@@ -44,7 +44,7 @@ The roadmap is authoritative for the full list and acceptance criteria. A past g
 
 ## 5. Documentation remediation status
 
-The README and core operator/engineering documentation have been reconciled against the current repository identity, package release identity, route structure, source-backed capabilities and open Engine v2/v1.0 acceptance gates. The legacy UI audit and point-in-time architecture inventory are explicitly historical. The master roadmap remains the authoritative execution order; this status file is not a substitute for source or passing tests.
+The README and core operator/engineering documentation were reconciled against the current repository identity, package release identity, route structure, source-backed capabilities and open Engine v2/v1.0 acceptance gates. This 2026-11-02 documentation pass also corrected stale troubleshooting instructions (including parser-coverage claims and the obsolete issue URL), documented the actual first-run dependency workflow, and aligned scope-override guidance with the CLI, web API and runner. The legacy UI audit and point-in-time architecture inventory are explicitly historical. The master roadmap remains the authoritative execution order; this status file is not a substitute for source or passing tests.
 
 The CLI follow-up drain and Nikto 2.6.1 parser defects were fixed in source and have regression tests on `main`. Their documentation/roadmap entries must be treated as implemented, while CI verification of the latest scheduler-test harness remains pending until the exact current-head run completes.
 

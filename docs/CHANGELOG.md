@@ -1,3 +1,10 @@
+## 2026-11-02 — Operator documentation reconciliation
+
+- Added an explicit first-run installation sequence to the README: install the selected interface extras, diagnose dependencies, inspect/verify tools, preview remediation, approve the exact plan, and verify the resulting environment.
+- Replaced stale troubleshooting guidance with current diagnostics, approval, scope, parser-coverage, follow-up-job, web-authentication, Docker and data-recovery guidance. Corrected the support URL to this repository.
+- Aligned scope documentation with the current CLI per-run override, one-time web API override and trusted runner API; clarified that none provides network containment.
+- Updated the dated project-state record to identify the documentation changes and retain the distinction between implementation and release acceptance.
+
 ## Main-branch engineering record — 2026-10-25 (not a v1.0.0 release)
 
 > Release identity: the latest published PyPI package recorded for this repository snapshot is **0.11.16** (2026-10-23). The former 1.0.0 heading did not establish a published v1.0.0 release. Master roadmap §38 remains OPEN; do not infer a release from this changelog heading or package metadata.

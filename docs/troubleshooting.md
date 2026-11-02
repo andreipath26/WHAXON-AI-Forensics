@@ -1,135 +1,134 @@
 # Troubleshooting
 
-## Installation
+This guide applies to the current `main` checkout. Package wheels may lag behind main; use `whaxon --help` and each command's `--help` to confirm the installed version's command surface.
 
-### ModuleNotFoundError: No module named 'whaxon'
+## Installation and Python environment
 
-Virtualenv not active:
+### `ModuleNotFoundError: No module named 'whaxon'`
 
-    source .venv/bin/activate
-    pip install -e ".[tui]"
+Activate the virtual environment used for installation and install the project into that interpreter:
 
-### error: externally-managed-environment
+```bash
+source .venv/bin/activate
+python -m pip install -e ".[tui,web]"
+python -c "import whaxon; print(whaxon.__file__)"
+```
 
-Use a virtualenv:
+On PowerShell:
 
-    python3 -m venv .venv
-    source .venv/bin/activate
-    pip install -e ".[tui]"
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[tui,web]"
+```
 
-### PySide6 wheel download is slow
+### `externally-managed-environment`
 
-Try a mirror:
+Do not use system pip. Create and activate a virtual environment, then use `python -m pip` from that environment.
 
-    pip install -e ".[gui]" --index-url https://mirrors.aliyun.com/pypi/simple/
+### Optional interface dependency is missing
 
-Or skip the GUI and install just the TUI: pip install -e ".[tui]"
+Install only the extra you need:
 
-### Could not find a version that satisfies the requirement PySide6
+```bash
+python -m pip install -e ".[tui]"   # terminal interface
+python -m pip install -e ".[web]"   # browser interface
+python -m pip install -e ".[gui]"   # desktop interface
+```
 
-PySide6 lags behind new Python releases. On Python 3.14, install 3.13:
+PySide6 wheel availability depends on the Python version and platform. WHAXON requires Python 3.11+; if a GUI dependency has no compatible wheel for your interpreter, use a supported Python release or install the TUI/web extras instead. Do not change Python versions without recreating the virtual environment.
 
-    sudo apt install python3.13 python3.13-venv
-    python3.13 -m venv .venv
-    source .venv/bin/activate
-    pip install -e ".[tui,gui]"
+## Dependency diagnostics and installation
 
-## Running scans
+### A dependency is MISSING, INCOMPATIBLE or BROKEN
 
-### Couldn't open a raw socket
+Run:
 
-Use TCP connect mode - edit tools.json:
+```bash
+whaxon doctor
+whaxon doctor --json
+```
 
-    "args": "-sT {target}"
+Check which interpreter is active, whether the dependency is required or optional, and whether a packaged resource is missing. A BLOCKED result concerns a required runtime/package/resource; DEGRADED can mean an optional integration or external tool is unavailable.
 
-Or grant capability (Linux only):
+### An external tool is DETECTED but not READY
 
-    sudo setcap cap_net_raw,cap_net_admin+eip $(which nmap)
+Run `whaxon doctor --verify` to perform only the curated, bounded version probes. Review multiple PATH candidates and the resolved executable path. A catalog entry does not mean the executable is installed, licensed or compatible.
 
-### binary not found
+### A remediation plan cannot be approved
 
-Install the tool or update the binary field in tools.json.
+Generate a fresh plan with `whaxon doctor --plan` and approve only its exact current plan ID. Approval is bound to the environment and manifest; a changed plan must be reviewed again. Python-package automation requires an active virtual environment and manifest allowlisting. OS-tool installation has a separate limited apt/Homebrew allowlist; unsupported platforms remain manual.
 
-### A scan hangs
+### An installation failed or was interrupted
 
-Press c in TUI/GUI or click Cancel in web. Sends SIGTERM to the subprocess.
+Rerun `whaxon doctor` and inspect the operation/audit record. A failed pip operation may have partially changed the virtual environment; WHAXON does not promise rollback. If the environment is inconsistent, recreate the virtual environment and reinstall the required approved extras. See [Dependency readiness](dependency-readiness.md).
 
-### No findings appear
+## Tool execution and scope
 
-Only these tools have parsers: nmap, nikto, gobuster, sqlmap, whois, dig,
-nuclei, ffuf, wpscan. Others stream but produce zero findings.
+### `binary not found` or a tool is unavailable
 
-## Interfaces
+Run `whaxon doctor` and `whaxon doctor --verify`, then check the tool's entry in [the packaged catalog](tools.md). Install external tools separately using the documented supported method for your OS. The catalog's package hint is not an installation command or permission.
 
-### TUI screen garbles after exit
+### A target is rejected
 
-Run reset in that terminal. If it persists, use tmux:
+Inspect the active configuration with `whaxon scope --show` and check the exact target with `whaxon scope --check <target>`. The default scope is restrictive (loopback and private ranges); it is not authorization to test every address in those ranges. Do not disable scope to work around an unexpected denial. Review [Scope and authorization](scope.md).
 
-    tmux new -s whaxon "whaxon tui"
+### A tool appears to run but no findings are produced
 
-### Could not load the Qt platform plugin "xcb"
+Not every catalog tool has a finding parser, and parser coverage differs by tool and output version. First inspect the persisted job output and exit status:
 
-Install X11 libs:
+```bash
+whaxon jobs --help
+whaxon findings --help
+whaxon report --help
+```
 
-    sudo apt install libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 \
-                     libxcb-image0 libxcb-keysyms1 libxcb-render-util0 \
-                     libxkbcommon-x11-0
+Check [Tools](tools.md) and [Adapters](adapters.md) for the current catalog and registered parser inventory. An empty finding list is not proof that the target is free of vulnerabilities. Preserve raw output and report unsupported or unparsed output as a coverage limitation.
 
-On Wayland: QT_QPA_PLATFORM=xcb whaxon gui
+### A scan hangs or cancellation does not complete
 
-### Web UI rejects credentials
+Use the cancellation control in the active interface or the supported job-cancel API. The runner uses process-group handling for subprocess termination on POSIX; behavior can vary by platform and by external tool. Check the job state and operating-system process list before starting a duplicate scan.
 
-Defaults are whaxon / whaxon. If changed via env, restart with new values.
+### A follow-up tool did not run
 
-Clear cached Basic auth in the browser: private window or clear site data.
+The CLI `whaxon run` drains Automator follow-up jobs queued by that invocation's initial findings. It deliberately leaves jobs that were already pending before the invocation untouched. Inspect `whaxon jobs` and the persisted job history if a follow-up is missing or failed.
 
-### Web UI says "unknown job" for a recent job
+## Web interface and authentication
 
-Two gunicorn workers with separate in-memory state. WHAXON uses SQLite to
-avoid this. Check:
+### The browser interface is unavailable
 
-    docker exec whaxon ls -la /data/
+Start the foreground server with `whaxon web` and use the address printed at startup (default `http://127.0.0.1:5001`). The root route redirects to `/ui-v2`; `/ui` is the legacy/reference interface.
 
-Verify /data/whaxon.db exists and is written.
+### Authentication fails
 
-## Docker
+Loopback requests use the local-peer shortcut after Host and cross-origin checks. Remote requests require explicit non-default Basic-auth credentials. Review `WHAXON_AUTH_USER`, `WHAXON_AUTH_PASS` or `WHAXON_AUTH_PASS_HASH`, restart the service after changing environment variables, and clear cached browser Basic-auth credentials if necessary. Never expose the loopback demo defaults remotely. See [Deployment](deployment.md).
 
-### Container starts then exits
+### A remote deployment rejects startup
 
-Run in foreground to see the crash:
+Set a non-default username and strong unique password or a supported bcrypt password hash. Install the web extra and review trusted-proxy and allowed-host configuration before exposing the service. Keep the application bound to loopback behind a reverse proxy where practical.
 
-    docker run --rm --name whaxon \
-      --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
-      --cap-drop=ALL -p 127.0.0.1:5001:5001 \
-      -v "$PWD/data:/data" -e HOME=/tmp \
-      -e WHAXON_AUTH_USER=whaxon -e WHAXON_AUTH_PASS=whaxon \
-      -e WHAXON_DATA=/data whaxon:secure
+## Docker and persistence
 
-### Read-only file system: '/home/whaxon/.gunicorn'
+### Container exits during startup
 
-Gunicorn writes a control socket to $HOME. Set HOME=/tmp in the container.
+Run the container in the foreground and inspect its logs. Confirm the mounted data directory is writable by the container process and that `WHAXON_DATA` points to that mount. The hardened image uses a read-only root filesystem; provide the documented writable tmpfs and persistent data volume.
 
-### unable to open database file
+### Jobs or history appear to disappear
 
-SQLite file is on a read-only mount, or container user can't write.
+Confirm all workers use the same `WHAXON_DATA` path and SQLite database. Check file ownership, permissions, and the database/WAL files before restarting or deleting anything. Do not remove the database as a first troubleshooting step.
 
-    ls -la data/whaxon.db
-    chmod 664 data/whaxon.db
+## Database inspection and reset
 
-## Database
+Inspect the local database read-only where possible:
 
-### Reset all history
+```bash
+sqlite3 data/whaxon.db
+sqlite> .tables
+sqlite> SELECT id, tool, target, status FROM jobs ORDER BY started_at DESC LIMIT 10;
+sqlite> .quit
+```
 
-    rm data/whaxon.db data/whaxon.db-wal data/whaxon.db-shm
-
-### Inspect manually
-
-    sqlite3 data/whaxon.db
-    sqlite> .tables
-    sqlite> SELECT id, tool, target, status FROM jobs ORDER BY started_at DESC LIMIT 10;
-    sqlite> .quit
+Deleting `whaxon.db`, its WAL/SHM files or the configured data directory destroys local history and evidence references. Back up the complete data directory first and only reset it when loss of that data is intended.
 
 ## Getting help
 
-Open an issue at https://github.com/andreipath26/WHAXON/issues with OS,
-Python version, and the exact command you ran.
+Open an issue in the active repository: https://github.com/andreipath26/WHAXON-AI-Forensics/issues. Include the operating system, Python version, WHAXON package/source revision, exact command, relevant diagnostic output and job ID. Redact credentials, tokens, private target data and other sensitive evidence before sharing.

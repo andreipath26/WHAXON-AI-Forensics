@@ -183,6 +183,21 @@ Diagnostics are read-only unless you explicitly request a supported installation
 
 See [Dependency readiness and guided installation](docs/dependency-readiness.md) for profiles, plan approval, verification, snapshots and limitations.
 
+### First-run installation workflow
+
+Use this sequence on a new machine; do not jump straight to installing every scanner:
+
+1. **Install the WHAXON runtime** in a dedicated Python 3.11+ virtual environment using the PyPI or source instructions above. Add only the interface extras you intend to use.
+2. **Run diagnostics:** `whaxon doctor`. Resolve a BLOCKED core runtime first. DEGRADED optional dependencies do not prevent unrelated core functions from working.
+3. **Inspect the dependency inventory and verify tools:** use `whaxon doctor --json` and, when needed, `whaxon doctor --verify`. Verification runs curated version probes; it does not run scans.
+4. **Preview remediation:** use `whaxon doctor --plan` (optionally `--check <dependency>`). Review the exact plan, package source, privilege/network impact and automation eligibility.
+5. **Approve only the reviewed action:** for an eligible Python package, use the exact plan ID with `whaxon doctor --install --check <dependency> --approve <PLAN_ID>`. External-tool OS installation is a separate, narrower CLI workflow; unsupported hosts/tools remain manual.
+6. **Verify again:** rerun `whaxon doctor` and `whaxon doctor --verify`, then inspect the reported state before using the tool.
+
+Installation is not a blanket approval to run a tool or assess a target. Scope configuration and written authorization remain separate prerequisites. Completed package changes are not generally rolled back automatically; recreate the virtual environment if recovery guidance indicates it is inconsistent.
+
+See [Dependency readiness and guided installation](docs/dependency-readiness.md) for exact policy, supported platforms, approval binding, operation tracking and recovery limits.
+
 ## Headless and server use
 
 The web service can run without a desktop session and be accessed through a browser:
