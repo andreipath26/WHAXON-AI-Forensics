@@ -57,12 +57,6 @@ def _parser() -> argparse.ArgumentParser:
         "cost", help="inspect measured cost and incomplete reporting",
     )
     cost_summary.add_argument("--id", required=True)
-    attempt_cost = plan_commands.add_parser(
-        "record-cost", help="record evidence-backed final attempt cost",
-    )
-    attempt_cost.add_argument("--attempt-id", required=True)
-    attempt_cost.add_argument("--cost-microusd", required=True, type=int)
-    attempt_cost.add_argument("--source", required=True)
     mission_deadline = mission_commands.add_parser(
         "deadline", help="set a mission-wide absolute execution cutoff",
     )
@@ -91,6 +85,12 @@ def _parser() -> argparse.ArgumentParser:
 
     plan = commands.add_parser("plan", help="manage persisted workflow plans")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
+    attempt_cost = plan_commands.add_parser(
+        "record-cost", help="record evidence-backed final attempt cost",
+    )
+    attempt_cost.add_argument("--attempt-id", required=True)
+    attempt_cost.add_argument("--cost-microusd", required=True, type=int)
+    attempt_cost.add_argument("--source", required=True)
     approval = plan_commands.add_parser(
         "approval", help="inspect and manage attributable task approvals",
     )
