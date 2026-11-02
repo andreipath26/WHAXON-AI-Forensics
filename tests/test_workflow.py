@@ -1,4 +1,5 @@
 import asyncio
+from functools import wraps
 
 import pytest
 
@@ -10,12 +11,10 @@ def _run_async_test(test_function):
     asyncio_mode=auto. Keep these scheduler tests independent of browser
     fixtures by exposing a synchronous pytest test that owns its loop.
     """
+    @wraps(test_function)
     def run(*args, **kwargs):
         return asyncio.run(test_function(*args, **kwargs))
 
-    run.__name__ = test_function.__name__
-    run.__qualname__ = test_function.__qualname__
-    run.__doc__ = test_function.__doc__
     return run
 
 from whaxon.core.workflow import (
