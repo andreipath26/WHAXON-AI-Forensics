@@ -781,6 +781,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @app.get("/api/v2/workflows/<plan_id>/evidence")
+    def workflow_v2_evidence(plan_id):
+        try:
+            limit = int(request.args.get("limit", "100"))
+            return jsonify(core.workflow_evidence(plan_id, limit=limit))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), (
+                404 if "unknown workflow plan" in str(exc) else 400
+            )
+
     @app.get("/api/v2/workflows/<plan_id>/resources")
     def workflow_v2_resources(plan_id):
         try:
