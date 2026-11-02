@@ -256,7 +256,8 @@ class ToolRunner:
         """
         if self._scope is not None:
             match = self._check_execution_scope(target)
-            if not match.allowed and not allow_out_of_scope:
+            hard_deny = getattr(match, "overridable", True) is False
+            if not match.allowed and (hard_deny or not allow_out_of_scope):
                 from .events import CoverageSkipped
                 jid = job_id or uuid.uuid4().hex[:12]
                 self._bus.publish(CoverageSkipped(
@@ -264,7 +265,10 @@ class ToolRunner:
                     kind="scope_blocked", detail=match.reason or "out of scope",
                     phase=phase,
                 ))
-                raise OutOfScopeError(target, match.reason, match.matched_rule)
+                raise OutOfScopeError(
+                    target, match.reason, match.matched_rule,
+                    overridable=not hard_deny,
+                )
             if not match.allowed and allow_out_of_scope:
                 # Explicit overrides must be auditable. If the log cannot be
                 # written, refuse the bypass rather than silently lose the trail.

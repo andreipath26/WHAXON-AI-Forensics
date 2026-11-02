@@ -217,8 +217,11 @@ def main(args: list[str] | None = None) -> None:
         print(f"error: target out of scope: {e.reason}", file=sys.stderr)
         if e.matched_rule:
             print(f"  matched rule: {e.matched_rule}", file=sys.stderr)
-        print(f"  override with: whaxon run {tool_id} {target} --allow-out-of-scope",
-              file=sys.stderr)
+        if e.overridable:
+            print(f"  override with: whaxon run {tool_id} {target} --allow-out-of-scope",
+                  file=sys.stderr)
+        else:
+            print("  this execution block cannot be overridden", file=sys.stderr)
         sys.exit(EXIT_OUT_OF_SCOPE)
     except FileNotFoundError as e:
         print(f"error: tool binary not found: {e}", file=sys.stderr)

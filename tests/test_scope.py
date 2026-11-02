@@ -183,3 +183,30 @@ def test_execution_scope_accepts_explicit_hostname_only_policy(scope_file):
         "in_scope": ["*.acme.test"],
     }))
     assert s.check_for_execution("https://scan.acme.test/").allowed is True
+
+
+def test_dns_pinning_execution_block_cannot_be_overridden(scope_file, monkeypatch):
+    import asyncio
+    import socket
+
+    from whaxon.core.events import EventBus
+    from whaxon.core.runner import ToolRunner
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["10.0.0.0/8"],
+    }))
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.1.2.3", 0))
+        ],
+    )
+    runner = ToolRunner(EventBus(), scope=scope)
+    with pytest.raises(OutOfScopeError) as error:
+        asyncio.run(
+            runner.run_tool(
+                "nikto", "scan.acme.test", allow_out_of_scope=True,
+            )
+        )
+    assert error.value.overridable is False

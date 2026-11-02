@@ -40,6 +40,7 @@ class ScopeMatch:
     allowed: bool
     reason: str = ""
     matched_rule: str = ""
+    overridable: bool = True
 
     def to_dict(self) -> dict:
         return {"allowed": self.allowed, "reason": self.reason,
@@ -48,10 +49,14 @@ class ScopeMatch:
 
 class OutOfScopeError(RuntimeError):
     """Raised when a target is outside the declared scope and no override was given."""
-    def __init__(self, target: str, reason: str, matched_rule: str = "") -> None:
+    def __init__(
+        self, target: str, reason: str, matched_rule: str = "",
+        *, overridable: bool = True,
+    ) -> None:
         self.target = target
         self.reason = reason
         self.matched_rule = matched_rule
+        self.overridable = overridable
         super().__init__(f"Out of scope: {target} — {reason}")
 
 
@@ -426,6 +431,7 @@ class ScopeManager:
                 False,
                 "hostname execution cannot be safely DNS-pinned under IP/CIDR scope; use an authorized IP literal",
                 host,
+                overridable=False,
             )
         return checked
 
