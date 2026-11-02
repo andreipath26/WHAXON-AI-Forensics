@@ -23,6 +23,9 @@ class _FakeCore:
         self.saved = (plan_id, plan)
         return True
 
+    def configure_mission_deadline(self, mission_id, *, deadline_at):
+        self.mission_deadline = (mission_id, deadline_at)
+
     def mission_execution_limits(self, mission_id):
         return {"mission_id": mission_id, "max_total_attempts": 2, "max_concurrency": 1}
 
@@ -279,3 +282,11 @@ def test_mission_limits_cli(monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)["max_concurrency"] == 1
     assert workflow_cmd.main(["mission", "budget", "--id", "m"]) == 0
     assert json.loads(capsys.readouterr().out)["max_total_attempts"] == 2
+
+
+def test_mission_deadline_cli(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "deadline", "--id", "m", "--unix-time", "2000000000",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["mission_id"] == "m"

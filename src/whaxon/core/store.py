@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS workflow_rate_limits (
 CREATE TABLE IF NOT EXISTS workflow_deadlines (
     plan_id TEXT PRIMARY KEY, deadline_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mission_deadlines (
+    mission_id TEXT PRIMARY KEY,
+    deadline_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS mission_execution_limits (
     mission_id TEXT PRIMARY KEY,
     max_total_attempts INTEGER NOT NULL,
@@ -1825,6 +1829,61 @@ class JobStore:
             finally:
                 c.close()
 
+    def set_mission_deadline(self, mission_id, *, deadline_at):
+        """A durable, mission-scoped cutoff that cannot be extended."""
+        import math
+
+        if (
+            isinstance(deadline_at, bool)
+            or not isinstance(deadline_at, (int, float))
+            or not math.isfinite(deadline_at) or deadline_at <= 0
+        ):
+            raise ValueError("mission deadline_at must be a finite positive unix timestamp")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?", (mission_id,),
+                ).fetchone()
+                if old is not None and deadline_at > old["deadline_at"]:
+                    raise ValueError("mission deadline cannot be extended")
+                c.execute(
+                    "INSERT INTO mission_deadlines (mission_id, deadline_at) VALUES (?, ?) "
+                    "ON CONFLICT(mission_id) DO UPDATE SET deadline_at=excluded.deadline_at",
+                    (mission_id, deadline_at),
+                )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_deadline(self, mission_id):
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            row = c.execute(
+                "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            return row["deadline_at"] if row else None
+        finally:
+            c.close()
+
+    def _mission_deadline_allows_dispatch(self, c, plan_id, now):
+        row = c.execute(
+            "SELECT d.deadline_at FROM mission_deadlines d "
+            "JOIN workflow_plans p ON p.mission_id=d.mission_id WHERE p.id=?",
+            (plan_id,),
+        ).fetchone()
+        return row is None or now < row["deadline_at"]
+
     def set_mission_execution_limits(self, mission_id, *, max_total_attempts, max_concurrency):
         """Tighten cumulative and concurrent budgets across every plan of a mission."""
         if any(
@@ -1880,8 +1939,13 @@ class JobStore:
                 "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
                 (mission_id,),
             ).fetchone()
+            deadline = c.execute(
+                "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?", (mission_id,),
+            ).fetchone()
             return {
                 "mission_id": mission_id,
+                "deadline_at": deadline["deadline_at"] if deadline else None,
+                "deadline_exceeded": bool(deadline and time.time() >= deadline["deadline_at"]),
                 "max_total_attempts": limits["max_total_attempts"] if limits else None,
                 "max_concurrency": limits["max_concurrency"] if limits else None,
                 "attempts": usage["attempts"], "active_attempts": usage["active"],
@@ -1958,7 +2022,10 @@ class JobStore:
                 deadline = c.execute(
                     "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
                 ).fetchone()
-                if deadline is not None and now >= deadline["deadline_at"]:
+                if (
+                    (deadline is not None and now >= deadline["deadline_at"])
+                    or not self._mission_deadline_allows_dispatch(c, plan_id, now)
+                ):
                     c.execute("COMMIT")
                     return False
                 previous = c.execute(
@@ -2072,7 +2139,10 @@ class JobStore:
                 deadline = c.execute(
                     "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
                 ).fetchone()
-                if deadline is not None and time.time() >= deadline["deadline_at"]:
+                if (
+                    (deadline is not None and time.time() >= deadline["deadline_at"])
+                    or not self._mission_deadline_allows_dispatch(c, plan_id, time.time())
+                ):
                     c.execute("COMMIT")
                     return None
                 limit_row = c.execute(
@@ -2241,6 +2311,8 @@ class JobStore:
                 ).fetchone()
                 if deadline is not None and time.time() >= deadline["deadline_at"]:
                     raise ValueError("workflow deadline exceeded")
+                if not self._mission_deadline_allows_dispatch(c, plan_row["plan_id"], now):
+                    raise ValueError("mission deadline exceeded")
                 effective_plan = plan_row["plan_id"]
                 limits = c.execute(
                     "SELECT max_total_attempts, max_concurrency FROM workflow_limits "

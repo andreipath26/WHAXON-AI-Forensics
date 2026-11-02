@@ -131,3 +131,24 @@ def test_workflow_v2_mission_budget_is_shared_with_store(tmp_path, monkeypatch):
         "max_total_attempts": 5, "max_concurrency": 2,
     }).status_code == 400
     assert client.get("/api/v2/missions/missing/budget").status_code == 404
+
+
+def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
+    import time
+
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.1"),
+    )))
+    response = client.post(
+        "/api/v2/missions/m/deadline", json={"deadline_at": time.time() - 1},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["deadline_exceeded"] is True
+    assert core.store.claim_ready_workflow_task("p", "worker") is None
+    assert client.post(
+        "/api/v2/missions/m/deadline", json={"deadline_at": time.time() + 100},
+    ).status_code == 400

@@ -203,6 +203,9 @@ class Core:
     def workflow_events(self, plan_id: str, *, after_id: int = 0, limit: int = 100):
         return self.store.list_workflow_events(plan_id, after_id, limit)
 
+    def configure_mission_deadline(self, mission_id: str, *, deadline_at: float):
+        return self.store.set_mission_deadline(mission_id, deadline_at=deadline_at)
+
     def mission_execution_limits(self, mission_id: str):
         return self.store.get_mission_execution_limits(mission_id)
 

@@ -48,6 +48,11 @@ def _parser() -> argparse.ArgumentParser:
 
     mission = commands.add_parser("mission", help="manage missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
+    mission_deadline = mission_commands.add_parser(
+        "deadline", help="set a mission-wide absolute execution cutoff",
+    )
+    mission_deadline.add_argument("--id", required=True)
+    mission_deadline.add_argument("--unix-time", type=float, required=True)
     mission_limits = mission_commands.add_parser(
         "limits", help="configure mission-wide cumulative and concurrent attempt limits",
     )
@@ -158,6 +163,10 @@ def main(args: list[str] | None = None) -> int:
         if options.command == "capabilities":
             capability_result = [manifest.to_dict() for manifest in core.capabilities.list()]
             print(json.dumps(capability_result, indent=2, sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "deadline":
+            core.configure_mission_deadline(options.id, deadline_at=options.unix_time)
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "limits":
             core.configure_mission_execution_limits(

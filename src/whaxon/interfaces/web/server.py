@@ -508,6 +508,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @app.post("/api/v2/missions/<mission_id>/deadline")
+    def workflow_v2_mission_deadline(mission_id):
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or "deadline_at" not in payload:
+            return jsonify({"error": "deadline_at required"}), 400
+        try:
+            core.configure_mission_deadline(
+                mission_id, deadline_at=payload["deadline_at"],
+            )
+            return jsonify(core.mission_execution_limits(mission_id))
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
     @app.route("/api/v2/missions/<mission_id>/budget", methods=["GET", "POST"])
     def workflow_v2_mission_budget(mission_id):
         try:

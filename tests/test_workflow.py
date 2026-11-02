@@ -1241,3 +1241,49 @@ def test_mission_budget_rejects_direct_attempt_bypass(tmp_path):
     store.finish_task_attempt(claim["attempt_id"], "succeeded")
     with pytest.raises(ValueError, match="mission execution budget"):
         store.start_task_attempt("manual", "b", 1, plan_id="p")
+
+
+def test_mission_deadline_stops_all_plans_and_is_durable(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    path = tmp_path / "mission-deadline.db"
+    store = JobStore(path)
+    store.create_mission("m", "controlled")
+    store.create_mission("other", "unrelated")
+    for plan_id, target in (("p1", "192.0.2.1"), ("p2", "192.0.2.2")):
+        store.save_workflow_plan(plan_id, WorkflowPlan("m", (
+            WorkflowTask("scan", "fixture", target),
+        )))
+    store.save_workflow_plan("p3", WorkflowPlan("other", (
+        WorkflowTask("scan", "fixture", "192.0.2.3"),
+    )))
+    cutoff = time.time() - 1
+    store.set_mission_deadline("m", deadline_at=cutoff)
+    restarted = JobStore(path)
+    assert restarted.get_mission_deadline("m") == cutoff
+    assert restarted.claim_ready_workflow_task("p1", "worker") is None
+    assert restarted.claim_ready_workflow_task("p2", "worker") is None
+    assert restarted.claim_ready_workflow_task("p3", "worker") is not None
+    with pytest.raises(ValueError, match="mission deadline exceeded"):
+        restarted.start_task_attempt("manual", "scan", 1, plan_id="p1")
+    with pytest.raises(ValueError, match="cannot be extended"):
+        restarted.set_mission_deadline("m", deadline_at=time.time() + 10)
+
+
+def test_mission_deadline_blocks_dispatch_after_claim(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "mission-dispatch-deadline.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.1"),
+    )))
+    claim = store.claim_ready_workflow_task("p", "worker")
+    store.set_mission_deadline("m", deadline_at=time.time() - 1)
+    assert store.mark_workflow_dispatch_started("p", claim["attempt_id"]) is False
