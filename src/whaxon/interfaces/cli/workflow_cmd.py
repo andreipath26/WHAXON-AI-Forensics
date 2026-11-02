@@ -268,14 +268,9 @@ def main(args: list[str] | None = None) -> int:
             }, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "show":
-            plan = core.store.get_workflow_plan(options.id)
-            if plan is None:
-                print(f"unknown workflow plan: {options.id}", file=sys.stderr)
-                return 2
-            print(json.dumps({
-                "plan": plan["plan"],
-                "tasks": core.store.list_workflow_tasks(options.id),
-            }, indent=2, sort_keys=True))
+            print(json.dumps(
+                core.workflow_plan_details(options.id), indent=2, sort_keys=True,
+            ))
             return 0
         if options.command == "plan" and options.plan_command == "reconciliation-report":
             print(json.dumps(

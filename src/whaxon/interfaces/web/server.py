@@ -533,6 +533,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 404 if "unknown mission" in str(exc) else 400
 
+    @app.get("/api/v2/workflows/<plan_id>")
+    def workflow_v2_plan_details(plan_id):
+        try:
+            return jsonify(core.workflow_plan_details(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
     @app.post("/api/v2/workflows")
     def workflow_v2_save_plan():
         from whaxon.core.workflow import WorkflowPlan

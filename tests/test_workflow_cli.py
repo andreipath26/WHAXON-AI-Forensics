@@ -23,6 +23,9 @@ class _FakeCore:
         self.saved = (plan_id, plan)
         return True
 
+    def workflow_plan_details(self, plan_id):
+        return {"plan": {"mission_id": "m"}, "tasks": [{"id": "scan"}]}
+
     def configure_mission_cost_limit(self, mission_id, *, max_cost_microusd):
         self.cost_cap = (mission_id, max_cost_microusd)
 

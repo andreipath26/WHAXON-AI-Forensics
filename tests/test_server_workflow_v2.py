@@ -177,6 +177,11 @@ def test_v2_api_creates_mission_and_persists_plan_using_core(tmp_path, monkeypat
     assert saved.status_code == 201
     assert saved.get_json()["digest"] == plan.digest
     assert core.store.get_workflow_plan("p")["digest"] == plan.digest
+    detail = client.get("/api/v2/workflows/p")
+    assert detail.status_code == 200
+    assert detail.get_json()["plan"]["mission_id"] == "m"
+    assert len(detail.get_json()["tasks"]) == 1
+    assert client.get("/api/v2/workflows/unknown").status_code == 404
     assert client.post("/api/v2/workflows", json={"id": "bad", "plan": {}}).status_code == 400
     assert client.post("/api/v2/missions", json={"id": 1, "objective": "x"}).status_code == 400
 

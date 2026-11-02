@@ -278,6 +278,16 @@ class Core:
         """Validate and persist a versioned mission DAG."""
         return self.store.save_workflow_plan(plan_id, plan)
 
+    def workflow_plan_details(self, plan_id: str):
+        """Return the same persisted plan/task snapshot to CLI and API."""
+        plan = self.store.get_workflow_plan(plan_id)
+        if plan is None:
+            raise ValueError(f"unknown workflow plan: {plan_id}")
+        return {
+            "plan": plan["plan"],
+            "tasks": self.store.list_workflow_tasks(plan_id),
+        }
+
     def authorize_workflow_task(self, task) -> bool:
         """Fail-closed default policy for scoped, read-only catalog scans."""
         from .capabilities import CapabilityUnavailable
