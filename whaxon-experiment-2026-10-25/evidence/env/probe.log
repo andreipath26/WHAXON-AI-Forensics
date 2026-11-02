@@ -1,0 +1,5 @@
+== env probe 2026-10-25T11:46:09Z ==
+wrote /workspace/chats/631d3594b40a92b083bca535/evidence/env/environment.json (valid JSON)
+{"target":"code=200 size=5930 time=0.939176","gh":"You are not logged into any GitHub hosts. To log in, run: gh auth login ","tokens":0}
+57f306db775479b84785f2adb63f5d2c308472a12b95773ddfd4a934a94862ce  /workspace/chats/631d3594b40a92b083bca535/evidence/env/environment.json
+== done ==

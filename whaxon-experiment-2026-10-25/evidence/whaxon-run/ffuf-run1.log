@@ -1,0 +1,40 @@
+[verbose] tool_id='ffuf' target='https://pentest-ground.com:4280'
+[verbose] extra_args='-t 2 -rate 5 -timeout 15'
+[verbose] timeout=300.0s allow_out_of_scope=False
+[verbose] scope: allowed=True rule='pentest-ground.com' reason='matches in-scope rule'
+[verbose] argv: ['/workspace/homes/631d3594b40a92b083bca535/.local/bin/ffuf', '-u', 'https://pentest-ground.com:4280/FUZZ', '-w', 'wordlists/dvwa-small.txt', '-mc', '200,204,301,302,307,401,403', '-s', '-t', '2', '-rate', '5', '-timeout', '15']
+[run] ffuf → https://pentest-ground.com:4280  (job 86c7295507ae)
+login.php
+setup.php
+about.php
+phpinfo.php
+instructions.php
+security.php
+vulnerabilities
+config
+favicon.ico
+.htaccess
+php.ini
+server-status
+external
+docs
+[run] finished: exit=0 in 56.34s
+
+[14 findings]
+  [LOW     ] found_path           login.php
+  [LOW     ] found_path           setup.php
+  [LOW     ] found_path           about.php
+  [LOW     ] found_path           phpinfo.php
+  [LOW     ] found_path           instructions.php
+  [LOW     ] found_path           security.php
+  [LOW     ] found_path           vulnerabilities
+  [LOW     ] found_path           config
+  [LOW     ] found_path           favicon.ico
+  [LOW     ] found_path           .htaccess
+  [LOW     ] found_path           php.ini
+  [LOW     ] found_path           server-status
+  [LOW     ] found_path           external
+  [LOW     ] found_path           docs
+
+job: 86c7295507ae
+report: whaxon report 86c7295507ae

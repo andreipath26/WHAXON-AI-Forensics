@@ -1,0 +1,16 @@
+{
+  "engagement": "whaxon-forensics-2026-10-25 (authorized DVWA practice target)",
+  "enabled": true,
+  "in_scope": [
+    "pentest-ground.com",
+    "127.0.0.0/8",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "127.0.0.1"
+  ],
+  "out_of_scope": [
+    "169.254.0.0/16"
+  ],
+  "notes": "Authorization basis: operator-designated practice target (pentest-ground.com:4280, DVWA). Prohibited per engagement rules: setup.php database reset, file uploads, brute force beyond 3 attempts, credential reads, host-level privilege escalation, other hosts/ports. See docs/scope-and-rules.md. Lab addition 2026-10-25T13:06Z: exact-host rule '127.0.0.1' added for the local ground-truth lab (localhost:8099), because upstream tool commit 5b61fa5 does not apply CIDR rules to URL-form targets (documented defect, see research/whaxon_execution_evidence.md). Enforcement stays enabled."
+}

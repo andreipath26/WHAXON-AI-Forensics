@@ -1,0 +1,424 @@
+{
+  "engagement": "WHAXON AI Forensics \u2014 autonomous research, security testing, decision trace",
+  "target": "https://pentest-ground.com:4280/",
+  "generated_at_utc": "2026-10-25T12:21:59Z",
+  "hash_algorithm": "sha256",
+  "classification_legend": {
+    "public-safe": "publishable: no credentials, no session values, no personal data",
+    "restricted": "kept local / access-controlled (none present in this study)",
+    "secret": "never written to disk (none present)"
+  },
+  "sanitisation_check": {
+    "patterns_checked": [
+      "PHPSESSID=",
+      "ghp_",
+      "github_pat_",
+      "BEGIN RSA PRIVATE KEY",
+      "BEGIN OPENSSH PRIVATE KEY"
+    ],
+    "offenders": []
+  },
+  "artefact_count": 40,
+  "artefacts": [
+    {
+      "id": "adapters-fidelity-json",
+      "path": "evidence/adapters/fidelity.json",
+      "description": "Adapter fidelity: synthetic ffuf shapes, shipped-artefact contradiction, live adjudication",
+      "classification": "public-safe",
+      "experiment": "E2/E6",
+      "bytes": 15662,
+      "captured_at_utc": "2026-10-25T12:10:53Z",
+      "sha256": "05e8269d58076d9b437ab055ef710a82d2382742b5cbc556a02ece9937684559"
+    },
+    {
+      "id": "benchmark-access-log-jsonl",
+      "path": "evidence/benchmark/access-log.jsonl",
+      "description": "Requests the validator actually made to each benchmark case",
+      "classification": "public-safe",
+      "experiment": "E3",
+      "bytes": 18186,
+      "captured_at_utc": "2026-10-25T12:21:38Z",
+      "sha256": "36c617e496a8092fe2ec9d4387c9cd8423588533e6e1ca51ca87479f19315a2b"
+    },
+    {
+      "id": "benchmark-confusion-json",
+      "path": "evidence/benchmark/confusion.json",
+      "description": "Confusion matrices, TPR/FPR/precision/Youden J for both replay paths",
+      "classification": "public-safe",
+      "experiment": "E3",
+      "bytes": 853,
+      "captured_at_utc": "2026-10-25T12:21:38Z",
+      "sha256": "025909d10b0e4ebdaa10cb3d0485c6b9f938ccb51b366979650623f6eefc53f2"
+    },
+    {
+      "id": "benchmark-results-json",
+      "path": "evidence/benchmark/results.json",
+      "description": "Per-case validator verdicts and reasons on the labelled benchmark",
+      "classification": "public-safe",
+      "experiment": "E3",
+      "bytes": 7521,
+      "captured_at_utc": "2026-10-25T12:21:38Z",
+      "sha256": "2404d5262a241f281a1b4d6ee5315bdbc0a6a2131406d23cb5e95275fca0273d"
+    },
+    {
+      "id": "env-environment-json",
+      "path": "evidence/env/environment.json",
+      "description": "Phase A runner environment, network reachability and git/GitHub auth state",
+      "classification": "public-safe",
+      "experiment": "E0",
+      "bytes": 3287,
+      "captured_at_utc": "2026-10-25T11:46:12Z",
+      "sha256": "57f306db775479b84785f2adb63f5d2c308472a12b95773ddfd4a934a94862ce"
+    },
+    {
+      "id": "env-probe-log",
+      "path": "evidence/env/probe.log",
+      "description": "Environment probe log with hashes",
+      "classification": "public-safe",
+      "experiment": "E0",
+      "bytes": 414,
+      "captured_at_utc": "2026-10-25T11:46:13Z",
+      "sha256": "8f6fad23aaa45d85ef890b76d091c319f67c081d95badb5ef35301cf8d46da5b"
+    },
+    {
+      "id": "env-target_root-headers",
+      "path": "evidence/env/target_root.headers",
+      "description": "First-contact response headers from the assessment target",
+      "classification": "public-safe",
+      "experiment": "E0",
+      "bytes": 453,
+      "captured_at_utc": "2026-10-25T12:18:59Z",
+      "sha256": "ab52a1936c9a4b41dd01b2c0fcb9fe1866709c382c8c1e10b6bc15667c42089a"
+    },
+    {
+      "id": "env-target_root-html",
+      "path": "evidence/env/target_root.html",
+      "description": "First-contact body from the assessment target (DVWA home)",
+      "classification": "public-safe",
+      "experiment": "E0",
+      "bytes": 5930,
+      "captured_at_utc": "2026-10-25T11:46:11Z",
+      "sha256": "c85abb2acd9eda01b0b21431fcc6ddc705fa831a07a73bdb72f736d19429a9e3"
+    },
+    {
+      "id": "live-confirm-json",
+      "path": "evidence/live/confirm.json",
+      "description": "Confirmed LFI / XSS / command-injection probes with matched negative controls",
+      "classification": "public-safe",
+      "experiment": "E5",
+      "bytes": 3614,
+      "captured_at_utc": "2026-10-25T12:05:51Z",
+      "sha256": "d0465ed3b5336fd9b7e6341ab5163d435be9f36caddf7a38511191ea5d60ff97"
+    },
+    {
+      "id": "live-exec_benign-html",
+      "path": "evidence/live/exec_benign.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4093,
+      "captured_at_utc": "2026-10-25T12:04:44Z",
+      "sha256": "3081f42f2f0c6b262e018ac68b0657c08096fd55e9adae4a8199679e0baa117a"
+    },
+    {
+      "id": "live-exec_benign_post-body",
+      "path": "evidence/live/exec_benign_post.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4529,
+      "captured_at_utc": "2026-10-25T12:05:51Z",
+      "sha256": "f441a5b95f09e17a7eb130c29fccdea2505b4f4af42f2090c3a30884f4bd9ea0"
+    },
+    {
+      "id": "live-exec_inject-html",
+      "path": "evidence/live/exec_inject.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4093,
+      "captured_at_utc": "2026-10-25T12:04:45Z",
+      "sha256": "3081f42f2f0c6b262e018ac68b0657c08096fd55e9adae4a8199679e0baa117a"
+    },
+    {
+      "id": "live-exec_inject_post-body",
+      "path": "evidence/live/exec_inject_post.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4583,
+      "captured_at_utc": "2026-10-25T12:05:51Z",
+      "sha256": "2eb52434a9fac4144e5e512911cdf0b00ff21941c958abd5bcd2b58342583cc2"
+    },
+    {
+      "id": "live-instructions-html",
+      "path": "evidence/live/instructions.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 32379,
+      "captured_at_utc": "2026-10-25T12:04:40Z",
+      "sha256": "1b54f775cd78fca931ca8e553b0888d3df1a89f78e25e47135f6df3695a614ac"
+    },
+    {
+      "id": "live-lfi_passwd-body",
+      "path": "evidence/live/lfi_passwd.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4582,
+      "captured_at_utc": "2026-10-25T12:05:44Z",
+      "sha256": "48513bcf262d05756672e93dd92e10fd378896e3008ffb01ffb9a4ea4a6c2d44"
+    },
+    {
+      "id": "live-lfi_traversal_hostname-body",
+      "path": "evidence/live/lfi_traversal_hostname.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4230,
+      "captured_at_utc": "2026-10-25T12:05:44Z",
+      "sha256": "774968142640ee540ef2a2c943b9981b3d3c8db39c80c4c1d26308d76644060a"
+    },
+    {
+      "id": "live-phpinfo-html",
+      "path": "evidence/live/phpinfo.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 87765,
+      "captured_at_utc": "2026-10-25T12:18:59Z",
+      "sha256": "8ef3eb694321e79cb90278a3135eecb75eaada2ca123a32ab930649ac13207e0"
+    },
+    {
+      "id": "live-request-log-jsonl",
+      "path": "evidence/live/request-log.jsonl",
+      "description": "All live requests: method, path, status, timing, redacted cookie attribute names",
+      "classification": "public-safe",
+      "experiment": "E4",
+      "bytes": 88394,
+      "captured_at_utc": "2026-10-25T12:10:53Z",
+      "sha256": "e1a22e966a2d2f10f668367b52e4a92fa3cc2fd135346124742c1492a19784f3"
+    },
+    {
+      "id": "live-routes-json",
+      "path": "evidence/live/routes.json",
+      "description": "Unauthenticated route matrix with classifications and excerpts",
+      "classification": "public-safe",
+      "experiment": "E4",
+      "bytes": 20637,
+      "captured_at_utc": "2026-10-25T12:04:49Z",
+      "sha256": "4f786bfdd95bb62a104cf9befd8d2de864322e212ee3af40f3a989ec7f402f54"
+    },
+    {
+      "id": "live-setup-html",
+      "path": "evidence/live/setup.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 5152,
+      "captured_at_utc": "2026-10-25T12:04:39Z",
+      "sha256": "4f20a224caa64ef455b73fe1c33513e5dc8d6187d8791c74c253e9c2222caeb3"
+    },
+    {
+      "id": "live-sqli-html",
+      "path": "evidence/live/sqli.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 461,
+      "captured_at_utc": "2026-10-25T12:04:42Z",
+      "sha256": "05c5792834f240b826aede03772a6f2651b0d97928ee428e2a1e47a5d4ceec83"
+    },
+    {
+      "id": "live-sqli_blind-html",
+      "path": "evidence/live/sqli_blind.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 485,
+      "captured_at_utc": "2026-10-25T12:04:42Z",
+      "sha256": "d493bf79fba6cf2fac9cebbc12de6e0e5302774e9b27aa8ef7e53633fbd46541"
+    },
+    {
+      "id": "live-xss_negative-body",
+      "path": "evidence/live/xss_negative.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4247,
+      "captured_at_utc": "2026-10-25T12:05:42Z",
+      "sha256": "e57e1924642a75ade1abe3063693afadd2417aa0671af00b2cdc8f85fdc6f556"
+    },
+    {
+      "id": "live-xss_positive-body",
+      "path": "evidence/live/xss_positive.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4267,
+      "captured_at_utc": "2026-10-25T12:05:42Z",
+      "sha256": "df6c6a4fbdbe42c2e5809696dd552e816408c7da41f06f9db0f5f829c5a17603"
+    },
+    {
+      "id": "live-xss_r_marker-html",
+      "path": "evidence/live/xss_r_marker.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4252,
+      "captured_at_utc": "2026-10-25T12:04:43Z",
+      "sha256": "2bfb4750a4c3e5d687bdcc21c873c90c32f4727e837efaba43b6c6c2c9cb51c7"
+    },
+    {
+      "id": "live-xss_r_payload-html",
+      "path": "evidence/live/xss_r_payload.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4269,
+      "captured_at_utc": "2026-10-25T12:04:44Z",
+      "sha256": "f541da9c1ca267d59f269e5e2c84223b18f33a0ee9cd00a41e36bc2013d8454c"
+    },
+    {
+      "id": "live-xss_s-html",
+      "path": "evidence/live/xss_s.html",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 435,
+      "captured_at_utc": "2026-10-25T12:04:48Z",
+      "sha256": "6d43dfe93264f90ae2b92ddaf80c94675f3b55f28b1d70d1cead8beb832ccae7"
+    },
+    {
+      "id": "redactions-json",
+      "path": "evidence/redactions.json",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 2231,
+      "captured_at_utc": "2026-10-25T12:18:59Z",
+      "sha256": "4cd406bbd5e13b2893ef7ef52f9386748979b945792d52f80f0a14e6a008abbc"
+    },
+    {
+      "id": "scope-decision-matrix-json",
+      "path": "evidence/scope/decision-matrix.json",
+      "description": "14 target forms evaluated through ScopeManager, plus DNS binding probe",
+      "classification": "public-safe",
+      "experiment": "E1",
+      "bytes": 2785,
+      "captured_at_utc": "2026-10-25T12:21:40Z",
+      "sha256": "3df7368c60166eaf1c53ccfe9fc502d94f40e32dc0efbd20515ade4b441f3cfa"
+    },
+    {
+      "id": "scope-redirect-escape-json",
+      "path": "evidence/scope/redirect-escape.json",
+      "description": "Two-address experiment: permitted host redirects to a denied host",
+      "classification": "public-safe",
+      "experiment": "E7",
+      "bytes": 1015,
+      "captured_at_utc": "2026-10-25T12:21:40Z",
+      "sha256": "aae15ca425fe718cfc508baf5d59d9d5d7915fe348b60e54db5bf3e9d87922e6"
+    },
+    {
+      "id": "verification-about_curl-body",
+      "path": "evidence/verification/about_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 5198,
+      "captured_at_utc": "2026-10-25T12:11:40Z",
+      "sha256": "2014348fedf4109aded6bdac4a658214bfaebd054c06b1a979e724587ed2df34"
+    },
+    {
+      "id": "verification-cmdi_control_curl-body",
+      "path": "evidence/verification/cmdi_control_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4529,
+      "captured_at_utc": "2026-10-25T12:11:37Z",
+      "sha256": "7e5d27d65b7bb356883dda5d722a09c7077f11703f87fc6d70f4724e7132818e"
+    },
+    {
+      "id": "verification-cmdi_curl-body",
+      "path": "evidence/verification/cmdi_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4583,
+      "captured_at_utc": "2026-10-25T12:11:28Z",
+      "sha256": "9875527983ae95e0dd4785107afac6f1483366235ee021f9aec67122c829c95a"
+    },
+    {
+      "id": "verification-lfi_control_curl-body",
+      "path": "evidence/verification/lfi_control_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4094,
+      "captured_at_utc": "2026-10-25T12:11:23Z",
+      "sha256": "c0ddb95548eaae824aaaf4793c48dccbedf7e6b09eb059d9c36795edb57c4197"
+    },
+    {
+      "id": "verification-lfi_passwd_curl-body",
+      "path": "evidence/verification/lfi_passwd_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4582,
+      "captured_at_utc": "2026-10-25T12:11:22Z",
+      "sha256": "48513bcf262d05756672e93dd92e10fd378896e3008ffb01ffb9a4ea4a6c2d44"
+    },
+    {
+      "id": "verification-phpinfo_curl-body",
+      "path": "evidence/verification/phpinfo_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 86981,
+      "captured_at_utc": "2026-10-25T12:18:59Z",
+      "sha256": "b93914ea47833dcc734372acb4780d2eb798abc391c7683632669fe8b4d6bd89"
+    },
+    {
+      "id": "verification-setup_curl-body",
+      "path": "evidence/verification/setup_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 5152,
+      "captured_at_utc": "2026-10-25T12:11:41Z",
+      "sha256": "32c0c0accb7f377a955c840653809d5ce8922a6e1403515745bb9288e9a893ab"
+    },
+    {
+      "id": "verification-verification-json",
+      "path": "evidence/verification/verification.json",
+      "description": "Independent curl re-test of F1-F6 with controls",
+      "classification": "public-safe",
+      "experiment": "V1",
+      "bytes": 3235,
+      "captured_at_utc": "2026-10-25T12:18:59Z",
+      "sha256": "0e2aad6f3a61c9f6da404cf8dbb6efff0aefef6ac346033d0d2b0d07d13a4f8f"
+    },
+    {
+      "id": "verification-xss_control_curl-body",
+      "path": "evidence/verification/xss_control_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4246,
+      "captured_at_utc": "2026-10-25T12:11:24Z",
+      "sha256": "a4d671b4371fa7c33eafe6e214c8d747895ed942f6631bef8b56c783233f8f92"
+    },
+    {
+      "id": "verification-xss_curl-body",
+      "path": "evidence/verification/xss_curl.body",
+      "description": "raw observation captured by the study",
+      "classification": "public-safe",
+      "experiment": "n/a",
+      "bytes": 4259,
+      "captured_at_utc": "2026-10-25T12:11:23Z",
+      "sha256": "4c5c15b67503ce08fb4f5092e2ccb8346d7e9522b0ecf7d55491d34f770cba99"
+    }
+  ]
+}

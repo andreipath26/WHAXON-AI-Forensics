@@ -1,0 +1,7 @@
+seq 0 boolean-based   V1 error=False | V2 false_differs=True  | V3 validator==whaxon_baseline=True  V3 error=False | V4 minimal error=True 
+seq 1 error-based     V1 error=True  | V2 false_differs=True  | V3 validator==whaxon_baseline=True  V3 error=False | V4 minimal error=True 
+seq 2 time/heavy-query V1 error=False | V2 false_differs=False | V3 validator==whaxon_baseline=True  V3 error=False | V4 minimal error=True 
+seq 3 union           V1 error=False | V2 false_differs=False | V3 validator==whaxon_baseline=True  V3 error=False | V4 minimal error=True 
+
+V3: WHAXON's replay payload produces no differential proof on any finding: True
+V4: a minimal breakout payload would have produced one: True

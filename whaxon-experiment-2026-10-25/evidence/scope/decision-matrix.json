@@ -1,0 +1,119 @@
+{
+  "scope_file": {
+    "engagement": "E10 matrix",
+    "enabled": true,
+    "in_scope": [
+      "127.0.0.1/32",
+      "*.example.test",
+      "example.com"
+    ],
+    "out_of_scope": [
+      "127.0.0.2"
+    ],
+    "notes": "synthetic scope used only for this offline experiment"
+  },
+  "matrix": [
+    {
+      "target": "http://127.0.0.1:8098/",
+      "allowed": true,
+      "reason": "matches in-scope rule",
+      "matched_rule": "127.0.0.1/32"
+    },
+    {
+      "target": "http://127.0.0.2:8098/",
+      "allowed": false,
+      "reason": "matches out-of-scope rule",
+      "matched_rule": "127.0.0.2"
+    },
+    {
+      "target": "127.0.0.1",
+      "allowed": true,
+      "reason": "matches in-scope rule",
+      "matched_rule": "127.0.0.1/32"
+    },
+    {
+      "target": "127.0.0.1:8098",
+      "allowed": true,
+      "reason": "matches in-scope rule",
+      "matched_rule": "127.0.0.1/32"
+    },
+    {
+      "target": "http://127.0.0.1./",
+      "allowed": true,
+      "reason": "matches in-scope rule",
+      "matched_rule": "127.0.0.1/32"
+    },
+    {
+      "target": "http://2130706433/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    },
+    {
+      "target": "http://0x7f000001/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    },
+    {
+      "target": "http://[::ffff:127.0.0.1]/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    },
+    {
+      "target": "http://127.0.0.1@evil.test/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    },
+    {
+      "target": "http://evil.test#@127.0.0.1/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    },
+    {
+      "target": "https://api.example.test/x",
+      "allowed": true,
+      "reason": "matches in-scope rule",
+      "matched_rule": "*.example.test"
+    },
+    {
+      "target": "https://example.com/",
+      "allowed": true,
+      "reason": "matches in-scope rule",
+      "matched_rule": "example.com"
+    },
+    {
+      "target": "http://localhost:8098/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    },
+    {
+      "target": "http://127.0.0.2.nip.io/",
+      "allowed": false,
+      "reason": "no matching in-scope rule",
+      "matched_rule": ""
+    }
+  ],
+  "dns_binding_probe": {
+    "name": "example.com",
+    "resolved": [
+      "104.20.23.154",
+      "172.66.147.243"
+    ],
+    "addresses_allowed_by_rules": [
+      {
+        "ip": "104.20.23.154",
+        "allowed_by_rule": false
+      },
+      {
+        "ip": "172.66.147.243",
+        "allowed_by_rule": false
+      }
+    ],
+    "name_allowed": true
+  }
+}

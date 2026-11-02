@@ -1,0 +1,20 @@
+########## whaxon validate 66b0be3c50f2 0
+[verbose] result status='candidate' reason='context replay did not produce a baseline-differential proof'
+[=] Verification status: CANDIDATE
+    Reason: context replay did not produce a baseline-differential proof
+########## whaxon validate 66b0be3c50f2 1
+[verbose] result status='candidate' reason='context replay did not produce a baseline-differential proof'
+[=] Verification status: CANDIDATE
+    Reason: context replay did not produce a baseline-differential proof
+########## whaxon validate 66b0be3c50f2 2
+[verbose] result status='candidate' reason='context replay did not produce a baseline-differential proof'
+[=] Verification status: CANDIDATE
+    Reason: context replay did not produce a baseline-differential proof
+########## whaxon validate 66b0be3c50f2 3
+[verbose] result status='candidate' reason='context replay did not produce a baseline-differential proof'
+[=] Verification status: CANDIDATE
+    Reason: context replay did not produce a baseline-differential proof
+########## whaxon validate 66b0be3c50f2 4
+[verbose] result status='candidate' reason="kind 'sqli_info' is not directly replayable"
+[=] Verification status: CANDIDATE
+    Reason: kind 'sqli_info' is not directly replayable

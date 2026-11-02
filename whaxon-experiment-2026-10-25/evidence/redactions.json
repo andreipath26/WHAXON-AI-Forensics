@@ -1,0 +1,59 @@
+{
+  "policy": "session identifiers are redacted before publication; values are never stored",
+  "placeholder": "PHPSESSID=<REDACTED-SESSION-ID>",
+  "files": [
+    {
+      "path": "evidence/env/target_root.headers",
+      "sha256_before": "df128573447f9ec5448b04bce15171e77cbbff5288754345005dcafb24c917f4",
+      "sha256_after": "ab52a1936c9a4b41dd01b2c0fcb9fe1866709c382c8c1e10b6bc15667c42089a",
+      "redactions": [
+        {
+          "pattern": "PHPSESSID=[0-9a-zA-Z]{16,64}",
+          "replacements": 1
+        }
+      ],
+      "transformation": "value replaced with placeholder; no other content altered",
+      "performed_at_utc": "2026-10-25T12:18:59Z"
+    },
+    {
+      "path": "evidence/live/phpinfo.html",
+      "sha256_before": "986e976c2acd9b001f11f0a79909fcd0158e9f50d019e2bfd5c645754f48e1a4",
+      "sha256_after": "8ef3eb694321e79cb90278a3135eecb75eaada2ca123a32ab930649ac13207e0",
+      "redactions": [
+        {
+          "pattern": "PHPSESSID=[0-9a-zA-Z]{16,64}",
+          "replacements": 3
+        }
+      ],
+      "transformation": "value replaced with placeholder; no other content altered",
+      "performed_at_utc": "2026-10-25T12:18:59Z"
+    },
+    {
+      "path": "evidence/verification/phpinfo_curl.body",
+      "sha256_before": "a5d8700ac4847bcba9e60f37887ec68f3a27cab4321c86896b9240f40875a070",
+      "sha256_after": "b93914ea47833dcc734372acb4780d2eb798abc391c7683632669fe8b4d6bd89",
+      "redactions": [
+        {
+          "pattern": "PHPSESSID=[0-9a-zA-Z]{16,64}",
+          "replacements": 1
+        }
+      ],
+      "transformation": "value replaced with placeholder; no other content altered",
+      "performed_at_utc": "2026-10-25T12:18:59Z"
+    },
+    {
+      "path": "evidence/verification/verification.json",
+      "sha256_before": "9d1b01470e5f746bcaeb61d4adf762ac736a0e01bda3d15a188b702fc66c5b66",
+      "sha256_after": "0e2aad6f3a61c9f6da404cf8dbb6efff0aefef6ac346033d0d2b0d07d13a4f8f",
+      "redactions": [
+        {
+          "pattern": "PHPSESSID=[0-9a-zA-Z]{16,64}",
+          "replacements": 1
+        }
+      ],
+      "transformation": "value replaced with placeholder; no other content altered",
+      "performed_at_utc": "2026-10-25T12:18:59Z"
+    }
+  ],
+  "total_files": 4
+}

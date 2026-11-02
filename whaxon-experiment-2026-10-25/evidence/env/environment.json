@@ -1,0 +1,81 @@
+{
+  "probe_timestamp_utc": "2026-10-25T11:46:09Z",
+  "record_type": "contemporaneous observation produced by scripts/env_probe.sh",
+  "runner": {
+    "uname": "Linux freestyle-vm 6.1.102 #1 SMP PREEMPT_DYNAMIC Wed Aug 26 20:12:24 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux",
+    "os_release": "Ubuntu 24.04.5 LTS",
+    "identity": "uid=104028665(fb631d3594b40a92b083bca535) gid=1001(freebuff) groups=1001(freebuff)",
+    "capabilities": "CapInh:\t0000000000000000 CapPrm:\t0000000000000000 CapEff:\t0000000000000000 CapBnd:\t000001ffffffffff CapAmb:\t0000000000000000 ",
+    "sudo_probe": "sudo: The \"no new privileges\" flag is set, which prevents sudo from running as root. sudo: If sudo is running in a container, you may need to adjust the container configuration to disable the flag. ",
+    "docker_probe": "permission denied while trying to connect to the docker API at unix:///var/run/docker.sock "
+  },
+  "resources": {
+    "nproc": "2",
+    "mem_total": "4009300 kB",
+    "mem_available": "3590856 kB",
+    "disk": "/dev/root 16G 5.5G 9.4G 37% /",
+    "nofile": "1024"
+  },
+  "tool_paths": {
+    "nmap": null,
+    "nikto": null,
+    "nuclei": null,
+    "sqlmap": null,
+    "whatweb": null,
+    "gobuster": null,
+    "ffuf": null,
+    "wpscan": null,
+    "hydra": null,
+    "curl": "/usr/bin/curl",
+    "dig": "/usr/bin/dig",
+    "openssl": "/usr/bin/openssl",
+    "jq": "/usr/bin/jq",
+    "git": "/usr/bin/git",
+    "python3": "/usr/local/bin/python3",
+    "pip3": "/usr/local/bin/pip3",
+    "node": "/usr/local/bin/node",
+    "npm": "/usr/local/bin/npm",
+    "bun": "/usr/local/bin/bun",
+    "docker": "/usr/bin/docker",
+    "gh": "/usr/bin/gh",
+    "zip": "/usr/bin/zip",
+    "unzip": "/usr/bin/unzip",
+    "whois": null,
+    "nc": "/usr/bin/nc",
+    "chromium": null,
+    "chromium-browser": null,
+    "google-chrome": null
+  },
+  "versions": {
+    "python": "Python 3.12.3",
+    "pip": "pip 26.2.1 from /opt/freestyle/python/lib/python3.12/site-packages/pip (python 3.12)",
+    "git": "git version 2.43.0",
+    "curl": "curl 8.5.0 (x86_64-pc-linux-gnu) libcurl/8.5.0 OpenSSL/3.0.13 zlib/1.3 brotli/1.1.0 zstd/1.5.5 libidn2/2.3.7 libpsl/0.21.2 (+libidn2/2.3.7) libssh/0.10.6/openssl/zlib nghttp2/1.59.0 librtmp/2.3 OpenLDAP/2.6.10",
+    "jq": "jq-1.7",
+    "openssl": "OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)",
+    "node": "v24.21.0",
+    "npm": "11.19.0"
+  },
+  "network": {
+    "dns_github": "172.182.252.133 github.com",
+    "https_github": "200",
+    "https_example": "200",
+    "target_url": "https://pentest-ground.com:4280/",
+    "target_response": "code=200 size=5930 time=0.939176",
+    "target_tls": "subject=CN = pentest-ground.com issuer=C = US, O = Let's Encrypt, CN = YE2 notBefore=Sep 22 18:46:51 2026 GMT notAfter=Dec 21 18:46:50 2026 GMT ",
+    "loopback_bindable": {
+      "127.0.0.1": true,
+      "127.0.0.2": true,
+      "127.0.0.3": true
+    }
+  },
+  "git": {
+    "branch": "research/forensics-2026-10-25",
+    "head": "898264ef4f958d7a9667698db6500a3cb08e559d",
+    "origin": "https://github.com/andreipath26/WHAXON-AI-Forensics.git",
+    "gh_auth_status": "You are not logged into any GitHub hosts. To log in, run: gh auth login ",
+    "github_token_env_vars": 0,
+    "ssh_key_files": 0,
+    "global_credential_helper": ""
+  }
+}

