@@ -65,7 +65,7 @@ class WorkflowTask:
     idempotency_key: str = ""
 
     def __post_init__(self) -> None:
-        if not self.id.strip() or not self.capability_id.strip() or not self.target.strip():
+        if any(not isinstance(value, str) or not value.strip() for value in (self.id, self.capability_id, self.target)):
             raise ValueError("task id, capability_id and target are required")
         if self.impact not in _ALLOWED_IMPACTS:
             raise ValueError(f"unsupported task impact: {self.impact}")
@@ -76,11 +76,15 @@ class WorkflowTask:
             or self.timeout_s <= 0
         ):
             raise ValueError("task timeout_s must be finite and positive")
+        if not isinstance(self.depends_on, (list, tuple)) or not isinstance(self.permissions, (list, tuple)):
+            raise TypeError("task dependencies and permissions must be arrays")
+        if not isinstance(self.idempotency_key, str):
+            raise TypeError("task idempotency_key must be a string")
         dependencies = tuple(self.depends_on)
         permissions = tuple(self.permissions)
         if self.id in dependencies or len(set(dependencies)) != len(dependencies):
             raise ValueError("task dependencies must be unique and cannot include itself")
-        if any(not isinstance(item, str) or not item for item in dependencies + permissions):
+        if any(not isinstance(item, str) or not item.strip() for item in dependencies + permissions):
             raise ValueError("task dependencies and permissions must be non-empty strings")
         object.__setattr__(self, "depends_on", dependencies)
         object.__setattr__(self, "permissions", permissions)
@@ -96,13 +100,18 @@ class WorkflowTask:
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> WorkflowTask:
+        if not isinstance(value, dict):
+            raise TypeError("workflow task must be an object")
+        for key in ("id", "capability_id", "target"):
+            if key not in value:
+                raise ValueError(f"workflow task missing required field: {key}")
         return cls(
             id=value["id"],
             capability_id=value["capability_id"],
             target=value["target"],
-            inputs=dict(value.get("inputs") or {}),
-            depends_on=tuple(value.get("depends_on") or ()),
-            permissions=tuple(value.get("permissions") or ()),
+            inputs=value.get("inputs", {}),
+            depends_on=value.get("depends_on", ()),
+            permissions=value.get("permissions", ()),
             impact=value.get("impact", "read_only"),
             timeout_s=value.get("timeout_s", 300.0),
             idempotency_key=value.get("idempotency_key", ""),
@@ -121,8 +130,12 @@ class WorkflowPlan:
     def __post_init__(self) -> None:
         if self.schema_version != WORKFLOW_SCHEMA_VERSION:
             raise ValueError(f"unsupported workflow schema: {self.schema_version}")
+        if not isinstance(self.tasks, (list, tuple)) or any(
+            not isinstance(task, WorkflowTask) for task in self.tasks
+        ):
+            raise TypeError("plan tasks must be an array of workflow tasks")
         object.__setattr__(self, "tasks", tuple(self.tasks))
-        if not self.mission_id.strip():
+        if not isinstance(self.mission_id, str) or not self.mission_id.strip():
             raise ValueError("mission_id is required")
         if not isinstance(self.metadata, dict):
             raise TypeError("plan metadata must be an object")
@@ -164,10 +177,17 @@ class WorkflowPlan:
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> WorkflowPlan:
+        if not isinstance(value, dict):
+            raise TypeError("workflow plan must be an object")
+        for key in ("mission_id", "tasks"):
+            if key not in value:
+                raise ValueError(f"workflow plan missing required field: {key}")
+        if not isinstance(value["tasks"], list):
+            raise TypeError("workflow plan tasks must be an array")
         return cls(
             mission_id=value["mission_id"],
             schema_version=value.get("schema_version", WORKFLOW_SCHEMA_VERSION),
-            metadata=dict(value.get("metadata") or {}),
+            metadata=value.get("metadata", {}),
             tasks=tuple(WorkflowTask.from_dict(task) for task in value["tasks"]),
         )
 
