@@ -75,9 +75,9 @@ These routes do not turn the installer into a general package manager. Exact-pla
 - `GET /api/ai/pending` — pending human questions.
 - `POST /api/ai/runs/<run_id>/answer` — answer a pending question.
 - `GET /api/ai/runs/<run_id>/stream` — stream run events.
-- `POST /api/validate/<job_id>/<seq>` — request deterministic validation.
-- `POST /api/retest/<job_id>/<seq>` — request a retest.
-- `POST /api/approvals/<job_id>/<seq>/resolve` — resolve a pending approval.
+- `POST /api/validate/<job_id>/<int:seq>` — request deterministic validation.
+- `POST /api/retest/<job_id>/<int:seq>` — request a retest.
+- `POST /api/approvals/<job_id>/<int:seq>/resolve` — resolve a pending approval.
 
 AI proposals are not authorization or execution evidence. Validation and retest outcomes may be inconclusive; do not interpret a missing observation as proof of safety.
 

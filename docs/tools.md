@@ -1,71 +1,64 @@
-# Tools
+# Tool Catalog and Execution
 
-The catalog at data/tools.json controls which tools are available and how they are invoked.
+The packaged catalog is maintained at `src/whaxon/data/tools.json`. It describes command-backed tools and session operations. The effective runtime catalog and availability should be checked through `GET /api/tools`; do not assume every catalog entry is installed or usable on every host.
 
-## Format
+## Catalog model
 
-    {
-      tools: [
-        {
-          id: nmap,
-          name: Nmap,
-          category: recon,
-          binary: nmap,
-          description: Network mapper,
-          args: -sT -sV {target},
-          package: nmap
-        }
-      ]
-    }
+A command-backed entry may include:
 
-Fields:
+- `id`: stable tool identifier used by the runner, API and adapters.
+- `name`: display name.
+- `category`: functional grouping.
+- `binary`: executable name or path resolved by the runtime.
+- `description`: operator-facing summary.
+- `args`: argument template used by the adapter and runner.
+- `package`: package hint; it is not by itself permission to install software.
 
-- id: key everywhere (API, adapters, reports)
-- name: display name
-- category: recon / web / exploit / test
-- binary: executable name (resolved via PATH) or absolute path
-- description: one-line summary
-- args: argv template; {target} is substituted
-- package: OS package name; used by whaxon install
-- available: computed - true if binary is on PATH
+Session-backed entries use a transport and command rather than a local executable. They operate through an existing session and are not standalone binaries. The tool catalog is not an authorization policy: scope checks and the execution path still govern whether an action can run.
 
-Unknown keys in tools.json are silently dropped by catalog.load() - the Tool dataclass only accepts declared fields.
+## Catalog entries in the current main snapshot
 
-## Current tools
+The packaged catalog contains 24 entries:
 
-- nmap (nmap, recon)
-- nikto (nikto, web)
-- gobuster (gobuster, web)
-- echo (/bin/echo, test)
-- sqlmap (sqlmap, web)
-- whois (whois, recon)
-- dig (dig, recon)
-- nuclei (nuclei, web)
-- ffuf (ffuf, web)
-- wpscan (wpscan, web)
-- impacket (impacket-secretsdump, exploit)
-- theharvester (theHarvester, recon)
-- dnsrecon (dnsrecon, recon)
-- netexec (netexec, recon)
-- arjun (arjun, web)
-- msf_sysinfo (—, session:msf_session)
-- msf_getuid (—, session:msf_session)
-- msf_hashdump (—, session:msf_session)
-- ssh_cmd (—, session:ssh)
-- smb_shares (—, session:smb)
-- smb_ls (—, session:smb)
-- wmi_exec (—, session:wmi)
+| ID | Kind |
+|---|---|
+| `nmap` | Command |
+| `nikto` | Command |
+| `gobuster` | Command |
+| `echo` | Test command |
+| `sqlmap` | Command |
+| `whois` | Command |
+| `dig` | Command |
+| `nuclei` | Command |
+| `commix` | Command |
+| `ffuf` | Command |
+| `wpscan` | Command |
+| `impacket` | Command |
+| `theharvester` | Command |
+| `dnsrecon` | Command |
+| `msf_sysinfo` | Metasploit session |
+| `msf_getuid` | Metasploit session |
+| `msf_hashdump` | Metasploit session |
+| `ssh_cmd` | SSH session |
+| `smb_shares` | SMB session |
+| `smb_ls` | SMB session |
+| `netexec` | Command |
+| `arjun` | Command |
+| `wmi_exec` | Session operation |
+| `hydra` | Command |
 
-## Adding a tool
+This list is a snapshot of the packaged catalog on 2026-11-02. The live API is authoritative for the runtime actually installed.
 
-1. Append an entry to data/tools.json.
-2. Restart the server - the catalog loads at Core.__init__ and has no hot-reload.
-3. Write an adapter if you want enriched output. See adapters.md.
+## Availability and installation
 
-## Checking availability
+Use `GET /api/tools` to inspect tool IDs and current availability. A missing optional executable does not mean the WHAXON core is unavailable. Use `whaxon doctor` and the [dependency readiness guide](dependency-readiness.md) to diagnose dependencies and review an allowlisted installation plan. A catalog `package` value is not sufficient approval to invoke a package manager.
 
-GET /api/tools reports available: true|false per tool via shutil.which(binary). If a tool shows false, install it or fix the binary field.
+## Adding or changing a tool
 
-## Installing tools
+1. Update the packaged catalog and any relevant adapter or provider registration.
+2. Add or update parser, invocation, scope and failure-mode tests.
+3. Confirm exact argv construction and that user-controlled values cannot bypass scope validation.
+4. Update dependency diagnostics and installation policy separately where appropriate.
+5. Verify the effective catalog through the API and run the relevant tests.
 
-whaxon install reads package from the catalog and invokes the system package manager.
+For output parsing, see [Writing an Adapter](adapters.md). For third-party adapter packages, see [Plugins](plugins.md).

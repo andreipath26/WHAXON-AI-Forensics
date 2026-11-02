@@ -3,7 +3,7 @@
 **Status:** Target architecture and implementation contract. This document does not claim the design is implemented.  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
 **Authority:** The master roadmap remains authoritative. Its §0 dependency-driven order governs delivery; this specification does not reorder or bypass it.  
-**Baseline:** Main at `b27d361e706bcea800300dcf3e8b2e094a429d42`; source and tests must be re-inventoried at implementation start.
+**Historical baseline:** Main at `b27d361e706bcea800300dcf3e8b2e094a429d42`. This was the architecture-design starting point, not the current implementation baseline. Implementation has since begun; use current main-branch source, tests and master roadmap §49 for status. The E0 inventory is a dated migration snapshot, not current-state evidence.
 
 ## 1. Architectural decision
 

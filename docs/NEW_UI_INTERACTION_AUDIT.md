@@ -20,7 +20,7 @@ The new templates use the supplied Obsidian Kinetic visual system. The original 
 
 | URL | Purpose | State |
 |---|---|---|
-| `/` | Default web entry point | Redirects to `/ui-v2` after commit `8313b8a`; CI pending at audit time |
+| `/` | Default web entry point | Redirects to `/ui-v2`; the initial audit marked CI pending, but the later run recorded above passed on its own commit. Current HEAD still requires its own CI evidence |
 | `/ui-v2` | Canonical Obsidian Kinetic dashboard | Implemented |
 | `/ui-v2/dashboard` | Dashboard alias | Implemented |
 | `/ui` | Previous web interface | Preserved as a compatibility/reference route |
