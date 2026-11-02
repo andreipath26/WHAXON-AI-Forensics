@@ -1838,6 +1838,79 @@ class JobStore:
             and snapshot["total_tasks"] == snapshot["counts"].get("succeeded", 0),
         }
 
+    def get_workflow_evidence(self, plan_id, *, limit=100):
+        """Link successful workflow attempts to their real persisted tool evidence.
+
+        This is a read-only reporting boundary. Missing, contradictory or
+        unfinished tool evidence is surfaced as incomplete, never synthesized.
+        """
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            plan = c.execute(
+                "SELECT mission_id, digest FROM workflow_plans WHERE id=?", (plan_id,),
+            ).fetchone()
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT t.task_key, t.target, t.capability_id, a.id AS attempt_id, "
+                "a.attempt_no, a.status, a.result_json, a.error "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "WHERE t.plan_id=? ORDER BY a.started_at, a.id LIMIT ?",
+                (plan_id, limit),
+            ).fetchall()
+            evidence = []
+            for row in rows:
+                entry = {
+                    "task_key": row["task_key"], "target": row["target"],
+                    "capability_id": row["capability_id"],
+                    "attempt_id": row["attempt_id"], "attempt_no": row["attempt_no"],
+                    "attempt_status": row["status"], "job_id": None,
+                    "evidence_status": "unavailable", "finding_count": 0,
+                    "findings": [],
+                }
+                if row["status"] != "succeeded":
+                    entry["evidence_status"] = "not_successful"
+                else:
+                    try:
+                        result = json.loads(row["result_json"] or "null")
+                    except (TypeError, json.JSONDecodeError):
+                        result = None
+                    job_id = result.get("job_id") if isinstance(result, dict) else None
+                    if isinstance(job_id, str) and job_id:
+                        job = c.execute(
+                            "SELECT id, target, status, exit_code FROM jobs WHERE id=?",
+                            (job_id,),
+                        ).fetchone()
+                        entry["job_id"] = job_id
+                        if (
+                            job is not None and job["target"] == row["target"]
+                            and job["status"] == "finished" and job["exit_code"] == 0
+                        ):
+                            findings = c.execute(
+                                "SELECT seq, kind, severity, source, raw_line, "
+                                "verification_status, verification_reason "
+                                "FROM findings WHERE job_id=? ORDER BY seq", (job_id,),
+                            ).fetchall()
+                            entry["findings"] = [dict(finding) for finding in findings]
+                            entry["finding_count"] = len(findings)
+                            entry["evidence_status"] = "recorded"
+                        else:
+                            entry["evidence_status"] = "job_not_verified"
+                evidence.append(entry)
+            return {
+                "plan_id": plan_id, "mission_id": plan["mission_id"],
+                "plan_digest": plan["digest"],
+                "attempts": evidence,
+                "all_evidence_recorded": bool(evidence) and all(
+                    item["evidence_status"] == "recorded" for item in evidence
+                ),
+            }
+        finally:
+            c.close()
+
     def get_workflow_resource_summary(self, plan_id):
         """Durable, evidence-based utilization; no invented CPU or provider costs."""
         c = self._conn()
