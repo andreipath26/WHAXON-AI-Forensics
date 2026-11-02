@@ -71,10 +71,21 @@ def _normalize_target(raw: str) -> tuple[str, str]:
     if not raw:
         return "", "host"
     raw = raw.strip()
+    # Reject control characters and embedded whitespace in targets. URL parsers
+    # otherwise accept ambiguous authorities that external tools may reinterpret.
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in raw):
+        return "", "host"
     if "://" in raw:
-        parsed = urlparse(raw)
-        host = parsed.hostname or ""
-        return host.lower().rstrip("."), "url"
+        try:
+            parsed = urlparse(raw)
+            host = parsed.hostname or ""
+            # Reject malformed authorities instead of letting urlparse errors
+            # escape the authorization boundary or treating them as hosts.
+            if not host or any(c.isspace() for c in host):
+                return "", "url"
+            return host.lower().rstrip("."), "url"
+        except ValueError:
+            return "", "url"
     # Bare host or IP, possibly with :port
     host = raw.split("/", 1)[0]  # strip any path
     if ":" in host and not _looks_like_ipv6(host):

@@ -271,3 +271,19 @@ def test_global_cidr_scope_rule_emits_high_blast_radius_warning(
         "effectively permits every address" in record.message
         for record in caplog.records
     )
+
+
+@pytest.mark.parametrize("target", [
+    "http://[not-an-ipv6]/",
+    "http://[::1",
+    "http://bad host.example/",
+    "127.0.0.1\nmalicious",
+])
+def test_malformed_url_authority_fails_closed(tmp_path: Path, target: str) -> None:
+    """Malformed target URLs must not crash or bypass scope authorization."""
+    sm = ScopeManager(tmp_path / "scope.json")
+    match = sm.check(target)
+    assert match.allowed is False
+    assert match.reason
+    execution = sm.check_for_execution(target)
+    assert execution.allowed is False
