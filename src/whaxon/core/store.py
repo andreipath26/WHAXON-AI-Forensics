@@ -2723,6 +2723,15 @@ class JobStore:
                         item["status"] != "succeeded" for item in dep_rows
                     ):
                         raise ValueError("workflow dependencies are not succeeded")
+                mission_rate = c.execute(
+                    "SELECT r.min_spacing_s, r.last_claimed_at "
+                    "FROM mission_rate_limits r JOIN workflow_plans p "
+                    "ON p.mission_id=r.mission_id WHERE p.id=?", (effective_plan,),
+                ).fetchone()
+                if mission_rate is not None and mission_rate["last_claimed_at"] is not None and (
+                    now < mission_rate["last_claimed_at"] + mission_rate["min_spacing_s"]
+                ):
+                    raise ValueError("mission rate budget exhausted")
                 rate = c.execute(
                     "SELECT min_spacing_s, last_claimed_at FROM workflow_rate_limits "
                     "WHERE plan_id=?", (effective_plan,),
@@ -2752,6 +2761,11 @@ class JobStore:
                     raise ValueError(f"task is already claimed: {task_id}")
                 c.execute(
                     "UPDATE workflow_rate_limits SET last_claimed_at=? WHERE plan_id=?",
+                    (now, effective_plan),
+                )
+                c.execute(
+                    "UPDATE mission_rate_limits SET last_claimed_at=? WHERE mission_id="
+                    "(SELECT mission_id FROM workflow_plans WHERE id=?)",
                     (now, effective_plan),
                 )
                 c.execute(

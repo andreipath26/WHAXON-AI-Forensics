@@ -1691,3 +1691,20 @@ def test_mission_rate_limit_rejects_invalid_configuration(tmp_path):
             store.set_mission_rate_limit("m", min_spacing_s=invalid)
     with pytest.raises(ValueError, match="unknown mission"):
         store.set_mission_rate_limit("missing", min_spacing_s=1)
+
+
+def test_mission_rate_limit_cannot_be_bypassed_by_manual_attempt(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "manual-mission-rate.db")
+    store.create_mission("m", "controlled lab")
+    for plan_id, target in (("p1", "192.0.2.10"), ("p2", "192.0.2.11")):
+        store.save_workflow_plan(plan_id, WorkflowPlan(
+            "m", (WorkflowTask("scan", "fixture", target),),
+        ))
+    store.set_mission_rate_limit("m", min_spacing_s=3600)
+    assert store.start_task_attempt("a1", "scan", 1, plan_id="p1")
+    with pytest.raises(ValueError, match="mission rate budget exhausted"):
+        store.start_task_attempt("a2", "scan", 1, plan_id="p2")
+    assert store.claim_ready_workflow_task("p2", "worker") is None
