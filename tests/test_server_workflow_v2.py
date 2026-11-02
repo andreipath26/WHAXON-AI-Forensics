@@ -115,3 +115,19 @@ def test_workflow_v2_control_routes_enforce_cross_origin_gate(tmp_path, monkeypa
         "/api/v2/workflows/p/rate-limit",
     ):
         assert client.post(route, headers={"Origin": "https://attacker.invalid"}).status_code == 403
+
+
+def test_workflow_v2_mission_budget_is_shared_with_store(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    response = client.post("/api/v2/missions/m/budget", json={
+        "max_total_attempts": 4, "max_concurrency": 2,
+    })
+    assert response.status_code == 200
+    assert response.get_json()["max_total_attempts"] == 4
+    assert core.store.get_mission_execution_limits("m")["max_concurrency"] == 2
+    assert client.get("/api/v2/missions/m/budget").get_json()["enforced"] is True
+    assert client.post("/api/v2/missions/m/budget", json={
+        "max_total_attempts": 5, "max_concurrency": 2,
+    }).status_code == 400
+    assert client.get("/api/v2/missions/missing/budget").status_code == 404

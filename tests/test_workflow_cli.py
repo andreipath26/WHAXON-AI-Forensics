@@ -23,6 +23,14 @@ class _FakeCore:
         self.saved = (plan_id, plan)
         return True
 
+    def mission_execution_limits(self, mission_id):
+        return {"mission_id": mission_id, "max_total_attempts": 2, "max_concurrency": 1}
+
+    def configure_mission_execution_limits(
+        self, mission_id, *, max_total_attempts, max_concurrency,
+    ):
+        self.mission_caps = (mission_id, max_total_attempts, max_concurrency)
+
     def missions(self, *, limit=100, after_created=0.0):
         return [{"id": "mission-1", "created_at": after_created + 1}][:limit]
 
@@ -260,3 +268,14 @@ def test_workflow_cli_event_inbox_and_checkpoint(monkeypatch, capsys):
         "--event-id", "7",
     ]) == 0
     assert json.loads(capsys.readouterr().out)["last_event_id"] == 7
+
+
+def test_mission_limits_cli(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "limits", "--id", "m",
+        "--max-total-attempts", "2", "--max-concurrency", "1",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["max_concurrency"] == 1
+    assert workflow_cmd.main(["mission", "budget", "--id", "m"]) == 0
+    assert json.loads(capsys.readouterr().out)["max_total_attempts"] == 2

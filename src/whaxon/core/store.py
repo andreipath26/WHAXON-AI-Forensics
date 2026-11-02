@@ -68,6 +68,11 @@ CREATE TABLE IF NOT EXISTS workflow_rate_limits (
 CREATE TABLE IF NOT EXISTS workflow_deadlines (
     plan_id TEXT PRIMARY KEY, deadline_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mission_execution_limits (
+    mission_id TEXT PRIMARY KEY,
+    max_total_attempts INTEGER NOT NULL,
+    max_concurrency INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS workflow_limits (
     plan_id TEXT PRIMARY KEY,
     max_total_attempts INTEGER NOT NULL,
@@ -1820,6 +1825,93 @@ class JobStore:
             finally:
                 c.close()
 
+    def set_mission_execution_limits(self, mission_id, *, max_total_attempts, max_concurrency):
+        """Tighten cumulative and concurrent budgets across every plan of a mission."""
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in (max_total_attempts, max_concurrency)
+        ):
+            raise ValueError("mission limits must be positive integers")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT max_total_attempts, max_concurrency FROM mission_execution_limits "
+                    "WHERE mission_id=?", (mission_id,),
+                ).fetchone()
+                if old is not None and (
+                    max_total_attempts > old["max_total_attempts"]
+                    or max_concurrency > old["max_concurrency"]
+                ):
+                    raise ValueError("mission limits cannot be relaxed")
+                c.execute(
+                    "INSERT INTO mission_execution_limits "
+                    "(mission_id, max_total_attempts, max_concurrency) VALUES (?, ?, ?) "
+                    "ON CONFLICT(mission_id) DO UPDATE SET "
+                    "max_total_attempts=excluded.max_total_attempts, "
+                    "max_concurrency=excluded.max_concurrency",
+                    (mission_id, max_total_attempts, max_concurrency),
+                )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_execution_limits(self, mission_id):
+        """Return configured mission caps and measured across-plan usage."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            limits = c.execute(
+                "SELECT max_total_attempts, max_concurrency FROM mission_execution_limits "
+                "WHERE mission_id=?", (mission_id,),
+            ).fetchone()
+            usage = c.execute(
+                "SELECT COUNT(*) AS attempts, "
+                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
+                (mission_id,),
+            ).fetchone()
+            return {
+                "mission_id": mission_id,
+                "max_total_attempts": limits["max_total_attempts"] if limits else None,
+                "max_concurrency": limits["max_concurrency"] if limits else None,
+                "attempts": usage["attempts"], "active_attempts": usage["active"],
+                "enforced": limits is not None,
+            }
+        finally:
+            c.close()
+
+    def _mission_budget_available(self, c, plan_id):
+        """Call inside BEGIN IMMEDIATE; serializes claims from different workers."""
+        limits = c.execute(
+            "SELECT l.max_total_attempts, l.max_concurrency FROM mission_execution_limits l "
+            "JOIN workflow_plans p ON p.mission_id=l.mission_id WHERE p.id=?",
+            (plan_id,),
+        ).fetchone()
+        if limits is None:
+            return True
+        usage = c.execute(
+            "SELECT COUNT(*) AS attempts, "
+            "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id "
+            "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?)",
+            (plan_id,),
+        ).fetchone()
+        return (
+            usage["attempts"] < limits["max_total_attempts"]
+            and usage["active"] < limits["max_concurrency"]
+        )
+
     def get_workflow_limits(self, plan_id):
         """Return effective backend limits, including defaults for old plans."""
         c = self._conn()
@@ -1995,7 +2087,11 @@ class JobStore:
                     "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                     "WHERE t.plan_id=?", (plan_id,),
                 ).fetchone()
-                if usage["attempts"] >= max_total or usage["active"] >= max_parallel:
+                if (
+                    usage["attempts"] >= max_total
+                    or usage["active"] >= max_parallel
+                    or not self._mission_budget_available(c, plan_id)
+                ):
                     c.execute("COMMIT")
                     return None
                 rate = c.execute(
@@ -2160,6 +2256,8 @@ class JobStore:
                     raise ValueError("workflow total attempt budget exhausted")
                 if usage["active"] >= (limits["max_concurrency"] if limits else 4):
                     raise ValueError("workflow concurrency budget exhausted")
+                if not self._mission_budget_available(c, effective_plan):
+                    raise ValueError("mission execution budget exhausted")
                 task = c.execute(
                     "SELECT status, idempotency_key FROM workflow_tasks WHERE id=?", (task_ref,)
                 ).fetchone()

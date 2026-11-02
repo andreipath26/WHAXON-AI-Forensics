@@ -48,6 +48,16 @@ def _parser() -> argparse.ArgumentParser:
 
     mission = commands.add_parser("mission", help="manage missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
+    mission_limits = mission_commands.add_parser(
+        "limits", help="configure mission-wide cumulative and concurrent attempt limits",
+    )
+    mission_limits.add_argument("--id", required=True)
+    mission_limits.add_argument("--max-total-attempts", type=int, required=True)
+    mission_limits.add_argument("--max-concurrency", type=int, required=True)
+    mission_status = mission_commands.add_parser(
+        "budget", help="show mission-wide usage and configured limits",
+    )
+    mission_status.add_argument("--id", required=True)
     mission_list = mission_commands.add_parser("list", help="list durable missions")
     mission_list.add_argument("--limit", type=int, default=100)
     mission_list.add_argument("--after-created", type=float, default=0.0)
@@ -148,6 +158,16 @@ def main(args: list[str] | None = None) -> int:
         if options.command == "capabilities":
             capability_result = [manifest.to_dict() for manifest in core.capabilities.list()]
             print(json.dumps(capability_result, indent=2, sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "limits":
+            core.configure_mission_execution_limits(
+                options.id, max_total_attempts=options.max_total_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "budget":
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "list":
             print(json.dumps(core.missions(

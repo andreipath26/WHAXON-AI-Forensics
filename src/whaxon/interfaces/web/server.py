@@ -508,6 +508,25 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @app.route("/api/v2/missions/<mission_id>/budget", methods=["GET", "POST"])
+    def workflow_v2_mission_budget(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict):
+                    return jsonify({"error": "JSON object required"}), 400
+                core.configure_mission_execution_limits(
+                    mission_id,
+                    max_total_attempts=payload["max_total_attempts"],
+                    max_concurrency=payload["max_concurrency"],
+                )
+            return jsonify(core.mission_execution_limits(mission_id))
+        except KeyError:
+            return jsonify({"error": "both mission limits required"}), 400
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
     @app.get("/api/v2/missions/<mission_id>/plans")
     def workflow_v2_mission_plans(mission_id):
         try:

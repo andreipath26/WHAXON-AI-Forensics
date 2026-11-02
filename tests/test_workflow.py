@@ -1180,3 +1180,64 @@ def test_workflow_claim_rejects_noninteger_attempt_limits(tmp_path):
         with pytest.raises(ValueError, match="positive integer"):
             store.claim_ready_workflow_task("p", "worker", max_attempts=invalid)
     assert store.claim_ready_workflow_task("p", "worker", max_attempts=1) is not None
+
+
+def test_mission_wide_attempt_cap_applies_across_independent_plans(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    path = tmp_path / "mission-budget.db"
+    store = JobStore(path)
+    store.create_mission("m", "controlled")
+    for plan_id in ("p1", "p2"):
+        store.save_workflow_plan(plan_id, WorkflowPlan("m", (
+            WorkflowTask("scan", "fixture", "192.0.2.10"),
+        )))
+    store.set_mission_execution_limits("m", max_total_attempts=1, max_concurrency=1)
+    first = store.claim_ready_workflow_task("p1", "worker-1")
+    assert first is not None
+    assert JobStore(path).claim_ready_workflow_task("p2", "worker-2") is None
+    store.finish_task_attempt(first["attempt_id"], "succeeded")
+    assert JobStore(path).claim_ready_workflow_task("p2", "worker-2") is None
+    usage = JobStore(path).get_mission_execution_limits("m")
+    assert usage["attempts"] == 1
+    assert usage["active_attempts"] == 0
+    with pytest.raises(ValueError, match="cannot be relaxed"):
+        store.set_mission_execution_limits("m", max_total_attempts=2, max_concurrency=1)
+
+
+def test_mission_concurrency_cap_releases_after_completed_attempt(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "mission-concurrency.db")
+    store.create_mission("m", "controlled")
+    for plan_id in ("p1", "p2"):
+        store.save_workflow_plan(plan_id, WorkflowPlan("m", (
+            WorkflowTask("scan", "fixture", "192.0.2.11"),
+        )))
+    store.set_mission_execution_limits("m", max_total_attempts=3, max_concurrency=1)
+    first = store.claim_ready_workflow_task("p1", "worker")
+    assert store.claim_ready_workflow_task("p2", "worker") is None
+    store.finish_task_attempt(first["attempt_id"], "succeeded")
+    assert store.claim_ready_workflow_task("p2", "worker") is not None
+    usage = store.get_mission_execution_limits("m")
+    assert usage["attempts"] == 2
+    assert usage["active_attempts"] == 1
+
+
+def test_mission_budget_rejects_direct_attempt_bypass(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "mission-direct.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.10"),
+        WorkflowTask("b", "fixture", "192.0.2.11"),
+    )))
+    store.set_mission_execution_limits("m", max_total_attempts=1, max_concurrency=1)
+    claim = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(claim["attempt_id"], "succeeded")
+    with pytest.raises(ValueError, match="mission execution budget"):
+        store.start_task_attempt("manual", "b", 1, plan_id="p")

@@ -203,6 +203,17 @@ class Core:
     def workflow_events(self, plan_id: str, *, after_id: int = 0, limit: int = 100):
         return self.store.list_workflow_events(plan_id, after_id, limit)
 
+    def mission_execution_limits(self, mission_id: str):
+        return self.store.get_mission_execution_limits(mission_id)
+
+    def configure_mission_execution_limits(
+        self, mission_id: str, *, max_total_attempts: int, max_concurrency: int,
+    ):
+        return self.store.set_mission_execution_limits(
+            mission_id, max_total_attempts=max_total_attempts,
+            max_concurrency=max_concurrency,
+        )
+
     def missions(self, *, limit: int = 100, after_created: float = 0.0):
         return self.store.list_missions(limit=limit, after_created=after_created)
 
