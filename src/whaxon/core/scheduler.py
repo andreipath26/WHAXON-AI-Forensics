@@ -175,8 +175,11 @@ class WorkflowScheduler:
 
     async def run(self, plan_id: str, *, max_tasks: int = 100,
                   max_attempts: int = 2, max_concurrency: int = 4) -> dict[str, Any]:
-        if max_tasks < 1 or max_attempts < 1 or max_concurrency < 1:
-            raise ValueError("max_tasks, max_attempts and max_concurrency must be positive")
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 1
+            for value in (max_tasks, max_attempts, max_concurrency)
+        ):
+            raise ValueError("max_tasks, max_attempts and max_concurrency must be positive integers")
         if self.store.get_workflow_plan(plan_id) is None:
             raise ValueError(f"unknown workflow plan: {plan_id}")
         # Caller-supplied values may tighten, but never loosen durable limits.

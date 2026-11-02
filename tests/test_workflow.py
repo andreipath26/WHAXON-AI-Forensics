@@ -1142,3 +1142,29 @@ def test_attempt_aggregation_is_unpaginated_and_plan_scoped(tmp_path):
     store.finish_task_attempt(second["attempt_id"], "succeeded")
     assert store.count_workflow_task_attempts("p") == {"a": 2}
     assert store.count_workflow_task_attempts("other") == {}
+
+
+def test_workflow_events_reject_boolean_pagination_bounds(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "boolean-pagination.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    with pytest.raises(ValueError, match="after_id"):
+        store.list_workflow_events("p", after_id=True)
+    with pytest.raises(ValueError, match="limit"):
+        store.list_workflow_events("p", limit=True)
+
+
+@_run_async_test
+async def test_scheduler_rejects_bool_and_fractional_execution_budgets(tmp_path):
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+
+    scheduler = WorkflowScheduler(
+        JobStore(tmp_path / "invalid-budget.db"),
+        authorize=lambda task: True, dispatch=lambda task: True,
+    )
+    for budget in (True, 1.5, 0, -1):
+        with pytest.raises(ValueError, match="positive integers"):
+            await scheduler.run("missing", max_tasks=budget)

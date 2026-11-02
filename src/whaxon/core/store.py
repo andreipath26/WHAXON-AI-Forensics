@@ -1486,9 +1486,9 @@ class JobStore:
 
     def list_workflow_events(self, plan_id, after_id=0, limit=100):
         """Bounded, ordered, persisted Engine V2 lifecycle event feed."""
-        if not isinstance(after_id, int) or after_id < 0:
+        if isinstance(after_id, bool) or not isinstance(after_id, int) or after_id < 0:
             raise ValueError("after_id must be a non-negative integer")
-        if not isinstance(limit, int) or not 1 <= limit <= 1000:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("limit must be between 1 and 1000")
         c = self._conn()
         try:
