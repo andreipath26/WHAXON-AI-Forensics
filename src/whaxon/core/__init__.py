@@ -284,7 +284,8 @@ class Core:
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""
         if authorize is None:
-            authorize = lambda task: self.authorize_workflow_task_for_plan(plan_id, task)
+            def authorize(task):
+                return self.authorize_workflow_task_for_plan(plan_id, task)
         scheduler = self.workflow_scheduler(
             authorize=authorize, dispatch=dispatch, worker_id=worker_id,
         )

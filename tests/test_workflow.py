@@ -588,6 +588,7 @@ def test_workflow_events_reject_invalid_polling_bounds(tmp_path):
 @_run_async_test
 async def test_cancellation_during_provider_dispatch_is_not_reported_as_success(tmp_path):
     import asyncio
+
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
     from whaxon.core.workflow import WorkflowPlan, WorkflowTask

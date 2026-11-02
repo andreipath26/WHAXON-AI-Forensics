@@ -970,10 +970,10 @@ class JobStore:
         Recording consent does not grant execution permission. Scope and provider
         policy are independently checked at each dispatch boundary.
         """
-        from dataclasses import asdict
-        from .workflow import ApprovalBinding, WorkflowPlan
-
         import math
+        from dataclasses import asdict
+
+        from .workflow import ApprovalBinding, WorkflowPlan
 
         for name, item in (
             ("approval_id", approval_id), ("actor", actor),
