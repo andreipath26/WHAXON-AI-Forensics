@@ -82,6 +82,13 @@ def _make_app(tmp_path, monkeypatch, fake_msf=None):
     core = Core(data_dir=tmp_path)
     if fake_msf is not None:
         monkeypatch.setattr(core, "msf", fake_msf)
+        # Model the tracker having persisted the initial live-session identity.
+        for session_id, info in fake_msf.sessions().items():
+            if isinstance(info, dict):
+                host = info.get("target_host") or info.get("tunnel_peer") or info.get("host") or "?"
+                core.store.upsert_session(
+                    str(session_id), str(host), str(info.get("type") or "?"), info
+                )
     registry = JobRegistry(core)
     runner = AsyncRunner(core)
     app = create_app(core, registry, runner)
@@ -283,3 +290,41 @@ def test_msf_run_accepts_in_scope(tmp_path, monkeypatch):
     body = r.get_json()
     assert "job_id" in body
     assert len(body["job_id"]) == 12
+
+# ---------------------------------------------------------------- persisted identity binding
+
+def test_msf_exec_rejects_live_session_host_drift(tmp_path, monkeypatch):
+    fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
+    app, _ = _make_app(tmp_path, monkeypatch, fake)
+    # A reused session ID now points at a different (still in-scope) host.
+    fake._sessions = {"1": {"target_host": "10.0.0.8", "type": "shell"}}
+    response = app.test_client().post(
+        "/api/msf/sessions/1/exec", json={"command": "id"}
+    )
+    assert response.status_code == 409
+    assert "identity changed" in response.get_json()["error"]
+    assert fake.exec_calls == []
+
+
+def test_msf_exec_rejects_session_without_persisted_identity(tmp_path, monkeypatch):
+    fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
+    app, core = _make_app(tmp_path, monkeypatch, fake)
+    core.store.close_session("1")
+    response = app.test_client().post(
+        "/api/msf/sessions/1/exec", json={"command": "id"}
+    )
+    assert response.status_code == 403
+    assert fake.exec_calls == []
+
+
+def test_msf_exec_accepts_matching_persisted_identity(tmp_path, monkeypatch):
+    fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
+    app, _ = _make_app(tmp_path, monkeypatch, fake)
+    response = app.test_client().post(
+        "/api/msf/sessions/1/exec", json={"command": "id"}
+    )
+    assert response.status_code == 200
+    assert fake.exec_calls == [("1", "id", 15.0)]

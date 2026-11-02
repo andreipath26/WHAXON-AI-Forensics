@@ -881,7 +881,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         return send_file(str(full), as_attachment=True, download_name=item["name"])
 
     def _msf_session_scope_error(session_id: str):
-        """Require a live Metasploit session whose host is currently in scope."""
+        """Require a live, persisted-identity-matching session in current scope."""
         client = registry.core.msf
         if not client.is_up():
             return {"error": "msf not reachable; session scope cannot be verified"}, 503
@@ -895,9 +895,33 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "session not found"}, 404
         if not isinstance(info, dict):
             return {"error": "session details are invalid; refusing to act"}, 503
-        host = info.get("target_host") or info.get("tunnel_peer")
+        host = info.get("target_host") or info.get("tunnel_peer") or info.get("host")
         if not host:
             return {"error": "session host is unknown; refusing out-of-scope-capable action"}, 403
+
+        # Session IDs are reusable by Metasploit. Never authorize a live session
+        # solely from its current host: bind it to the identity first persisted
+        # by the tracker, and reject missing/closed records or host drift.
+        try:
+            stored = registry.core.store.get_session(str(session_id))
+        except Exception:
+            app.logger.exception("Could not read persisted Metasploit session identity")
+            return {"error": "could not verify persisted session identity"}, 503
+        if not isinstance(stored, dict) or stored.get("status") != "open":
+            return {"error": "session has no active persisted identity; refusing to act"}, 403
+        stored_host = stored.get("host")
+        if not stored_host or str(stored_host).strip() in {"", "?"}:
+            return {"error": "persisted session host is unknown; refusing to act"}, 403
+        from whaxon.core.runner import ToolRunner
+        live_identity = ToolRunner._canonical_session_host(host)
+        stored_identity = ToolRunner._canonical_session_host(stored_host)
+        if not live_identity or live_identity != stored_identity:
+            return {
+                "error": "Metasploit session identity changed since it was persisted; refusing to act",
+                "persisted_host": str(stored_host),
+                "live_host": str(host),
+            }, 409
+
         try:
             match = registry.core.scope.check(str(host))
         except Exception:
