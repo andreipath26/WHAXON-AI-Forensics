@@ -1,3 +1,11 @@
+## 2026-11-02 — Full documentation consistency pass
+
+- Documented the implemented `whaxon setup` CLI profile planner, exact-plan Python batch approval, separate external-tool consent path and virtual-environment bootstrap in the README, getting-started guide and dependency-readiness guide.
+- Corrected deployment instructions: `whaxon web` uses the Flask server with debug/reloader disabled; `whaxon serve` uses Waitress for production-oriented WSGI serving. Clarified PID-file shutdown behavior.
+- Aligned report documentation with actual CLI/API formats and the default Markdown appendix's critical/high detail boundary.
+- Removed duplicated sections from historical agent/session design records and listed those records in the documentation index.
+- Checked relative links across the canonical user/operator and engineering documentation against the current repository tree.
+
 ## 2026-11-02 — Operator documentation reconciliation
 
 - Added an explicit first-run installation sequence to the README: install the selected interface extras, diagnose dependencies, inspect/verify tools, preview remediation, approve the exact plan, and verify the resulting environment.

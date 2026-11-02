@@ -137,13 +137,17 @@ Windows users should create and activate the environment with the appropriate `p
 
 ## First run
 
-Initialize local data, inspect the active scope and review the available commands:
+Preview the capability profile, inspect dependencies, initialize local data and review scope:
 
 ```bash
+whaxon setup --profile core
+whaxon doctor
 whaxon init
 whaxon scope --show
 whaxon --help
 ```
+
+`whaxon setup --profile core` is a read-only first-run plan; it does not install packages. Choose `standard`, `full` or `custom` when you need a different capability profile. Review the exact plan before using its approval-bound installation command. External-tool OS packages use a separate, narrower plan and consent flow.
 
 Before running an assessment, read [Scope and authorization](docs/scope.md). WHAXON's default scope is restrictive and intended for local/private lab use. Public or third-party targets require explicit authorization and explicit scope configuration.
 
@@ -188,10 +192,10 @@ See [Dependency readiness and guided installation](docs/dependency-readiness.md)
 Use this sequence on a new machine; do not jump straight to installing every scanner:
 
 1. **Install the WHAXON runtime** in a dedicated Python 3.11+ virtual environment using the PyPI or source instructions above. Add only the interface extras you intend to use.
-2. **Run diagnostics:** `whaxon doctor`. Resolve a BLOCKED core runtime first. DEGRADED optional dependencies do not prevent unrelated core functions from working.
-3. **Inspect the dependency inventory and verify tools:** use `whaxon doctor --json` and, when needed, `whaxon doctor --verify`. Verification runs curated version probes; it does not run scans.
-4. **Preview remediation:** use `whaxon doctor --plan` (optionally `--check <dependency>`). Review the exact plan, package source, privilege/network impact and automation eligibility.
-5. **Approve only the reviewed action:** for an eligible Python package, use the exact plan ID with `whaxon doctor --install --check <dependency> --approve <PLAN_ID>`. External-tool OS installation is a separate, narrower CLI workflow; unsupported hosts/tools remain manual.
+2. **Preview a capability profile:** run `whaxon setup --profile core` (or `standard`, `full` or `custom`). This is read-only. Resolve a BLOCKED core runtime first; DEGRADED optional dependencies do not prevent unrelated core functions from working.
+3. **Inspect and verify:** use `whaxon doctor --json` and, when needed, `whaxon doctor --verify`. Verification runs curated version probes; it does not run scans.
+4. **Preview remediation:** use `whaxon setup --profile core` for a profile batch, or `whaxon doctor --plan --check <dependency>` for an individual dependency. Review the exact plan, package source, privilege/network impact and automation eligibility.
+5. **Approve only the reviewed action:** for an eligible profile batch, use `whaxon setup --profile core --install --approve <PLAN_ID>`; for one eligible Python package, use `whaxon doctor --install --check <dependency> --approve <PLAN_ID>`. External-tool OS installation is a separate, narrower CLI workflow; unsupported hosts/tools remain manual.
 6. **Verify again:** rerun `whaxon doctor` and `whaxon doctor --verify`, then inspect the reported state before using the tool.
 
 Installation is not a blanket approval to run a tool or assess a target. Scope configuration and written authorization remain separate prerequisites. Completed package changes are not generally rolled back automatically; recreate the virtual environment if recovery guidance indicates it is inconsistent.

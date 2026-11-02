@@ -2,22 +2,30 @@
 
 WHAXON web interface can run headless and be accessed from any browser.
 
-## Foreground
+## Local browser server
 
     whaxon web
 
-Dev mode: reload on change, verbose logs.
+Starts the Flask development-server entry point in the foreground. Debug mode and the automatic reloader are disabled; it does not provide production WSGI serving or automatic reload-on-change. Keep it on loopback for local use.
+
+## Production WSGI server
+
+    whaxon serve
+    whaxon serve --threads 8
+
+Runs the application through Waitress in the foreground. This is the production-oriented WSGI command; the web extra includes Waitress.
 
 ## Daemon
 
     whaxon serve --daemon --log data/whaxon.log
 
-Double-forks, writes data/whaxon.pid, redirects stdout/stderr. Rejects startup if a live pid already occupies data/whaxon.pid.
+On supported POSIX hosts, daemon mode double-forks, writes the PID to `<WHAXON_DATA>/whaxon.pid` (default `data/whaxon.pid`) and redirects stdout/stderr to the selected log. Startup rejects a live PID already occupying the PID file.
 
-Stop:
+Stop the daemon with SIGTERM:
 
-    kill $(cat data/whaxon.pid)
-    rm -f data/whaxon.pid
+    kill -TERM "$(cat data/whaxon.pid)"
+
+The daemon's signal handler removes its PID file. If a stale PID file remains, first verify that the recorded process is no longer running before removing it. For managed deployments, prefer the included systemd unit or a process supervisor.
 
 ## Environment
 

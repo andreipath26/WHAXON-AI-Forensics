@@ -4,7 +4,7 @@
 
 This implementation adds dependency diagnostics, deterministic remediation planning, a tightly allowlisted Python-package installer, single-package and profile-batch operation tracking, readiness history, authenticated web APIs, and a first-run profile planner in the existing Diagnostics page.
 
-The Diagnostics page is the canonical entry point. It supports Core, Standard, Full and Custom profiles. The operator can review a read-only plan, explicitly approve the complete eligible Python-package batch, and track the sequential operation through verification. Individual package review remains available. External-tool OS packages are not part of the Python profile batch. A separate CLI flow supports exact-plan-approved apt/Homebrew installation for Nmap, Gobuster, SQLmap and ffuf, plus Nuclei through Homebrew only; unsupported combinations remain manual.
+The Diagnostics page is the canonical web entry point; `whaxon setup` is the CLI first-run entry point. Both expose Core, Standard, Full and Custom profiles. The operator can review a read-only plan, explicitly approve the complete eligible Python-package batch, and track the sequential operation through verification. Individual package review remains available. External-tool OS packages are not part of the Python profile batch. A separate CLI flow supports exact-plan-approved apt/Homebrew installation for Nmap, Gobuster, SQLmap and ffuf, plus Nuclei through Homebrew only; unsupported combinations remain manual.
 
 Its four states are:
 1. Environment overview.
@@ -44,6 +44,42 @@ The versioned JSON report includes runtime details, active interpreter and virtu
 An overall `BLOCKED` result means a required runtime/package/resource is not READY. `DEGRADED` means optional integrations or external tools are missing or unverified. Optional tools do not block unrelated core functionality.
 
 Diagnostics themselves do not install software, invoke package managers, access the network, use privilege escalation, or change PATH. Explicit external verification is a separate action.
+
+## CLI first-run setup
+
+Use `whaxon setup` to inspect the host and build a deterministic capability-profile plan without requiring the browser Diagnostics page:
+
+```bash
+# Read-only profile previews
+whaxon setup --profile core
+whaxon setup --profile standard
+whaxon setup --profile full
+whaxon setup --profile custom --capability core --capability tui
+
+# Machine-readable preview
+whaxon setup --profile core --json
+```
+
+The preview prints the exact plan ID and selected dependency actions. A profile selection does not install packages or grant permission. After reviewing the complete plan, the eligible Python-package batch can be approved explicitly:
+
+```bash
+whaxon setup --profile core --install --approve PLAN_ID
+```
+
+Replace `PLAN_ID` with the exact ID from the plan you reviewed. The batch is restricted to manifest-allowlisted Python packages, requires an active virtual environment, runs sequentially and stops on failure or cancellation. Already completed package operations are not rolled back.
+
+External tools are a separate operation. Preview a curated OS-package plan, then approve that exact plan with explicit system-change consent:
+
+```bash
+whaxon setup --tool nmap
+whaxon setup --tool nmap --install-tools --approve-tools PLAN_ID --allow-system-changes
+```
+
+Add `--allow-elevation` only when the reviewed plan requires a non-interactive privilege elevation. Automated OS-tool installation is limited to the supported apt/Homebrew mappings described above; other tools, distributions and platforms remain manual. The CLI does not install arbitrary catalog entries.
+
+If a working `whaxon` command is already available, `whaxon setup --create-venv` can create a new `.venv` without overwriting an existing directory and prints activation instructions. Otherwise, create the virtual environment with Python's `venv` module before installing WHAXON.
+
+For one dependency rather than a whole profile, `whaxon doctor --plan --check DEPENDENCY_ID` and the exact-plan `whaxon doctor --install --check DEPENDENCY_ID --approve PLAN_ID` path remain available. The older `whaxon install` command is a legacy apt-only installer; prefer `whaxon setup` for current guided setup.
 
 ## Manifest and policy
 

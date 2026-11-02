@@ -39,11 +39,14 @@ The latest published version recorded on PyPI is **0.11.16 (October 23, 2026)**.
 ## First run
 
 ```bash
-whaxon init
+whaxon setup --profile core
 whaxon doctor
+whaxon init
 whaxon scope --show
 whaxon --help
 ```
+
+`whaxon setup --profile core` creates a read-only capability/dependency plan; it does not install anything. Use `standard`, `full` or `custom` to preview a different profile. Review the plan and use its exact approval ID only if you deliberately choose an eligible installation. Run `whaxon doctor --verify` when you need the curated external-tool version checks.
 
 Review the generated data directory and the active scope before running anything. The default scope is restrictive and covers loopback and private address ranges; it is not authorization to assess every host in those ranges.
 

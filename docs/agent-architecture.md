@@ -501,34 +501,6 @@ The report (session 28), web UI (session 30), and TUI (session 36) all show AI r
 
 **Recommendation.** Do nothing. If a user complains the GUI lacks AI visibility, redirect to the web UI tab (which is what the GUI renders anyway).
 
-## 16. Approval queue and multi-user (v2 design note)
-
-v1 ships single-user, single-run, blocking. Multi-user breaks the CLI stdin model.
-
-**Proposed shape.**
-- ai_runs gains an owner column (default "local").
-- New approvals table: (run_id, seq, user, answer, at, note). Every answer is a row, not a status mutation.
-- New route GET /api/ai/pending lists waiting runs, filtered by owner.
-- Web UI queue view with approve/reject/skip buttons.
-- Existing CLI --resume becomes one frontend for the same answer API.
-
-**Authority.** Queue does not change what the LLM may propose. It changes who can approve. Recommend owner-only by default, admin override.
-
-**No changes needed to.** The executor loop, ai_run_steps schema, LLM provider interface.
-
-**Effort.** Two sessions: schema + API, then web UI. CLI keeps working throughout.
-
-## 17. GUI slice of Phase D (deferred)
-
-Report (28), web UI (30), and TUI (36) all show AI runs with phase and status. GUI does not.
-
-**Why deferred.** The GUI is a thin wrapper around the web interface — interfaces/gui/embed.py loads the web UI in a WebEngineView. Anything visible in the web UI is visible in the GUI already. Building a native PySide6 panel duplicates logic that exists in three places.
-
-**If it becomes worth doing.** QTableView bound to core.store.list_ai_runs(), refreshed on a timer. ~150 lines. Not worth a session unless someone wants native-app feel.
-
-**Recommendation.** Do nothing.
-
-
 ## 18. Resolved / deferred status of §14 questions
 
 Reviewed after sessions 39-47. Every item is now either answered or deferred with rationale.

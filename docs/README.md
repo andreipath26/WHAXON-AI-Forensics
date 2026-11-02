@@ -48,7 +48,7 @@ The following documents are retained for traceability and must not be read as cu
 - [Legacy web UI interaction audit](WEB_UI_INTERACTION_AUDIT.md) — superseded by the [new UI acceptance audit](NEW_UI_INTERACTION_AUDIT.md).
 - [Report redesign](report-redesign.md) and [report visual design](report-visual-design.md) — design records; current report behavior is defined by source, tests and [reports and evidence](reports-and-evidence.md).
 - [First-run installation implementation and acceptance record](first-run-installation-redesign.md) — current implementation boundary and remaining clean-machine acceptance work; operator instructions are in [dependency readiness](dependency-readiness.md).
-- [Demo](demo.md), [screenshots](screenshots.md), [autonomous loop](autonomous-loop.md), [session execution](session-execution.md), and [tool intelligence/onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md) are explanatory/design records unless explicitly marked implemented in the roadmap.
+- [Agent architecture](agent-architecture.md), [session execution](session-execution.md), [autonomous loop](autonomous-loop.md), [demo](demo.md), [screenshots](screenshots.md), and [tool intelligence/onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md) are historical explanatory/design records unless explicitly marked implemented in the roadmap.
 
 All other documents are current guides or dated engineering records, not proof that every described capability is deployed. For present behavior, source and tests on `main` win; for priority and release status, the master roadmap wins.
 

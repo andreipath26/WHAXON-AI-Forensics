@@ -56,7 +56,7 @@ Run `whaxon doctor --verify` to perform only the curated, bounded version probes
 
 ### A remediation plan cannot be approved
 
-Generate a fresh plan with `whaxon doctor --plan` and approve only its exact current plan ID. Approval is bound to the environment and manifest; a changed plan must be reviewed again. Python-package automation requires an active virtual environment and manifest allowlisting. OS-tool installation has a separate limited apt/Homebrew allowlist; unsupported platforms remain manual.
+Generate a fresh profile plan with `whaxon setup --profile core`, or a single-dependency plan with `whaxon doctor --plan --check DEPENDENCY_ID`. Approve only the exact current plan ID using the matching setup/doctor command. Approval is bound to the environment and manifest; a changed plan must be reviewed again. Python-package automation requires an active virtual environment and manifest allowlisting. OS-tool installation has a separate limited apt/Homebrew allowlist and requires explicit system-change consent; unsupported platforms remain manual.
 
 ### An installation failed or was interrupted
 

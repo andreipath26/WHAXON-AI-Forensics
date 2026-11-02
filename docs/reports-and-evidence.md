@@ -6,17 +6,19 @@ Two report shapes.
 
 ### Per-job
 
-Markdown or HTML for a single job plus its findings.
+The CLI supports Markdown, HTML, PDF and JSON for a single job:
 
     whaxon report <job_id>                    # Markdown to stdout
     whaxon report <job_id> --format html      # HTML
+    whaxon report <job_id> --format pdf       # PDF
+    whaxon report <job_id> --format json      # JSON
     whaxon report <job_id> --out scan.md      # To file
 
-HTTP: GET /api/jobs/<job_id>/report?format=md or ?format=html
+HTTP: GET /api/jobs/<job_id>/report?format=md or `?format=html`.
 
 ### Engagement
 
-Markdown or JSON covering every job and finding, plus the loot summary and pivot chains.
+Engagement reports support Markdown, HTML, PDF, JSON and the integrity-wrapped WHAXON JSON format. JSON and WHAXON output preserve the complete engagement dataset, including findings and job history. Markdown provides the executive summary, all-severity counts, loot, coverage, and job history; its detailed Technical Findings appendix includes critical/high findings by default, not every low/informational record. HTML/PDF use the engagement report renderer. The engagement report also includes pivot chains when available.
 
     curl -u whaxon:whaxon http://127.0.0.1:5001/api/report?format=md   > engagement.md
     curl -u whaxon:whaxon http://127.0.0.1:5001/api/report?format=json > engagement.json
