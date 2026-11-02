@@ -1,102 +1,76 @@
-# WHAXON Documentation Index
+# WHAXON documentation
 
-This index separates **current operator guidance**, **current engineering/acceptance records**, **roadmap designs**, and **historical evidence**. It applies only to `andreipath26/WHAXON-AI-Forensics`. The current implementation baseline is `main`; source and tests establish behavior, while the master roadmap establishes scope and release gates.
-
-Start with the [repository-wide documentation reconciliation](DOCUMENTATION_RECONCILIATION.md) before using older material. The repository contains imported snapshots, point-in-time designs, experiment records and generated reports; their presence does not make them current product specifications.
+Source and tests on an exact commit establish implemented behavior. The [product trajectory](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) is the single active priority and release-gate file. A design, screenshot, old DONE label or passing historical CI run is not current product acceptance.
 
 ## Start here
 
-- [README](../README.md) — public product overview, install entry point and capability boundaries.
-- [Getting started](getting-started.md) — current checkout and first run.
-- [Project state](STATE.md) — dated release/CI/acceptance snapshot.
-- [Master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) — authoritative scope, sequencing and release gates.
-- [Changelog](CHANGELOG.md) — chronological engineering history; older entries are not current status.
-- [Documentation reconciliation](DOCUMENTATION_RECONCILIATION.md) — file inventory, status classes and source-of-truth rules.
+- [Project README](../README.md): overview and installation entry point.
+- [Product trajectory and release gates](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md): P0–P8, current work order, §38 acceptance and previous-scope reconciliation.
+- [Project state](STATE.md): concise dated snapshot.
+- [Baseline and acceptance register](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md): current source, test and CI evidence, critical workflow map and remaining acceptance.
+- [Repository due diligence and dispositions](DOCUMENTATION_RECONCILIATION.md): exact removal candidates, dependency-bound cleanup, retirement gates and retained material. This is a disposition register, not another roadmap.
+- [Changelog](CHANGELOG.md): engineering/release history, not the active task queue.
 
-## Current operator and developer guides
+## Maintained operator and developer guides
 
-- [Dependency readiness and guided installation](dependency-readiness.md)
-- [Troubleshooting](troubleshooting.md)
-- [Scope and authorization](scope.md)
-- [Tool catalog and execution](tools.md)
-- [Adapters](adapters.md)
-- [Findings](findings.md)
-- [Reports and evidence](reports-and-evidence.md)
-- [Interfaces](interfaces.md)
-- [HTTP API](api.md) — selected routes; server source is authoritative.
-- [Deployment](deployment.md)
-- [AI behavior and configuration](ai.md)
-- [Data retention](DATA_RETENTION.md)
-- [Architecture](architecture.md)
-- [Plugin development](plugins.md)
-- [Contributing](../CONTRIBUTING.md)
-- [Security policy](../SECURITY.md)
+| Topic | Guide |
+|---|---|
+| First run | [Getting started](getting-started.md), [dependency readiness](dependency-readiness.md), [troubleshooting](troubleshooting.md) |
+| Execution | [Scope](scope.md), [tools](tools.md), [adapters](adapters.md), [plugins](plugins.md), [AI](ai.md) |
+| Results | [Findings](findings.md), [reports and evidence](reports-and-evidence.md), [data retention](DATA_RETENTION.md) |
+| Interfaces | [Interfaces](interfaces.md), [selected HTTP API](api.md), [deployment](deployment.md) |
+| Development | [Architecture](architecture.md), [contributing](../CONTRIBUTING.md), [security policy](../SECURITY.md) |
 
-## Current implementation and acceptance records
+Guides can describe supported subsets. Check current source and the capability register before assuming every tool, transport, platform or API workflow is implemented and accepted.
 
-These are dated engineering records. They describe the implementation or acceptance state at the stated revision; re-check the current source, tests and CI before relying on them for a financing or release claim.
+## Detailed architecture and acceptance records
 
-- [Project state](STATE.md)
-- [New UI interaction and acceptance audit](NEW_UI_INTERACTION_AUDIT.md)
-- [Dependency readiness implementation and acceptance record](first-run-installation-redesign.md) — implementation detail; operator instructions are in `dependency-readiness.md`.
-- [Engine v2 architecture and roadmap crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) — target architecture plus dated implementation updates; not proof of v2 production acceptance.
-- [Tool intelligence and controlled onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md) — proposed subsystem/acceptance design, not a shipped capability.
-- [Engineering execution model](ENGINEERING_EXECUTION_MODEL.md) — project engineering process, not product functionality.
-- [WHAXON experiment audit](WHAXON_EXPERIMENT_AUDIT_2026-10-25.md) — dated research evidence and limitations, not current CI or release evidence.
+These documents serve distinct purposes and remain subordinate to the trajectory's work order:
 
-## Roadmap and proposed designs — not shipped merely because documented
+- [New UI interaction/acceptance audit](NEW_UI_INTERACTION_AUDIT.md): page-route/test mapping and remaining supplied-design acceptance.
+- [Engine v2 architecture/crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md): detailed target contracts, migration and dated implementation records.
+- [First-run implementation/acceptance record](first-run-installation-redesign.md): setup design and remaining deployment checks; current use belongs in the dependency-readiness guide.
+- [Engineering execution model](ENGINEERING_EXECUTION_MODEL.md): dependency-driven work ownership, integration and verification.
 
-- [Master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md)
-- [Competitor capability and remediation addendum](../WHAXON%20Competitor%20Capability%20and%20Remediation%20Roadmap%20Addendum.md)
-- [Bug-bounty add-on design](bounty-addon.md)
-- [Metasploit / Armitage Engine integration design](METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md)
-- [Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md)
+## Approved deferred designs
 
-A roadmap item, architecture proposal, acceptance criterion or UI route is not an implemented or verified capability unless current source and tests demonstrate it.
+Presence here is not a claim that a subsystem ships:
 
-## Historical and superseded engineering records
+- [Tool intelligence and controlled onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md).
+- [Metasploit / Armitage integration](METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md).
+- [Bug-bounty add-on](bounty-addon.md).
+- [Competitor capability and remediation addendum](../WHAXON%20Competitor%20Capability%20and%20Remediation%20Roadmap%20Addendum.md).
 
-Retained for provenance and to avoid losing design rationale. Do not use their old status tables, estimates, module inventories or present-tense statements as current facts:
+The trajectory places these at their dependency gates. Inspect source before implementing; preserve reusable existing contracts and do not create parallel schedulers, registries or execution authorities.
 
-- [Agent architecture](agent-architecture.md) — early agent design snapshot.
-- [Autonomous loop](autonomous-loop.md) — early autonomy design snapshot.
-- [Session execution](session-execution.md) — pre-implementation session transport design.
-- [Report redesign](report-redesign.md) and [report visual design](report-visual-design.md) — historical design/PR plans; current behavior is in [Reports and evidence](reports-and-evidence.md) and source/tests.
-- [Business impact](business-impact.md) — historical implementation/design notes; current behavior is in source/tests.
-- [Engine v2 baseline inventory](ENGINE_V2_BASELINE_INVENTORY.md) — point-in-time E0 baseline, superseded by later crosswalk updates and current source.
-- [Legacy web UI interaction audit](WEB_UI_INTERACTION_AUDIT.md) — superseded by the new UI audit.
-- [Screenshots and demo capture guide](screenshots.md) — capture instructions, not evidence that listed screenshots exist.
-- [Demo script](demo.md) — a proposed walkthrough, not a recorded product demonstration.
+## Historical records and references
 
-## Research, experiment and generated evidence
+These files retain rationale or earlier evidence. They are not current implementation instructions:
 
-- `whaxon-experiment-2026-10-25/` — preserved experiment notebook, raw evidence, logs and dated results. Its target observations and CI claims are historical; do not generalize them to current product behavior.
-- [Experiment audit](WHAXON_EXPERIMENT_AUDIT_2026-10-25.md) — current-main follow-up to that historical experiment; limitations remain explicit.
-- `data/proof-dvwa/` — generated sample job and engagement reports from a dated DVWA run. These are sample artifacts, not a current benchmark, supported-tool guarantee or release test.
-- `src/whaxon/data/payloads/` — vendored payload/reference material. Payload presence does not imply that a validator supports or safely executes every technique. See [payload attribution](../src/whaxon/data/payloads/ATTRIBUTION.md).
+- [Agent architecture](agent-architecture.md), [autonomous loop](autonomous-loop.md), [session execution](session-execution.md).
+- [Report redesign](report-redesign.md), [report visual design](report-visual-design.md), [business impact](business-impact.md).
+- [Engine v2 E0 baseline](ENGINE_V2_BASELINE_INVENTORY.md), [legacy UI audit](WEB_UI_INTERACTION_AUDIT.md).
+- [Screenshot capture guide](screenshots.md), [demo script](demo.md): instructions/proposals, not completed demonstrations.
+- [Partnership/investor research](CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md): dated research, with external facts requiring revalidation before use.
+- `data/proof-dvwa/`: dated generated sample reports; not current regression or release evidence.
 
-## UI source and imported web captures
+The previously referenced `whaxon-experiment-2026-10-25/` folder and `docs/WHAXON_EXPERIMENT_AUDIT_2026-10-25.md` are absent from the inspected `6fa1fa5` working tree. Do not follow their former local links or describe them as currently checked-in artifacts. Their historical branch/reference disposition is recorded in the due-diligence register.
 
-- `web ui files and rendering/obsidian_kinetic/DESIGN.md` — supplied Obsidian Kinetic design reference.
-- `web ui files and rendering/extracted_text_*.md` and related GitHub page captures — raw imported snapshots, including material from the original `WHAXON` repository. They are archival research artifacts, **not** current source, documentation or authority for this repository.
-- `web ui files and rendering/whaxon_road_map_whats_next_full_scope.md` — older copied roadmap snapshot; superseded by the root master roadmap.
-- `web ui files and rendering/whaxon_v1.0.0_deployment_release_notes.md` — unissued draft, not an actual v1.0.0 release note. See its replacement disclaimer.
+The complete previous roadmap remains available through the trajectory's pinned Git-history link. There is no second active roadmap or copied archive added to this tree.
+
+## Supplied UI assets and imported captures
+
+[Supplied UI source](../web%20ui%20files%20and%20rendering/README.md) and its [design reference](../web%20ui%20files%20and%20rendering/obsidian_kinetic/DESIGN.md) govern visual fidelity. Production templates live in `src/whaxon/interfaces/web/templates/ui_v2_*.html`. Named source variants are not interchangeable until mapped.
+
+The same supplied folder contains loose duplicate files, imported `extracted_text_*.md` page captures, an old copied roadmap and an unissued release-note disclaimer. They remain pending disposition; they do not define current behavior or release identity. The [due-diligence register](DOCUMENTATION_RECONCILIATION.md) gives precise conditions for removal. Distinct source assets and legacy designs are preserved.
+
+Vendored [payload attribution](../src/whaxon/data/payloads/ATTRIBUTION.md) is a runtime/provenance resource. Payload presence does not establish validator support for every listed technique.
 
 ## Licensing and notices
 
-- [Editions](editions.md)
-- [Licensing overview](licensing.md)
-- [Commercial licensing](commercial-licensing.md)
-- [Community license](../LICENSE)
-- [Commercial license notice](../LICENSE-COMMERCIAL.md)
-- [Enterprise licensing status](../LICENSE-ENTERPRISE.md)
-- [Third-party notices](../THIRD_PARTY_NOTICES.md)
-- [Trademark policy](../TRADEMARK.md)
-- [Contributor License Agreement](../CLA.md)
+- [Editions](editions.md), [licensing overview](licensing.md), [commercial licensing](commercial-licensing.md).
+- [Community license](../LICENSE), [commercial notice](../LICENSE-COMMERCIAL.md), [enterprise status](../LICENSE-ENTERPRISE.md).
+- [Third-party notices](../THIRD_PARTY_NOTICES.md), [third-party license inventory](../THIRD_PARTY_LICENSES/README.md).
+- [Trademark policy](../TRADEMARK.md), [contributor agreement](../CLA.md).
 
-## Related projects
-
-KILN and Aletheia Framework are separate repositories and products, not WHAXON modules or dependencies:
-
-- [KILN](https://github.com/andreipath26/KILN)
-- [Aletheia Framework](https://github.com/andreipath26/aletheia-framework)
+KILN, Aletheia Framework, SYBIL and other portfolio projects are separate repositories/products, not WHAXON runtime dependencies or release workstreams.

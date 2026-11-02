@@ -1,20 +1,17 @@
-> **Current-head CI correction (2026-11-02):** The documentation commit `e9b2f02` has workflow run [#41452761676](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41452761676), which failed one Python 3.13 browser test: `test_approvals_refresh_queue_and_halt_use_live_apis[chromium]` expected Refresh queue to trigger another `/api/ai/pending` request but observed no additional request. This is an unresolved test/product behavior until diagnosed. Earlier passing runs do not supersede this result; re-check CI for the exact candidate commit.
-
 # New Default Web UI — Interaction and Acceptance Audit
 
-**Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` (especially the repository reality check, §19, §32.12, §34.2 step 5, and §38).
+**Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, P4 and §38 G06; the previous section references are reconciled in its §50.
 
-**Repository:** `andreipath26/WHAXON-AI-Forensics`  
-**Audit baseline:** `main` before the default-route change at `aea6a2ff859301192b3133330a94ecc0e6a21cbf`.  
-**Default-route change:** `8313b8af885d4c4f5711c4df0998f0e8523f9b33` (root redirects to `/ui-v2`).  
-**Test assertion change:** `aa8fcd2b633b267e577ee32034e330bfb7bc9c71`.  
-**CI evidence update (2026-11-02):** the master roadmap records CI run [#41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) on 2026-11-01 as passing Ruff, mypy, 1,322 tests (14 skipped), wheel/sdist metadata validation and selected packaging/scanner smoke checks. This is a recorded run, not proof that every later commit or current HEAD passed. Check CI on the exact candidate commit.
+**Repository:** `andreipath26/WHAXON-AI-Forensics`
+**Current source baseline:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`, reviewed 2026-11-02.
+**Historical integration baseline:** `aea6a2ff859301192b3133330a94ecc0e6a21cbf`; default-route change `8313b8af885d4c4f5711c4df0998f0e8523f9b33`; test assertion change `aa8fcd2b633b267e577ee32034e330bfb7bc9c71`.
+**Exact-baseline CI:** [#41488450899](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41488450899) passed all nine jobs. Python 3.11/3.12/3.13 each reported 1,408 passed, 14 skipped; browser tests are part of that matrix. The earlier approvals Refresh-queue failure on `e9b2f02` is historical, not the current red-CI state. This does not establish complete UI acceptance. No browser tests were rerun locally during this documentation review.
 
 This is a dated implementation and acceptance audit, not a declaration that the UI is fully accepted or deployment-ready. The roadmap §38 remains the controlling release gate; visual regression, complete visible-control inventory, accessibility, CLI/web parity and external-asset deployment checks remain open until evidence is recorded.
 
 ## 1. Source-of-truth assets and preservation
 
-The checked-in design package contains 32 HTML files and 32 PNG files, plus `obsidian_kinetic/DESIGN.md`. The HTML/PNG set includes versioned alternatives and duplicate top-level copies; these are retained as reference assets. The production implementation consists of 22 `ui_v2_*.html` templates and 22 corresponding web routes.
+The checked-in design package contains 32 HTML files and 32 PNG files, plus `obsidian_kinetic/DESIGN.md`. The HTML/PNG set includes distinct versioned alternatives and ten byte-identical loose copies. Counts therefore do not mean 32 accepted workflows. The [due-diligence register](DOCUMENTATION_RECONCILIATION.md) separates safe duplicate-removal candidates from distinct supplied designs requiring canonical mapping; this review deletes neither. The production implementation consists of 22 `ui_v2_*.html` templates and 22 corresponding web routes.
 
 The new templates use the supplied Obsidian Kinetic visual system. The original `base.html`, `index.html`, `app.js`, `style.css`, and historical `docs/WEB_UI_INTERACTION_AUDIT.md` remain the deprecated interface/reference. They must not be redesigned, repurposed as the new UI, or overwritten as part of this work.
 
@@ -22,10 +19,11 @@ The new templates use the supplied Obsidian Kinetic visual system. The original 
 
 | URL | Purpose | State |
 |---|---|---|
-| `/` | Default web entry point | Redirects to `/ui-v2`; the initial audit marked CI pending, but the later run recorded above passed on its own commit. Current HEAD still requires its own CI evidence |
+| `/` | Default web entry point | Redirects to `/ui-v2`; exact-baseline CI above passed; future candidates need their own CI evidence |
 | `/ui-v2` | Canonical Obsidian Kinetic dashboard | Implemented |
 | `/ui-v2/dashboard` | Dashboard alias | Implemented |
-| `/ui` | Previous web interface | Preserved as a compatibility/reference route |
+| `/ui` | Previous web interface | Preserved compatibility/reference route; desktop `gui/embed.py` still points here |
+| Desktop launcher | `gui/app.py` → `embed.URL` | Still opens `/ui`; migrate to accepted new default and test startup/navigation |
 
 ## 3. Canonical screen-to-route map
 
@@ -54,7 +52,7 @@ The new templates use the supplied Obsidian Kinetic visual system. The original 
 | Threat intelligence / exploit arsenal | `/ui-v2/threat-intel` | `ui_v2_threat_intel.html` | `test_web_ui_v2_auxiliary_pages.py` |
 | Trust Layer approvals queue | `/ui-v2/approvals` | `ui_v2_approvals.html` | `test_web_ui_v2_auxiliary_pages.py` |
 
-All 22 routes have a corresponding production template. The browser suite currently has 21 UI-v2 test modules; some related pages share the auxiliary-page module.
+All 22 routes have a corresponding production template. The tracked baseline has 23 UI-v2 test modules; some related pages share the auxiliary-page module.
 
 ## 4. Live workflows with browser coverage
 
@@ -90,14 +88,15 @@ These controls must remain disabled/hidden until a real backend implementation, 
 2. **CLI/web service parity:** the roadmap requires CLI verbs to use shared service modules and a parity test for CLI/web surfaces (or documented deliberate differences). A dedicated parity test was not identified in the current test tree. Audit the actual CLI/web command surface before claiming this gate passed.
 3. **Accessibility:** browser tests exist, but a full keyboard/focus-management/screen-reader/WCAG 1.4.1 acceptance pass is not evidenced by the current test names or contents reviewed. Add automated checks where practical and record manual checks separately.
 4. **All-control inventory:** the 22 pages have dedicated or shared browser tests, but a complete per-control inventory proving every visible control is wired, disabled or hidden has not yet been recorded. Continue page-by-page and extend tests for any uncovered controls.
-5. **Deployment dependencies:** the supplied pages load Tailwind and web fonts from external CDNs. Decide and test whether the supported deployment requires network-independent bundled assets; do not silently claim air-gapped readiness while external runtime assets remain.
-6. **Default route:** the current web server redirects `/` to `/ui-v2`; the current route matrix covers the new UI routes. The historical note about awaiting CI for `aa8fcd2` is obsolete; acceptance of the exact release candidate still requires its own current CI result.
+5. **Deployment dependencies:** the supplied pages load Tailwind, fonts/icons and images from external hosts. Decide and test whether the supported deployment requires network-independent bundled assets; do not silently claim air-gapped readiness while external runtime assets remain.
+6. **Desktop/default entry points:** the web server redirects `/` to `/ui-v2`, but `src/whaxon/interfaces/gui/embed.py` still sets its URL to `/ui`. Correct the desktop entry point, test startup/navigation against the accepted supplied UI and preserve legacy design source unchanged. Web-route CI does not prove desktop parity.
+7. **Exact candidate:** the inspected baseline is CI-green. Repeat required browser/E2E and acceptance checks for the final release candidate rather than relying on earlier commits.
 
 ## 7. Branch and PR reconciliation
 
 At the time of this audit there were no open pull requests; the repository was checked again on 2026-11-02 and still had none open. The canonical UI integration PRs #37, #41 and #42, and the subsequent UI wiring/truthfulness PRs #43–#73, were already merged into `main`. The old full-wiring PR #16 was closed unmerged as a draft; its own description explicitly said not to merge because wiring and browser acceptance were incomplete. PRs #33–#36 were superseded by the later integrated UI work. Their old branch tips must not be blindly merged over newer main code.
 
-No new branch or alternate UI was created for this audit. Stale historical branches are not merge candidates merely because they still exist.
+No alternate UI or runtime implementation is created by this documentation refresh. Current branch comparison and retirement conditions are in the [due-diligence register](DOCUMENTATION_RECONCILIATION.md). Stale historical branches are not merge candidates merely because they still exist.
 
 ## 8. Release gate
 
