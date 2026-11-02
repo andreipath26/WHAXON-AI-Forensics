@@ -24,12 +24,11 @@ from whaxon.core.events import (
     JobStarted,
 )
 
+
 def _check_execution_scope(scope, target):
     """Use the scope manager's DNS-safe execution gate when available."""
     checker = getattr(scope, "check_for_execution", None)
     return checker(target) if callable(checker) else scope.check(target)
-
-
 
 
 def _redact_sensitive_settings(value: Any) -> Any:

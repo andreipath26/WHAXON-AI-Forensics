@@ -145,3 +145,38 @@ def test_msf_execute_polls_for_job_without_fixed_wait(monkeypatch):
     assert result["job_id"] == 17
     assert console.reads == 1
     assert "run -j" in console.writes
+
+
+def test_verified_rpc_transport_uses_default_certificate_validation(monkeypatch):
+    import requests
+    from whaxon.core.msf import _verified_rpc_post
+
+    captured = {}
+    def fake_post(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return object()
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    _verified_rpc_post(
+        "https://msf.internal:55553/api/", b"payload", {"Content-Type": "x"},
+        timeout=(3, 3),
+    )
+    assert captured["verify"] is True
+    assert captured["timeout"] == (3, 3)
+
+
+def test_verified_rpc_transport_uses_configured_private_ca(monkeypatch):
+    import requests
+    from whaxon.core.msf import _verified_rpc_post
+
+    captured = {}
+    def fake_post(url, **kwargs):
+        captured.update(url=url, **kwargs)
+        return object()
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    _verified_rpc_post(
+        "https://msf.internal:55553/api/", b"payload", {"Content-Type": "x"},
+        timeout=(3, 3), ca_bundle="/tmp/msf-ca.pem",
+    )
+    assert captured["verify"] == "/tmp/msf-ca.pem"

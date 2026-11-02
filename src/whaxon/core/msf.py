@@ -50,6 +50,19 @@ class MSFConfig:
         return f"{scheme}://{self.host}:{self.port}"
 
 
+def _verified_rpc_post(url, payload, headers, *, timeout, ca_bundle=None):
+    """Send a pymetasploit3 RPC request with certificate verification enabled."""
+    import requests
+
+    return requests.post(
+        url,
+        data=payload,
+        headers=headers,
+        verify=ca_bundle or True,
+        timeout=timeout,
+    )
+
+
 class MSFClient:
     """Thin wrapper around pymetasploit3.MsfRpcClient.
 
@@ -102,8 +115,20 @@ class MSFClient:
                 "Run: pip install -e '.[metasploit]'"
             ) from e
 
+        timeout = max(1.0, min(5.0, self.config.timeout))
+        ca_bundle = os.environ.get("WHAXON_MSF_CA_BUNDLE") or None
+
+        class _VerifiedMsfRpcClient(MsfRpcClient):
+            """Override pymetasploit3's insecure verify=False HTTP transport."""
+
+            def post_request(self, url, payload):
+                return _verified_rpc_post(
+                    url, payload, self.headers,
+                    timeout=(timeout, timeout), ca_bundle=ca_bundle,
+                )
+
         try:
-            self._client = MsfRpcClient(
+            self._client = _VerifiedMsfRpcClient(
                 self.config.password,
                 server=self.config.host,
                 port=self.config.port,
