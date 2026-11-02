@@ -624,18 +624,15 @@ These remain the design discipline for all future work.
 
 | File | Contents |
 |---|---|
-| whaxon_state.md | Project state snapshot (whaxon state) |
-| whaxon_full_scope.md (this file) | Everything in scope, queued, excluded |
-| whaxon_tools_master.md | Master tool list, tiered |
-| whaxon_tool_candidates.md | Original 15-tool shortlist |
-| whaxon_tool_candidates_full.md | Full distro-research list |
-| whaxon_github_research.md | GitHub/MCP collections research |
-| whaxon_web_research.md | Web search results |
-| WHAXON RULES.md | Development rules (Parts 1–6) |
-| PITCH DECK.MD | Investor pitch deck (10 slides + appendices) |
-| VCS TO GET FUNDING.MD | Funding targets and application sequence |
-| whaxon_tool_candidates_confirm.txt | External tool-candidate memo (session 58 review); items reconciled against §3, no new adoptions |
-| whaxon_tool_candidates_reorganized.txt | Full reorganized tool-candidate list, ~110 entries by function; see §7 addendum |
+| `README.md` | Current product overview, installation entry point and capability boundaries |
+| `docs/README.md` | Documentation index and historical-document classification |
+| `docs/STATE.md` | Dated project/release status snapshot |
+| `docs/CHANGELOG.md` | Main-branch engineering and release history |
+| `docs/NEW_UI_INTERACTION_AUDIT.md` | Current new-UI route and acceptance record |
+| `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md` | Engine v2 target architecture and implementation crosswalk |
+| `docs/ENGINE_V2_BASELINE_INVENTORY.md` | Historical Engine v2 migration baseline |
+
+Older standalone companion notes and research files from earlier working directories are not part of this repository unless listed in the current tree; do not treat their former filenames as current repository deliverables.
 
 ---
 
@@ -698,7 +695,7 @@ Expose catalog + runner via Model Context Protocol. New module `src/whaxon/inter
 ## 17.2 Verification layer
 
 ~~Findings become candidates → verified → reported. New field `verification_status` (candidate/verified/refuted). New adapter method `verify(finding)`. Report filter shows verified by default.~~
-**(DONE — see §33.1, §34.2, and white paper findings. Validation engine is shipped with 1.0.0)**
+**Implementation status:** validation and retest capabilities exist in the current codebase; this does not mean WHAXON v1.0.0 has shipped. The release identity and acceptance status are controlled exclusively by §38, which remains OPEN until its evidence-backed gates are met. See §34.2 for current behavior and limitations.
 
 ## 17.3 Multi-agent split
 

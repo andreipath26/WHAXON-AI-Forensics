@@ -14,9 +14,9 @@
 
 ## 2. Recorded engineering verification
 
-The master roadmap §47 records CI run [#41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) on 2026-11-01 as passing Ruff, mypy, 1,322 tests (14 skipped), and wheel/sdist metadata validation on Python 3.11, 3.12 and 3.13. It also records clean-wheel diagnostics and selected Ubuntu/macOS/Windows setup and scanner smoke checks.
+The master roadmap §47 records CI run [#41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) on 2026-11-01 as passing Ruff, mypy, 1,322 tests (14 skipped), and wheel/sdist metadata validation on Python 3.11, 3.12 and 3.13. It also records clean-wheel diagnostics and selected Ubuntu/macOS/Windows setup and scanner smoke checks. The scheduler-test harness correction subsequently passed in run [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) on commit `1cefb99276b8db0bae697b17ca8f781d0c754147`.
 
-This is a specific recorded CI result, **not a claim that every later commit or the current HEAD has passed CI**. Check Actions for the exact candidate commit before release.
+These are specific recorded CI results, **not a claim that every later commit or the current HEAD has passed CI**. Check Actions for the exact candidate commit before release.
 
 ## 3. Current product surfaces
 

@@ -28,15 +28,12 @@ This index is for the active repository: [andreipath26/WHAXON-AI-Forensics](http
 
 - [New UI interaction and acceptance audit](NEW_UI_INTERACTION_AUDIT.md) — current route map and remaining UI gates.
 - [Engine v2 architecture and roadmap crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md)
-- [Engine v2 baseline inventory](ENGINE_V2_BASELINE_INVENTORY.md) — historical baseline, not current status.
-- [Dependency readiness implementation and acceptance record](first-run-installation-redesign.md)
 - [Experiment audit](WHAXON_EXPERIMENT_AUDIT_2026-10-25.md) — dated research evidence and limitations.
 - [Engineering execution model](ENGINEERING_EXECUTION_MODEL.md)
 - [Changelog](CHANGELOG.md)
 
 ## Additional technical and business records
 
-- [Tool intelligence and onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md)
 - [Metasploit / Armitage integration](METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md)
 - [Data retention](DATA_RETENTION.md)
 - [Bug-bounty add-on](bounty-addon.md)
@@ -50,7 +47,7 @@ The following documents are retained for traceability and must not be read as cu
 - [Engine v2 baseline inventory](ENGINE_V2_BASELINE_INVENTORY.md) — point-in-time migration baseline.
 - [Legacy web UI interaction audit](WEB_UI_INTERACTION_AUDIT.md) — superseded by the [new UI acceptance audit](NEW_UI_INTERACTION_AUDIT.md).
 - [Report redesign](report-redesign.md) and [report visual design](report-visual-design.md) — design records; current report behavior is defined by source, tests and [reports and evidence](reports-and-evidence.md).
-- [First-run installation redesign](first-run-installation-redesign.md) — implementation/acceptance history; current operator instructions are in [dependency readiness](dependency-readiness.md).
+- [First-run installation implementation and acceptance record](first-run-installation-redesign.md) — current implementation boundary and remaining clean-machine acceptance work; operator instructions are in [dependency readiness](dependency-readiness.md).
 - [Demo](demo.md), [screenshots](screenshots.md), [autonomous loop](autonomous-loop.md), [session execution](session-execution.md), and [tool intelligence/onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md) are explanatory/design records unless explicitly marked implemented in the roadmap.
 
 All other documents are current guides or dated engineering records, not proof that every described capability is deployed. For present behavior, source and tests on `main` win; for priority and release status, the master roadmap wins.
