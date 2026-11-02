@@ -2234,6 +2234,47 @@ class JobStore:
             and usage["active"] < limits["max_concurrency"]
         )
 
+    def _execution_limits_allow_dispatch(self, c, plan_id):
+        """Recheck tightened plan and mission caps after claim, before effects.
+
+        The current running attempt is already counted, so equality is allowed.
+        New claims use strict less-than comparisons instead.
+        """
+        limits = c.execute(
+            "SELECT max_total_attempts, max_concurrency FROM workflow_limits "
+            "WHERE plan_id=?", (plan_id,),
+        ).fetchone()
+        usage = c.execute(
+            "SELECT COUNT(*) AS attempts, "
+            "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "WHERE t.plan_id=?", (plan_id,),
+        ).fetchone()
+        if usage["attempts"] > (limits["max_total_attempts"] if limits else 100):
+            return False
+        if usage["active"] > (limits["max_concurrency"] if limits else 4):
+            return False
+        mission_limits = c.execute(
+            "SELECT l.max_total_attempts, l.max_concurrency "
+            "FROM mission_execution_limits l JOIN workflow_plans p "
+            "ON p.mission_id=l.mission_id WHERE p.id=?", (plan_id,),
+        ).fetchone()
+        if mission_limits is not None:
+            mission_usage = c.execute(
+                "SELECT COUNT(*) AS attempts, "
+                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id "
+                "WHERE p.mission_id=(SELECT mission_id FROM workflow_plans WHERE id=?)",
+                (plan_id,),
+            ).fetchone()
+            if (
+                mission_usage["attempts"] > mission_limits["max_total_attempts"]
+                or mission_usage["active"] > mission_limits["max_concurrency"]
+            ):
+                return False
+        return self._mission_cost_allows_claim(c, plan_id)
+
     def get_workflow_limits(self, plan_id):
         """Return effective backend limits, including defaults for old plans."""
         c = self._conn()
@@ -2284,6 +2325,7 @@ class JobStore:
                 if (
                     (deadline is not None and now >= deadline["deadline_at"])
                     or not self._mission_deadline_allows_dispatch(c, plan_id, now)
+                    or not self._execution_limits_allow_dispatch(c, plan_id)
                 ):
                     c.execute("COMMIT")
                     return False

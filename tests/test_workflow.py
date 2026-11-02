@@ -1602,3 +1602,59 @@ def test_attempt_cost_source_is_canonical_for_idempotent_replays(tmp_path):
     )
     assert len([e for e in store.list_workflow_events("p")
                 if e["event_type"] == "cost_recorded"]) == 1
+
+
+def test_dispatch_rechecks_tightened_mission_budget_after_claim(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "tightened-mission-dispatch.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+        WorkflowTask("b", "fixture", "192.0.2.2"),
+    )))
+    first = store.claim_ready_workflow_task("p", "worker-a")
+    second = store.claim_ready_workflow_task("p", "worker-b")
+    assert first is not None and second is not None
+    store.set_mission_execution_limits(
+        "m", max_total_attempts=1, max_concurrency=1,
+    )
+    assert store.mark_workflow_dispatch_started("p", first["attempt_id"]) is False
+    assert store.mark_workflow_dispatch_started("p", second["attempt_id"]) is False
+    assert not [event for event in store.list_workflow_events("p")
+                if event["event_type"] == "dispatch_started"]
+
+
+def test_dispatch_rechecks_tightened_plan_budget_after_claim(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "tightened-plan-dispatch.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+        WorkflowTask("b", "fixture", "192.0.2.2"),
+    )))
+    first = store.claim_ready_workflow_task("p", "worker-a")
+    second = store.claim_ready_workflow_task("p", "worker-b")
+    assert first is not None and second is not None
+    store.set_workflow_limits("p", max_total_attempts=1, max_concurrency=1)
+    assert store.mark_workflow_dispatch_started("p", first["attempt_id"]) is False
+    assert store.mark_workflow_dispatch_started("p", second["attempt_id"]) is False
+
+
+def test_dispatch_rechecks_cost_cap_tightening_after_claim(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "tightened-cost-dispatch.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1"),
+    )))
+    first = store.claim_ready_workflow_task("p", "worker")
+    store.set_mission_cost_limit("m", max_cost_microusd=0)
+    assert store.mark_workflow_dispatch_started("p", first["attempt_id"]) is False
+    assert not [event for event in store.list_workflow_events("p")
+                if event["event_type"] == "dispatch_started"]
