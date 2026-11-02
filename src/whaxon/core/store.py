@@ -1322,10 +1322,9 @@ class JobStore:
             c.close()
 
     def verify_workflow_plan_integrity(self, plan_id):
-        """Verify immutable DAG snapshot against the persisted executable rows.
+        """Verify the immutable DAG snapshot against persisted executable rows.
 
-        Detects corruption or out-of-band edits before a provider can receive
-        a task. Call in the same transaction as claiming to avoid a TOCTOU gap.
+        The execution paths use the same check in their write transaction.
         """
         c = self._conn()
         try:

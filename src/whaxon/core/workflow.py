@@ -69,7 +69,12 @@ class WorkflowTask:
             raise ValueError("task id, capability_id and target are required")
         if self.impact not in _ALLOWED_IMPACTS:
             raise ValueError(f"unsupported task impact: {self.impact}")
-        if not math.isfinite(self.timeout_s) or self.timeout_s <= 0:
+        if (
+            isinstance(self.timeout_s, bool)
+            or not isinstance(self.timeout_s, (int, float))
+            or not math.isfinite(self.timeout_s)
+            or self.timeout_s <= 0
+        ):
             raise ValueError("task timeout_s must be finite and positive")
         dependencies = tuple(self.depends_on)
         permissions = tuple(self.permissions)
@@ -99,7 +104,7 @@ class WorkflowTask:
             depends_on=tuple(value.get("depends_on") or ()),
             permissions=tuple(value.get("permissions") or ()),
             impact=value.get("impact", "read_only"),
-            timeout_s=float(value.get("timeout_s", 300.0)),
+            timeout_s=value.get("timeout_s", 300.0),
             idempotency_key=value.get("idempotency_key", ""),
         )
 

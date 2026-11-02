@@ -1409,3 +1409,54 @@ def test_workflow_integrity_rejects_mutated_plan_snapshot(tmp_path):
         conn.close()
     with pytest.raises(ValueError, match="integrity verification failed"):
         store.claim_ready_workflow_task("p", "worker")
+
+
+def test_workflow_integrity_preserves_integer_timeout_digests_across_restart(tmp_path):
+    from whaxon.core.store import JobStore
+
+    path = tmp_path / "integer-timeout-integrity.db"
+    store = JobStore(path)
+    store.create_mission("m", "objective")
+    plan = WorkflowPlan("m", (
+        WorkflowTask("a", "fixture", "192.0.2.1", timeout_s=15),
+        WorkflowTask("b", "fixture", "192.0.2.2", timeout_s=30, depends_on=("a",)),
+    ))
+    assert WorkflowPlan.from_dict(plan.to_dict()).digest == plan.digest
+    store.save_workflow_plan("p", plan)
+    reopened = JobStore(path)
+    assert reopened.verify_workflow_plan_integrity("p")["digest"] == plan.digest
+    assert reopened.claim_ready_workflow_task("p", "worker") is not None
+
+
+def test_workflow_task_rejects_boolean_timeout_and_non_numeric_contract():
+    for invalid in (True, False, "10", None, [], {}):
+        with pytest.raises(ValueError, match="timeout_s"):
+            WorkflowTask("a", "fixture", "192.0.2.1", timeout_s=invalid)
+
+
+def test_workflow_integrity_rejects_dependency_target_or_capability_tampering(tmp_path):
+    from whaxon.core.store import JobStore
+
+    for column, bad in (
+        ("capability_id", "unexpected.provider"),
+        ("target", "192.0.2.250"),
+        ("depends_on_json", '["bad-reference"]'),
+        ("permissions_json", '["unapproved.permission"]'),
+    ):
+        store = JobStore(tmp_path / f"integrity-{column}.db")
+        store.create_mission("m", "objective")
+        store.save_workflow_plan("p", WorkflowPlan("m", (
+            WorkflowTask("a", "fixture", "192.0.2.1"),
+            WorkflowTask("b", "fixture", "192.0.2.2", depends_on=("a",)),
+        )))
+        conn = store._conn()
+        try:
+            conn.execute(
+                f"UPDATE workflow_tasks SET {column}=? WHERE plan_id='p' AND task_key='b'",
+                (bad,),
+            )
+        finally:
+            conn.close()
+        with pytest.raises(ValueError, match="integrity verification failed"):
+            store.claim_ready_workflow_task("p", "worker")
+        assert store.count_workflow_task_attempts("p") == {}
