@@ -156,6 +156,61 @@ class Core:
         """Create a durable Engine v2 mission through the shared Core service."""
         return self.store.create_mission(mission_id, objective, metadata)
 
+    def configure_workflow_rate_limit(self, plan_id: str, *, min_spacing_s: float):
+        return self.store.set_workflow_rate_limit(plan_id, min_spacing_s=min_spacing_s)
+
+    def configure_workflow_deadline(self, plan_id: str, *, deadline_at: float):
+        return self.store.set_workflow_deadline(plan_id, deadline_at=deadline_at)
+
+    def configure_workflow_limits(
+        self, plan_id: str, *, max_total_attempts: int, max_concurrency: int,
+    ):
+        return self.store.set_workflow_limits(
+            plan_id, max_total_attempts=max_total_attempts,
+            max_concurrency=max_concurrency,
+        )
+
+    def reconcile_workflow_plan(self, plan_id: str, *, stale_after_s: float = 60.0):
+        """Reconcile expired worker leases without repeating external effects."""
+        return self.store.reconcile_workflow_plan(plan_id, stale_after_s=stale_after_s)
+
+    def workflow_events(self, plan_id: str, *, after_id: int = 0, limit: int = 100):
+        return self.store.list_workflow_events(plan_id, after_id, limit)
+
+    def missions(self, *, limit: int = 100, after_created: float = 0.0):
+        return self.store.list_missions(limit=limit, after_created=after_created)
+
+    def mission_workflow_plans(self, mission_id: str):
+        return self.store.list_workflow_mission_plans(mission_id)
+
+    def workflow_dispatch_reconciliation(self, plan_id: str):
+        return self.store.get_workflow_dispatch_reconciliation(plan_id)
+
+    def workflow_readiness(self, plan_id: str):
+        return self.store.get_workflow_readiness(plan_id)
+
+    def workflow_resource_summary(self, plan_id: str):
+        return self.store.get_workflow_resource_summary(plan_id)
+
+    def workflow_audit_integrity(self, plan_id: str):
+        return self.store.get_workflow_audit_integrity(plan_id)
+
+    def workflow_attempts(
+        self, plan_id: str, *, after_started: float = 0.0, limit: int = 100,
+    ):
+        """Expose read-only attempt diagnostics through the shared Core service."""
+        return self.store.list_workflow_attempts(
+            plan_id, after_started=after_started, limit=limit,
+        )
+
+    def workflow_progress(self, plan_id: str):
+        """Expose durable task/attempt progress to CLI, API and headless clients."""
+        return self.store.get_workflow_progress(plan_id)
+
+    def cancel_workflow_plan(self, plan_id: str) -> int:
+        """Durably halt future claims; in-flight provider effects remain uncertain."""
+        return self.store.request_workflow_cancellation(plan_id)
+
     def save_workflow_plan(self, plan_id: str, plan):
         """Validate and persist a versioned mission DAG."""
         return self.store.save_workflow_plan(plan_id, plan)

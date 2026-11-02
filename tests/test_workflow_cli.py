@@ -23,6 +23,53 @@ class _FakeCore:
         self.saved = (plan_id, plan)
         return True
 
+    def missions(self, *, limit=100, after_created=0.0):
+        return [{"id": "mission-1", "created_at": after_created + 1}][:limit]
+
+    def mission_workflow_plans(self, mission_id):
+        return [{"id": "p", "status": "proposed", "digest": "abc"}]
+
+    def workflow_dispatch_reconciliation(self, plan_id):
+        return [{"attempt_id": "a", "external_effect_possible": True}]
+
+    def workflow_readiness(self, plan_id):
+        return {"plan_id": plan_id, "ready_to_report_success": False}
+
+    def workflow_resource_summary(self, plan_id):
+        return {"plan_id": plan_id, "cost_usd": None, "cost_accounting_available": False}
+
+    def workflow_audit_integrity(self, plan_id):
+        return {"plan_id": plan_id, "consistent": True, "attempts": 0}
+
+    def workflow_attempts(self, plan_id, *, after_started=0.0, limit=100):
+        return [{
+            "id": "attempt-1", "task_key": "scan",
+            "started_at": after_started + 1, "status": "running",
+        }][:limit]
+
+    def workflow_progress(self, plan_id):
+        return {"plan_id": plan_id, "complete": False, "counts": {"pending": 1}}
+
+    def workflow_events(self, plan_id, after_id=0, limit=100):
+        return [{"plan_id": plan_id, "id": after_id + 1, "event_type": "task_claimed"}][:limit]
+
+    def cancel_workflow_plan(self, plan_id):
+        self.cancelled = plan_id
+        return 1
+
+    def reconcile_workflow_plan(self, plan_id, *, stale_after_s=60.0):
+        self.reconciled = (plan_id, stale_after_s)
+        return 2
+
+    def configure_workflow_rate_limit(self, plan_id, *, min_spacing_s):
+        self.rate_limit = (plan_id, min_spacing_s)
+
+    def configure_workflow_deadline(self, plan_id, *, deadline_at):
+        self.deadline = (plan_id, deadline_at)
+
+    def configure_workflow_limits(self, plan_id, *, max_total_attempts, max_concurrency):
+        self.limits = (plan_id, max_total_attempts, max_concurrency)
+
     async def initialize(self, drain=True):
         self.initialized_with_drain = drain
 
@@ -64,3 +111,103 @@ def test_workflow_cli_runs_headless_without_draining_legacy_jobs(monkeypatch, ca
     monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
     assert workflow_cmd.main(["plan", "run", "--id", "plan-1"]) == 0
     capsys.readouterr()
+
+
+def test_workflow_cli_progress_and_events(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "progress", "--id", "p"]) == 0
+    assert json.loads(capsys.readouterr().out)["counts"]["pending"] == 1
+    assert workflow_cmd.main([
+        "plan", "events", "--id", "p", "--after-id", "3", "--limit", "1",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["id"] == 4
+
+
+def test_workflow_cli_cancel_and_limits(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "cancel", "--id", "p"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["cancellation_requested"] is True
+    assert result["tasks_cancelled"] == 1
+    assert workflow_cmd.main([
+        "plan", "limits", "--id", "p", "--max-total-attempts", "7",
+        "--max-concurrency", "2",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["max_total_attempts"] == 7
+
+
+def test_workflow_cli_reconcile_marks_uncertain_without_dispatch(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "reconcile", "--id", "p", "--stale-after-seconds", "90",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["attempts_marked_uncertain"] == 2
+
+
+def test_workflow_cli_exposes_read_only_attempt_diagnostics(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "attempts", "--id", "p",
+        "--after-started", "4", "--limit", "1",
+    ]) == 0
+    attempts = json.loads(capsys.readouterr().out)
+    assert attempts == [{
+        "id": "attempt-1", "task_key": "scan",
+        "started_at": 5.0, "status": "running",
+    }]
+
+
+def test_mission_plan_list_cli(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["mission", "plans", "--id", "mission-1"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["id"] == "p"
+
+
+def test_workflow_cli_lists_persisted_missions(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "list", "--limit", "1", "--after-created", "2",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["created_at"] == 3.0
+
+
+def test_workflow_cli_audit(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "audit", "--id", "p"]) == 0
+    assert json.loads(capsys.readouterr().out)["consistent"] is True
+
+
+def test_workflow_cli_reconciliation_report(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "reconciliation-report", "--id", "p"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["external_effect_possible"] is True
+
+
+def test_workflow_cli_configures_durable_deadline(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "deadline", "--id", "p", "--unix-time", "2000000000",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["deadline_at"] == 2000000000.0
+
+
+def test_workflow_cli_persists_rate_limit(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "rate-limit", "--id", "p", "--min-spacing-seconds", "4.5",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["min_spacing_s"] == 4.5
+
+
+def test_workflow_cli_resources_do_not_invent_cost(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "resources", "--id", "p"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["cost_usd"] is None
+    assert result["cost_accounting_available"] is False
+
+
+def test_workflow_cli_readiness_fails_closed(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "readiness", "--id", "p"]) == 1
+    assert json.loads(capsys.readouterr().out)["ready_to_report_success"] is False
