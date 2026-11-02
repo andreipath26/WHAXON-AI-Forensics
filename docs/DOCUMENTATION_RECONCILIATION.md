@@ -1,5 +1,8 @@
 # WHAXON repository disposition and retirement register
 
+> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](UI_CONTROL_INVENTORY.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
+
+
 **Review date:** 2026-11-02
 **Repository:** `andreipath26/WHAXON-AI-Forensics` · **Inspected main:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`
 **Scope:** removal due diligence and retirement prerequisites, subordinate to the master roadmap P0–P8 and §38. **Execution update:** Batches A and B (23 non-runtime files) have now been removed after hash/reference checks. Runtime behavior, protected designs, Git history and branch refs are unchanged; Batch C and migration retirements remain pending.

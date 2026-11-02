@@ -197,8 +197,8 @@ def test_cli_retest_restores_request_context(tmp_path, monkeypatch):
     assert seen["context"] == context
 
 
-async def _async_noop():
-    return None
+async def _async_noop(*, drain):
+    assert drain is False
 
 
 def test_cli_validate_unknown_job_returns_not_found(tmp_path, monkeypatch):

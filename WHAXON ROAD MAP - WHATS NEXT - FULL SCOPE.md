@@ -1,5 +1,8 @@
 # WHAXON — Product trajectory and release gates
 
+> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](docs/UI_CONTROL_INVENTORY.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
+
+
 **Reviewed:** 2026-11-02 · **Repository:** `andreipath26/WHAXON-AI-Forensics`
 **Inspected baseline:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b` · **Package:** `0.11.16`, Beta
 **Decision:** finish and accept one reliable solo assessment product before expanding the platform. **v1.0 acceptance is OPEN.**

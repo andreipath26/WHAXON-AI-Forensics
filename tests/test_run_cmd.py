@@ -1,8 +1,8 @@
 """Tests for whaxon.interfaces.cli.run_cmd.
 
 Runs the CLI entry point directly against a temp data dir. Uses the
-`echo` catalog tool as the "real run" case — it always exists if
-`data/tools.json` is loaded and produces predictable output.
+`echo` catalog tool as the "real run" case. The packaged catalog
+provides it and produces predictable output.
 """
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from whaxon.interfaces.cli import run_cmd
 
 
 def _seed_data_dir(tmp_path: Path) -> Path:
-    """Copy data/tools.json into tmp_path so the catalog has tools."""
-    repo_data = Path(__file__).resolve().parents[1] / "data"
+    """Copy the packaged tools.json into tmp_path so the catalog has tools."""
+    repo_data = Path(__file__).resolve().parents[1] / "src" / "whaxon" / "data"
     if (repo_data / "tools.json").exists():
         shutil.copy(repo_data / "tools.json", tmp_path / "tools.json")
     return tmp_path

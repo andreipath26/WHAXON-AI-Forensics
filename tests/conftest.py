@@ -69,7 +69,7 @@ def _seed(data_dir: Path) -> None:
     """Create two jobs with findings so the UI has something real to render,
     and copy the real tool catalog so /api/tools is populated."""
     import shutil
-    src_catalog = REPO / "data" / "tools.json"
+    src_catalog = REPO / "src" / "whaxon" / "data" / "tools.json"
     if src_catalog.exists():
         shutil.copy(src_catalog, data_dir / "tools.json")
     sys.path.insert(0, str(REPO / "src"))
