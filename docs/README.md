@@ -43,9 +43,17 @@ This index is for the active repository: [andreipath26/WHAXON-AI-Forensics](http
 - [Plugins](plugins.md)
 - [CBC 2026 partnership and investor playbook](CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md)
 
-## Historical design records
+## Historical and superseded records
 
-Documents marked **historical design record** preserve reasoning and plans from when they were written. They are not current specifications or a live backlog. Use current source, tests, roadmap and acceptance audits for present behavior.
+The following documents are retained for traceability and must not be read as current implementation status or active work queues:
+
+- [Engine v2 baseline inventory](ENGINE_V2_BASELINE_INVENTORY.md) — point-in-time migration baseline.
+- [Legacy web UI interaction audit](WEB_UI_INTERACTION_AUDIT.md) — superseded by the [new UI acceptance audit](NEW_UI_INTERACTION_AUDIT.md).
+- [Report redesign](report-redesign.md) and [report visual design](report-visual-design.md) — design records; current report behavior is defined by source, tests and [reports and evidence](reports-and-evidence.md).
+- [First-run installation redesign](first-run-installation-redesign.md) — implementation/acceptance history; current operator instructions are in [dependency readiness](dependency-readiness.md).
+- [Demo](demo.md), [screenshots](screenshots.md), [autonomous loop](autonomous-loop.md), [session execution](session-execution.md), and [tool intelligence/onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md) are explanatory/design records unless explicitly marked implemented in the roadmap.
+
+All other documents are current guides or dated engineering records, not proof that every described capability is deployed. For present behavior, source and tests on `main` win; for priority and release status, the master roadmap wins.
 
 ## Licensing
 

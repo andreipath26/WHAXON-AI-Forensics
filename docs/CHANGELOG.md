@@ -4,6 +4,16 @@
 
 ## 2026-11-02 — Documentation and verification corrections
 
+### Execution defect closure
+- `whaxon run` now drains Automator follow-up jobs queued by the initial run while preserving pre-existing queued work and the primary job's result. Regression: `tests/test_run_cmd.py::test_run_automatically_drains_jobs_queued_by_automator`.
+- Nikto 2.6.1 output parsing now handles plugin-ID-prefixed findings, full URLs/paths and trailing `See:` references. Regression: `tests/test_adapters_parse.py::test_nikto_261_parses_plugin_ids_full_urls_and_see_references`.
+- These are source/test closures, not a claim that every Engine v2 deployment gate is closed. Latest scheduler-test CI is tracked separately below.
+
+### CI status clarification
+- The scheduler test harness correction is on current main; CI run [#41445780317](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41445780317) was still in progress at the time of this documentation update. Do not describe it as passing until GitHub reports a successful conclusion.
+
+## 2026-11-02 — Documentation and verification corrections
+
 - Corrected the package/release identity: 0.11.16 remains the published package version; v1.0.0 remains unreleased until roadmap §38 acceptance is complete.
 - Reconciled the active repository URL, safe first-run guidance, `/ui-v2` default, API/authentication descriptions, current tool catalog and Engine v2 status with main-branch source.
 - Replaced corrupted data-retention text and removed unsupported claims of automatic secret scrubbing or regulatory alignment.

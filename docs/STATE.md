@@ -42,14 +42,20 @@ The controlling checklist is master roadmap §38. It remains OPEN. The principal
 
 The roadmap is authoritative for the full list and acceptance criteria. A past green CI run or a version string does not close these gates.
 
-## 5. Known operational limitations
+## 5. Documentation remediation status
+
+The README and core operator/engineering documentation have been reconciled against the current repository identity, package release identity, route structure, source-backed capabilities and open Engine v2/v1.0 acceptance gates. The legacy UI audit and point-in-time architecture inventory are explicitly historical. The master roadmap remains the authoritative execution order; this status file is not a substitute for source or passing tests.
+
+The CLI follow-up drain and Nikto 2.6.1 parser defects were fixed in source and have regression tests on `main`. Their documentation/roadmap entries must be treated as implemented, while CI verification of the latest scheduler-test harness remains pending until the exact current-head run completes.
+
+## 6. Known operational limitations
 
 - Scope checks are application-level preflight controls, not a network firewall or connection-time DNS pin. External tools may follow redirects or make secondary requests. Enforce egress restrictions independently for real engagements.
 - Dependency installation is allowlisted and approval-gated, but completed package changes are not generally rolled back. Audit-chain limitations and the absence of an independently stored trust anchor are documented in the installation design.
 - Registered catalog tools are not automatically installed, licensed, platform-compatible or fully tested. Check tool readiness and adapter support individually.
 - AI output is a proposal, not authorization, execution evidence or a verification verdict.
 
-## 6. How to resume work
+## 7. How to resume work
 
 1. Read the master roadmap from §0 and the OPEN release checklist in §38.
 2. Check current `main`, exact CI status and the latest UI/Engine v2 acceptance records.
