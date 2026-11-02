@@ -129,6 +129,11 @@ def _parser() -> argparse.ArgumentParser:
         "readiness", help="check durable workflow completion and reconciliation gates",
     )
     readiness.add_argument("--id", required=True)
+    evidence = plan_commands.add_parser(
+        "evidence", help="inspect persisted tool evidence linked to workflow attempts",
+    )
+    evidence.add_argument("--id", required=True)
+    evidence.add_argument("--limit", type=int, default=100)
     resources = plan_commands.add_parser(
         "resources", help="show measured workflow utilization and unavailable metrics",
     )
@@ -284,6 +289,12 @@ def main(args: list[str] | None = None) -> int:
             readiness = core.workflow_readiness(options.id)
             print(json.dumps(readiness, indent=2, sort_keys=True))
             return 0 if readiness["ready_to_report_success"] else 1
+        if options.command == "plan" and options.plan_command == "evidence":
+            print(json.dumps(
+                core.workflow_evidence(options.id, limit=options.limit),
+                indent=2, sort_keys=True,
+            ))
+            return 0
         if options.command == "plan" and options.plan_command == "resources":
             print(json.dumps(
                 core.workflow_resource_summary(options.id), indent=2, sort_keys=True,
