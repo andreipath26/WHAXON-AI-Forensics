@@ -2,11 +2,11 @@
 
 **Review date:** 2026-11-02
 **Repository:** `andreipath26/WHAXON-AI-Forensics` · **Inspected main:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`
-**Scope:** removal due diligence and retirement prerequisites, subordinate to the master roadmap P0–P8 and §38. **No files, runtime behavior, history or branches are removed by this register.**
+**Scope:** removal due diligence and retirement prerequisites, subordinate to the master roadmap P0–P8 and §38. **Execution update:** Batches A and B (23 non-runtime files) have now been removed after hash/reference checks. Runtime behavior, protected designs, Git history and branch refs are unchanged; Batch C and migration retirements remain pending.
 
 ## 1. Decision and evidence boundary
 
-There are **26 specific file candidates**: 23 non-runtime artifacts and three no-consumer runtime/research files. These are candidates for bounded cleanup, not evidence that all obsolete material has been found or that every candidate is interchangeable with its replacement. Ten of the 26 are exact loose UI duplicates; they alone occupy **3,594,129 bytes**. The root tool catalog, legacy interface, old execution paths, distinct UI variants, legal notices and proof records are **not safe unconditional deletions**.
+The baseline identified **26 specific file candidates**: 23 non-runtime artifacts and three no-consumer runtime/research files. These are candidates for bounded cleanup, not evidence that all obsolete material has been found or that every candidate is interchangeable with its replacement. Ten of the 26 are exact loose UI duplicates; they alone occupy **3,594,129 bytes**. The root tool catalog, legacy interface, old execution paths, distinct UI variants, legal notices and proof records are **not safe unconditional deletions**.
 
 The inspected tree contains **534 tracked files, 82 Markdown files, 294 Python files, 147 `tests/test_*.py` modules, 23 UI-v2 test modules, 32 supplied HTML files and 32 PNG files**. The HTML count includes five loose duplicate copies. No tracked `.db` file is present. Counts describe this baseline, not future HEADs.
 
@@ -59,7 +59,7 @@ The nine capture candidates, all under `web ui files and rendering/`, are:
 - `extracted_text_from_https_github.com_andreipath26_whaxon_commit.md`
 - `extracted_text_from_https_github.com_andreipath26_whaxon_commits_main.md`
 
-Their provenance remains in Git. Do not treat removal of imported page text as permission to remove supplied `code.html`, PNG or `obsidian_kinetic/DESIGN.md` inputs.
+These nine captures have been removed; their provenance remains in Git. Do not treat removal of imported page text as permission to remove supplied `code.html`, PNG or `obsidian_kinetic/DESIGN.md` inputs.
 
 ## 4. Batch C — no-consumer code/template/research candidates
 
@@ -77,7 +77,7 @@ Exact baseline identities for these candidates:
 | `src/whaxon/interfaces/web/templates/report.html` | 3,193 | `7eabe0b090ba64eafccd1b9771523a653cdbc8724d701efaade596c5bc9737dc` |
 | `data/tool_registry.json` | 17,223 | `649ad1ad946e8adafcbc29575e257ba91e99aaf9fd07365783c2fa26157a159f` |
 
-These are strong removal candidates after their checks, not permission to delete active GUI/report functionality. No local deletion or runtime test has been performed in this review.
+These are strong removal candidates after their checks, not permission to delete active GUI/report functionality. The three Batch C files remain present; no runtime test was performed locally. Batches A/B remove only non-runtime artifacts.
 
 ## 5. Batch D — migrate consumers before removing anything
 
@@ -192,8 +192,8 @@ For each diverged ref: identify associated PRs and merged/superseded decisions; 
 
 | Batch | Scope | Required validation before merge |
 |---|---|---|
-| A | Ten exact loose UI copies | Fresh hashes, named-original inventory, links, no design/template change, distribution resource comparison |
-| B | Thirteen stale non-runtime artifacts (nine captures, copied roadmap, release disclaimer, two exports) | Incoming-link repair, maintained authority/release statement retained, no runtime/package/resource delta |
+| A — removed | Ten exact loose UI copies | Fresh hashes, named-original inventory, links, no design/template change, distribution resource comparison |
+| B — removed | Thirteen stale non-runtime artifacts (nine captures, copied roadmap, release disclaimer, two exports) | Incoming-link repair, maintained authority/release statement retained, no runtime/package/resource delta |
 | C | Three no-consumer files | Public/dynamic-consumer review, GUI/report regressions for affected resources, catalog/research reconciliation, clean wheel/sdist inspection |
 | D1 | Root catalog consolidation | Migrate every consumer, preserve existing/custom runtime data, fresh CLI/TUI/API startup and relevant fixture/packaging regressions |
 | D2 | UI route/desktop retirement | Accepted `/ui-v2` desktop default, compatibility contract, route/navigation/browser tests; protected legacy source unchanged |

@@ -43,7 +43,7 @@ Remaining trajectory:
 
 ## Repository simplification
 
-The tracked baseline has **534 files, including 82 Markdown files**. The old 102-file count and claims that an experiment archive remains in the current tree are stale. [Due diligence](DOCUMENTATION_RECONCILIATION.md) distinguishes exact duplicate/no-consumer removals from dependency-bound retirement and retained design/evidence/legal resources. No files or branches are deleted by this documentation batch.
+The tracked baseline has **534 files, including 82 Markdown files**. The old 102-file count and claims that an experiment archive remains in the current tree are stale. [Due diligence](DOCUMENTATION_RECONCILIATION.md) distinguishes exact duplicate/no-consumer removals from dependency-bound retirement and retained design/evidence/legal resources. Cleanup now removes the 23 verified non-runtime superseded files; runtime and branch retirements remain gated.
 
 The 56 remote branches include main, ten other tips strictly behind it and 45 diverged tips. Retire only after exact-tip/reference checks; divergence needs content/PR reconciliation. Old branch tips are not merge instructions.
 

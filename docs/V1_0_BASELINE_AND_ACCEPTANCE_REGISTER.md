@@ -102,7 +102,7 @@ The provider bridge's allowlist and registered manifests are an initial slice. T
 
 ## 6. Repository cleanup and branch disposition
 
-[Due diligence](DOCUMENTATION_RECONCILIATION.md) is the exact removal/retirement register. This review makes no file or branch deletions. Byte-identical loose UI copies and unconsumed imports/exports differ from live compatibility paths, unique historical rationale, legal notices or retained evidence. Root `data/tools.json` still has test/runtime consumers; migration must precede removal. Distinct supplied designs and the legacy UI design remain preserved.
+[Due diligence](DOCUMENTATION_RECONCILIATION.md) is the exact removal/retirement register. Cleanup removes Batches A/B (23 non-runtime files); no runtime code or branches are deleted. Byte-identical loose UI copies and unconsumed imports/exports differ from live compatibility paths, unique historical rationale, legal notices or retained evidence. Root `data/tools.json` still has test/runtime consumers; migration must precede removal. Distinct supplied designs and the legacy UI design remain preserved.
 
 Remote comparison of all 55 non-main tips against the baseline found **10 strictly behind** and **45 diverged**. Strict ancestry containment proves no unique commits beyond main at that tip; it does not check external references or authorize deletion. Divergence can reflect squashed integration; it neither proves missing work nor safe deletion. Match PR contents and final files before retiring those tips. Do not merge old branches over current main merely because they are ahead. No pending PR merge was identified.
 

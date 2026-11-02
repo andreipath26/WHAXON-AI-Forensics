@@ -11,7 +11,7 @@ This is a dated implementation and acceptance audit, not a declaration that the 
 
 ## 1. Source-of-truth assets and preservation
 
-The checked-in design package contains 32 HTML files and 32 PNG files, plus `obsidian_kinetic/DESIGN.md`. The HTML/PNG set includes distinct versioned alternatives and ten byte-identical loose copies. Counts therefore do not mean 32 accepted workflows. The [due-diligence register](DOCUMENTATION_RECONCILIATION.md) separates safe duplicate-removal candidates from distinct supplied designs requiring canonical mapping; this review deletes neither. The production implementation consists of 22 `ui_v2_*.html` templates and 22 corresponding web routes.
+The checked-in design package contained 32 HTML files and 32 PNG files at the inspected baseline, plus `obsidian_kinetic/DESIGN.md`. The HTML/PNG set includes distinct versioned alternatives and ten byte-identical loose copies. Counts therefore do not mean 32 accepted workflows. The [due-diligence register](DOCUMENTATION_RECONCILIATION.md) separates safe duplicate-removal candidates from distinct supplied designs requiring canonical mapping; the cleanup removes the ten exact loose copies while retaining named originals and distinct alternatives. The production implementation consists of 22 `ui_v2_*.html` templates and 22 corresponding web routes.
 
 The new templates use the supplied Obsidian Kinetic visual system. The original `base.html`, `index.html`, `app.js`, `style.css`, and historical `docs/WEB_UI_INTERACTION_AUDIT.md` remain the deprecated interface/reference. They must not be redesigned, repurposed as the new UI, or overwritten as part of this work.
 

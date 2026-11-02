@@ -62,7 +62,7 @@ The complete previous roadmap remains available through the trajectory's pinned 
 
 [Supplied UI source](../web%20ui%20files%20and%20rendering/README.md) and its [design reference](../web%20ui%20files%20and%20rendering/obsidian_kinetic/DESIGN.md) govern visual fidelity. Production templates live in `src/whaxon/interfaces/web/templates/ui_v2_*.html`. Named source variants are not interchangeable until mapped.
 
-The same supplied folder contains loose duplicate files, imported `extracted_text_*.md` page captures, an old copied roadmap and an unissued release-note disclaimer. They remain pending disposition; they do not define current behavior or release identity. The [due-diligence register](DOCUMENTATION_RECONCILIATION.md) gives precise conditions for removal. Distinct source assets and legacy designs are preserved.
+Verified loose duplicates, imported page captures, the copied roadmap, unissued release-note disclaimer and static source/history exports have been removed. Named design originals remain unchanged. See the [disposition register](DOCUMENTATION_RECONCILIATION.md) for executed cleanup and remaining migration gates.
 
 Vendored [payload attribution](../src/whaxon/data/payloads/ATTRIBUTION.md) is a runtime/provenance resource. Payload presence does not establish validator support for every listed technique.
 

@@ -123,7 +123,7 @@ The old Route/session-host collection failure is **closed at this baseline**: `r
 
 ### P4 — Supplied UI integration and acceptance
 
-- Use the 22 current production routes/templates and named supplied designs. The package has 32 HTML and 32 PNG files; counts include loose duplicates and distinct alternatives, not 32 accepted product workflows.
+- Use the 22 current production routes/templates and named supplied designs. The baseline package contained 32 HTML and 32 PNG files. Cleanup removes five exact loose copies of each type, leaving 27 HTML and 27 PNG named inputs including distinct alternatives; counts are not accepted product workflows.
 - Complete one page/workflow at a time against real service contracts. Every visible control must be recorded as real, hidden or disabled with its endpoint, permission, loading/empty/error/progress/cancel/reconnect behavior and test. A passing route is not acceptance of all its controls.
 - Account for dashboard, scope, run, findings, report, reports, history, diagnostics, evidence, AI, retest, chains, adapters, settings, audit, monitoring, BAS, bounty, compliance, PTaaS, threat intelligence and approvals. Pages may present supported subsets; future capabilities stay inaccessible.
 - Run visual regression against approved supplied references, responsive checks, keyboard/focus/non-color/screen-reader acceptance, and CLI/API/UI service parity or documented deliberate differences.
@@ -183,7 +183,7 @@ Each addition needs source/license/version/platform, overlap/replacement, permis
 
 The repository name does not expand scope into forensic tooling. Preserve original exclusions: wireless/SDR/hardware, digital forensics, reverse engineering, malware analysis, social engineering, mobile-app pentesting, honeypots, unsupported commercial scanners without CLI parity, and unstructured protocol-attack tooling. No unapproved/non-consenting activity, automatic scope expansion or bypass of the deterministic executor. Retain existing explicitly approved session/transport scope; this list is not permission to broaden it.
 
-Safe removal is distinct from product retirement. The [disposition register](docs/DOCUMENTATION_RECONCILIATION.md) identifies exact duplicate/no-consumer candidates, dependency-bound removals, retained evidence/design/legal resources and migration gates. No runtime code, design source, evidence artifact or branch is deleted by this roadmap rewrite.
+Safe removal is distinct from product retirement. The [disposition register](docs/DOCUMENTATION_RECONCILIATION.md) identifies exact duplicate/no-consumer candidates, dependency-bound removals, retained evidence/design/legal resources and migration gates. Cleanup removes only verified loose copies and superseded non-runtime artifacts; named design originals, runtime code, evidence and branch refs remain intact.
 
 ## 38. Solo v1.0 release acceptance — OPEN
 
