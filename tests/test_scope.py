@@ -145,3 +145,41 @@ def test_runner_refuses_out_of_scope(scope_file):
 
     with pytest.raises(OutOfScopeError):
         asyncio.run(runner.run_tool("echo", "forbidden.com"))
+
+
+def test_execution_scope_fails_closed_for_dns_under_cidr_policy(scope_file, monkeypatch):
+    import socket
+
+    s = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["10.0.0.0/8"],
+        "out_of_scope": ["10.9.0.0/16"],
+    }))
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.1.2.3", 0))
+        ],
+    )
+    # The ordinary check is a DNS preflight only; it cannot bind the address
+    # that an arbitrary third-party scanner will use when it connects.
+    assert s.check("scan.acme.test").allowed is True
+    result = s.check_for_execution("https://scan.acme.test/")
+    assert result.allowed is False
+    assert "cannot be safely DNS-pinned" in result.reason
+
+
+def test_execution_scope_accepts_authorized_ip_literal(scope_file):
+    s = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["10.0.0.0/8"],
+    }))
+    assert s.check_for_execution("https://10.1.2.3/").allowed is True
+
+
+def test_execution_scope_accepts_explicit_hostname_only_policy(scope_file):
+    s = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["*.acme.test"],
+    }))
+    assert s.check_for_execution("https://scan.acme.test/").allowed is True

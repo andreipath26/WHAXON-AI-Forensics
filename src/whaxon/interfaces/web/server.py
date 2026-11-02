@@ -24,6 +24,13 @@ from whaxon.core.events import (
     JobStarted,
 )
 
+def _check_execution_scope(scope, target):
+    """Use the scope manager's DNS-safe execution gate when available."""
+    checker = getattr(scope, "check_for_execution", None)
+    return checker(target) if callable(checker) else scope.check(target)
+
+
+
 
 def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
@@ -558,7 +565,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         # Scope enforcement is mandatory. Web out-of-scope overrides are
         # disabled until an operator-confirmed, target-bound audit flow exists.
         try:
-            match = registry.core.scope.check(target)
+            match = _check_execution_scope(registry.core.scope, target)
         except Exception:
             # Authorization must fail closed: a broken scope engine must never
             # turn a target into an implicitly authorized one.
@@ -611,7 +618,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not target:
             return {"error": "target required; AI run was not started"}, 400
         try:
-            match = registry.core.scope.check(target)
+            match = _check_execution_scope(registry.core.scope, target)
         except Exception:
             app.logger.exception("Scope evaluation failed before AI run")
             return {"error": "scope evaluation failed; AI run was not started"}, 503
@@ -895,7 +902,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "session not found"}, 404
         if not isinstance(info, dict):
             return {"error": "session details are invalid; refusing to act"}, 503
-        host = info.get("target_host") or info.get("tunnel_peer") or info.get("host")
+        host = (
+            info.get("target_host") or info.get("session_host")
+            or info.get("tunnel_peer") or info.get("peer_host") or info.get("host")
+        )
         if not host:
             return {"error": "session host is unknown; refusing out-of-scope-capable action"}, 403
 
@@ -921,9 +931,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 "persisted_host": str(stored_host),
                 "live_host": str(host),
             }, 409
+        stored_type = str(stored.get("type") or "").strip().lower()
+        live_type = str(info.get("type") or "").strip().lower()
+        if stored_type and live_type and stored_type != live_type:
+            return {
+                "error": "Metasploit session type changed since it was persisted; refusing to act",
+                "persisted_type": stored_type,
+                "live_type": live_type,
+            }, 409
 
         try:
-            match = registry.core.scope.check(str(host))
+            match = _check_execution_scope(registry.core.scope, str(host))
         except Exception:
             app.logger.exception("Scope evaluation failed for Metasploit session host")
             return {"error": "scope evaluation failed; action was not performed"}, 503
@@ -1035,7 +1053,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return {"error": "an explicit in-scope target (RHOST/RHOSTS) is required"}, 400
         for cand in candidates:
             try:
-                match = registry.core.scope.check(cand)
+                match = _check_execution_scope(registry.core.scope, cand)
             except Exception:
                 app.logger.exception("Scope evaluation failed for Metasploit target")
                 return {"error": "scope evaluation failed; no job was started"}, 503
@@ -1253,7 +1271,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         target = (data.get("target") or "").strip()
         if not target:
             return {"error": "target required"}, 400
-        match = registry.core.scope.check(target)
+        match = _check_execution_scope(registry.core.scope, target)
         return jsonify(match.to_dict())
 
     @app.post("/api/scope/override")
@@ -1272,7 +1290,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not target_url:
             return {"error": "finding has no target URL; replay was not attempted"}, 400
         try:
-            match = registry.core.scope.check(target_url)
+            match = _check_execution_scope(registry.core.scope, target_url)
         except Exception:
             app.logger.exception("Scope evaluation failed before validation replay")
             return {"error": "scope evaluation failed; replay was not attempted"}, 503
@@ -1557,7 +1575,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if session_error:
             return session_error
         try:
-            match = registry.core.scope.check(rhost)
+            match = _check_execution_scope(registry.core.scope, rhost)
         except Exception:
             app.logger.exception("Scope evaluation failed for port-forward destination")
             return {"error": "scope evaluation failed; port forward was not created"}, 503

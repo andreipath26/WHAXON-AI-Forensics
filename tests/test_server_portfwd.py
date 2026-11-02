@@ -45,7 +45,17 @@ def _make_app(tmp_path, monkeypatch):
     monkeypatch.delenv("WHAXON_AUTH_USER", raising=False)
     monkeypatch.delenv("WHAXON_AUTH_PASS_HASH", raising=False)
     core = Core(data_dir=tmp_path)
-    monkeypatch.setattr(core, "msf", _FakeMSF())
+    fake_msf = _FakeMSF()
+    monkeypatch.setattr(core, "msf", fake_msf)
+    # The API now requires a persisted open identity as well as a live RPC
+    # session; mirror the tracker state used by production.
+    for session_id, info in fake_msf.sessions().items():
+        core.store.upsert_session(
+            str(session_id),
+            str(info.get("target_host") or "?"),
+            str(info.get("type") or "?"),
+            info,
+        )
     registry = JobRegistry(core)
     runner = AsyncRunner(core)
     app = create_app(core, registry, runner)

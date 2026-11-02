@@ -328,3 +328,16 @@ def test_msf_exec_accepts_matching_persisted_identity(tmp_path, monkeypatch):
     )
     assert response.status_code == 200
     assert fake.exec_calls == [("1", "id", 15.0)]
+
+
+def test_msf_exec_rejects_session_type_drift(tmp_path, monkeypatch):
+    fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
+    app, _ = _make_app(tmp_path, monkeypatch, fake)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "meterpreter"}}
+    response = app.test_client().post(
+        "/api/msf/sessions/1/exec", json={"command": "id"}
+    )
+    assert response.status_code == 409
+    assert "type changed" in response.get_json()["error"]
+    assert fake.exec_calls == []

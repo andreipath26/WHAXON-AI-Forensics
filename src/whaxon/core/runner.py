@@ -62,6 +62,14 @@ class ToolRunner:
         """Bind persisted session metadata used for dispatch-time authorization."""
         self._session_lookup = lookup
 
+    def _check_execution_scope(self, target: str):
+        if self._scope is None:
+            return None
+        checker = getattr(self._scope, "check_for_execution", None)
+        if callable(checker):
+            return checker(target)
+        return self._scope.check(target)
+
     @staticmethod
     def _session_host(value: object) -> str:
         """Extract a host from an MSF peer/host field without retaining its port."""
@@ -90,7 +98,7 @@ class ToolRunner:
         if not host:
             raise ValueError(f"cannot authorize Metasploit session: {source} host is missing")
         if self._scope is not None:
-            match = self._scope.check(host)
+            match = self._check_execution_scope(host)
             if not match.allowed:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         return host
@@ -247,7 +255,7 @@ class ToolRunner:
         OutOfScopeError unless allow_out_of_scope=True.
         """
         if self._scope is not None:
-            match = self._scope.check(target)
+            match = self._check_execution_scope(target)
             if not match.allowed and not allow_out_of_scope:
                 from .events import CoverageSkipped
                 jid = job_id or uuid.uuid4().hex[:12]
@@ -324,7 +332,7 @@ class ToolRunner:
         # engagement scope tightened while route discovery or argv preparation
         # was in progress; the initial check above remains the early gate.
         if self._scope is not None:
-            final_match = self._scope.check(target)
+            final_match = self._check_execution_scope(target)
             if not final_match.allowed:
                 if not allow_out_of_scope:
                     from .events import CoverageSkipped
@@ -434,7 +442,7 @@ class ToolRunner:
         ):
             return "[error] invalid SMB session identity or command"
         if self._scope is not None:
-            match = self._scope.check(host)
+            match = self._check_execution_scope(host)
             if not match.allowed:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         password = _os.environ.get("WHAXON_SMB_PASS", "")
@@ -511,7 +519,7 @@ class ToolRunner:
         ):
             return "[error] invalid WMI session identity"
         if self._scope is not None:
-            match = self._scope.check(host)
+            match = self._check_execution_scope(host)
             if not match.allowed:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         password = _os.environ.get("WHAXON_WMI_PASS") or _os.environ.get("WHAXON_SMB_PASS", "")
@@ -573,7 +581,7 @@ class ToolRunner:
                 user_host, port = head, tail
         host = user_host.split("@", 1)[-1]
         if self._scope is not None:
-            match = self._scope.check(host)
+            match = self._check_execution_scope(host)
             if not match.allowed:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         argv = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", "-o", "StrictHostKeyChecking=accept-new"]

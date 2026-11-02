@@ -399,3 +399,33 @@ class ScopeManager:
             return ScopeMatch(True, "all resolved addresses match in-scope rules", matched)
 
         return ScopeMatch(False, "no matching in-scope rule for host or resolved addresses", "")
+
+    def check_for_execution(self, raw_target: str) -> ScopeMatch:
+        """Authorize a network target without relying on a second DNS lookup.
+
+        Generic external tools resolve hostnames themselves, so a preflight
+        getaddrinfo() check cannot pin the address used at connect time. Until
+        a provider has an explicit pinned-address transport, fail closed for
+        hostname targets whenever the engagement policy contains IP/CIDR
+        rules. Operators can pass the authorized IP literal, or use an
+        explicit hostname-only policy where no IP/CIDR boundary is defined.
+        """
+        checked = self.check(raw_target)
+        if not checked.allowed or not self._enabled:
+            return checked
+        host, _kind = _normalize_target(raw_target)
+        try:
+            ipaddress.ip_address(host)
+            is_ip_literal = True
+        except ValueError:
+            is_ip_literal = False
+        if not is_ip_literal and any(
+            _is_ip_rule(rule) for rule in (*self._in, *self._out)
+        ):
+            return ScopeMatch(
+                False,
+                "hostname execution cannot be safely DNS-pinned under IP/CIDR scope; use an authorized IP literal",
+                host,
+            )
+        return checked
+
