@@ -277,7 +277,7 @@ def test_global_cidr_scope_rule_emits_high_blast_radius_warning(
     "http://[not-an-ipv6]/",
     "http://[::1",
     "http://bad host.example/",
-    "127.0.0.1\\nmalicious",
+    "127.0.0.1\nmalicious",
 ])
 def test_malformed_url_authority_fails_closed(tmp_path: Path, target: str) -> None:
     """Malformed target URLs must not crash or bypass scope authorization."""
