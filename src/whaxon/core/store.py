@@ -49,6 +49,17 @@ CREATE TABLE IF NOT EXISTS workflow_tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_workflow_tasks_plan ON workflow_tasks(plan_id);
 CREATE TABLE IF NOT EXISTS capability_manifests (capability_id TEXT NOT NULL, provider_id TEXT NOT NULL, provider_version TEXT NOT NULL, fingerprint TEXT NOT NULL, manifest_json TEXT NOT NULL, registered_at REAL NOT NULL, PRIMARY KEY (capability_id, provider_id, provider_version));
+CREATE TABLE IF NOT EXISTS workflow_approvals (
+    approval_id TEXT PRIMARY KEY,
+    plan_id TEXT NOT NULL,
+    task_key TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    policy_version TEXT NOT NULL,
+    binding_json TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    revoked_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_approvals_plan ON workflow_approvals(plan_id, task_key);
 CREATE TABLE IF NOT EXISTS workflow_rate_limits (
     plan_id TEXT PRIMARY KEY,
     min_spacing_s REAL NOT NULL,
@@ -949,6 +960,186 @@ class JobStore:
                 raise
             finally:
                 c.close()
+
+    def grant_workflow_approval(
+        self, plan_id, task_key, approval_id, actor, *, expires_at,
+        policy_version="policy.v1",
+    ):
+        """Persist attributable consent bound to the immutable task and plan.
+
+        Recording consent does not grant execution permission. Scope and provider
+        policy are independently checked at each dispatch boundary.
+        """
+        from dataclasses import asdict
+        from .workflow import ApprovalBinding, WorkflowPlan
+
+        import math
+
+        for name, item in (
+            ("approval_id", approval_id), ("actor", actor),
+            ("policy_version", policy_version), ("task_key", task_key),
+        ):
+            if not isinstance(item, str) or not item.strip():
+                raise ValueError(f"{name} must be a nonempty string")
+        if (
+            isinstance(expires_at, bool) or not isinstance(expires_at, (int, float))
+            or not math.isfinite(expires_at) or expires_at <= time.time()
+        ):
+            raise ValueError("approval expiry must be finite and in the future")
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                row = c.execute(
+                    "SELECT p.plan_json, p.digest, p.status FROM workflow_plans p "
+                    "WHERE p.id=?", (plan_id,),
+                ).fetchone()
+                if row is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                if row["status"] == "cancel_requested":
+                    raise ValueError("workflow cancellation requested")
+                plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+                matching = [task for task in plan.tasks if task.id == task_key]
+                if not matching:
+                    raise ValueError(f"unknown workflow task: {task_key}")
+                task = matching[0]
+                binding = ApprovalBinding(
+                    plan_digest=row["digest"], task_id=task_key,
+                    target=task.target, input_digest=ApprovalBinding.digest_inputs(task.inputs),
+                    policy_version=policy_version, expires_at=float(expires_at),
+                    permissions=task.permissions, impact=task.impact,
+                )
+                encoded = json.dumps(asdict(binding), sort_keys=True)
+                existing = c.execute(
+                    "SELECT plan_id, task_key, actor, policy_version, binding_json, revoked_at "
+                    "FROM workflow_approvals WHERE approval_id=?", (approval_id,),
+                ).fetchone()
+                if existing:
+                    if (
+                        existing["plan_id"] != plan_id
+                        or existing["task_key"] != task_key
+                        or existing["actor"] != actor
+                        or existing["policy_version"] != policy_version
+                        or existing["binding_json"] != encoded
+                        or existing["revoked_at"] is not None
+                    ):
+                        raise ValueError("approval id is immutable or has been revoked")
+                    c.execute("COMMIT")
+                    return False
+                c.execute(
+                    "INSERT INTO workflow_approvals "
+                    "(approval_id, plan_id, task_key, actor, policy_version, binding_json, created_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (approval_id, plan_id, task_key, actor, policy_version, encoded, now),
+                )
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id, task_ref, event_type, detail_json, at) "
+                    "VALUES (?, (SELECT id FROM workflow_tasks WHERE plan_id=? AND task_key=?), "
+                    "'approval_granted', ?, ?)",
+                    (plan_id, plan_id, task_key,
+                     json.dumps({"approval_id": approval_id, "actor": actor}), now),
+                )
+                c.execute("COMMIT")
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def revoke_workflow_approval(self, plan_id, approval_id, *, actor):
+        """Durably revoke a consent record; revocation is non-reversible."""
+        if not isinstance(actor, str) or not actor.strip():
+            raise ValueError("revoking actor is required")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                approval = c.execute(
+                    "SELECT task_key FROM workflow_approvals WHERE plan_id=? AND approval_id=?",
+                    (plan_id, approval_id),
+                ).fetchone()
+                if approval is None:
+                    raise ValueError(f"unknown workflow approval: {approval_id}")
+                now = time.time()
+                changed = c.execute(
+                    "UPDATE workflow_approvals SET revoked_at=? "
+                    "WHERE plan_id=? AND approval_id=? AND revoked_at IS NULL",
+                    (now, plan_id, approval_id),
+                )
+                if changed.rowcount:
+                    c.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id, task_ref, event_type, detail_json, at) "
+                        "VALUES (?, (SELECT id FROM workflow_tasks "
+                        "WHERE plan_id=? AND task_key=?), 'approval_revoked', ?, ?)",
+                        (plan_id, plan_id, approval["task_key"],
+                         json.dumps({"approval_id": approval_id, "actor": actor}), now),
+                    )
+                c.execute("COMMIT")
+                return changed.rowcount > 0
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def list_workflow_approvals(self, plan_id):
+        """List consent metadata without exposing bound task inputs."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            rows = c.execute(
+                "SELECT approval_id, task_key, actor, policy_version, "
+                "created_at, revoked_at, binding_json FROM workflow_approvals "
+                "WHERE plan_id=? ORDER BY created_at, approval_id", (plan_id,),
+            ).fetchall()
+            return [{
+                "approval_id": row["approval_id"], "task_key": row["task_key"],
+                "actor": row["actor"], "policy_version": row["policy_version"],
+                "created_at": row["created_at"], "revoked_at": row["revoked_at"],
+                "expires_at": json.loads(row["binding_json"])["expires_at"],
+            } for row in rows]
+        finally:
+            c.close()
+
+    def has_valid_workflow_approval(self, plan_id, task_key, *, policy_version="policy.v1"):
+        """Validate unrevoked, unexpired consent against current canonical plan."""
+        from .workflow import ApprovalBinding, WorkflowPlan
+
+        c = self._conn()
+        try:
+            row = c.execute(
+                "SELECT digest, plan_json, status FROM workflow_plans WHERE id=?", (plan_id,),
+            ).fetchone()
+            if row is None or row["status"] == "cancel_requested":
+                return False
+            plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+            task = next((task for task in plan.tasks if task.id == task_key), None)
+            if task is None:
+                return False
+            approvals = c.execute(
+                "SELECT binding_json FROM workflow_approvals "
+                "WHERE plan_id=? AND task_key=? AND policy_version=? AND revoked_at IS NULL",
+                (plan_id, task_key, policy_version),
+            ).fetchall()
+            for approval in approvals:
+                value = json.loads(approval["binding_json"])
+                value["permissions"] = tuple(value.get("permissions") or ())
+                binding = ApprovalBinding(**value)
+                if binding.is_valid(
+                    plan_digest=row["digest"], task=task,
+                    policy_version=policy_version, now=time.time(),
+                ):
+                    return True
+            return False
+        finally:
+            c.close()
 
     def set_workflow_rate_limit(self, plan_id, *, min_spacing_s):
         """Persist the minimum spacing between claims, without loosening bounds."""

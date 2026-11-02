@@ -61,6 +61,17 @@ class _FakeCore:
         self.reconciled = (plan_id, stale_after_s)
         return 2
 
+    def grant_workflow_approval(
+        self, plan_id, task_key, approval_id, actor, *, expires_at, policy_version="policy.v1",
+    ):
+        return True
+
+    def revoke_workflow_approval(self, plan_id, approval_id, *, actor):
+        return True
+
+    def workflow_approvals(self, plan_id):
+        return [{"approval_id": "approved-1", "task_key": "scan", "actor": "operator"}]
+
     def configure_workflow_rate_limit(self, plan_id, *, min_spacing_s):
         self.rate_limit = (plan_id, min_spacing_s)
 
@@ -211,3 +222,22 @@ def test_workflow_cli_readiness_fails_closed(monkeypatch, capsys):
     monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
     assert workflow_cmd.main(["plan", "readiness", "--id", "p"]) == 1
     assert json.loads(capsys.readouterr().out)["ready_to_report_success"] is False
+
+
+def test_workflow_cli_approval_workflows(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "approval", "grant", "--id", "p", "--task", "scan",
+        "--approval-id", "approved-1", "--actor", "operator",
+        "--expires-at", "2000000000",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["created"] is True
+    assert workflow_cmd.main([
+        "plan", "approval", "list", "--id", "p",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["actor"] == "operator"
+    assert workflow_cmd.main([
+        "plan", "approval", "revoke", "--id", "p",
+        "--approval-id", "approved-1", "--actor", "operator",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out)["revoked"] is True

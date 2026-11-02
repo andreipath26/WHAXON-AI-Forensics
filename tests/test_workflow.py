@@ -986,3 +986,55 @@ def test_workflow_readiness_no_premature_success(tmp_path):
     status = store.get_workflow_readiness("p")
     assert status["complete"] is False
     assert status["ready_to_report_success"] is False
+
+
+def test_workflow_approval_is_durable_exact_bound_and_revocable(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+
+    path = tmp_path / "approvals.db"
+    store = JobStore(path)
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    expiry = time.time() + 300
+    assert store.grant_workflow_approval(
+        "p", "recon", "approval-1", "operator", expires_at=expiry,
+    ) is True
+    reopened = JobStore(path)
+    assert reopened.has_valid_workflow_approval("p", "recon")
+    assert not reopened.has_valid_workflow_approval("p", "web")
+    assert not reopened.has_valid_workflow_approval("p", "recon", policy_version="policy.v2")
+    assert len(reopened.list_workflow_approvals("p")) == 1
+    assert reopened.grant_workflow_approval(
+        "p", "recon", "approval-1", "operator", expires_at=expiry,
+    ) is False
+    with pytest.raises(ValueError, match="immutable"):
+        reopened.grant_workflow_approval(
+            "p", "recon", "approval-1", "different-actor", expires_at=expiry,
+        )
+    assert reopened.revoke_workflow_approval("p", "approval-1", actor="operator")
+    assert not reopened.has_valid_workflow_approval("p", "recon")
+    assert not reopened.revoke_workflow_approval("p", "approval-1", actor="operator")
+    assert [event["event_type"] for event in store.list_workflow_events("p")] == [
+        "approval_granted", "approval_revoked",
+    ]
+
+
+def test_workflow_approval_rejects_expired_and_cancelled_plan(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "approval-invalid.db")
+    store.create_mission("mission-1", "objective")
+    store.save_workflow_plan("p", _plan())
+    with pytest.raises(ValueError, match="future"):
+        store.grant_workflow_approval(
+            "p", "recon", "approval-expired", "operator", expires_at=time.time() - 1,
+        )
+    store.request_workflow_cancellation("p")
+    with pytest.raises(ValueError, match="cancellation"):
+        store.grant_workflow_approval(
+            "p", "recon", "approval-cancelled", "operator", expires_at=time.time() + 300,
+        )

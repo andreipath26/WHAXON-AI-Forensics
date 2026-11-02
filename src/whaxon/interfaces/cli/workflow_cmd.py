@@ -61,6 +61,22 @@ def _parser() -> argparse.ArgumentParser:
 
     plan = commands.add_parser("plan", help="manage persisted workflow plans")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
+    approval = plan_commands.add_parser(
+        "approval", help="inspect and manage attributable task approvals",
+    )
+    approval_commands = approval.add_subparsers(dest="approval_command", required=True)
+    approval_list = approval_commands.add_parser("list", help="list approvals")
+    approval_list.add_argument("--id", required=True, help="plan identifier")
+    approval_grant = approval_commands.add_parser("grant", help="persist bounded consent")
+    approval_grant.add_argument("--id", required=True)
+    approval_grant.add_argument("--task", required=True)
+    approval_grant.add_argument("--approval-id", required=True)
+    approval_grant.add_argument("--actor", required=True)
+    approval_grant.add_argument("--expires-at", type=float, required=True)
+    approval_revoke = approval_commands.add_parser("revoke", help="revoke task consent")
+    approval_revoke.add_argument("--id", required=True)
+    approval_revoke.add_argument("--approval-id", required=True)
+    approval_revoke.add_argument("--actor", required=True)
     save = plan_commands.add_parser("save", help="validate and persist a JSON workflow plan")
     save.add_argument("--id", required=True, help="immutable persisted plan identifier")
     save.add_argument("--file", required=True, type=Path, help="JSON file containing a WorkflowPlan")
@@ -139,6 +155,25 @@ def main(args: list[str] | None = None) -> int:
                 core.mission_workflow_plans(options.id), indent=2, sort_keys=True,
             ))
             return 0
+        if options.command == "plan" and options.plan_command == "approval":
+            if options.approval_command == "list":
+                print(json.dumps(
+                    core.workflow_approvals(options.id), indent=2, sort_keys=True,
+                ))
+                return 0
+            if options.approval_command == "grant":
+                created = core.grant_workflow_approval(
+                    options.id, options.task, options.approval_id, options.actor,
+                    expires_at=options.expires_at,
+                )
+                print(json.dumps({"approval_id": options.approval_id, "created": created}))
+                return 0
+            if options.approval_command == "revoke":
+                revoked = core.revoke_workflow_approval(
+                    options.id, options.approval_id, actor=options.actor,
+                )
+                print(json.dumps({"approval_id": options.approval_id, "revoked": revoked}))
+                return 0
         if options.command == "plan" and options.plan_command == "save":
             raw = json.loads(options.file.read_text(encoding="utf-8"))
             workflow = WorkflowPlan.from_dict(raw)

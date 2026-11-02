@@ -156,6 +156,21 @@ class Core:
         """Create a durable Engine v2 mission through the shared Core service."""
         return self.store.create_mission(mission_id, objective, metadata)
 
+    def grant_workflow_approval(
+        self, plan_id: str, task_key: str, approval_id: str, actor: str,
+        *, expires_at: float, policy_version: str = "policy.v1",
+    ):
+        return self.store.grant_workflow_approval(
+            plan_id, task_key, approval_id, actor,
+            expires_at=expires_at, policy_version=policy_version,
+        )
+
+    def revoke_workflow_approval(self, plan_id: str, approval_id: str, *, actor: str):
+        return self.store.revoke_workflow_approval(plan_id, approval_id, actor=actor)
+
+    def workflow_approvals(self, plan_id: str):
+        return self.store.list_workflow_approvals(plan_id)
+
     def configure_workflow_rate_limit(self, plan_id: str, *, min_spacing_s: float):
         return self.store.set_workflow_rate_limit(plan_id, min_spacing_s=min_spacing_s)
 
