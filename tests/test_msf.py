@@ -149,6 +149,7 @@ def test_msf_execute_polls_for_job_without_fixed_wait(monkeypatch):
 
 def test_verified_rpc_transport_uses_default_certificate_validation(monkeypatch):
     import requests
+
     from whaxon.core.msf import _verified_rpc_post
 
     captured = {}
