@@ -1189,9 +1189,9 @@ def test_mission_wide_attempt_cap_applies_across_independent_plans(tmp_path):
     path = tmp_path / "mission-budget.db"
     store = JobStore(path)
     store.create_mission("m", "controlled")
-    for plan_id in ("p1", "p2"):
+    for plan_id, target in (("p1", "192.0.2.10"), ("p2", "192.0.2.12")):
         store.save_workflow_plan(plan_id, WorkflowPlan("m", (
-            WorkflowTask("scan", "fixture", "192.0.2.10"),
+            WorkflowTask("scan", "fixture", target),
         )))
     store.set_mission_execution_limits("m", max_total_attempts=1, max_concurrency=1)
     first = store.claim_ready_workflow_task("p1", "worker-1")
@@ -1212,9 +1212,9 @@ def test_mission_concurrency_cap_releases_after_completed_attempt(tmp_path):
 
     store = JobStore(tmp_path / "mission-concurrency.db")
     store.create_mission("m", "controlled")
-    for plan_id in ("p1", "p2"):
+    for plan_id, target in (("p1", "192.0.2.11"), ("p2", "192.0.2.13")):
         store.save_workflow_plan(plan_id, WorkflowPlan("m", (
-            WorkflowTask("scan", "fixture", "192.0.2.11"),
+            WorkflowTask("scan", "fixture", target),
         )))
     store.set_mission_execution_limits("m", max_total_attempts=3, max_concurrency=1)
     first = store.claim_ready_workflow_task("p1", "worker")
