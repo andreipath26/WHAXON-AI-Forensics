@@ -2405,7 +2405,7 @@ class JobStore:
                     c.execute(
                         "INSERT INTO workflow_events "
                         "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
-                        "VALUES (?, ?, ?, 'task_claimed', ?, ?)"
+                        "VALUES (?, ?, ?, 'task_claimed', ?, ?)",
                         (plan_id, row["id"], attempt_id,
                          json.dumps({"worker_id": worker_id, "attempt_no": attempt_no}), now),
                     )
