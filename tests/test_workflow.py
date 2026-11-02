@@ -1065,3 +1065,20 @@ async def test_scheduler_does_not_claim_failed_retryable_workflow_complete(tmp_p
     second = await scheduler.run("p", max_tasks=1, max_attempts=2)
     assert second["attempts"] == 1
     assert second["complete"] is True
+
+
+def test_durable_progress_does_not_mark_retryable_failure_complete(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "retry-progress.db")
+    store.create_mission("m", "controlled test")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("only", "fixture", "192.0.2.10"),
+    )))
+    attempt = store.claim_ready_workflow_task("p", "worker")
+    store.finish_task_attempt(attempt["attempt_id"], "failed")
+    progress = store.get_workflow_progress("p")
+    assert progress["counts"]["failed"] == 1
+    assert progress["terminal_tasks"] == 0
+    assert progress["complete"] is False

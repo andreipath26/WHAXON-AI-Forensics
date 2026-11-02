@@ -1660,8 +1660,10 @@ class JobStore:
             concurrency = limits["max_concurrency"] if limits else 4
             counts = {row["status"]: row["n"] for row in rows}
             total = sum(counts.values())
+            # A failed task may still be retryable; without the caller's retry
+            # policy persisted here it must never count as verified complete.
             terminal = sum(counts.get(status, 0) for status in (
-                "succeeded", "failed", "blocked", "cancelled", "uncertain",
+                "succeeded", "blocked", "cancelled", "uncertain",
             ))
             return {
                 "plan_id": plan_id,
