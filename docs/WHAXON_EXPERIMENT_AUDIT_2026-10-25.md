@@ -1,6 +1,6 @@
 # WHAXON experiment audit — 2026-10-25
 
-> **Historical evidence record.** This audit describes a dated experiment snapshot. Its CI references, implementation claims and recommendations are not automatically current on 2026-11-02. Re-check source, tests, current CI and master roadmap before using any status statement as present-day evidence. The experiment evidence directory is not modified by this documentation update.
+> **Historical evidence record.** This audit describes a dated experiment snapshot. Its CI references, implementation claims and recommendations are not automatically current on 2026-11-02. Re-check source, tests, current CI and master roadmap before using any status statement as present-day evidence. The experiment evidence is retained as a historical record. The exposed value in `evidence/whaxon-run/whaxon.env` has since been blanked in the current main-branch tree; the other experiment captures and database artefacts were not rewritten. Git history may still contain the earlier blob.
 
 **Purpose:** translate the read-only `whaxon-experiment-2026-10-25/` evidence into current WHAXON engineering and release actions.
 
@@ -56,13 +56,13 @@ This is loopback evidence, not evidence of 3,473 requests to the public target. 
 
 ### E-A5 — The evidence package contains a plaintext lab credential
 
-`evidence/whaxon-run/whaxon.env` includes `WHAXON_MSF_USER=msf` and `WHAXON_MSF_PASS=test123`. The surrounding comments say these lab variables are not read by WHAXON, and the configuration disables the related auto-chain. This appears to be a lab/default credential rather than proof of a production secret, but it is still a plaintext credential in a public repository and conflicts with a strict “credentials are never stored” publication policy.
+`evidence/whaxon-run/whaxon.env` includes `WHAXON_MSF_USER=msf` and `WHAXON_MSF_PASS=[REDACTED]`. The surrounding comments say these lab variables are not read by WHAXON, and the configuration disables the related auto-chain. This appears to be a lab/default credential rather than proof of a production secret, but it is still a plaintext credential in a public repository and conflicts with a strict “credentials are never stored” publication policy.
 
-**Constraint respected:** this file has not been modified because the experiment directory is explicitly protected. For a later, separately authorised evidence-publication cleanup, replace lab credentials with inert placeholders or move them to an untracked local environment file; do not reuse this value outside the disposable lab.
+**Current-tree correction:** the password field in this tracked environment file has been blanked in the current main-branch tree. This does not revoke a credential and does not erase historical Git objects. If the value was real, reused or could access a live service, rotate it at the service; do not rely on repository redaction as remediation.
 
 ### E-A6 — Raw target responses are more sensitive than the “public-safe” label suggests
 
-The folder contains raw responses including `/etc/passwd` output, command-injection output, phpinfo details, application paths and configuration metadata. The redaction manifest specifically documents session-ID redaction in four artefacts; that is not the same as a full secret/PII review of every raw response. No obvious live PHP session ID was detected in the textual artefacts inspected, but the raw phpinfo and passwd bodies remain detailed operational disclosures about a third-party hosted practice instance.
+The remaining experiment folder contains raw responses including `/etc/passwd` output, command-injection output, phpinfo details, application paths and configuration metadata. The redaction manifest specifically documents session-ID redaction in four artefacts; that is not the same as a full secret/PII review of every raw response. No obvious live PHP session ID was detected in the textual artefacts inspected, but the raw phpinfo and passwd bodies remain detailed operational disclosures about a third-party hosted practice instance.
 
 **Constraint respected:** none of the evidence was edited. Before future publication of live-target captures, run a broader secret/PII review and confirm the target owner's disclosure expectations. Prefer minimal excerpts for public reports and retain raw captures in a controlled evidence store when appropriate.
 
@@ -74,7 +74,7 @@ The experiment's `docs/scope-and-rules.md` explicitly says there were no written
 
 ### E-A9 — The evidence redaction/provenance claims are internally inconsistent
 
-The experiment's `logs/publication-log.md` says no credentials were written and the manifest's sanitisation section says no credential values were present, but the tracked `evidence/whaxon-run/whaxon.env` contains `WHAXON_MSF_PASS=test123`. This is a lab/default credential, not evidence of a production password, but the absolute publication claim is not accurate.
+The experiment's `logs/publication-log.md` says no credentials were written and the manifest's sanitisation section says no credential values were present, but the tracked `evidence/whaxon-run/whaxon.env` contains `WHAXON_MSF_PASS=[REDACTED]`. This is a lab/default credential, not evidence of a production password, but the absolute publication claim is not accurate.
 
 There is also a separate `evidence/whaxon-run/redactions.json` entry claiming three database redactions while recording identical before/after SHA-256 values for `whaxon.db`. The database could not be opened with the available GitHub text reader, so the underlying content was not independently checked. The identical hashes make the claimed redaction unverifiable from the published record and may indicate that SQLite/WAL state or hash accounting was handled incorrectly.
 

@@ -1,3 +1,5 @@
+> **Operator guide, not the latest implementation inventory (reviewed 2026-11-02).** This page summarizes dependency readiness commands and policy. The more complete implementation and acceptance record is [first-run-installation-redesign.md](first-run-installation-redesign.md); use that record and current source/CI for the current feature boundary and release status.
+
 # Dependency readiness and guided installation
 
 ## Scope and status
