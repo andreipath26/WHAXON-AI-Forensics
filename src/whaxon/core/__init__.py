@@ -290,6 +290,11 @@ class Core:
         # The network-execution gate is stricter than a UI scope preview:
         # DNS-rebinding-prone hostnames must not be authorized under CIDR scope.
         try:
+            # Scope may be revoked by another CLI/server process. Refresh the
+            # persisted policy at each decision; malformed updates fail closed.
+            reload_scope = getattr(self.scope, "load", None)
+            if callable(reload_scope):
+                reload_scope()
             execution_check = getattr(self.scope, "check_for_execution", None)
             if not callable(execution_check):
                 execution_check = self.scope.check

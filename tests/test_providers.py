@@ -333,3 +333,34 @@ def test_engine_v2_scheduler_uses_plan_bound_approval_instead_of_scope_only(tmp_
     result = asyncio.run(scheduler.run("p"))
     assert dispatched == []
     assert result["tasks"] == [{"id": "scan", "status": "blocked"}]
+
+
+def test_engine_v2_scope_revocation_from_another_process_takes_effect(tmp_path):
+    import json
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+    from whaxon.core.scope import ScopeManager
+
+    scope_path = tmp_path / "scope.json"
+    scope_path.write_text(json.dumps({
+        "enabled": True, "engagement": "test",
+        "in_scope": ["lab.example"], "out_of_scope": [],
+    }), encoding="utf-8")
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.fixture", provider_id="whaxon.adapter.fixture",
+        provider_version="catalog-v1", transports=("local_process",),
+        permissions=(), impact="low",
+    ))
+    core.scope = ScopeManager(scope_path)
+    task = WorkflowTask("scan", "tool.fixture", "lab.example", impact="low")
+    assert core.authorize_workflow_task(task) is True
+    scope_path.write_text(json.dumps({
+        "enabled": True, "engagement": "test",
+        "in_scope": ["lab.example"], "out_of_scope": ["lab.example"],
+    }), encoding="utf-8")
+    assert core.authorize_workflow_task(task) is False
+    scope_path.write_text("{invalid", encoding="utf-8")
+    assert core.authorize_workflow_task(task) is False
