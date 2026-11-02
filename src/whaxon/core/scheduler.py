@@ -29,6 +29,34 @@ class WorkflowScheduler:
         self.dispatch = dispatch
         self.worker_id = worker_id
 
+    async def _invoke(self, callback, task: WorkflowTask, deadline: float):
+        """Invoke sync or async policy/provider code within one task deadline.
+
+        Synchronous callbacks run off-loop so lease heartbeats and other tasks
+        continue while they work. A timed-out thread cannot be force-killed;
+        dispatch timeout is therefore recorded as uncertain, never replayed
+        as if cancellation had stopped an external effect.
+        """
+        loop = asyncio.get_running_loop()
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise TimeoutError
+        is_async = inspect.iscoroutinefunction(callback) or inspect.iscoroutinefunction(
+            getattr(callback, "__call__", None)
+        )
+        if is_async:
+            result = callback(task)
+        else:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(callback, task), timeout=remaining,
+            )
+        if inspect.isawaitable(result):
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                raise TimeoutError
+            return await asyncio.wait_for(result, timeout=remaining)
+        return result
+
     async def _heartbeat(self, attempt_id: str, interval: float, lost: asyncio.Event) -> None:
         while True:
             await asyncio.sleep(interval)
@@ -57,11 +85,10 @@ class WorkflowScheduler:
         heartbeat = asyncio.create_task(
             self._heartbeat(attempt_id, heartbeat_interval, lease_lost),
         )
+        deadline = asyncio.get_running_loop().time() + task.timeout_s
         try:
             try:
-                authorized = self.authorize(task)
-                if inspect.isawaitable(authorized):
-                    authorized = await authorized
+                authorized = await self._invoke(self.authorize, task, deadline)
             except Exception as exc:
                 if lease_lost.is_set():
                     return {"task_id": task.id, "status": "uncertain"}
@@ -78,19 +105,7 @@ class WorkflowScheduler:
                 )
                 return {"task_id": task.id, "status": "blocked"}
 
-            loop = asyncio.get_running_loop()
-            started = loop.time()
-            if inspect.iscoroutinefunction(self.dispatch):
-                result = self.dispatch(task)
-            else:
-                result = await asyncio.wait_for(
-                    asyncio.to_thread(self.dispatch, task), timeout=task.timeout_s,
-                )
-            if inspect.isawaitable(result):
-                remaining = task.timeout_s - (loop.time() - started)
-                if remaining <= 0:
-                    raise TimeoutError
-                result = await asyncio.wait_for(result, timeout=remaining)
+            result = await self._invoke(self.dispatch, task, deadline)
             if lease_lost.is_set():
                 return {"task_id": task.id, "status": "uncertain"}
             self.store.finish_task_attempt(attempt_id, "succeeded", result=result)

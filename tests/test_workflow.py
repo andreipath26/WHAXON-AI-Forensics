@@ -292,3 +292,55 @@ async def test_scheduler_respects_max_concurrency_and_task_budget(tmp_path):
     assert peak <= 2
     assert sum(task["status"] == "succeeded" for task in result["tasks"]) == 3
     assert result["complete"] is False
+
+
+@_run_async_test
+async def test_scheduler_applies_task_deadline_to_synchronous_authorization(tmp_path):
+    import time
+
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "scheduler-auth-timeout.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "provider.scan", "192.0.2.10", timeout_s=0.02),
+    )))
+    dispatched = []
+
+    def authorize(task):
+        time.sleep(0.1)
+        return True
+
+    result = await WorkflowScheduler(
+        store, authorize=authorize, dispatch=lambda task: dispatched.append(task.id),
+    ).run("p")
+    assert result["tasks"] == [{"id": "scan", "status": "blocked"}]
+    assert dispatched == []
+
+
+@_run_async_test
+async def test_scheduler_applies_task_deadline_to_async_authorization(tmp_path):
+    import asyncio
+
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "scheduler-async-auth-timeout.db")
+    store.create_mission("m", "objective")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "provider.scan", "192.0.2.10", timeout_s=0.02),
+    )))
+    dispatched = []
+
+    async def authorize(task):
+        await asyncio.sleep(0.1)
+        return True
+
+    result = await WorkflowScheduler(
+        store, authorize=authorize, dispatch=lambda task: dispatched.append(task.id),
+    ).run("p")
+    assert result["tasks"] == [{"id": "scan", "status": "blocked"}]
+    assert dispatched == []

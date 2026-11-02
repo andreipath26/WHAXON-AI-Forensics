@@ -289,8 +289,7 @@ The first implementation slice is on main:
 - E1: worker leases carry owner/token/heartbeat; stale recovery uses heartbeat age; Metasploit session dispatch requires persisted session identity and scope revalidation; TLS verification is enabled by default and the weak default RPC password is removed. CI acceptance remains pending.
 - E2 foundation: versioned WorkflowTask and immutable WorkflowPlan contracts validate DAGs and produce a content digest. ApprovalBinding ties consent to the exact plan, task, target, inputs, permissions, impact, policy version and expiry. SQLite persists missions, plans, tasks and attempts transactionally.
 - E3 foundation: WorkflowScheduler atomically claims dependency-ready tasks, bounds retries, requires an explicit authorization callback and marks timeouts uncertain rather than replaying potentially side-effecting work.
-- These are foundational primitives, not a claim that Engine v2 is integrated or release-ready. The scheduler is not yet connected to a capability provider resolver or Core/API/UI. AI cannot directly authorize or bypass dispatch.
-- Next: pass E1 security/regression acceptance; add task-attempt lease recovery, cancellation and budget enforcement; then bridge catalog/adapters through versioned capability manifests and integrate the scheduler behind shared Core services.
+- This 2026-11-01 snapshot is historical and is superseded by the 2026-11-02 implementation update below. The scheduler/provider bridge and shared Core integration have since landed; release acceptance remains open.
 
 
 ## Implementation update — 2026-11-01 (supersedes the earlier E2/E3-only status)
@@ -315,3 +314,8 @@ The following Engine v2 work is now implemented on `main`; release acceptance is
 ### Current execution example
 
 The first provider-backed task uses a capability such as `tool.nmap`, with `permissions=("network.scan",)`, `impact="moderate"`, an explicitly in-scope target and empty `inputs`. Dynamic CLI arguments are deliberately rejected by this initial provider bridge. The provider invokes the existing ToolRunner; it does not construct shell commands or bypass scope enforcement.
+
+
+### 2026-11-02 scheduler deadline correction
+
+A task's declared timeout now covers both deterministic authorization and provider dispatch. Synchronous callbacks execute in worker threads rather than blocking the event loop, preserving lease heartbeats and independent task progress. Authorization timeout fails closed as `blocked` and never dispatches; provider timeout remains `uncertain` because cancelling an await or timing out a worker thread cannot prove that an external effect stopped. Regression tests cover synchronous and asynchronous authorization timeouts. This closes a scheduler correctness gap, not the remaining mission-wide budget, cancellation, audit/outbox or recovery acceptance gates.
