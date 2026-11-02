@@ -185,3 +185,108 @@ def test_core_plan_bound_policy_requires_exact_unrevoked_approval(tmp_path):
     )) is False
     core.store.revoke_workflow_approval("p", "approval", actor="operator")
     assert core.authorize_workflow_task_for_plan("p", task) is False
+
+
+def test_engine_v2_scope_execution_gate_rejects_dns_rebinding_preview():
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v1", transports=("local_process",),
+        permissions=("network.scan",), impact="moderate",
+    ))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=True),
+        check_for_execution=lambda target: SimpleNamespace(allowed=False),
+    )
+    task = WorkflowTask(
+        "scan", "tool.nmap", "lab.example",
+        permissions=("network.scan",), impact="moderate",
+    )
+    assert core.authorize_workflow_task(task) is False
+
+
+def test_engine_v2_scope_requires_literal_true_not_truthy_authorization():
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v1", transports=("local_process",),
+        permissions=("network.scan",), impact="moderate",
+    ))
+    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed="yes"))
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    assert core.authorize_workflow_task(task) is False
+
+
+def test_engine_v2_plan_authorization_rejects_modified_low_impact_nodes(tmp_path):
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "plan-auth-identity.db")
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.fixture", provider_id="whaxon.adapter.fixture",
+        provider_version="catalog-v1", transports=("local_process",),
+        permissions=(), impact="low",
+    ))
+    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    original = WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low")
+    core.store.create_mission("m", "controlled lab")
+    core.store.save_workflow_plan("p", WorkflowPlan("m", (original,)))
+    assert core.authorize_workflow_task_for_plan("p", original) is True
+    assert core.authorize_workflow_task_for_plan(
+        "p", WorkflowTask("scan", "tool.fixture", "192.0.2.11", impact="low"),
+    ) is False
+    assert core.authorize_workflow_task_for_plan("missing", original) is False
+    core.store.request_workflow_cancellation("p")
+    assert core.authorize_workflow_task_for_plan("p", original) is False
+
+
+def test_engine_v2_plan_authorization_rejects_tampered_sqlite_plan(tmp_path):
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "tampered-auth.db")
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.fixture", provider_id="whaxon.adapter.fixture",
+        provider_version="catalog-v1", transports=("local_process",),
+        permissions=(), impact="low",
+    ))
+    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    task = WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low")
+    core.store.create_mission("m", "controlled lab")
+    core.store.save_workflow_plan("p", WorkflowPlan("m", (task,)))
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET target=? WHERE plan_id=?",
+            ("192.0.2.200", "p"),
+        )
+    finally:
+        conn.close()
+    assert core.authorize_workflow_task_for_plan("p", task) is False

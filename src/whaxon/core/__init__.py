@@ -287,8 +287,13 @@ class Core:
             return False
         if impact_rank[task.impact] > impact_rank["moderate"]:
             return False
+        # The network-execution gate is stricter than a UI scope preview:
+        # DNS-rebinding-prone hostnames must not be authorized under CIDR scope.
         try:
-            return bool(self.scope.check(task.target).allowed)
+            execution_check = getattr(self.scope, "check_for_execution", None)
+            if not callable(execution_check):
+                execution_check = self.scope.check
+            return execution_check(task.target).allowed is True
         except Exception:
             return False
 
@@ -298,14 +303,29 @@ class Core:
         An approval is never a substitute for scope/provider policy. Revocation,
         expiry, changed task bindings and missing approval all fail closed.
         """
-        if not self.authorize_workflow_task(task):
+        from .workflow import WorkflowPlan, WorkflowTask
+
+        # Never authorize an unpersisted or modified task using approval/scope
+        # from a different plan. This applies to low-impact nodes too.
+        if not isinstance(task, WorkflowTask):
             return False
-        if task.impact in ("moderate", "high", "critical"):
-            try:
-                return bool(self.store.has_valid_workflow_approval(plan_id, task.id))
-            except (ValueError, TypeError, RuntimeError):
+        try:
+            row = self.store.get_workflow_plan(plan_id)
+            if row is None or row["status"] == "cancel_requested":
                 return False
-        return True
+            plan = WorkflowPlan.from_dict(row["plan"])
+            if plan.digest != row["digest"] or plan.mission_id != row["mission_id"]:
+                return False
+            if not any(candidate == task for candidate in plan.tasks):
+                return False
+            self.store.verify_workflow_plan_integrity(plan_id)
+            if not self.authorize_workflow_task(task):
+                return False
+            if task.impact in ("moderate", "high", "critical"):
+                return self.store.has_valid_workflow_approval(plan_id, task.id) is True
+            return True
+        except (ValueError, TypeError, RuntimeError, KeyError):
+            return False
 
     def workflow_scheduler(
         self, *, authorize=None, dispatch=None, worker_id: str = "workflow-worker",
