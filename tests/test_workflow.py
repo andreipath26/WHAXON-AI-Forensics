@@ -383,17 +383,24 @@ async def test_scheduler_applies_timeout_to_synchronous_provider(tmp_path):
     store.create_mission("m", "objective")
     store.save_workflow_plan(
         "p", WorkflowPlan("m", (
-            WorkflowTask("slow", "provider.sync", "192.0.2.10", timeout_s=0.01),
+            WorkflowTask("slow", "provider.sync", "192.0.2.10", timeout_s=0.3),
         )),
     )
 
+    dispatched = []
+
     def dispatch(task):
-        time.sleep(0.1)
+        dispatched.append(task.id)
+        time.sleep(0.8)
         return {"done": True}
 
+    async def authorize(task):
+        return True
+
     result = await WorkflowScheduler(
-        store, authorize=lambda task: True, dispatch=dispatch,
+        store, authorize=authorize, dispatch=dispatch,
     ).run("p")
+    assert dispatched == ["slow"]
     assert result["tasks"] == [{"id": "slow", "status": "uncertain"}]
     assert result["attempts"] == 1
 
