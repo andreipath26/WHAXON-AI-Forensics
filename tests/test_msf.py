@@ -88,3 +88,60 @@ def test_client_refuses_missing_rpc_password():
     client = MSFClient(MSFConfig(host="127.0.0.1", port=65530, password=""))
     with pytest.raises(MSFUnavailableError, match="WHAXON_MSF_PASS"):
         client.connect()
+
+
+def test_client_rejects_plaintext_rpc_to_remote_host():
+    client = MSFClient(MSFConfig(host="10.0.0.9", password="secret", ssl=False))
+    with pytest.raises(MSFUnavailableError, match="refusing plaintext"):
+        client._validate_transport()
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "::1", "localhost"])
+def test_client_allows_loopback_plaintext_for_local_development(host):
+    client = MSFClient(MSFConfig(host=host, password="secret", ssl=False))
+    client._validate_transport()
+
+
+def test_client_allows_remote_rpc_when_tls_is_enabled():
+    client = MSFClient(MSFConfig(host="msf.internal", password="secret", ssl=True))
+    client._validate_transport()
+
+
+def test_msf_execute_rejects_console_command_injection_before_connect():
+    client = MSFClient(MSFConfig())
+    with pytest.raises(ValueError, match="command delimiter"):
+        client.execute("exploit", "multi/handler", {"LHOST": "127.0.0.1; sessions -K"})
+
+
+def test_msf_execute_rejects_invalid_module_path_before_connect():
+    client = MSFClient(MSFConfig())
+    with pytest.raises(ValueError, match="module path"):
+        client.execute("exploit", "../handler", {})
+
+
+def test_msf_execute_polls_for_job_without_fixed_wait(monkeypatch):
+    class Console:
+        def __init__(self):
+            self.writes = []
+            self.reads = 0
+
+        def write(self, command):
+            self.writes.append(command)
+
+        def read(self):
+            self.reads += 1
+            return {"data": "Exploit running as background job 17"} if self.reads == 1 else {"data": ""}
+
+    console = Console()
+    class Consoles:
+        def console(self):
+            return console
+    class Rpc:
+        consoles = Consoles()
+
+    client = MSFClient(MSFConfig())
+    monkeypatch.setattr(client, "connect", lambda: Rpc())
+    result = client.execute("exploit", "multi/handler", {"LHOST": "127.0.0.1"})
+    assert result["job_id"] == 17
+    assert console.reads == 1
+    assert "run -j" in console.writes

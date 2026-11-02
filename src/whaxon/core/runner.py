@@ -74,6 +74,17 @@ class ToolRunner:
                 return name
         return host
 
+    @classmethod
+    def _canonical_session_host(cls, value: object) -> str:
+        """Normalize a persisted/live session host for identity comparison."""
+        import ipaddress
+
+        host = cls._session_host(value).lower().rstrip(".")
+        try:
+            return ipaddress.ip_address(host).compressed
+        except ValueError:
+            return host
+
     def _authorize_session_host(self, value: object, *, source: str) -> str:
         host = self._session_host(value)
         if not host:
@@ -267,19 +278,74 @@ class ToolRunner:
             outdir = Path(tempfile.mkdtemp(prefix="whaxon-"))
             outfile = outdir / "output.json"
 
-        # Phase E.2: if a pivot route exists for the target and the tool
-        # is pivot_capable, rewrite the target to the local forward.
+        # Pivoting is a second authorization boundary: the original target
+        # was scope-checked above, but the forwarding session must also be a
+        # persisted, open, in-scope session before its local port is trusted.
         effective_target = target
         if (self._route_resolver is not None
                 and tool is not None
                 and getattr(tool, "pivot_capable", False)):
-            try:
-                host_only = target.split(":", 1)[0] if ":" in target else target
-                route = self._route_resolver(host_only)
-                if route is not None:
-                    effective_target = "127.0.0.1:" + str(route.local_port)
-            except Exception:
-                route = None
+            from urllib.parse import urlsplit
+
+            parsed_target = urlsplit(target if "://" in target else "//" + target)
+            host_only = parsed_target.hostname or ""
+            route = self._route_resolver(host_only)
+            if route is not None:
+                route_host = self._session_host(getattr(route, "target_host", ""))
+                local_port = getattr(route, "local_port", None)
+                target_port = getattr(route, "target_port", None)
+                via_session = str(getattr(route, "via_session", "") or "")
+                if route_host.lower().rstrip(".") != host_only.lower().rstrip("."):
+                    raise ValueError("pivot route target does not match the authorized target")
+                if (not isinstance(local_port, int) or isinstance(local_port, bool)
+                        or not 1 <= local_port <= 65535):
+                    raise ValueError("pivot route has an invalid local forwarding port")
+                if (not isinstance(target_port, int) or isinstance(target_port, bool)
+                        or not 1 <= target_port <= 65535):
+                    raise ValueError("pivot route has an invalid remote target port")
+                if not via_session or self._session_lookup is None:
+                    raise RuntimeError(
+                        "pivot route requires persisted session authorization context"
+                    )
+                stored_session = self._session_lookup(via_session)
+                if not stored_session or stored_session.get("status") != "open":
+                    raise ValueError("pivot route session is not an open persisted session")
+                stored_host = self._authorize_session_host(
+                    stored_session.get("host"), source="persisted pivot session"
+                )
+                live_host = self._authorize_session_host(
+                    getattr(route, "session_host", ""), source="live pivot session"
+                )
+                if stored_host.lower().rstrip(".") != live_host.lower().rstrip("."):
+                    raise ValueError("pivot session identity changed since it was persisted")
+                effective_target = "127.0.0.1:" + str(local_port)
+
+        # Re-authorize immediately before process creation. This catches an
+        # engagement scope tightened while route discovery or argv preparation
+        # was in progress; the initial check above remains the early gate.
+        if self._scope is not None:
+            final_match = self._scope.check(target)
+            if not final_match.allowed:
+                if not allow_out_of_scope:
+                    from .events import CoverageSkipped
+                    jid = job_id or uuid.uuid4().hex[:12]
+                    self._bus.publish(CoverageSkipped(
+                        job_id=jid, tool_id=tool_id, target=target,
+                        kind="scope_blocked",
+                        detail=final_match.reason or "out of scope",
+                        phase=phase,
+                    ))
+                    raise OutOfScopeError(
+                        target, final_match.reason, final_match.matched_rule
+                    )
+                from .override_log import log_override
+                scope_path = getattr(self._scope, "path", None)
+                if scope_path is None or not log_override(
+                    scope_path.parent, tool_id, target
+                ):
+                    raise RuntimeError(
+                        "scope override could not be audited; refusing out-of-scope execution"
+                    )
 
         try:
             argv = self.build_argv(tool_id, effective_target, extra_args=extra_args, outfile=outfile)
@@ -300,8 +366,10 @@ class ToolRunner:
                 import shutil
                 shutil.rmtree(outdir, ignore_errors=True)
 
-    def _run_msf_session(self, session_id: str, command: str,
-                        timeout_s: float) -> str:
+    def _run_msf_session(
+        self, session_id: str, command: str, timeout_s: float,
+        *, expected_host: str | None = None,
+    ) -> str:
         """Run a command inside a Metasploit session."""
         from .msf import MSFClient, MSFUnavailableError
         client = MSFClient()
@@ -315,7 +383,12 @@ class ToolRunner:
         info = sessions[str(session_id)] or {}
         # Re-check the live RPC peer at dispatch; the stored host may be stale.
         live_host = info.get("target_host") or info.get("session_host") or info.get("tunnel_peer") or info.get("peer_host")
-        self._authorize_session_host(live_host, source="live RPC")
+        authorized_live_host = self._authorize_session_host(live_host, source="live RPC")
+        if expected_host is not None:
+            if self._canonical_session_host(expected_host) != self._canonical_session_host(authorized_live_host):
+                raise ValueError(
+                    "Metasploit session identity changed since it was persisted; refusing dispatch"
+                )
         actual_type = info.get("type") or ""
         required = getattr(self, '_required_session_type', "") or ""
         if required and actual_type and actual_type != required:
@@ -574,9 +647,11 @@ class ToolRunner:
             stored = self._session_lookup(str(session_id))
             if not stored or stored.get("status") != "open":
                 raise ValueError(f"session {session_id} is not an open persisted session")
-            self._authorize_session_host(stored.get("host"), source="stored")
+            stored_host = self._authorize_session_host(stored.get("host"), source="stored")
             self._required_session_type = getattr(tool, 'required_session_type', "") or ""
-            output = self._run_msf_session(session_id, command, timeout_s)
+            output = self._run_msf_session(
+                session_id, command, timeout_s, expected_host=stored_host,
+            )
         elif transport == "smb":
             output = await self._run_smb_session(session_id, command, timeout_s)
         elif transport == "wmi":

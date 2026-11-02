@@ -6,7 +6,7 @@ Reads configuration from environment variables:
     WHAXON_MSF_PORT      default 55553
     WHAXON_MSF_USER      default msf
     WHAXON_MSF_PASS      required; no built-in default
-    WHAXON_MSF_SSL       default "0" (use "1" or "true" to enable)
+    WHAXON_MSF_SSL       default "0"; non-loopback RPC requires verified TLS
 
 The client is lazy: it doesn't connect until first use. If the daemon
 isn't running, `MSFUnavailableError` is raised — callers can catch it
@@ -64,11 +64,30 @@ class MSFClient:
 
     # ---- connection ----
 
+    def _validate_transport(self) -> None:
+        """Never send RPC credentials over plaintext to a non-loopback host."""
+        import ipaddress
+
+        host = str(self.config.host).strip().strip("[]").lower().rstrip(".")
+        loopback = host == "localhost"
+        if not loopback:
+            try:
+                loopback = ipaddress.ip_address(host).is_loopback
+            except ValueError:
+                loopback = False
+        if not loopback and not self.config.ssl:
+            raise MSFUnavailableError(
+                "refusing plaintext Metasploit RPC to a non-loopback host; "
+                "enable verified TLS with WHAXON_MSF_SSL=1 and configure "
+                "WHAXON_MSF_CA_BUNDLE for a private CA"
+            )
+
     def connect(self) -> Any:
         """Connect and cache the client. Raises MSFUnavailableError on failure."""
         if self._client is not None:
             return self._client
 
+        self._validate_transport()
         if not self.config.password:
             raise MSFUnavailableError(
                 "WHAXON_MSF_PASS is not configured; refusing Metasploit RPC authentication"
@@ -256,48 +275,82 @@ class MSFClient:
         module_name: str,
         options: dict,
         payload: str | None = None,
+        timeout_s: float = 30.0,
     ) -> dict:
-        """Execute a module through an RPC console.
+        """Execute a validated module and poll for its job without fixed sleeps.
 
-        pymetasploit3's module.execute() does not reliably apply options
-        for handler/exploit modules (mod.options is a list; mod[KEY]=v
-        raises KeyError for payload-derived options). Driving a real
-        msfconsole session over RPC is the robust path.
+        Console input is a command language, not an argv vector. Reject
+        delimiters/control characters so option values cannot inject commands.
         """
-        import re as _re
+        import re
         import time
+
+        if module_type not in {"exploit", "auxiliary", "post"}:
+            raise ValueError("unsupported Metasploit module type")
+        if (not isinstance(module_name, str)
+                or not re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", module_name)
+                or any(part in {".", ".."} for part in module_name.split("/"))):
+            raise ValueError("invalid Metasploit module path")
+
+        def safe_value(value, label):
+            text = str(value)
+            if not text or ";" in text or any(ord(ch) < 32 for ch in text):
+                raise ValueError(f"invalid Metasploit {label}: command delimiter/control character")
+            return text
+
+        if payload is not None:
+            payload = safe_value(payload, "payload")
+        validated_options = {}
+        for key, value in (options or {}).items():
+            if key == "PAYLOAD":
+                continue
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", key):
+                raise ValueError("invalid Metasploit option name")
+            validated_options[key] = safe_value(value, f"option {key}")
+
+        if not 0.1 <= float(timeout_s) <= 180.0:
+            raise ValueError("Metasploit dispatch timeout must be between 0.1 and 180 seconds")
+
         c = self.connect()
         console = c.consoles.console()
-        cmds = [f"use {module_type}/{module_name}"]
+        commands = [f"use {module_type}/{module_name}"]
         if payload:
-            cmds.append(f"set PAYLOAD {payload}")
-        for k, v in (options or {}).items():
-            if k == "PAYLOAD":
-                continue
-            cmds.append(f"set {k} {v}")
-        cmds.append("run -j")
-        cmds.append("jobs -l")
-        for cmd in cmds:
-            console.write(cmd)
-        time.sleep(8)
-        out = console.read().get("data", "")
+            commands.append(f"set PAYLOAD {payload}")
+        commands.extend(f"set {key} {value}" for key, value in validated_options.items())
+        commands.extend(("run -j", "jobs -l"))
+        for command in commands:
+            console.write(command)
+
+        deadline = time.monotonic() + float(timeout_s)
+        output_parts: list[str] = []
         job_id = None
-        for line in out.splitlines():
-            m = _re.search(r"(?:Exploit|Post module|Auxiliary module) running as background job (\d+)", line)
-            if m:
-                job_id = int(m.group(1))
+        while time.monotonic() < deadline:
+            response = console.read() or {}
+            chunk = response.get("data", "") if isinstance(response, dict) else str(response)
+            if chunk:
+                output_parts.append(str(chunk))
+            output = "".join(output_parts)
+            match = re.search(
+                r"(?:Exploit|Post module|Auxiliary module) running as background job ([0-9]+)",
+                output,
+            )
+            if match:
+                job_id = int(match.group(1))
                 break
-        if job_id is None:
             in_jobs = False
-            for line in out.splitlines():
+            for line in output.splitlines():
                 if line.strip() == "Jobs":
                     in_jobs = True
                     continue
                 if in_jobs:
-                    m = _re.match(r"\s+(\d+)\s+", line)
-                    if m:
-                        job_id = int(m.group(1))
+                    match = re.match(r" +([0-9]+) +", line)
+                    if match:
+                        job_id = int(match.group(1))
                         break
                     if line.strip() and not line.strip().startswith("-"):
                         in_jobs = False
-        return {"job_id": job_id, "console_output": out}
+            if job_id is not None:
+                break
+            time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
+
+        return {"job_id": job_id, "console_output": "".join(output_parts)}

@@ -42,7 +42,7 @@ class WorkflowScheduler:
         if remaining <= 0:
             raise TimeoutError
         is_async = inspect.iscoroutinefunction(callback) or inspect.iscoroutinefunction(
-            getattr(callback, "__call__", None)
+            type(callback).__call__
         )
         if is_async:
             result = callback(task)
