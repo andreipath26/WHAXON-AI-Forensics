@@ -637,7 +637,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             core.configure_mission_deadline(
                 mission_id, deadline_at=payload["deadline_at"],
             )
-            return jsonify(core.mission_execution_limits(mission_id))
+            return jsonify({
+                "mission_id": mission_id, "deadline_at": core.mission_deadline(mission_id),
+            })
         except (ValueError, TypeError) as exc:
             status = 404 if "unknown mission" in str(exc) else 400
             return jsonify({"error": str(exc)}), status

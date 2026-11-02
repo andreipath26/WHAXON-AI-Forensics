@@ -298,3 +298,20 @@ def test_v2_api_event_consumer_parity_and_validation(tmp_path, monkeypatch):
         "/api/v2/workflows/p/event-ack", json={"consumer": "worker", "event_id": 1},
         headers={"Origin": "https://attacker.invalid"},
     ).status_code == 403
+
+
+def test_v2_api_mission_deadline_returns_persisted_cutoff_not_budget(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    response = client.post("/api/v2/missions/m/deadline", json={
+        "deadline_at": 2000000000,
+    })
+    assert response.status_code == 200
+    assert response.get_json() == {"mission_id": "m", "deadline_at": 2000000000}
+    assert core.store.get_mission_deadline("m") == 2000000000
+    assert client.post(
+        "/api/v2/missions/m/deadline", json={"deadline_at": 2100000000},
+    ).status_code == 400
+    assert client.post(
+        "/api/v2/missions/unknown/deadline", json={"deadline_at": 2000000000},
+    ).status_code == 404

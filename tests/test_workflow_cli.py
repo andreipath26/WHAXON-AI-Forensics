@@ -42,7 +42,10 @@ class _FakeCore:
         return {"mission_id": mission_id, "min_spacing_s": getattr(self, "mission_rate", (None, None))[1]}
 
     def configure_mission_deadline(self, mission_id, *, deadline_at):
-        self.mission_deadline = (mission_id, deadline_at)
+        self.persisted_mission_deadline = (mission_id, deadline_at)
+
+    def mission_deadline(self, mission_id):
+        return self.persisted_mission_deadline[1]
 
     def mission_execution_limits(self, mission_id):
         return {"mission_id": mission_id, "max_total_attempts": 2, "max_concurrency": 1}
@@ -332,3 +335,13 @@ def test_cli_mission_rate_config_and_query(monkeypatch, capsys):
     assert configured["min_spacing_s"] == 5
     assert workflow_cmd.main(["mission", "rate", "--id", "m"]) == 0
     assert json.loads(capsys.readouterr().out)["mission_id"] == "m"
+
+
+def test_cli_mission_deadline_returns_persisted_cutoff_not_budget(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "deadline", "--id", "m", "--unix-time", "2000000000",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "mission_id": "m", "deadline_at": 2000000000.0,
+    }

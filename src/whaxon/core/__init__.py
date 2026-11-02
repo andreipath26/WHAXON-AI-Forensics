@@ -229,6 +229,10 @@ class Core:
     def configure_mission_deadline(self, mission_id: str, *, deadline_at: float):
         return self.store.set_mission_deadline(mission_id, deadline_at=deadline_at)
 
+    def mission_deadline(self, mission_id: str):
+        """Read the authoritative persisted mission cutoff for every interface."""
+        return self.store.get_mission_deadline(mission_id)
+
     def mission_execution_limits(self, mission_id: str):
         return self.store.get_mission_execution_limits(mission_id)
 

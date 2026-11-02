@@ -213,7 +213,9 @@ def main(args: list[str] | None = None) -> int:
             return 0
         if options.command == "mission" and options.mission_command == "deadline":
             core.configure_mission_deadline(options.id, deadline_at=options.unix_time)
-            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            print(json.dumps({
+                "mission_id": options.id, "deadline_at": core.mission_deadline(options.id),
+            }, sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "limits":
             core.configure_mission_execution_limits(
