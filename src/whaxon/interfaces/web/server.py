@@ -500,12 +500,56 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     # Engine V2 read-only API. All operations use the same Core contracts
     # consumed by the CLI; inherited application auth/rate gates apply.
-    @app.get("/api/v2/missions")
+    @app.route("/api/v2/missions", methods=["GET", "POST"])
     def workflow_v2_missions():
+        if request.method == "POST":
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict) or not isinstance(payload.get("id"), str) or (
+                not isinstance(payload.get("objective"), str)
+            ):
+                return jsonify({"error": "id and objective strings required"}), 400
+            try:
+                created = core.create_mission(payload["id"], payload["objective"])
+                return jsonify({"mission_id": payload["id"], "created": bool(created)}), 201
+            except (ValueError, TypeError) as exc:
+                return jsonify({"error": str(exc)}), 400
         try:
             limit = int(request.args.get("limit", "100"))
             return jsonify(core.missions(limit=limit))
         except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.route("/api/v2/missions/<mission_id>/rate-limit", methods=["GET", "POST"])
+    def workflow_v2_mission_rate_limit(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict) or "min_spacing_s" not in payload:
+                    return jsonify({"error": "min_spacing_s required"}), 400
+                core.configure_mission_rate_limit(
+                    mission_id, min_spacing_s=payload["min_spacing_s"],
+                )
+            return jsonify(core.mission_rate_limit(mission_id))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 404 if "unknown mission" in str(exc) else 400
+
+    @app.post("/api/v2/workflows")
+    def workflow_v2_save_plan():
+        from whaxon.core.workflow import WorkflowPlan
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or not isinstance(payload.get("id"), str) or (
+            not isinstance(payload.get("plan"), dict)
+        ):
+            return jsonify({"error": "id string and plan object required"}), 400
+        try:
+            plan = WorkflowPlan.from_dict(payload["plan"])
+            created = core.save_workflow_plan(payload["id"], plan)
+            return jsonify({
+                "plan_id": payload["id"], "mission_id": plan.mission_id,
+                "digest": plan.digest, "created": bool(created),
+            }), 201
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
     @app.route("/api/v2/missions/<mission_id>/cost", methods=["GET", "POST"])
@@ -537,21 +581,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify({"attempt_id": attempt_id, "cost_microusd": amount})
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
-
-    @app.route("/api/v2/missions/<mission_id>/rate-limit", methods=["GET", "POST"])
-    def workflow_v2_mission_rate_limit(mission_id):
-        try:
-            if request.method == "POST":
-                payload = request.get_json(silent=True)
-                if not isinstance(payload, dict) or "min_spacing_s" not in payload:
-                    return jsonify({"error": "min_spacing_s required"}), 400
-                core.configure_mission_rate_limit(
-                    mission_id, min_spacing_s=payload["min_spacing_s"],
-                )
-            return jsonify(core.mission_rate_limit(mission_id))
-        except (ValueError, TypeError) as exc:
-            status = 404 if "unknown mission" in str(exc) else 400
-            return jsonify({"error": str(exc)}), status
 
     @app.post("/api/v2/missions/<mission_id>/deadline")
     def workflow_v2_mission_deadline(mission_id):

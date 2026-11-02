@@ -219,13 +219,11 @@ class Core:
         return self.store.get_mission_cost_summary(mission_id)
 
     def configure_mission_rate_limit(self, mission_id: str, *, min_spacing_s: float):
-        """Persist a non-relaxable rate limit shared by all mission plans."""
         return self.store.set_mission_rate_limit(
             mission_id, min_spacing_s=min_spacing_s,
         )
 
     def mission_rate_limit(self, mission_id: str):
-        """Return mission rate configuration and durable claim history."""
         return self.store.get_mission_rate_limit(mission_id)
 
     def configure_mission_deadline(self, mission_id: str, *, deadline_at: float):

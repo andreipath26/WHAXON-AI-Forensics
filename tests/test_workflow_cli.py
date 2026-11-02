@@ -36,7 +36,7 @@ class _FakeCore:
         self.mission_rate = (mission_id, min_spacing_s)
 
     def mission_rate_limit(self, mission_id):
-        return {"mission_id": mission_id, "min_spacing_s": self.mission_rate[1]}
+        return {"mission_id": mission_id, "min_spacing_s": getattr(self, "mission_rate", (None, None))[1]}
 
     def configure_mission_deadline(self, mission_id, *, deadline_at):
         self.mission_deadline = (mission_id, deadline_at)
@@ -320,10 +320,12 @@ def test_mission_cost_commands_use_shared_core(monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)["cost_microusd"] == 25
 
 
-def test_mission_rate_limit_cli_uses_shared_core(monkeypatch, capsys):
+def test_cli_mission_rate_config_and_query(monkeypatch, capsys):
     monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
     assert workflow_cmd.main([
-        "mission", "rate-limit", "--id", "m", "--min-spacing-seconds", "3.5",
+        "mission", "rate-limit", "--id", "m", "--min-spacing-s", "5",
     ]) == 0
-    result = json.loads(capsys.readouterr().out)
-    assert result == {"mission_id": "m", "min_spacing_s": 3.5}
+    configured = json.loads(capsys.readouterr().out)
+    assert configured["min_spacing_s"] == 5
+    assert workflow_cmd.main(["mission", "rate", "--id", "m"]) == 0
+    assert json.loads(capsys.readouterr().out)["mission_id"] == "m"

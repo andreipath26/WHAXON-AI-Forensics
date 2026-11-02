@@ -167,25 +167,42 @@ def test_mission_cost_api_requires_explicit_cost_evidence(tmp_path, monkeypatch)
     ).status_code == 400
 
 
-def test_mission_rate_limit_api_shares_store_and_blocks_bypass(tmp_path, monkeypatch):
+def test_v2_api_creates_mission_and_persists_plan_using_core(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    created = client.post("/api/v2/missions", json={"id": "m", "objective": "controlled"})
+    assert created.status_code == 201
+    assert created.get_json()["created"] is True
+    plan = WorkflowPlan("m", (WorkflowTask("scan", "fixture", "192.0.2.10"),))
+    saved = client.post("/api/v2/workflows", json={"id": "p", "plan": plan.to_dict()})
+    assert saved.status_code == 201
+    assert saved.get_json()["digest"] == plan.digest
+    assert core.store.get_workflow_plan("p")["digest"] == plan.digest
+    assert client.post("/api/v2/workflows", json={"id": "bad", "plan": {}}).status_code == 400
+    assert client.post("/api/v2/missions", json={"id": 1, "objective": "x"}).status_code == 400
+
+
+def test_v2_api_mission_rate_limit_shared_and_fail_closed(tmp_path, monkeypatch):
     client, core = _client(tmp_path, monkeypatch)
     core.create_mission("m", "controlled")
-    for plan_id, address in (("first", "192.0.2.1"), ("second", "192.0.2.2")):
-        core.save_workflow_plan(plan_id, WorkflowPlan(
-            "m", (WorkflowTask("scan", "fixture", address),),
-        ))
-    route = "/api/v2/missions/m/rate-limit"
-    assert client.get(route).get_json()["min_spacing_s"] is None
-    response = client.post(route, json={"min_spacing_s": 3600})
+    core.save_workflow_plan("p1", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    core.save_workflow_plan("p2", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.11"),
+    )))
+    response = client.post("/api/v2/missions/m/rate-limit", json={"min_spacing_s": 3600})
     assert response.status_code == 200
     assert response.get_json()["min_spacing_s"] == 3600
-    assert core.store.claim_ready_workflow_task("first", "worker-a") is not None
-    assert core.store.claim_ready_workflow_task("second", "worker-b") is None
-    assert client.post(route, json={"min_spacing_s": 1}).status_code == 400
-    assert client.post(route, json={"min_spacing_s": 7200}).status_code == 200
-    assert client.post(route, json={"min_spacing_s": True}).status_code == 400
+    assert core.store.claim_ready_workflow_task("p1", "worker-1") is not None
+    assert core.store.claim_ready_workflow_task("p2", "worker-2") is None
+    assert client.get("/api/v2/missions/m/rate-limit").get_json()["last_claimed_at"] is not None
+    assert client.post("/api/v2/missions/m/rate-limit", json={"min_spacing_s": 1}).status_code == 400
     assert client.get("/api/v2/missions/unknown/rate-limit").status_code == 404
     assert client.post(
-        route, json={"min_spacing_s": 8000},
+        "/api/v2/missions/m/rate-limit", json={"min_spacing_s": 7200},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+    assert client.post(
+        "/api/v2/workflows", json={"id": "evil", "plan": {}},
         headers={"Origin": "https://attacker.invalid"},
     ).status_code == 403
