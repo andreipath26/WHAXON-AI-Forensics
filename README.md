@@ -94,6 +94,8 @@ See the [new UI interaction and acceptance audit](docs/NEW_UI_INTERACTION_AUDIT.
 
 WHAXON requires **Python 3.11 or newer**. Use a virtual environment.
 
+**Release identity:** the latest published PyPI version verified on November 2, 2026 is `0.11.16` (released October 23). The `main` branch may contain newer, unreleased code. The master roadmap's v1.0 release checklist remains open; do not interpret the roadmap revision, package metadata or a CI run as a v1.0 release.
+
 ### Install from PyPI
 
 For the core package with terminal and browser interfaces:
@@ -219,6 +221,8 @@ Install the development dependencies and required browser-test tooling before ru
 
 ## Documentation
 
+- [Project state](docs/STATE.md)
+- [Master roadmap](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md)
 - [Architecture](docs/architecture.md)
 - [Scope and authorization](docs/scope.md)
 - [Tools](docs/tools.md)
@@ -238,6 +242,7 @@ Install the development dependencies and required browser-test tooling before ru
 - [Security policy](SECURITY.md)
 - [Licensing](docs/licensing.md)
 - [Commercial licensing](docs/commercial-licensing.md)
+- [Documentation index](docs/README.md)
 
 ## Project direction
 

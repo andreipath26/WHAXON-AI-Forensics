@@ -1,12 +1,12 @@
 # Agent Architecture
 
-**Status:** Design document. No code in this file is implemented yet.
+**Status (2026-11-02): HISTORICAL DESIGN RECORD.** This proposal predates the current agent and Engine v2 implementation. The module table below is an older snapshot; statements describing the agent as one-step-only, unable to resume, or otherwise unimplemented must not be treated as current without checking `src/whaxon/ai/`, `src/whaxon/core/` and their tests. Current delivery status is governed by the master roadmap and [Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md).
 **Scope:** The autonomous driving layer described in `whaxon_vision.md`.
 **Non-goals:** Anything that changes the pipeline, the executor's deterministic boundary, or the adapter layer.
 
 ## 1. Purpose
 
-WHAXON today runs one tool at a time. A human picks the tool, picks the
+At the time this design was written, WHAXON was primarily operated one tool at a time. A human picks the tool, picks the
 target, presses run, reads the output, and decides what to do next. The
 AI layer (`whaxon/ai/`) can propose a single next action and a
 deterministic executor will validate and run it — but only within a

@@ -1,13 +1,15 @@
 # WHAXON — CONSOLIDATED SCOPE (MERGED)
 
-**Version:** v1.0.0
-**Status:** Living document. Source of truth for project scope.
+**Document revision:** 1.0.0 (roadmap document revision; not the WHAXON package/release version)
+**Status:** Living document. Source of truth for project scope. The package release version is maintained separately in `pyproject.toml` and `src/whaxon/__init__.py`; this document's revision number is not a release claim.
 
 **Status legend:**
 - **DONE** — implemented and shipped
 - **QUEUED** — in scope, not yet built
 - **URGENT** — do before other queued work
 - **OUT** — explicitly excluded, never built
+
+**Status precedence:** DONE is a historical implementation/shipping marker for the scope item and is not, by itself, proof of current production acceptance or v1.0 release readiness. Later dated implementation updates supersede earlier status snapshots within a section. The solo v1.0 release checklist in §38 is the controlling acceptance gate; a DONE label elsewhere does not close a §38 requirement without the required current evidence.
 
 ## Foundational operating principles — five, all mandatory
 
@@ -3305,7 +3307,7 @@ The release record must list the exact commit, environment, commands/workflows, 
 
 # 49. ENGINE V2 — CAPABILITY-DRIVEN EXECUTION ARCHITECTURE
 
-**Status:** Architecture specified; initial E2 mission/task contracts and E3 DAG scheduler primitives implemented on main; E1 acceptance and end-to-end integration remain open.  
+**Status (updated 2026-11-02):** E2 contracts/persistence and E3 scheduler/recovery primitives are implemented on `main`; the E4 read-only scanner-provider integration slice and shared-core/headless smoke are also recorded below. This supersedes the earlier E2/E3-only snapshot. E1 security acceptance, remaining E3 production guarantees, broader E4 migration, E5 shared lifecycle, E6 UI acceptance and full deployment integration remain open. See the dated implementation update at the end of this section.  
 **Specification:** `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md`  
 **Authority:** Subordinate to §0; this section does not reorder roadmap gates.
 

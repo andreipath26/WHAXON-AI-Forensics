@@ -1,3 +1,5 @@
+> **Historical audit — superseded (2026-11-02).** This file records an earlier UI generation and must not be used to assess the current Obsidian Kinetic UI. Its page inventory, PASS/WIRED/MOCKUP labels, endpoint wiring and test counts are historical. Use [NEW_UI_INTERACTION_AUDIT.md](NEW_UI_INTERACTION_AUDIT.md) for the current 22-route implementation/acceptance record and master roadmap §38 for release acceptance. This historical file is retained for traceability only.
+
 # WHAXON Web UI Interaction Audit
 
 ## Status legend

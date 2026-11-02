@@ -1,6 +1,6 @@
 # Report redesign
 
-**Status:** DRAFT — active.
+**Status (2026-11-02): HISTORICAL IMPLEMENTATION DESIGN.** The PR sequence records the report-redesign rationale and plan at the time. It is not an active PR plan and its problem statements are not assertions about the current report. For current behavior, use [Reports and Evidence](reports-and-evidence.md), current report source/tests and the master roadmap's release gates.
 **Owner:** andreipath
 **Depends on:** docs/reports-and-evidence.md
 **Non-goals:** does not change the finding model, does not add new adapters.
@@ -9,7 +9,7 @@
 
 ## Why
 
-The current report is not a client deliverable. Four concrete failures:
+At the time this design was drafted, the report was not considered a client deliverable. Four concrete failures:
 
 1. **Duplication.** The same finding appears once per job that produced it. A single vsftpd 2.3.4 finding appears 10 times in one engagement. `finding_count: 570` is raw rows, not unique findings.
 

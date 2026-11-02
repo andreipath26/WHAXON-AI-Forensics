@@ -21,7 +21,7 @@ Wait for the catalog to populate, then press / and type nmap. The filtered catal
 ## Web UI capture
 
     whaxon serve --daemon
-    xdg-open http://127.0.0.1:5001/ui
+    xdg-open http://127.0.0.1:5001/
 
 Run nmap against your target from the UI. Wait for findings to appear, expand one finding, then capture.
 
@@ -43,14 +43,14 @@ Wait for the embedded web view to load, then capture the whole window.
     whaxon report "$JID" --format pdf --out /tmp/report.pdf
     xdg-open /tmp/report.pdf
 
-Capture the executive summary page.
+Capture the executive summary page. Confirm that the report contains real data from the selected authorized lab run.
 
 - File: docs/assets/report-pdf.png
 - Alt text: Exported WHAXON PDF report showing the executive summary.
 
 ## Pivot chain capture
 
-Requires at least one pivot edge in the store. Run an exploit through MSF, add a port forward, then open the Chain tab in the web UI.
+Requires at least one pivot edge in the store. Run an exploit through MSF, add a port forward, then open the Chains page in the `/ui-v2` interface.
 
 - File: docs/assets/pivot-chain.png
 - Alt text: WHAXON pivot chain graph: exploit, session, forward.

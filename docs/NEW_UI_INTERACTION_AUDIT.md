@@ -6,9 +6,9 @@
 **Audit baseline:** `main` before the default-route change at `aea6a2ff859301192b3133330a94ecc0e6a21cbf`.  
 **Default-route change:** `8313b8af885d4c4f5711c4df0998f0e8523f9b33` (root redirects to `/ui-v2`).  
 **Test assertion change:** `aa8fcd2b633b267e577ee32034e330bfb7bc9c71`.  
-**CI:** the baseline main commit had a successful CI run; CI for the default-route/test commits was running when this audit was written. Do not treat the latter as passing until GitHub reports a successful conclusion.
+**CI evidence update (2026-11-02):** the master roadmap records CI run [#41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) on 2026-11-01 as passing Ruff, mypy, 1,322 tests (14 skipped), wheel/sdist metadata validation and selected packaging/scanner smoke checks. This is a recorded run, not proof that every later commit or current HEAD passed. Check CI on the exact candidate commit.
 
-This is a current-state audit, not a declaration that the UI is complete or deployment-ready.
+This is a dated implementation and acceptance audit, not a declaration that the UI is fully accepted or deployment-ready. The roadmap §38 remains the controlling release gate; visual regression, complete visible-control inventory, accessibility, CLI/web parity and external-asset deployment checks remain open until evidence is recorded.
 
 ## 1. Source-of-truth assets and preservation
 

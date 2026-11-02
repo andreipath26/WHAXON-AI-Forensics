@@ -1,5 +1,7 @@
 # WHAXON experiment audit — 2026-10-25
 
+> **Historical evidence record.** This audit describes a dated experiment snapshot. Its CI references, implementation claims and recommendations are not automatically current on 2026-11-02. Re-check source, tests, current CI and master roadmap before using any status statement as present-day evidence. The experiment evidence directory is not modified by this documentation update.
+
 **Purpose:** translate the read-only `whaxon-experiment-2026-10-25/` evidence into current WHAXON engineering and release actions.
 
 **Repository boundary:** this audit does not edit, rename, delete, or regenerate any file under `whaxon-experiment-2026-10-25/`. The experiment folder is treated as immutable evidence.

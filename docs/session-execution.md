@@ -1,12 +1,12 @@
 # Session-Based Execution
 
-**Status:** Design document. No code in this file is implemented yet.
+**Status (2026-11-02): HISTORICAL DESIGN RECORD.** This document predates the session-scoped implementation. The current source and the later session implementation notes supersede the original design assumptions. Check `src/whaxon/core/msf.py`, `src/whaxon/core/portfwd.py`, `src/whaxon/core/autopivot.py`, `src/whaxon/adapters/msf.py` and their tests for current behavior.
 **Scope:** Post-exploitation primitives that run *inside* a session, not *against* a host.
 **Non-goals:** Changing the pipeline, the executor's deterministic boundary, or the existing MSF module-execution path.
 
 ## 1. Purpose
 
-Every tool WHAXON can run today executes the same way: build an argv, spawn a subprocess, capture stdout, parse findings. That model works for scanning a host. It does not work for acting *through* a host.
+In the original design snapshot, ordinary host-scoped tools executed this way: build an argv, spawn a subprocess, capture stdout, parse findings. That model works for scanning a host. It does not work for acting *through* a host.
 
 A Metasploit session is a live connection to a compromised machine. Once you have it, the useful operations are not new commands against a target — they are commands *inside* the session: `sysinfo`, `getuid`, `hashdump`, `enum_network`, `portfwd add`. These have no argv. They have a session id and a verb.
 

@@ -1,5 +1,7 @@
 # Dependency readiness and guided installation
 
+**Status reviewed 2026-11-02:** implementation exists on `main`; this document records behavior and remaining acceptance requirements. CI run #41313223574 is a specific passing run from 2026-11-01, not a guarantee that every later commit or current HEAD passed. Deployment gates below remain open unless the master roadmap records closure with evidence.
+
 ## Scope and status
 
 This implementation adds dependency diagnostics, deterministic remediation planning, a tightly allowlisted Python-package installer, durable operation tracking, readiness history, authenticated web APIs, and the first UI integration in the existing Diagnostics page.
@@ -116,7 +118,7 @@ A failed, timed-out or interrupted pip operation may have partially changed the 
 ## Remaining deployment gates
 
 This feature is not considered production-deployable until all of the following are verified:
-- **Latest CI passed 2026-11-01:** [run #41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) passed Ruff, mypy, 1,322 tests (14 skipped) and wheel/sdist metadata checks on Python 3.11, 3.12 and 3.13. The clean Python 3.12 wheel smoke test verified `whaxon doctor --json`, zero required blockers, READY validation payloads, the seeded catalog, scope policy and a local HTTP observation. Ubuntu apt and Apple Silicon Homebrew install acceptance passed; Windows/macOS/Ubuntu setup preview and venv smoke checks passed.
+- **Recorded CI passed 2026-11-01:** [run #41313223574](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41313223574) passed Ruff, mypy, 1,322 tests (14 skipped) and wheel/sdist metadata checks on Python 3.11, 3.12 and 3.13. The clean Python 3.12 wheel smoke test verified `whaxon doctor --json`, zero required blockers, READY validation payloads, the seeded catalog, scope policy and a local HTTP observation. Ubuntu apt and Apple Silicon Homebrew install acceptance passed; Windows/macOS/Ubuntu setup preview and venv smoke checks passed.
 - The manifest, tool catalog and required payload resources are present in both wheel and sdist.
 - Clean wheel installation, setup preview and virtual-environment creation are tested on Ubuntu, macOS and Windows CI runners. Actual apt and Homebrew package installation is separately exercised on Ubuntu and Apple Silicon macOS. Restricted-host behavior is now regression-tested: without a package manager, planning stays read-only and installation fails closed to manual guidance; without `sudo`, apt plans are manual-only; missing elevation consent is rejected before audit or execution. These are deterministic policy tests, not a claim that a physically disconnected host was provisioned.
 - **CI now performs real Ubuntu apt and macOS Homebrew installation acceptance** of the curated Nmap, Gobuster, SQLmap, ffuf and Nuclei packages, then runs the trusted version probes and a loopback-only Nmap discovery smoke test. Loopback functional smoke tests now exercise Nmap TCP discovery, Gobuster directory enumeration, ffuf content discovery and SQLmap HTTP parameter testing. The Homebrew acceptance job also runs a local Nuclei template against the loopback fixture and requires a matching result.

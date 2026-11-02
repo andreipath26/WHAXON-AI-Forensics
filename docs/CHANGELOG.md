@@ -1,4 +1,6 @@
-## 1.0.0 — 2026-10-25
+## Main-branch engineering record — 2026-10-25 (not a v1.0.0 release)
+
+> Release identity: the latest published PyPI package recorded for this repository snapshot is **0.11.16** (2026-10-23). The former 1.0.0 heading did not establish a published v1.0.0 release. Master roadmap §38 remains OPEN; do not infer a release from this changelog heading or package metadata.
 
 **Validation correctness**
 - Request context now survives the SQLMap adapter, SQLite persistence, and web/CLI validation and retest paths. Older findings using the legacy `data["_request_context"]` shape remain supported.

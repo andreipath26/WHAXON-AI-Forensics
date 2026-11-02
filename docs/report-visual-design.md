@@ -1,6 +1,6 @@
 # Report visual design — PR 4
 
-**Status:** draft, active.
+**Status (2026-11-02): HISTORICAL DESIGN RECORD.** This file preserves the original visual specification and PR planning notes. It is not a live design task or proof that every visual requirement is currently implemented. Compare the current report renderer and tests with [Reports and Evidence](reports-and-evidence.md); acceptance remains subject to the master roadmap's release gates.
 **Owner:** andreipath.
 **Depends on:** docs/report-redesign.md §4, docs/reports-and-evidence.md.
 **Non-goals:** this doc does not design the in-app report preview, the reports store, or the past-reports menu. Those are follow-on units (named at the end) and get their own design docs. It does not change the report data model.

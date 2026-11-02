@@ -1,13 +1,13 @@
 # Architecture
 
-WHAXON is a headless core surrounded by three interface shells and a plugin layer for tool knowledge.
+WHAXON is a shared Python assessment core exposed through CLI, terminal, desktop and Flask web interfaces. External tools are described by a catalog and connected through adapters/providers. The architecture is evolving toward the durable, capability-driven Engine v2 described in [the Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md); that target design is not the same as a fully accepted deployment architecture.
 
 ## Layers
 
     Interfaces
       TUI (Textual)   GUI (PySide6 + QWebEngineView)
       Web (Flask + SSE + Basic auth)
-      CLI (21-subcommand dispatcher)
+      CLI (mode dispatcher; see `whaxon --help` for the installed command surface)
                 |
           whaxon.core.Core
             EventBus       pub/sub, async
@@ -15,14 +15,14 @@ WHAXON is a headless core surrounded by three interface shells and a plugin laye
             ScopeManager   fail-closed policy, data/scope.json
             Settings       data/settings.json
             ToolRunner     build_argv + subprocess + stream pump
-            JobStore       SQLite (data/whaxon.db): jobs, findings,
-                           evidence, pivot_edges
+            JobStore       SQLite (data/whaxon.db): jobs, lines, findings,
+                           coverage, evidence, sessions and workflow state
             MSFClient      pymetasploit3 RPC
                 |
           whaxon.adapters
             Adapter ABC   parse(lines, ctx) -> list[Finding]
             register()    module-level self-registration
-            built-ins     nmap nikto sqlmap burp hashcat impacket msf
+            built-ins     catalog-backed adapters; see adapters.md and the live catalog
 
 ## Data flow - one job end to end
 
@@ -30,7 +30,7 @@ WHAXON is a headless core surrounded by three interface shells and a plugin laye
 2. ScopeManager checks target. Out of scope and no allow_out_of_scope -> OutOfScopeError, no process spawned.
 3. ToolRunner.build_argv looks up the Tool, formats its args template with {target}, appends extra_args.
 4. ToolRunner.run spawns the subprocess via asyncio.create_subprocess_exec, pumps stdout/stderr line by line, publishes JobStarted, JobOutput, JobFinished / JobFailed.
-5. JobStore subscribes to every event and persists job, lines, findings, evidence.
+5. JobStore persists job lifecycle, output lines, findings, coverage and evidence through the event/store integration.
 6. Runner._publish_findings looks up the adapter for tool_id, calls adapter.parse(lines, ctx={tool_id, extra_args, argv, target}), publishes JobFindings.
 7. Interface renders. Web streams events via SSE at /api/jobs/<id>/stream.
 
@@ -49,19 +49,18 @@ See adapters.md.
 
 ## Persistence
 
-SQLite at data/whaxon.db. Tables:
+SQLite at the configured data directory (default `data/whaxon.db`). The schema is created and migrated by `src/whaxon/core/store.py`. The following is a concise source-derived inventory; migrations may add columns to older databases.
 
-- jobs: id, tool_id, target, status, exit_code, started_at, duration_s
-- job_lines: stream, text per job
-- findings: job_id, seq, kind, severity, data (JSON), raw_line, cvss, cwe, impact, remediation, references
-- evidence: job_id, seq, kind, note/filename, blob
-- pivot_edges: from_kind, from_id, relation, to_kind, to_id, evidence
+- `jobs`: id, tool, target, status, exit_code, error, started_at, finished_at, duration_s and worker lease/heartbeat fields.
+- `lines`: job_id, seq, stream, text.
+- `findings`: job_id, seq, kind, severity, source, data_json, raw_line, enrichment_json, verification_status, verified_by and verification_reason.
+- `coverage`: job_id, seq, tool_id, target, kind, detail, phase and timestamp (`at`).
+- `sessions`: id, host, type, info_json, opened_at, last_seen and status.
+- `evidence`: job_id, seq, kind, name, path, note and added_at.
+- `ai_runs`, `ai_run_steps` and `approvals`: AI run state, step history and approval records.
+- Engine v2: `missions`, `workflow_plans`, `workflow_tasks`, `capability_manifests` and `task_attempts`.
 
-The store subscribes to the EventBus so writes happen consistently regardless of which interface started the job.
-
-## Pivot chains
-
-/api/pivot/graph walks pivot_edges to build chains. Each edge has a relation (from_exploit, from_session, from_loot) and an evidence string. Engagement reports render the tree under ## Pivot Chains.
+The schema above is not a promise that every subsystem has completed production acceptance. Engine v2's remaining guarantees and migration work are tracked in [the Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) and master roadmap §49.
 
 ## Fail-closed design
 

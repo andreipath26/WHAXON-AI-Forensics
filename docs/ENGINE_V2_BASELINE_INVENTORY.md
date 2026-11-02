@@ -7,6 +7,8 @@
 **Roadmap authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, §0 and §49  
 **Review type:** Static source, test, configuration and repository-tree inspection. No runtime tests were executed in this inventory pass. No runtime code was changed.
 
+> **Historical baseline (2026-11-01).** This is a point-in-time E0 inventory at the commit above. Its statements that Engine v2 contracts, scheduler, mission persistence or leases do not exist are superseded by the dated implementation update in master roadmap §49 and the current [Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md). Use this file only to understand the migration starting point, not current implementation status.
+
 ## 1. Executive result
 
 The repository has a substantial and useful execution foundation, but the current system is not yet a general-purpose, capability-driven mission engine. It is a composition of a low-level tool runner, a durable-but-minimal pending-job queue, event subscribers, a deterministic single-rule Automator, and a separate sequential AI action loop.

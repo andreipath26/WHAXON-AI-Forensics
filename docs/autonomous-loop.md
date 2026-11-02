@@ -1,7 +1,8 @@
-cd "$HOME/Desktop/WHAXON RESERCH LAB/securelab_portable" && cat >> docs/autonomous-loop.md << 'EOF'
 # Autonomous Loop
 
-**Status:** Design document. No code in this file is implemented yet.
+> **Historical design record (2026-11-02).** This document captures an early autonomy proposal and must not be used as a current implementation specification. Its factual snapshot explicitly refers to v0.8.0. Current behavior and delivery status are governed by `src/whaxon/ai/`, the Engine v2 crosswalk and master roadmap §49.
+
+**Status:** Historical proposal; implementation status has evolved since this document was written.
 **Scope:** Phase H of `whaxon_vision.md` — persistent, resumable, objective-driven autonomy.
 **Non-goals:** Multi-target engagements, cost budgets, rate limiting, anything that touches the executor boundary.
 
@@ -17,9 +18,9 @@ Phase F gave us the human-in-the-loop machinery: approvals persist, overrides ar
 
 **The human is still in charge.** `--auto` is opt-in, gated behind `WHAXON_AI_AUTO_ALLOW=1`. Default behavior is unchanged: the loop pauses on every `ask_human` and waits.
 
-## 2. What exists today (factual)
+## 2. What existed at the v0.8.0 snapshot (historical)
 
-Verified by reading the source at v0.8.0.
+This table records the source state at v0.8.0 only; it is not a current verification.
 
 | Component | Current behavior |
 |---|---|
@@ -37,10 +38,7 @@ Verified by reading the source at v0.8.0.
 3. **Unattended phase decisions.** Every phase transition fires an `ask_human`. In `--auto` mode this needs a policy so the loop can cross from recon to enumeration without a human at the keyboard.
 4. **Auto-answer policy.** The loop has no way to answer its own questions. Every `ask_human` either blocks or (with no callback) terminates.
 
-EOF
-wc -l docs/autonomous-loop.md
 
-cd "$HOME/Desktop/WHAXON RESERCH LAB/securelab_portable" && cat >> docs/autonomous-loop.md << 'EOF'
 ## 3. The three questions
 
 Phase H is fundamentally three design questions, not one big one. Each gets its own answer.
@@ -132,10 +130,7 @@ If the goal doesn't parse to a known verb, the loop runs until the model emits `
 - The loop never auto-approves a scope expansion.
 - The loop never auto-approves a run against an out-of-scope target. That's the executor's check, not the answerer's job.
 
-EOF
-wc -l docs/autonomous-loop.md
 
-cd "$HOME/Desktop/WHAXON RESERCH LAB/securelab_portable" && cat >> docs/autonomous-loop.md << 'EOF'
 ## 4. The mode
 
 **New flag:** `whaxon ai "<goal>" --auto`.
@@ -219,10 +214,7 @@ cd "$HOME/Desktop/WHAXON RESERCH LAB/securelab_portable" && cat >> docs/autonomo
 
 **Estimated: 3 sessions.** Session 1: steps 1–3 (store + executor). Session 2: steps 4–5 (objectives + auto_answers). Session 3: steps 6–7 (CLI wiring) plus tests.
 
-EOF
-wc -l docs/autonomous-loop.md
 
-cd "$HOME/Desktop/WHAXON RESERCH LAB/securelab_portable" && cat >> docs/autonomous-loop.md << 'EOF'
 ## 7. What this document does not answer
 
 1. **Multi-target engagements.** The loop tracks one goal, one target. "Enumerate 10.0.0.0/24" is not supported; the loop would need to fan out per host and aggregate. Deferred.
@@ -264,5 +256,3 @@ cd "$HOME/Desktop/WHAXON RESERCH LAB/securelab_portable" && cat >> docs/autonomo
 Phase H is the last phase the vision doc names. What it delivers is not "the AI does everything on its own" — it's "the AI can keep working without a human at the keyboard, *when the human has explicitly allowed it*." The default stays interactive. `--auto` is a mode, not the new normal.
 
 The human is still in charge. The store is still the source of truth. The executor's boundary still holds. Phase H changes who answers the questions, not what the questions are or who they're answered for.
-EOF
-wc -l docs/autonomous-loop.md && head -5 docs/autonomous-loop.md && git status --short

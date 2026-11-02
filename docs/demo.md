@@ -1,67 +1,48 @@
 # Demo Script
 
-A 90-second scripted walkthrough. Every command is copy-pasteable. Use a Metasploitable2 VM at 10.0.0.42 or substitute your own authorised target.
+A scripted walkthrough for a controlled lab. Use a Metasploitable2 VM or another target you own and have explicitly authorized. The example address below is illustrative; substitute the actual lab address and add it to the active scope before running any tool.
 
-## 0:00 - Setup (off camera)
+## 0:00 - Setup
 
-    cd whaxon
-    source .venv/bin/activate
-    whaxon serve --daemon
-    xdg-open http://127.0.0.1:5001/ui
+```bash
+cd WHAXON-AI-Forensics
+source .venv/bin/activate
+whaxon web
+```
 
-Browser opens on the WHAXON web UI. Login whaxon / whaxon.
+Open [http://127.0.0.1:5001/](http://127.0.0.1:5001/). The root route redirects to the canonical `/ui-v2` interface. Loopback requests use the local-peer authentication shortcut; if prompted, use locally configured credentials. Never expose default credentials remotely.
 
 ## 0:10 - Scope check
 
-Open a terminal beside the browser. Run:
+```bash
+whaxon scope --show
+whaxon scope --check 10.0.0.42
+```
 
-    whaxon scope --show
-
-WHAXON is fail-closed. Everything outside RFC1918 is refused by default. The scope decision is a file, not a UI toggle.
+Confirm that the target is explicitly listed and authorized. Private addressing is not proof of authorization; scope checks are application-level preflight controls, not a network firewall.
 
 ## 0:20 - Run a tool
 
-In the browser, pick nmap from the catalog. Target: 10.0.0.42. Hit Run. Output streams in; findings render below.
+In the browser, select nmap, enter the explicitly authorized lab target, and submit the job. Review streamed output, persisted findings and evidence. Do not assume every nmap line becomes a finding; parser coverage and tool output determine what is recorded.
 
-The adapter turned nmap output into structured findings: open ports, service fingerprints, severity. Everything the report will need.
+## 0:35 - Review findings
 
-## 0:35 - A correlated finding
+Open the job's findings and inspect the raw evidence and coverage. Correlation is data-dependent: only describe a correlated finding if the actual run produced one. Do not stage or imply a finding that was not observed.
 
-When the nmap job finishes, the correlator fires. A correlated finding appears: web_service on port 80 or exposed_service on 139/445.
+## 0:45 - AI planner
 
-The correlator noticed a pattern across findings - a web port plus a service fingerprint - and produced a single finding that says more than the parts.
-
-## 0:45 - The AI planner
-
-In the terminal:
-
-    WHAXON_AI_ENABLED=true WHAXON_AI_PROVIDER=ollama WHAXON_AI_MODEL=qwen2.5:1.5b whaxon ai "assess 10.0.0.42 for open web services" --target 10.0.0.42
-
-Steps print one per line - each showing the tool it chose and why. The target lock prevents the model from scanning anything else.
-
-The AI never executes anything. It proposes an action. The executor validates every proposal against the catalog, the scope, and a target lock before a single process starts.
+AI planning is optional and provider-dependent. If enabled, use a lab target and review the proposed plan. A proposal is not authorization or execution evidence; only supported, approved actions can be executed.
 
 ## 1:05 - Reports
 
-Back in the browser, click Export PDF (or run in terminal):
-
-    JID=$(curl -s -u whaxon:whaxon http://127.0.0.1:5001/api/history | python3 -c "import sys,json;print(json.load(sys.stdin)[0][chr(39)+chr(105)+chr(100)+chr(39)])")
-    whaxon report "$JID" --format pdf --out /tmp/demo.pdf
-    xdg-open /tmp/demo.pdf
-
-A rendered PDF report opens with executive summary, findings table, and remediation.
-
-The whole engagement - discoveries, correlations, suggestions, remediation advice - in one PDF.
+Export a report for the selected job. Review the coverage, verification state and limitations before presenting it as a client deliverable. Reports contain only the data actually persisted by the selected workflow.
 
 ## 1:20 - Cleanup
 
-    kill "$(cat data/whaxon.pid)" && rm -f data/whaxon.pid
+Stop the foreground server with Ctrl+C. If you deliberately started it as a daemon, use the PID file documented by the installed version and confirm the PID belongs to WHAXON before terminating it.
 
-WHAXON - one platform, every layer of security.
+## Recording notes
 
-## Tips for recording
-
-- Terminal: 14pt monospace, dark theme, cursor hidden while typing.
-- Browser: 1400x900 viewport, hide bookmarks bar.
-- Timing: cut nothing; keep the whole thing under 2 minutes.
-- Voice: script it, then record audio separately; sync in post.
+- Use a lab target and show the active scope before execution.
+- Do not fabricate findings or claim planner proposals were executed.
+- Keep credentials, customer data and sensitive evidence out of screenshots and recordings.

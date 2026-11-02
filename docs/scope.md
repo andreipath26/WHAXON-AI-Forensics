@@ -97,9 +97,9 @@ An enabled scope containing `0.0.0.0/0` or `::/0` emits a warning when loaded be
 
 When the scope contains IP/CIDR rules, hostname checks resolve the hostname and compare the current A/AAAA answers against the configured rules. Resolution errors fail closed, and an out-of-scope address overrides an allow rule. This is a **preflight check**, not a guarantee about the address ultimately contacted: DNS answers can change between the check and a tool's connection, and many external tools resolve the hostname independently.
 
-For beta deployments, do not treat the scope checker as a network firewall or as complete DNS-rebinding protection.
+For any deployment, do not treat the scope checker as a network firewall or as complete DNS-rebinding protection.
 
-- Run beta tests in an isolated lab/VM or container with outbound network access restricted to the approved target ranges.
+- Run tests in an isolated lab/VM or container with outbound network access restricted to the approved target ranges.
 - Use a dedicated test engagement and a written target allowlist; review redirects, proxy settings, VPN routes, and pivot/port-forward paths.
 - Do not use the default scope as authorization to scan arbitrary public hosts. It is intentionally limited to loopback and private ranges.
 - Do not expose WHAXON to untrusted users or allow untrusted users to edit scope, configure tools, or invoke runner APIs.
