@@ -3,8 +3,6 @@
 These tests execute in-process fake providers only; they do not establish
 external scanner equivalence or authorize a real network assessment.
 """
-from __future__ import annotations
-
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
