@@ -149,6 +149,15 @@ def _parser() -> argparse.ArgumentParser:
     resources.add_argument("--id", required=True)
     audit = plan_commands.add_parser("audit", help="verify persisted attempt/event consistency")
     audit.add_argument("--id", required=True)
+    audit_snapshot = plan_commands.add_parser(
+        "audit-snapshot", help="print read-only lifecycle digest for external retention",
+    )
+    audit_snapshot.add_argument("--id", required=True)
+    audit_verify = plan_commands.add_parser(
+        "audit-verify", help="compare lifecycle state to externally retained SHA-256",
+    )
+    audit_verify.add_argument("--id", required=True)
+    audit_verify.add_argument("--expected-digest", required=True)
     attempts = plan_commands.add_parser("attempts", help="inspect durable task attempts")
     attempts.add_argument("--id", required=True)
     attempts.add_argument("--after-started", type=float, default=0.0)
@@ -345,6 +354,20 @@ def main(args: list[str] | None = None) -> int:
             audit = core.workflow_audit_integrity(options.id)
             print(json.dumps(audit, indent=2, sort_keys=True))
             return 0 if audit["consistent"] else 1
+        if options.command == "plan" and options.plan_command == "audit-snapshot":
+            print(json.dumps(
+                core.workflow_audit_snapshot(options.id), indent=2, sort_keys=True,
+            ))
+            return 0
+        if options.command == "plan" and options.plan_command == "audit-verify":
+            matches = core.verify_workflow_audit_snapshot(
+                options.id, options.expected_digest,
+            )
+            print(json.dumps({
+                "plan_id": options.id, "digest_matches_reference": matches,
+                "independent_anchor_verified": False,
+            }, sort_keys=True))
+            return 0 if matches else 1
         if options.command == "plan" and options.plan_command == "attempts":
             print(json.dumps(
                 core.workflow_attempts(

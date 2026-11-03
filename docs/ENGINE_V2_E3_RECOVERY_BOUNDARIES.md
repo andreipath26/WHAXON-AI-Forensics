@@ -43,3 +43,8 @@
 - `JobStore.get_workflow_audit_snapshot(plan_id)` hashes the versioned plan identity, ordered durable task/attempt state and persisted event stream from one SQLite read transaction. It exposes only the SHA-256 digest and counts, not raw event details, inputs or stored results.
 - `verify_workflow_audit_snapshot(plan_id, expected_digest)` compares a caller-retained reference with the current snapshot. A separate operator-controlled, immutable or independently protected location must retain **the original digest** (and associated plan, SHA, environment and observation time) before this protects against rewriting the local database. Tests mutate event, task and attempt records and detect mismatch across restarts.
 - **Not a shipped independent trust anchor.** This API cannot prove its own previous digest was retained externally; it is no substitute for a signed/anchored audit log or an approved operational retention/deletion procedure. The snapshot does not cover external provider-side effects, legacy jobs outside this workflow, or binary evidence files. `independent_anchor_verified` remains `False`.
+
+## Operator-facing shared CLI/Core service
+
+- `Core.workflow_audit_snapshot()` and `Core.verify_workflow_audit_snapshot()` surface the store's read-only versioned lifecycle digest. `whaxon workflow plan audit-snapshot --id ...` prints the digest; `audit-verify --id ... --expected-digest ...` returns nonzero on mismatch.
+- The CLI explicitly emits `independent_anchor_verified: false` even on a matching caller-provided digest. Operator-managed independent retention and a recorded witness are mandatory for external trust assurance. See `docs/ENGINE_V2_E3_PHASE_ACCEPTANCE.md`.

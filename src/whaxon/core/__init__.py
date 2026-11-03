@@ -277,6 +277,14 @@ class Core:
     def workflow_audit_integrity(self, plan_id: str):
         return self.store.get_workflow_audit_integrity(plan_id)
 
+    def workflow_audit_snapshot(self, plan_id: str):
+        """Read-only lifecycle digest; external anchoring is operator-owned."""
+        return self.store.get_workflow_audit_snapshot(plan_id)
+
+    def verify_workflow_audit_snapshot(self, plan_id: str, expected_digest: str):
+        """Compare current lifecycle state against an externally retained digest."""
+        return self.store.verify_workflow_audit_snapshot(plan_id, expected_digest)
+
     def workflow_attempts(
         self, plan_id: str, *, after_started: float = 0.0, limit: int = 100,
     ):
