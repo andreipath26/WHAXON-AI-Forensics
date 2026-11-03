@@ -1349,3 +1349,28 @@ def test_e4_portfolio_audit_marks_disappeared_adapter_stale_without_dispatch(mon
     assert snapshot["rows"][0]["adapter_registered"] is False
     assert snapshot["summary"]["stale_binding"] == 1
     assert snapshot["execution_enabled_by_audit"] is False
+
+
+def test_e4_portfolio_audit_detects_registry_manifest_disappearance(monkeypatch):
+    """A local route without its registered immutable manifest is stale."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    registry = CapabilityRegistry()
+    bridge = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(), store=_Store(),
+        registry=registry,
+    )
+    router = BoundProviderRouter((bridge,))
+    assert router.portfolio_audit()["rows"][0]["state"] == "bound"
+
+    monkeypatch.setattr(registry, "list", lambda _capability=None: [])
+    report = router.portfolio_audit()
+    row = report["rows"][0]
+    assert row["state"] == "stale_binding"
+    assert row["reason"] == "manifest_binding_mismatch"
+    assert row["v2_provider_bound"] is True
+    assert report["summary"]["stale_binding"] == 1
+    assert report["execution_enabled_by_audit"] is False
