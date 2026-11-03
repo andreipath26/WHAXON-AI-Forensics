@@ -59,6 +59,13 @@ class WorkflowRunQueue:
         data["limits"] = json.loads(data.pop("limits_json"))
         return data
 
+    @classmethod
+    def _public_record(cls, row) -> dict:
+        """Client-facing queue records never expose worker lease credentials."""
+        value = cls._format(row)
+        value.pop("lease_token", None)
+        return value
+
     def enqueue(self, plan_id: str, *, limits: dict) -> dict:
         self._check_limits(limits)
         now = time.time()
@@ -84,7 +91,7 @@ class WorkflowRunQueue:
                     if json.loads(existing["limits_json"]) != limits:
                         raise ValueError("active workflow request has different limits")
                     conn.execute("COMMIT")
-                    return self._format(existing)
+                    return self._public_record(existing)
                 conn.execute(
                     "INSERT INTO workflow_run_requests "
                     "(id,plan_id,plan_digest,limits_json,submitted_at) "
@@ -97,7 +104,7 @@ class WorkflowRunQueue:
                     (request_id,),
                 ).fetchone()
                 conn.execute("COMMIT")
-                return self._format(row)
+                return self._public_record(row)
             except Exception:
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")
@@ -115,9 +122,7 @@ class WorkflowRunQueue:
             ).fetchone()
             if row is None:
                 return None
-            value = self._format(row)
-            value.pop("lease_token", None)
-            return value
+            return self._public_record(row)
         finally:
             conn.close()
 
