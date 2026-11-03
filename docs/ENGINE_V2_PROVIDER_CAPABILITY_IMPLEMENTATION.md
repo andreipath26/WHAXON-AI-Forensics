@@ -122,3 +122,5 @@ providers with and without other trusted implementations, the rule requiring
 immutable semantic plan provider pins, and unconfigured ambiguity failing closed.
 Full E4 catalog/transport/interface parity, provider substitution in a
 controlled lab, and retirement of legacy bypasses are still separate gates.
+
+The catalog/adapter portfolio audit also now checks the live catalog argv-version digest and the currently registered manifest fingerprint before calling a provider `bound`. Catalog drift or missing/changed manifest registration is reported `unbound` with `catalog_or_binding_changed`, rather than retaining a stale admission label. This affects inventory reporting only; the dispatch boundary retains its separate runtime revalidation. Regression tests cover both forms of drift.
