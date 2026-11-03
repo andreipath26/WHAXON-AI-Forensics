@@ -2,7 +2,7 @@
 
 **Scope:** E3 durable operations, on the sole E3 integration PR #122. The master roadmap §0/P2 and the V2 crosswalk §14 are authoritative.
 
-**Decision:** **OPEN / NOT ACCEPTED** until exact-head CI, controlled authorized integration and external audit anchoring requirements have verifiable evidence. Source tests below are test *definitions*, not claims of observed passing results until a cited exact-head run succeeds. Zero additional phase PRs or premature merge permitted.
+**Decision:** ENGINEERING FREEZE PENDING exact-head CI and engineering sign-off. Real-world lab, independent external audit anchor and production recovery validation are mandatory at the final integrated Engine V2 deployment gate, not at the phase engineering freeze. Source tests below are test *definitions*, not claims of observed passing results until a cited exact-head run succeeds. Zero additional phase PRs or premature merge permitted.
 
 | Gate | Required behavior and evidence | Source/test candidate | Current decision |
 |---|---|---|---|
@@ -17,11 +17,15 @@
 | E3-I | Event cursors monotone and persisted; at-least-once delivery, post-effect failure redelivery and independent consumer isolation | `src/whaxon/core/outbox.py`; `tests/test_workflow.py`; `tests/test_engine_v2_e3_outbox_delivery.py` | NEW DELIVERY TESTS DEFINED, CI pending; external transport acceptance open |
 | E3-J | Semantic audit integrity cross-check and fail-closed reporting | `tests/test_engine_v2_e3_audit_semantic_integrity.py` | NEW TEST DEFINED, CI pending |
 | E3-K | Lifecycle snapshot stable across restart; changed event/attempt/task detected against caller-held digest | `tests/test_engine_v2_e3_audit_snapshot_anchor.py`; `tests/test_engine_v2_e3_audit_cli.py` | NEW TEST DEFINED, CI pending |
-| E3-L | Independently protected trust anchor, retention and deletion contract verified under database tampering | Operator-controlled external anchor and witness evidence required | **OPEN: NOT IMPLEMENTATION-ACCEPTED** |
-| E3-M | Real authorized scanner external effects plus crash, network failure, host restart and independent reconciliation | Approved lab target, recorded run, side-effect ledger and recovery transcript required | **OPEN: LAB NOT RUN** |
-| E3-N | Production multi-worker/service/database-backup and restored-client operational recovery | Systemd deployment, backup including config/evidence, supported host, recovery evidence required | **OPEN: E3/E5 INTEGRATION** |
+| E3-L | Independently protected trust anchor, retention and deletion contract verified under database tampering | Operator-controlled external anchor and witness evidence required | **DEFERRED TO V2 DEPLOYMENT — NOT PASSED** |
+| E3-M | Real authorized scanner external effects plus crash, network failure, host restart and independent reconciliation | Approved lab target, recorded run, side-effect ledger and recovery transcript required | **DEFERRED TO V2 DEPLOYMENT — NOT PASSED** |
+| E3-N | Production multi-worker/service/database-backup and restored-client operational recovery | Systemd deployment, backup including config/evidence, supported host, recovery evidence required | **DEFERRED TO V2 DEPLOYMENT — NOT PASSED** |
 | E3-O | Supported Python/platform lint, mypy, tests, package and security checks on exact PR SHA | GitHub Actions workflow `.github/workflows/ci.yml` | **OPEN until exact-head CI succeeds** |
 | E3-P | Signed reviewer/operator acceptance, SHA, test commands, environment, residuals and rollback | Final acceptance record | **OPEN** |
+
+## Governing phase-freeze decision (applies to Engine V2 E0–E9)
+
+Every Engine V2 phase may be engineering-accepted, merged and frozen once its implementation, phase-level automated adversarial/security/integration tests, exact-head supported CI and engineering sign-off pass. External authorized-scanner labs, independently operated audit-anchor/witness retention, and production-like service, host-restart and backup/restore testing are deferred until the fully integrated V2 engine is ready for deployment. Deferred gates are NOT PASSED and must be retained for final deployment acceptance; no production-readiness claim or release closure is permitted before they pass. Frozen phases may be reopened for proven security, correctness or cross-phase integration defects, with regression evidence. This decision supersedes earlier phase-freeze prerequisites without weakening execution authorization, fail-closed safety or audit integrity.
 
 ## Coordinated workstreams and integration rules
 
