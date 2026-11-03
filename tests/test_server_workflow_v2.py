@@ -380,3 +380,79 @@ def test_v2_evidence_api_rejects_bad_bounds_and_unknown_plans(tmp_path, monkeypa
     )))
     for limit in ("0", "-1", "1001", "invalid"):
         assert client.get(f"/api/v2/workflows/p/evidence?limit={limit}").status_code == 400
+
+
+def test_v2_evidence_seal_survives_restart_and_rejects_modified_findings(tmp_path, monkeypatch):
+    """Terminal job evidence is sealed atomically, then checked across Core restarts."""
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-sealed", "authorized test")
+    core.save_workflow_plan("p-sealed", WorkflowPlan("m-sealed", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.44"),
+    )))
+    attempt = core.store.claim_ready_workflow_task("p-sealed", "operator")
+    assert attempt is not None
+    with core.store._conn() as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, tool, target, status, exit_code) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("job-sealed", "nmap", "192.0.2.44", "finished", 0),
+        )
+        connection.execute(
+            "INSERT INTO lines (job_id, seq, stream, text) VALUES (?, ?, ?, ?)",
+            ("job-sealed", 0, "stdout", "80/tcp open http"),
+        )
+        connection.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, "
+            "data_json, raw_line, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("job-sealed", 0, "open_port", "info", "nmap",
+             '{"port": 80}', "80/tcp open http", "candidate"),
+        )
+    core.store.finish_task_attempt(
+        attempt["attempt_id"], "succeeded",
+        result={"job_id": "job-sealed", "tool_id": "nmap", "target": "192.0.2.44"},
+    )
+    verified = client.get("/api/v2/workflows/p-sealed/evidence").get_json()
+    assert verified["all_evidence_recorded"] is True
+    assert verified["all_evidence_integrity_verified"] is True
+    assert verified["attempts"][0]["integrity_status"] == "verified"
+
+    reopened = Core(data_dir=tmp_path)
+    assert reopened.workflow_evidence("p-sealed")["all_evidence_integrity_verified"] is True
+    with reopened.store._conn() as connection:
+        connection.execute(
+            "UPDATE findings SET raw_line=? WHERE job_id=? AND seq=0",
+            ("80/tcp filtered", "job-sealed"),
+        )
+    changed = client.get("/api/v2/workflows/p-sealed/evidence").get_json()
+    assert changed["all_evidence_recorded"] is False
+    assert changed["all_evidence_integrity_verified"] is False
+    assert changed["attempts"][0]["evidence_status"] == "integrity_mismatch"
+    assert changed["attempts"][0]["integrity_status"] == "changed"
+    assert changed["attempts"][0]["findings"] == []
+
+
+def test_v2_evidence_cannot_seal_wrong_tool_or_wrong_target(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "authorized")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+    )))
+    attempt = core.store.claim_ready_workflow_task("p", "worker")
+    assert attempt is not None
+    with core.store._conn() as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, tool, target, status, exit_code) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("wrong-tool", "nikto", "192.0.2.10", "finished", 0),
+        )
+    core.store.finish_task_attempt(
+        attempt["attempt_id"], "succeeded",
+        result={"job_id": "wrong-tool", "tool_id": "nmap", "target": "192.0.2.10"},
+    )
+    result = client.get("/api/v2/workflows/p/evidence").get_json()
+    assert result["all_evidence_integrity_verified"] is False
+    assert result["attempts"][0]["integrity_status"] == "unsealed"
+    with core.store._conn() as connection:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM workflow_evidence_seals"
+        ).fetchone()[0] == 0
