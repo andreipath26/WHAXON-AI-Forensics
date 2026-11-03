@@ -376,7 +376,13 @@ class Core:
             raise TypeError("stop_event must expose is_set()")
         if not initialized:
             await self.initialize(drain=False)
-        self.workflow_requests.reconcile_stale()
+        # Reconcile the full bounded backlog before claiming fresh work.
+        # Each pass holds a short transaction (at most 128 lost leases).
+        # A single pass would leave older lost leases indefinitely if the
+        # service exits after draining all newly queued work.
+        while self.workflow_requests.reconcile_stale():
+            if stop_event is not None and stop_event.is_set():
+                return 0
         owner = "workflow-run-worker-" + uuid.uuid4().hex
         processed = 0
         for _ in range(max_runs):
