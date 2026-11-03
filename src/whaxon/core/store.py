@@ -1618,14 +1618,14 @@ class JobStore:
                 if stale_after_s is None:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
-                        "WHERE status='running' ORDER BY started_at, id LIMIT 128"
+                        "WHERE status='running' ORDER BY started_at, id"
                     ).fetchall()
                 else:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
                         "WHERE status='running' "
                         "AND COALESCE(heartbeat_at, started_at) < ? "
-                        "ORDER BY started_at, id LIMIT 128",
+                        "ORDER BY started_at, id",
                         (stale_before,),
                     ).fetchall()
                 for row in rows:
