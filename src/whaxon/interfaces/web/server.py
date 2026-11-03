@@ -625,6 +625,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             jsonify({"error": "unknown workflow run request"}), 404
         )
 
+    @app.post("/api/v2/workflow-runs/<request_id>/cancel")
+    def workflow_v2_cancel_run_request(request_id):
+        """Cancel by durable request identity through the plan stop barrier."""
+        try:
+            return jsonify(core.cancel_workflow_run_request(request_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
     @app.get("/api/v2/workflow-runs/<request_id>/snapshot")
     def workflow_v2_run_snapshot(request_id):
         """Reconnect to one durable request and its persisted task progress."""

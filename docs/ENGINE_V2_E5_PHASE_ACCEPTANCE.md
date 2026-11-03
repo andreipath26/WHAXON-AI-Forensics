@@ -84,3 +84,13 @@ durable cancellation after Core restart, stale-worker reconciliation, and
 credential-free inspection of an uncertain request. These tests require
 execution and exact-head CI evidence; their presence alone does not close
 E5-C or E5-D.
+
+
+### Request-identity cancellation
+
+The Core `cancel_workflow_run_request(request_id)` operation and the
+API `POST /api/v2/workflow-runs/<request_id>/cancel` and CLI
+`plan cancel-request --id <request_id>` share the existing persisted
+plan cancellation barrier. Unknown requests fail closed. Running external
+effects are never represented as stopped by this acknowledgement. This
+cancels the associated plan, not an isolated task.

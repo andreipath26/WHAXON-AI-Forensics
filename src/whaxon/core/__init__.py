@@ -342,6 +342,25 @@ class Core:
     def workflow_run_request(self, request_id: str):
         return self.workflow_requests.get(request_id)
 
+    def cancel_workflow_run_request(self, request_id: str):
+        """Request cancellation through the existing durable plan stop barrier.
+
+        A running external effect is not asserted to have stopped. Unknown
+        requests never cancel an unrelated plan.
+        """
+        row = self.workflow_run_request(request_id)
+        if row is None:
+            raise ValueError("unknown workflow run request")
+        cancelled = self.cancel_workflow_plan(row["plan_id"])
+        return {
+            "run_request_id": request_id,
+            "plan_id": row["plan_id"],
+            "cancellation_requested": True,
+            "tasks_cancelled": cancelled,
+            "external_effects_stopped": False,
+            "request": self.workflow_run_request(request_id),
+        }
+
     def workflow_run_snapshot(self, request_id: str):
         """Reconnect-safe persisted run and task progress, without lease secrets.
 
