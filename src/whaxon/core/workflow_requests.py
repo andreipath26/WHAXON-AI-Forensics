@@ -97,6 +97,14 @@ class WorkflowRunQueue:
                     (plan_id,),
                 ).fetchone()
                 if existing is not None:
+                    # A duplicate submission must not adopt an old intent
+                    # after the source plan's persisted identity has drifted.
+                    # Keep the original queue row for reconciliation; never
+                    # silently rebind it to the new digest.
+                    if existing["plan_digest"] != plan["digest"]:
+                        raise ValueError(
+                            "active workflow request has a different plan digest"
+                        )
                     try:
                         persisted_limits = json.loads(existing["limits_json"])
                         self._check_limits(persisted_limits)

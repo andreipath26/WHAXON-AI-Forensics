@@ -1,5 +1,6 @@
 import hashlib
 import json
+import math
 import sqlite3
 import threading
 import time
@@ -1600,9 +1601,14 @@ class JobStore:
         """Mark orphaned attempts uncertain; optionally preserve fresh worker leases."""
         now = time.time()
         if stale_after_s is not None:
-            stale_after_s = float(stale_after_s)
-            if stale_after_s <= 0:
-                raise ValueError("stale_after_s must be positive")
+            if isinstance(stale_after_s, bool):
+                raise ValueError("stale_after_s must be finite and positive")
+            try:
+                stale_after_s = float(stale_after_s)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("stale_after_s must be finite and positive") from exc
+            if not math.isfinite(stale_after_s) or stale_after_s <= 0:
+                raise ValueError("stale_after_s must be finite and positive")
             stale_before = now - stale_after_s
         with self._lock:
             c = self._conn()
