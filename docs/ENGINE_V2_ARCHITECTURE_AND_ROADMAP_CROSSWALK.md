@@ -598,3 +598,22 @@ subobjects remain supported; stable round trips keep the same digest.
 This is an E2 source-contract safety improvement, not a migration of all
 legacy finding/evidence schemas or full E2 acceptance. Regression tests
 verify fail-closed validation at construction and digest boundaries.
+
+### E3/E5 persisted run-intent contract integrity (2026-11-03)
+
+The durable `WorkflowRunQueue` now validates stored execution limits again
+**inside the atomic worker claim**, beyond its original enqueue validation.
+Malformed JSON, missing/extra fields, boolean integers and out-of-bounds values
+are quarantined as `uncertain` and create an audit event in the **same
+transaction**. A bad queue head cannot starve a valid request behind it.
+Duplicate submissions to a corrupt active request fail closed rather than
+adopting an altered execution budget. Read-only status inspection preserves
+the evidence of malformed stored limits as `limits: null` and
+`limits_integrity: invalid`, without exposing worker credentials. Valid
+worker claims still return their private lease token. Regression tests cover
+multiple corruption classes, restart, audit event cardinality, valid queue
+continuation and worker fencing.
+
+**Acceptance boundary:** This is E3/E5 durability and truthful reconciliation
+behavior, not proof of safe replay of unknown external effects or complete
+service/container acceptance. Full E0–E6 gates and exact-revision CI remain open.
