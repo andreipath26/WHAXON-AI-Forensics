@@ -541,3 +541,66 @@ def test_e5_request_identity_cancel_api_is_durable_and_fails_closed(
     assert result["request"]["status"] == "cancelled"
     assert Core(tmp_path).workflow_run_request(request_id)["status"] == "cancelled"
     assert Core(tmp_path).workflow_requests.claim("worker") is None
+
+
+def test_e5_concurrent_duplicate_api_submissions_share_one_durable_intent(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+
+    def submit(_):
+        # Each request gets its own Flask test client, as in separate
+        # client connections racing to persist the same plan intent.
+        response = app.test_client().post(
+            "/api/v2/workflows/p/run", json={
+                "max_tasks": 10, "max_attempts": 2, "max_concurrency": 1,
+            },
+        )
+        return response.status_code, response.get_json()
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(submit, range(24)))
+    assert all(status == 202 for status, _ in results)
+    ids = {body["run_request_id"] for _, body in results}
+    assert len(ids) == 1
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 1
+    assert core.workflow_run_queue_summary()["total"] == 1
+    assert all(
+        body["run_snapshot_url"].endswith(
+            f"/{body['run_request_id']}/snapshot"
+        ) for _, body in results
+    )
+
+
+def test_e5_concurrent_cancel_and_claim_never_replays_queued_intent(tmp_path):
+    core = _core(tmp_path)
+    queued = core.enqueue_workflow_run("p")
+    barrier = __import__("threading").Barrier(2)
+
+    def cancel():
+        barrier.wait()
+        return Core(tmp_path).cancel_workflow_run_request(queued["id"])
+
+    def claim():
+        barrier.wait()
+        return Core(tmp_path).workflow_requests.claim("racing-worker")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        cancelled_future = pool.submit(cancel)
+        claimed_future = pool.submit(claim)
+        cancelled = cancelled_future.result(timeout=15)
+        claimed = claimed_future.result(timeout=15)
+    assert cancelled["cancellation_requested"] is True
+    assert cancelled["external_effects_stopped"] is False
+    state = Core(tmp_path).workflow_run_request(queued["id"])
+    assert state["status"] in {"cancelled", "running"}
+    if state["status"] == "cancelled":
+        assert claimed is None
+    else:
+        assert claimed is not None and claimed["id"] == queued["id"]
+        assert Core(tmp_path).workflow_requests.claim("late-worker") is None
+        assert "lease_token" not in state
+    assert Core(tmp_path).workflow_requests.claim("another-worker") is None

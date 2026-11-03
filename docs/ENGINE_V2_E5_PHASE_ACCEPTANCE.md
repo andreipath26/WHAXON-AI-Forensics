@@ -94,3 +94,13 @@ API `POST /api/v2/workflow-runs/<request_id>/cancel` and CLI
 plan cancellation barrier. Unknown requests fail closed. Running external
 effects are never represented as stopped by this acknowledgement. This
 cancels the associated plan, not an isolated task.
+
+
+### Adversarial concurrency coverage
+
+Additional tests race 24 independent HTTP submissions against one durable
+SQLite request and race request-identity cancellation against a worker claim.
+The allowed cancellation/claim race outcomes are either cancellation before
+claim or a previously claimed run with a durable stop barrier; neither permits
+a second claim. These are engineering tests pending exact-head CI, not
+production multi-host proof.
