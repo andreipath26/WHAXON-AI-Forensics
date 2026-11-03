@@ -641,3 +641,63 @@ provider selection and immutable-plan approval remain independent gates.
 **Still open:** exhaustive catalog/CLI/API/supplied UI control/transport
 migration crosswalk, external-provider lab equivalence, and the explicit
 legacy-autochain cutover decision. No E4 phase acceptance is asserted.
+
+### E5 standalone systemd durable-worker integration (2026-11-03)
+
+A dedicated `whaxon-workflow-worker.service` provides an **explicit**
+foreground process supervisor for the existing durable
+`whaxon workflow plan serve-requests` CLI entry point. It shares the
+production web unit's restricted `whaxon` identity, environment file,
+working directory and `WHAXON_DATA=/var/lib/whaxon/data` SQLite store,
+while running independently of Gunicorn. The unit uses systemd
+`Restart=on-failure`, SIGTERM graceful stop, restricted write paths,
+and no direct public listener. No process-local in-memory handoff or
+automatic replay of uncertain external effects is introduced.
+
+`tests/test_engine_v2_e5_systemd_deployment.py` checks
+service identity/storage parity, exact supported foreground CLI arguments,
+and the absence of a second web-side worker command. This is a deployable
+service-unit candidate, **not** evidence that it has been started and
+restarted on a real supported host. Host provisioning, filesystem ownership,
+reverse-proxy/auth/TLS, packaged unit placement, Docker/service lifecycle,
+backup/restore and crash-recovery acceptance remain E5/P3/G07 gates.
+
+**Release artifact delivery:** both the existing web unit and the dedicated
+worker unit are now explicit source-distribution inputs and are force-included
+in installed wheels under `whaxon/data/systemd/`. This makes the unit
+templates retrievable from a published package; systemd installation,
+permissions, path adjustments and service enablement remain manual and are
+not claimed as automatic packaging behavior.
+
+**SQLite snapshot/recovery lab:** `tests/test_engine_v2_e5_backup_restore.py`
+uses SQLite's transactional backup API to copy durable run/mission state
+from one Core data directory into another. It checks that a queued request
+remains claimable with its original limits and digest, that the original
+store remains untouched, and that a backed-up, now-stale running request
+becomes `uncertain` and cannot automatically replay or reuse its old
+fencing token. This tests a **database snapshot only**; a complete operator
+backup additionally requires protected configuration, scope/approval
+materials, evidence and installed-provider provenance. Live filesystem copy,
+encrypted backups, schema upgrade and deployment restore remain unaccepted.
+
+**State-directory provisioning:** the existing web service and the new durable
+worker now use systemd `StateDirectory=whaxon` with mode `0700` and
+`RequiresMountsFor=/var/lib/whaxon`. This aligns user/group ownership,
+persistent state availability and the service's restricted writable path
+without granting the worker root privileges or allowing a second queue store.
+This is configuration-level verification, not a claim that systemd has
+actually launched both units on a supported target host.
+
+**Cross-phase CI corrections on this candidate:** The sdist exclusion
+no longer strips the installed web service unit required by wheel
+force-inclusion. The hard-kill crash-test marker is published atomically
+before its parent asserts its contents. Late asynchronous reference
+approval buttons are denied after insertion unless they belong to the
+real live-approval panel; no demo operation is enabled or UI restyled.
+These are exact-head CI corrections, not a full E3/E6 acceptance claim.
+
+**CI scope correction (E6/G08):** The legacy `test_web_smoke`
+findings-page assertion is a route/DOM smoke test and no longer depends
+on the exact count of mutable session-scoped seeded findings. Source
+and API/behavior acceptance tests still own true finding-count and
+evidence correctness. This does **not** accept E6 supplied UI controls.

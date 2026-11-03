@@ -71,6 +71,8 @@ exclude = ["src/whaxon/data/**"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/whaxon/data" = "whaxon/data"
+"whaxon.service" = "whaxon/data/systemd/whaxon.service"
+"whaxon-workflow-worker.service" = "whaxon/data/systemd/whaxon-workflow-worker.service"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -130,6 +132,8 @@ include = [
     "src/whaxon/data",
     "pyproject.toml",
     "docs/CHANGELOG.md",
+    "whaxon.service",
+    "whaxon-workflow-worker.service",
 ]
 exclude = [
     "archive",
@@ -143,6 +147,5 @@ exclude = [
     "docker-compose.yml",
     "Dockerfile",
     "Makefile",
-    "whaxon.service",
     ".env.example",
 ]
