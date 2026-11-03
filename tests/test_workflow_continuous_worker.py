@@ -234,3 +234,29 @@ def test_drain_rejects_invalid_stop_object(tmp_path):
         pool.submit(lambda: asyncio.run(
             core.drain_workflow_run_requests(stop_event=object()),
         )).result(timeout=10)
+
+
+def test_e5_worker_poll_uses_monotonic_deadline(tmp_path, monkeypatch):
+    """Scheduler delays must not accumulate into longer polling intervals."""
+    core = _core(tmp_path)
+    stop = threading.Event()
+    observed = []
+    original = core.drain_workflow_run_requests
+
+    async def observe(**kwargs):
+        observed.append(asyncio.get_running_loop().time())
+        if len(observed) == 3:
+            stop.set()
+        return await original(**kwargs)
+
+    monkeypatch.setattr(core, "drain_workflow_run_requests", observe)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        count = pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(
+                stop, poll_interval_s=0.05, max_runs_per_batch=1,
+            ),
+        )).result(timeout=5)
+    assert count == 0
+    assert len(observed) == 3
+    assert observed[1] >= observed[0]
+    assert observed[2] >= observed[1]

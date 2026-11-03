@@ -432,13 +432,15 @@ class Core:
                 max_runs=max_runs_per_batch, initialized=True,
                 stop_event=stop_event,
             )
-            # Check shutdown at least every 250 ms even if configured
-            # polling is long. Do not terminate in-flight task executions.
-            remaining = float(poll_interval_s)
-            while remaining > 0 and not stop_event.is_set():
-                delay = min(remaining, 0.25)
-                await asyncio.sleep(delay)
-                remaining -= delay
+            # Poll deadlines use a monotonic clock: repeated fractional
+            # subtraction can drift under scheduler pauses and postpone new
+            # durable requests. A stop signal remains responsive.
+            deadline = asyncio.get_running_loop().time() + float(poll_interval_s)
+            while not stop_event.is_set():
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    break
+                await asyncio.sleep(min(remaining, 0.25))
         return total
 
     def propose_workflow_followups(self, source_plan_id: str, *, max_tasks: int = 16):
