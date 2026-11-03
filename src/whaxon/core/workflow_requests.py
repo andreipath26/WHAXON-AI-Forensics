@@ -163,6 +163,19 @@ class WorkflowRunQueue:
                             (time.time(), row["id"]),
                         )
                         continue
+                    try:
+                        # Persisted limits are untrusted after restart, manual
+                        # recovery or storage damage. A malformed payload must
+                        # never acquire a worker lease or starve later work.
+                        self._check_limits(json.loads(row["limits_json"]))
+                    except (TypeError, ValueError):
+                        conn.execute(
+                            "UPDATE workflow_run_requests SET status='uncertain', "
+                            "completed_at=?,error='invalid persisted execution limits' "
+                            "WHERE id=? AND status='queued'",
+                            (time.time(), row["id"]),
+                        )
+                        continue
                     token = uuid.uuid4().hex
                     now = time.time()
                     conn.execute(
