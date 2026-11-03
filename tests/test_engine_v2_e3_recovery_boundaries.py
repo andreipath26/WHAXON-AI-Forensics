@@ -1,8 +1,6 @@
 """Engine V2 E3: cross-boundary recovery input and plan identity hardening."""
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from whaxon.core import Core
