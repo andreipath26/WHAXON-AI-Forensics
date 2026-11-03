@@ -1294,3 +1294,52 @@ def test_semantic_operation_rejects_changed_registry_manifest(monkeypatch):
     ))
     with pytest.raises(CapabilityUnavailable, match="semantic provider manifest changed"):
         semantic.resolve_task(task)
+
+
+def test_e4_catalog_audit_does_not_claim_bound_after_catalog_drift(monkeypatch):
+    """Changed catalog argv cannot be advertised as a bound V2 provider."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    tool = _tool("nmap")
+    catalog = _Catalog([tool])
+    registry = CapabilityRegistry()
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=registry,
+    )
+    router = BoundProviderRouter((provider,))
+    before = router.portfolio_audit()
+    assert before["rows"][0]["state"] == "bound"
+
+    # A post-registration catalog modification invalidates the versioned
+    # argv contract until a deliberately reviewed provider is reloaded.
+    tool.args = ["--new-argv"]
+    report = router.portfolio_audit()
+    assert report["rows"][0]["state"] == "unbound"
+    assert report["rows"][0]["v2_provider_bound"] is False
+    assert report["rows"][0]["reason"] == "catalog_or_binding_changed"
+    assert report["execution_enabled_by_audit"] is False
+
+
+def test_e4_catalog_audit_does_not_claim_bound_after_registry_drift(monkeypatch):
+    """A missing persisted manifest must not look like an admitted binding."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    registry = CapabilityRegistry()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]),
+        runner=_Runner(), store=_Store(), registry=registry,
+    )
+    router = BoundProviderRouter((provider,))
+    assert router.portfolio_audit()["rows"][0]["state"] == "bound"
+
+    monkeypatch.setattr(registry, "list", lambda _capability=None: [])
+    report = router.portfolio_audit()
+    assert report["rows"][0]["state"] == "unbound"
+    assert report["rows"][0]["v2_provider_bound"] is False
+    assert report["execution_enabled_by_audit"] is False

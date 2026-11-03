@@ -244,7 +244,25 @@ class CatalogAdapterProvider:
         for tool_id in sorted(set(catalog) | adapters):
             tool = catalog.get(tool_id)
             has_adapter = tool_id in adapters
-            is_bound = tool_id in bound
+            bound_provider_id = f"whaxon.adapter.{tool_id}"
+            expected = self._manifest_by_provider.get(bound_provider_id)
+            current = (
+                next((
+                    item for item in self.registry.list(expected.capability_id)
+                    if item.provider_id == expected.provider_id
+                    and item.provider_version == expected.provider_version
+                ), None)
+                if expected is not None else None
+            )
+            is_bound = (
+                tool is not None
+                and tool_id in bound
+                and expected is not None
+                and current is not None
+                and current.fingerprint == expected.fingerprint
+                and _catalog_version(tool) == expected.provider_version
+                and getattr(tool, "transport", "cli") == "cli"
+            )
             if tool is None:
                 state = "adapter_only"
                 reason = "adapter_not_in_catalog"
@@ -693,6 +711,68 @@ class BoundProviderRouter:
             raise RuntimeError("provider result identity does not match resolved manifest")
         return result
 
+    def operation_reconciliation(self) -> list[dict]:
+        """Inventory trusted capability bindings, including unselected options.
+
+        This is not an admission or execution operation. It distinguishes the
+        selected in-process provider from other compatible but unselected
+        bindings. A persisted manifest alone is never an execution option.
+        """
+        rows: list[dict] = []
+        for capability_id in sorted(self._alternatives):
+            selected = self._bindings.get(capability_id)
+            preferred = self._preferred.get(capability_id)
+            for provider_id in sorted(self._alternatives[capability_id]):
+                is_selected = (
+                    selected is not None
+                    and selected.provider_id == provider_id
+                    and (preferred is None or preferred == provider_id)
+                )
+                rows.append({
+                    "capability_id": capability_id,
+                    "provider_id": provider_id,
+                    "selected": is_selected,
+                    "selection_status": (
+                        "selected" if is_selected else "unselected"
+                    ),
+                    "selection_explicit": preferred is not None,
+                    "manifest_fingerprint": (
+                        selected.fingerprint if is_selected and selected is not None else None
+                    ),
+                    "authorization_required": True,
+                    "smoke_tested": False,
+                    "lab_validated": False,
+                    "end_to_end_verified": False,
+                })
+            if preferred and preferred not in self._alternatives[capability_id]:
+                rows.append({
+                    "capability_id": capability_id,
+                    "provider_id": preferred,
+                    "selected": False,
+                    "selection_status": "preferred_provider_missing",
+                    "selection_explicit": True,
+                    "manifest_fingerprint": None,
+                    "authorization_required": True,
+                    "smoke_tested": False,
+                    "lab_validated": False,
+                    "end_to_end_verified": False,
+                })
+        for capability_id, provider_id in sorted(self._preferred.items()):
+            if capability_id not in self._alternatives:
+                rows.append({
+                    "capability_id": capability_id,
+                    "provider_id": provider_id,
+                    "selected": False,
+                    "selection_status": "preferred_provider_missing",
+                    "selection_explicit": True,
+                    "manifest_fingerprint": None,
+                    "authorization_required": True,
+                    "smoke_tested": False,
+                    "lab_validated": False,
+                    "end_to_end_verified": False,
+                })
+        return rows
+
     def portfolio_audit(self) -> dict:
         """Aggregate read-only provider inventories without enabling adapters."""
         audits = []
@@ -701,10 +781,14 @@ class BoundProviderRouter:
             if callable(optional_audit):
                 audits.append(optional_audit())
         if len(audits) == 1:
-            return audits[0]
+            return {
+                **audits[0],
+                "operation_bindings": self.operation_reconciliation(),
+            }
         return {
             "schema_version": "whaxon.portfolio-audit.v1",
             "provider_audits": audits,
+            **({"operation_bindings": self.operation_reconciliation()} if audits else {}),
             "execution_enabled_by_audit": False,
         }
 
