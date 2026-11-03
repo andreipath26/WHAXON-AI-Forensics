@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import uuid
+from urllib.parse import urlsplit
 
 from .capabilities import (
     CapabilityManifest,
     CapabilityRegistry,
     CapabilityRequirements,
+    CapabilityUnavailable,
 )
 from .workflow import WorkflowTask
 
@@ -17,6 +20,24 @@ _READ_ONLY_TOOLS = frozenset({
     "nmap", "nikto", "gobuster", "ffuf", "nuclei", "wpscan", "sqlmap",
     "whois", "dig", "whatweb", "theharvester", "dnsrecon", "arjun",
 })
+
+
+def _target_type(target: str) -> str:
+    """Classify literal targets without DNS lookups or network side effects."""
+    if not isinstance(target, str) or not target or target != target.strip():
+        raise ValueError("target must be a non-empty normalized string")
+    if "://" in target:
+        parsed = urlsplit(target)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
+            raise ValueError("unsupported URL target")
+        return "url"
+    try:
+        ipaddress.ip_address(target.strip("[]"))
+        return "ip"
+    except ValueError:
+        if any(c in target for c in "/?#@\\\\") or any(c.isspace() for c in target):
+            raise ValueError("invalid hostname target")
+        return "hostname"
 
 
 class CatalogAdapterProvider:
@@ -66,16 +87,22 @@ class CatalogAdapterProvider:
             task.capability_id,
             CapabilityRequirements(
                 transport="local_process",
+                target_type=_target_type(task.target),
                 minimum_readiness="registered",
                 allowed_providers=tuple(self._tool_by_provider),
             ),
         )
         tool_id = self._tool_by_provider.get(resolution.manifest.provider_id)
-        if tool_id is None:
+        if tool_id is None or resolution.manifest.capability_id != f"tool.{tool_id}":
             raise RuntimeError("resolved provider is not bound to this Core instance")
         tool = self.catalog.get(tool_id)
         if tool is None or not tool.available:
             raise RuntimeError(f"required tool is not installed: {tool_id}")
+        # Never allow a stale persisted registry entry to dispatch through a
+        # different adapter or a newer manifest version by accident.
+        if resolution.manifest.provider_version != "catalog-v1":
+            raise CapabilityUnavailable(task.capability_id, (
+                "resolved catalog provider version is not supported by this adapter",))
 
         job_id = uuid.uuid4().hex[:12]
         timeout_s = min(float(task.timeout_s), resolution.manifest.timeout_s)
