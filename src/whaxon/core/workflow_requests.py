@@ -277,18 +277,51 @@ class WorkflowRunQueue:
 
     def finish(self, request_id: str, token: str, *, status: str,
                error: str = "") -> bool:
+        """Fence the terminal result against cancellation in one transaction."""
         if status not in {"completed", "incomplete", "failed", "uncertain"}:
             raise ValueError("invalid run request outcome")
         with self.store._lock:
             conn = self.store._conn()
             try:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute(
+                    "SELECT r.plan_id, p.status AS plan_status "
+                    "FROM workflow_run_requests r "
+                    "LEFT JOIN workflow_plans p ON p.id=r.plan_id "
+                    "WHERE r.id=? AND r.status='running' AND r.lease_token=?",
+                    (request_id, token),
+                ).fetchone()
+                if row is None:
+                    conn.execute("COMMIT")
+                    return False
+                reason = None
+                if row["plan_status"] is None:
+                    status, error = "uncertain", "source plan missing at completion"
+                elif row["plan_status"] == "cancel_requested":
+                    status = "uncertain"
+                    error = "workflow cancelled during execution; reconcile external effects"
+                    reason = "plan_cancelled_during_run"
+                now = time.time()
                 cursor = conn.execute(
                     "UPDATE workflow_run_requests SET status=?,error=?,"
                     "completed_at=?,owner=NULL,lease_token=NULL "
                     "WHERE id=? AND status='running' AND lease_token=?",
-                    (status, error, time.time(), request_id, token),
+                    (status, error, now, request_id, token),
                 )
+                if cursor.rowcount == 1 and reason is not None:
+                    conn.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                        (row["plan_id"], "workflow_run_uncertain",
+                         json.dumps({"request_id": request_id, "reason": reason},
+                                    sort_keys=True), now),
+                    )
+                conn.execute("COMMIT")
                 return cursor.rowcount == 1
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
             finally:
                 conn.close()
 
@@ -359,7 +392,7 @@ class WorkflowRunQueue:
                     "WHERE status='running' AND "
                     "(heartbeat_at IS NULL OR heartbeat_at<?)",
                     (now - older_than_s,),
-                ).fetchall()
+                ).fetchmany(128)
                 for row in stale:
                     conn.execute(
                         "UPDATE workflow_run_requests SET status='uncertain',"
