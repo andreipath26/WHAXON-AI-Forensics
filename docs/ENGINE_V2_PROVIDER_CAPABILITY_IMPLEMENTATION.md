@@ -1,5 +1,7 @@
 # Engine V2: Provider and Capability Abstraction
 
+> **2026-11-03 main reconciliation:** The branch and pre-merge gate notes later in this file are development history, not current merge instructions. Current main `f0b25d3629d776b433f72c83db679bb41313c812` includes semantic aliases, explicit provider selection, plan-pinned identity, operation-level reconciliation, and live missing-adapter / manifest / catalog-drift refusal. Full E4 multi-transport parity, live provider substitution and legacy autochain cutover remain unaccepted. See [dated audit reconciliation](ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md).
+
 The capability registry stores immutable versioned declarations and resolves
 requirements deterministically, returning an explainable rejection and a registry
 digest. Manifest registration never grants execution permission.

@@ -1,5 +1,7 @@
 # Engine V2 — source versus roadmap audit (2026-11-03)
 
+> **Later main reconciliation:** See [Current-head reconciliation](#current-head-reconciliation--2026-11-03-newer-than-the-audit-above) below: `f0b25d3629d776b433f72c83db679bb41313c812`, **33/48 (68.75%)** sampled source coverage. Original **25/40** is a preserved historical comparison, not a current engine-completion percentage.
+
 **Audited main commit:** `781246b87575f6a7e5f7eea22e63aad789428894` (semantic provider migration, durable provenance and portfolio reconciliation).
 **Authority:** master product roadmap §§0, 38, 49; `docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md` §14; `docs/ENGINE_V2_ROADMAP_REQUIREMENTS.csv`.
 **Method:** parallel read-only inspection of main Git tree, selected source, named test definitions, documentation and GitHub Actions check-runs. **No local tests, deployment, UI/browser acceptance or external-effect crash lab were executed for this audit.** GitHub check-runs for the exact inspected head were **9/9 successful**, including the three Python-version jobs and setup/headless jobs. A successful CI check is not universal acceptance.
@@ -58,3 +60,34 @@ Symbols: **S** source/artifact and related test found; **G** gate incomplete or 
 For **each atomic criterion**, store: requirement ID, scope/applicability, source path and symbol, test function plus exact assertion, observed command/environment/commit, result, limitation, reviewer and decision. Only then compute `accepted / applicable atomic criteria`. Review all new writes against current head to avoid overwriting concurrent work.
 
 **Audit outcome:** code has advanced materially beyond several narrative status snapshots; 9/9 exact-head CI succeeded; **no credible full Engine V2 completion percentage is established yet**. This document supplies a reproducible checkpoint scope and explicit next evidence tasks rather than inventing a release percent.
+
+
+## Current-head reconciliation — 2026-11-03 (newer than the audit above)
+
+**Inspected main:** `f0b25d3629d776b433f72c83db679bb41313c812`. This section supersedes the 25/40 sampled checkpoint total above for current source reporting, but preserves the original 40 rows and their historical audited SHA. This review checks current GitHub source and named test definitions; **it does not execute pytest, deploy systemd, launch a browser or certify release acceptance**.
+
+The checkpoint ledger has eight new bounded, separately identifiable source-backed checks. **33/48 = 68.75% sampled implementation coverage** across E0–E6. This is an unweighted presence ratio for selected checkpoints only; it is **not** the percent of the entire Engine V2 built, remaining engineering effort, operational readiness or release completion. Neither its denominator nor individual checkpoints are exhaustive/equal-sized.
+
+| Phase | Source-backed / sampled | Sampled source implementation | Formal phase acceptance |
+|---|---:|---:|---|
+| E0 | 2/5 | 40.0% | Open |
+| E1 | 5/6 | 83.3% | Open |
+| E2 | 5/6 | 83.3% | Open |
+| E3 | 7/8 | 87.5% | Open |
+| E4 | 6/8 | 75.0% | Open |
+| E5 | 6/9 | 66.7% | Open |
+| E6 | 2/6 | 33.3% | Open |
+| **E0–E6** | **33/48** | **68.75%** | **All open** |
+
+The separate 75-row roadmap-index ledger still records **0/75 formally accepted requirement entries**. Those source-level rows combine multiple criteria, so this is a sign-off count, not proof that 0% is implemented. No credible full-engine percent-complete estimate can be computed solely from these ledgers. Deferred E7–E9 features are excluded from the sampled solo-v1.0 denominator.
+
+### Reconciled current implementation, with exact limitations
+
+- **E1:** Public queue enqueue, duplicate and status records redact private worker lease credentials. E1 branch-only wording is historical; current main already contains security corrections, but full adversarial acceptance is open.
+- **E2:** Strict JSON task/plan construction rejects ambiguous unsupported values, cycles, nonfinite numbers and invalid mapping keys before digest/approval. Full backward schema migration remains open.
+- **E3:** Lost worker leases and changed plan digests emit durable, bounded, idempotent uncertain-request audit events. A regression actually kills a Python child process after a synthetic callback writes a marker, manually ages its heartbeat and asserts uncertain/no automatic replay; this is **not** a real external-scanner effects test nor a complete independent integrity/outbox test.
+- **E4:** Adapter disappearance, stale manifests and changed catalog bindings are checked at live resolution; this does not certify cross-transport provider substitution or retirement of all legacy execution paths.
+- **E5:** PR #120 (squash `15fd5e4058377abaea2f0103f849f3817f050ba8`) merged a packaged, independently supervised *systemd unit candidate* and SQLite-only snapshot/restore tests. Health checks differentiate Core data/DB readiness from optional MSF. The crosswalk records 10/10 successful **pre-merge PR-head checks**, not verified runtime launch on an actual host or complete disaster recovery.
+- **E6:** Source presence of 22 UI-v2 pages and a 793-control static inventory remains distinct from complete authorized per-control runtime, visual/accessibility and lab-release acceptance.
+
+**Authoritative precedence:** master roadmap defines goals and gates; current source/tests establish code behavior; dated documents and branch/PR checkpoint notes are historical unless verified against main. Do not resurrect fixed one-shot startup issues or represent partial provider/service components as absent. Existing legacy worker/Automator/AI paths remain until migration, parity and rollback gates are passed.

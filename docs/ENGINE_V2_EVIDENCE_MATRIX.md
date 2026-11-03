@@ -1,7 +1,7 @@
 # Engine V2 — Roadmap requirement evidence matrix
 
 **Source of truth:** [master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and [architecture crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md).  
-**Audited baseline:** `c75c03888e35f6147cfae3547f286202bb09fd6e` (main, 2026-11-03).  
+**Original audited baseline:** `c75c03888e35f6147cfae3547f286202bb09fd6e` (main, 2026-11-03). **Current-head source reconciliation:** `f0b25d3629d776b433f72c83db679bb41313c812`; see [checkpoint audit](ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md) and [48-row bounded checkpoint ledger](ENGINE_V2_AUDIT_CHECKPOINTS_2026-11-03.csv). The figures below remain a historical mapping of compound roadmap requirements, not current completeness.  
 **Detailed ledger:** [ENGINE_V2_ROADMAP_REQUIREMENTS.csv](ENGINE_V2_ROADMAP_REQUIREMENTS.csv).
 
 ## Coverage and limitations
