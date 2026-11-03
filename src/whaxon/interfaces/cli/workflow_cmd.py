@@ -194,6 +194,9 @@ def _parser() -> argparse.ArgumentParser:
         "drain-requests", help="claim queued V2 workflow requests after restart",
     )
     drain.add_argument("--max-runs", type=int, default=20)
+    plan_commands.add_parser(
+        "queue-summary", help="inspect durable run queue and reconciliation risks",
+    )
     request_status = plan_commands.add_parser(
         "run-request", help="inspect persisted V2 execution request status",
     )
@@ -413,6 +416,9 @@ def main(args: list[str] | None = None) -> int:
                 "plan_id": options.id, "max_total_attempts": options.max_total_attempts,
                 "max_concurrency": options.max_concurrency,
             }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "queue-summary":
+            print(json.dumps(core.workflow_run_queue_summary(), indent=2, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "run-request":
             state = core.workflow_run_request(options.id)
