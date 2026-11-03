@@ -177,6 +177,14 @@ def _parser() -> argparse.ArgumentParser:
     limits.add_argument("--max-total-attempts", type=int, required=True)
     limits.add_argument("--max-concurrency", type=int, required=True)
 
+    drain = plan_commands.add_parser(
+        "drain-requests", help="claim queued V2 workflow requests after restart",
+    )
+    drain.add_argument("--max-runs", type=int, default=20)
+    request_status = plan_commands.add_parser(
+        "run-request", help="inspect persisted V2 execution request status",
+    )
+    request_status.add_argument("--id", required=True)
     run = plan_commands.add_parser("run", help="execute a plan through scoped Core providers")
     run.add_argument("--id", required=True)
     run.add_argument("--max-tasks", type=int, default=100)
@@ -379,6 +387,17 @@ def main(args: list[str] | None = None) -> int:
                 "plan_id": options.id, "max_total_attempts": options.max_total_attempts,
                 "max_concurrency": options.max_concurrency,
             }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "run-request":
+            state = core.workflow_run_request(options.id)
+            if state is None:
+                print("unknown workflow run request", file=sys.stderr)
+                return 1
+            print(json.dumps(state, indent=2, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "drain-requests":
+            count = _run_async(core.drain_workflow_run_requests(max_runs=options.max_runs))
+            print(json.dumps({"processed_requests": count}, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "run":
             if options.max_tasks < 1 or options.max_attempts < 1 or options.max_concurrency < 1:

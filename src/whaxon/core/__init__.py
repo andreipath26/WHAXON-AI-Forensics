@@ -47,6 +47,8 @@ class Core:
         # SQLite-backed persistence for all UIs
         state_path = self.data_dir / "whaxon.db"
         self.store = JobStore(state_path)
+        from .workflow_requests import WorkflowRunQueue
+        self.workflow_requests = WorkflowRunQueue(self.store)
         self.runner.bind_session_lookup(self.store.get_session)
         # Subscribe the persister FIRST so every other JobFindings consumer
         # (correlator, suggester, automator) sees findings already in the store.
@@ -279,8 +281,10 @@ class Core:
         return self.store.get_workflow_progress(plan_id)
 
     def cancel_workflow_plan(self, plan_id: str) -> int:
-        """Durably halt future claims; in-flight provider effects remain uncertain."""
-        return self.store.request_workflow_cancellation(plan_id)
+        """Stop future task claims and close queued (not running) run intents."""
+        cancelled = self.store.request_workflow_cancellation(plan_id)
+        self.workflow_requests.cancel_queued(plan_id)
+        return cancelled
 
     def save_workflow_plan(self, plan_id: str, plan):
         """Validate and persist a versioned mission DAG."""
@@ -295,6 +299,68 @@ class Core:
             "plan": plan["plan"],
             "tasks": self.store.list_workflow_tasks(plan_id),
         }
+
+    def enqueue_workflow_run(self, plan_id: str, *, max_tasks: int = 100,
+                             max_attempts: int = 2, max_concurrency: int = 4):
+        """Persist an execution request before acknowledging any client."""
+        return self.workflow_requests.enqueue(plan_id, limits={
+            "max_tasks": max_tasks, "max_attempts": max_attempts,
+            "max_concurrency": max_concurrency,
+        })
+
+    def workflow_run_request(self, request_id: str):
+        return self.workflow_requests.get(request_id)
+
+    async def drain_workflow_run_requests(self, *, max_runs: int = 20) -> int:
+        """Claim persistent V2 run requests; never replay uncertain executions.
+
+        A CLI, headless daemon or web service can call this after restart.
+        The scheduler continues to own task leases, policy and evidence.
+        """
+        import asyncio
+        import uuid
+
+        if type(max_runs) is not int or not 1 <= max_runs <= 100:
+            raise ValueError("max_runs must be between 1 and 100")
+        await self.initialize(drain=False)
+        self.workflow_requests.reconcile_stale()
+        owner = "workflow-run-worker-" + uuid.uuid4().hex
+        processed = 0
+        for _ in range(max_runs):
+            request = self.workflow_requests.claim(owner)
+            if request is None:
+                break
+            token = request["lease_token"]
+            request_id = request["id"]
+            async def heartbeat(active_id=request_id, active_token=token):
+                while True:
+                    await asyncio.sleep(5)
+                    if not self.workflow_requests.heartbeat(active_id, active_token):
+                        return
+
+            pulse = asyncio.create_task(heartbeat())
+            status = "uncertain"
+            error = ""
+            try:
+                result = await self.run_workflow_plan(
+                    request["plan_id"], worker_id=owner, **request["limits"],
+                )
+                status = "completed" if result["complete"] else "incomplete"
+            except Exception as exc:
+                # Dispatch may have produced an external effect before failure.
+                # Never automatically retry this request.
+                error = f"worker error after claim: {type(exc).__name__}"
+            finally:
+                pulse.cancel()
+                try:
+                    await pulse
+                except asyncio.CancelledError:
+                    pass
+                self.workflow_requests.finish(
+                    request_id, token, status=status, error=error,
+                )
+            processed += 1
+        return processed
 
     def capability_inventory(self):
         """Return truthful live provider readiness without changing manifests."""

@@ -543,10 +543,11 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/v2/workflows/<plan_id>/run")
     def workflow_v2_run(plan_id):
-        """Queue a bounded run; clients poll durable progress for its outcome.
+        """Persist a bounded run request before returning 202.
 
-        A 202 only acknowledges submission to this process, never completed
-        execution, scope approval, or guaranteed survival of a server crash.
+        Process-local wakeup is only an optimization. Another worker or a
+        restarted service can claim the persisted request. Interrupted
+        requests remain uncertain until explicitly reconciled.
         """
         payload = request.get_json(silent=True)
         if payload is None:
@@ -556,29 +557,38 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         fields = ("max_tasks", "max_attempts", "max_concurrency")
         defaults = {"max_tasks": 100, "max_attempts": 2, "max_concurrency": 4}
         bounds = {name: payload.get(name, defaults[name]) for name in fields}
-        if any(
-            isinstance(value, bool) or not isinstance(value, int) or value < 1
-            for value in bounds.values()
-        ):
-            return jsonify({"error": "execution limits must be positive integers"}), 400
+        if any(type(value) is not int or not 1 <= value <= 1000
+               for value in bounds.values()):
+            return jsonify({"error": "execution limits must be positive and bounded"}), 400
         try:
-            core.workflow_plan_details(plan_id)
+            queued = core.enqueue_workflow_run(plan_id, **bounds)
         except ValueError as exc:
-            return jsonify({"error": str(exc)}), 404
-
-        def execute():
-            async def run():
-                await core.initialize(drain=False)
-                return await core.run_workflow_plan(plan_id, **bounds)
-
-            asyncio.run(run())
-
-        runner.submit(execute)
+            return jsonify({"error": str(exc)}), (
+                404 if "unknown workflow plan" in str(exc) else 409
+            )
+        # The accepted intent lives in SQLite even if this process stops.
+        try:
+            runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+        except Exception:
+            # The accepted request is already in durable storage. Worker
+            # failure must not turn that accepted submission into a false 500.
+            pass
         return jsonify({
-            "plan_id": plan_id, "execution_submitted": True,
+            "plan_id": plan_id,
+            "run_request_id": queued["id"],
+            "request_status": queued["status"],
+            "execution_submitted": True,
             "execution_completed": False,
             "durable_progress_url": f"/api/v2/workflows/{plan_id}/progress",
+            "run_request_url": f"/api/v2/workflow-runs/{queued['id']}",
         }), 202
+
+    @app.get("/api/v2/workflow-runs/<request_id>")
+    def workflow_v2_run_request_status(request_id):
+        row = core.workflow_run_request(request_id)
+        return (jsonify(row), 200) if row else (
+            jsonify({"error": "unknown workflow run request"}), 404
+        )
 
     @app.get("/api/v2/workflows/<plan_id>")
     def workflow_v2_plan_details(plan_id):
@@ -2607,7 +2617,10 @@ def create_app_factory(host: str | None = None, port: int | None = None):
     core = Core(data_dir=data_dir)
     registry = JobRegistry(core)
     runner = AsyncRunner(core)
-    return create_app(core, registry, runner)
+    app = create_app(core, registry, runner)
+    # Recover queued (not running/uncertain) requests after service restart.
+    runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+    return app
 
 
 def main(args: list[str] | None = None) -> None:
@@ -2651,6 +2664,7 @@ def main(args: list[str] | None = None) -> None:
     runner = AsyncRunner(core)
 
     app = create_app(core, registry, runner)
+    runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
     auth_user = os.environ.get("WHAXON_AUTH_USER", "")
     auth_on = "enabled" if auth_user else "DISABLED"
     print()
