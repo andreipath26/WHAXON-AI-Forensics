@@ -1294,3 +1294,60 @@ def test_semantic_operation_rejects_changed_registry_manifest(monkeypatch):
     ))
     with pytest.raises(CapabilityUnavailable, match="semantic provider manifest changed"):
         semantic.resolve_task(task)
+
+
+def test_e4_portfolio_audit_detects_catalog_contract_drift_without_execution(monkeypatch):
+    """A startup-bound provider is not current after its tool argv changes."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    catalog = _Catalog([_tool("nmap")])
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    router = BoundProviderRouter((provider,))
+    initial = router.portfolio_audit()
+    assert initial["summary"]["bound"] == 1
+    assert initial["rows"][0]["binding_current"] is True
+
+    catalog.tools["nmap"].args = ("--contract-changed",)
+    changed = router.portfolio_audit()
+    assert changed["summary"]["bound"] == 0
+    assert changed["summary"]["stale_binding"] == 1
+    assert changed["rows"][0]["state"] == "stale_binding"
+    assert changed["rows"][0]["binding_current"] is False
+    assert changed["rows"][0]["v2_provider_bound"] is True
+    assert changed["execution_enabled_by_audit"] is False
+
+
+def test_e4_portfolio_audit_reports_removed_adapter_and_registry_binding(monkeypatch):
+    """An installed binary cannot disguise a removed adapter or manifest."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    registry = CapabilityRegistry()
+    router = BoundProviderRouter((
+        CatalogAdapterProvider(
+            catalog=_Catalog([_tool("nmap")]), runner=_Runner(),
+            store=_Store(), registry=registry,
+        ),
+    ))
+    assert router.portfolio_audit()["summary"]["bound"] == 1
+
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: [])
+    missing_adapter = router.portfolio_audit()
+    assert missing_adapter["rows"][0]["state"] == "stale_binding"
+    assert not missing_adapter["rows"][0]["binding_current"]
+    assert missing_adapter["adapter_count"] == 0
+    assert missing_adapter["execution_enabled_by_audit"] is False
+
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    registry._manifests.clear()
+    changed_registry = router.portfolio_audit()
+    assert changed_registry["summary"]["stale_binding"] == 1
+    assert not changed_registry["rows"][0]["binding_current"]
