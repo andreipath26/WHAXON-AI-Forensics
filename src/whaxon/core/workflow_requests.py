@@ -279,7 +279,7 @@ class WorkflowRunQueue:
                     "UPDATE workflow_run_requests SET status='uncertain',"
                     "error='run worker lost; reconcile task attempts before any retry',"
                     "completed_at=?,owner=NULL,lease_token=NULL "
-                    "WHERE status='running' AND heartbeat_at<?",
+                    "WHERE status='running' AND (heartbeat_at IS NULL OR heartbeat_at<?)",
                     (time.time(), time.time() - older_than_s),
                 )
                 return cursor.rowcount
