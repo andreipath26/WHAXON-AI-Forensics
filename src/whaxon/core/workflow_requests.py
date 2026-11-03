@@ -149,11 +149,21 @@ class WorkflowRunQueue:
                             "source plan missing before dispatch"
                             if plan is None else "plan digest changed before dispatch"
                         )
+                        now = time.time()
                         conn.execute(
                             "UPDATE workflow_run_requests SET status='uncertain', "
                             "completed_at=?,error=? WHERE id=? AND status='queued'",
-                            (time.time(), reason, row["id"]),
+                            (now, reason, row["id"]),
                         )
+                        if plan is not None:
+                            conn.execute(
+                                "INSERT INTO workflow_events "
+                                "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                                (row["plan_id"], "workflow_run_uncertain",
+                                 json.dumps({"request_id": row["id"],
+                                             "reason": "plan_digest_changed"},
+                                            sort_keys=True), now),
+                            )
                         continue
                     if plan["status"] == "cancel_requested":
                         conn.execute(
@@ -293,13 +303,39 @@ class WorkflowRunQueue:
         with self.store._lock:
             conn = self.store._conn()
             try:
-                cursor = conn.execute(
-                    "UPDATE workflow_run_requests SET status='uncertain',"
-                    "error='run worker lost; reconcile task attempts before any retry',"
-                    "completed_at=?,owner=NULL,lease_token=NULL "
-                    "WHERE status='running' AND (heartbeat_at IS NULL OR heartbeat_at<?)",
-                    (time.time(), time.time() - older_than_s),
-                )
-                return cursor.rowcount
+                conn.execute("BEGIN IMMEDIATE")
+                now = time.time()
+                stale = conn.execute(
+                    "SELECT id,plan_id FROM workflow_run_requests "
+                    "WHERE status='running' AND "
+                    "(heartbeat_at IS NULL OR heartbeat_at<?)",
+                    (now - older_than_s,),
+                ).fetchall()
+                for row in stale:
+                    conn.execute(
+                        "UPDATE workflow_run_requests SET status='uncertain',"
+                        "error='run worker lost; reconcile task attempts before any retry',"
+                        "completed_at=?,owner=NULL,lease_token=NULL "
+                        "WHERE id=? AND status='running'",
+                        (now, row["id"]),
+                    )
+                    if conn.execute(
+                        "SELECT 1 FROM workflow_plans WHERE id=?",
+                        (row["plan_id"],),
+                    ).fetchone() is not None:
+                        conn.execute(
+                            "INSERT INTO workflow_events "
+                            "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                            (row["plan_id"], "workflow_run_uncertain",
+                             json.dumps({"request_id": row["id"],
+                                         "reason": "worker_lease_lost"},
+                                        sort_keys=True), now),
+                        )
+                conn.execute("COMMIT")
+                return len(stale)
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
             finally:
                 conn.close()
