@@ -253,14 +253,28 @@ class CatalogAdapterProvider:
                 is_bound and bound_manifest is not None and tool is not None
                 and _catalog_version(tool) != bound_manifest.provider_version
             )
+            stale_manifest = False
+            if is_bound and bound_manifest is not None:
+                persisted = next((
+                    manifest for manifest in self.registry.list(
+                        bound_manifest.capability_id,
+                    )
+                    if manifest.provider_id == bound_manifest.provider_id
+                    and manifest.provider_version == bound_manifest.provider_version
+                ), None)
+                stale_manifest = (
+                    persisted is None
+                    or persisted.fingerprint != bound_manifest.fingerprint
+                )
             if tool is None:
                 state = "adapter_only"
                 reason = "adapter_not_in_catalog"
-            elif is_bound and (stale_contract or not has_adapter):
+            elif is_bound and (stale_contract or not has_adapter or stale_manifest):
                 state = "stale_binding"
                 reason = (
                     "catalog_contract_changed" if stale_contract
-                    else "registered_adapter_disappeared"
+                    else "registered_adapter_disappeared" if not has_adapter
+                    else "manifest_binding_mismatch"
                 )
             elif is_bound:
                 state = "bound"
