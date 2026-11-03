@@ -301,7 +301,16 @@ class Core:
         from .capabilities import CapabilityUnavailable
 
         try:
-            manifest = self.capabilities.resolve(task.capability_id).manifest
+            from .capabilities import CapabilityRequirements
+            from .providers import _target_type
+            manifest = self.capabilities.resolve(
+                task.capability_id,
+                CapabilityRequirements(
+                    target_type=_target_type(task.target),
+                    required_permissions=tuple(task.permissions),
+                    transport="local_process",
+                ),
+            ).manifest
         except (CapabilityUnavailable, ValueError):
             return False
         impact_rank = {

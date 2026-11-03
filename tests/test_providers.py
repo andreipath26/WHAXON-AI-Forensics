@@ -448,3 +448,64 @@ def test_catalog_dispatch_rejects_undeclared_task_permissions(monkeypatch):
             permissions=("credentials.read",), impact="moderate",
         )))
     assert runner.calls == []
+
+
+def test_catalog_dispatch_rejects_mutated_registry_manifest_before_runner(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(), registry=registry,
+    )
+    registry.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v2", transports=("local_process",),
+        target_types=("hostname", "ip", "url"), permissions=("network.scan",),
+        impact="moderate", readiness="end_to_end_verified",
+    ))
+    with pytest.raises(CapabilityUnavailable):
+        asyncio.run(provider.dispatch(WorkflowTask("scan", "tool.nmap", "192.0.2.10")))
+    assert runner.calls == []
+
+
+def test_catalog_dispatch_rejects_job_identity_mismatch(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+
+    class WrongJobStore(_Store):
+        def get(self, job_id):
+            return {**super().get(job_id), "tool": "nikto", "target": "192.0.2.99"}
+
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=_Runner(),
+        store=WrongJobStore(), registry=CapabilityRegistry(),
+    )
+    with pytest.raises(RuntimeError, match="identity"):
+        asyncio.run(provider.dispatch(WorkflowTask("scan", "tool.nmap", "192.0.2.10")))
+
+
+def test_core_authorization_rejects_provider_without_local_transport():
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest
+
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.fixture", provider_id="remote.fixture",
+        provider_version="1", transports=("remote_agent",),
+        target_types=("ip",), impact="low",
+    ))
+    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    assert core.authorize_workflow_task(
+        WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low"),
+    ) is False

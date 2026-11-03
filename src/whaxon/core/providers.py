@@ -54,6 +54,7 @@ class CatalogAdapterProvider:
         self.store = store
         self.registry = registry
         self._tool_by_provider: dict[str, str] = {}
+        self._manifest_by_provider: dict[str, CapabilityManifest] = {}
         from ..adapters import get_adapter
 
         for tool in catalog.list():
@@ -77,6 +78,7 @@ class CatalogAdapterProvider:
             )
             registry.register(manifest)
             self._tool_by_provider[provider_id] = tool.id
+            self._manifest_by_provider[provider_id] = manifest
 
     async def dispatch(self, task: WorkflowTask) -> dict:
         if task.inputs:
@@ -90,12 +92,16 @@ class CatalogAdapterProvider:
                 target_type=_target_type(task.target),
                 required_permissions=tuple(task.permissions),
                 minimum_readiness="registered",
-                allowed_providers=tuple(self._tool_by_provider),
+                allowed_providers=(f"whaxon.adapter.{task.capability_id.removeprefix('tool.')}",),
             ),
         )
         tool_id = self._tool_by_provider.get(resolution.manifest.provider_id)
         if tool_id is None or resolution.manifest.capability_id != f"tool.{tool_id}":
             raise RuntimeError("resolved provider is not bound to this Core instance")
+        expected_manifest = self._manifest_by_provider.get(resolution.manifest.provider_id)
+        if expected_manifest is None or expected_manifest.fingerprint != resolution.manifest.fingerprint:
+            raise CapabilityUnavailable(task.capability_id, (
+                "provider manifest differs from the bound execution adapter",))
         tool = self.catalog.get(tool_id)
         if tool is None or not tool.available:
             raise RuntimeError(f"required tool is not installed: {tool_id}")
@@ -119,6 +125,8 @@ class CatalogAdapterProvider:
         job = self.store.get(job_id)
         if job is None:
             raise RuntimeError(f"tool execution {job_id} did not persist a job record")
+        if job.get("tool") not in (None, tool_id) or job.get("target") not in (None, task.target):
+            raise RuntimeError("persisted provider job identity does not match dispatched task")
         if job.get("error") == "timeout":
             raise TimeoutError(f"{tool_id} exceeded {timeout_s:g}s")
         if job.get("status") != "finished" or job.get("exit_code") != 0:
