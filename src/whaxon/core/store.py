@@ -1874,7 +1874,7 @@ class JobStore:
         try:
             c.execute("BEGIN")
             plan = c.execute(
-                "SELECT id, mission_id, digest, status, schema_version "
+                "SELECT id, mission_id, digest, status, schema_version, plan_json "
                 "FROM workflow_plans WHERE id=?", (plan_id,),
             ).fetchone()
             if plan is None:
@@ -1882,8 +1882,10 @@ class JobStore:
             record("plan", tuple(plan))
             counts = {}
             streams = (
-                ("tasks", "SELECT id, task_key, capability_id, target, status, "
-                 "active_attempt_id, error, result_json FROM workflow_tasks "
+                ("tasks", "SELECT id, task_key, capability_id, target, "
+                 "inputs_json, depends_on_json, permissions_json, impact, "
+                 "timeout_s, idempotency_key, status, active_attempt_id, "
+                 "error, result_json FROM workflow_tasks "
                  "WHERE plan_id=? ORDER BY id"),
                 ("attempts", "SELECT a.id, a.task_id, a.attempt_no, a.status, "
                  "a.worker_id, a.idempotency_key, a.started_at, "

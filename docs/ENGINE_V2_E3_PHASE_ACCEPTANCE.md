@@ -42,3 +42,7 @@ Record, on the *final* PR SHA: Python 3.11/3.12/3.13 CI job names and conclusion
 ## Operator lifecycle audit snapshot workflow
 
 Run `whaxon workflow --data-dir <state> plan audit-snapshot --id <plan>` and **save the displayed digest outside the WHAXON host/database in an independently protected store**, with plan ID, UTC time, environment and code SHA. Later run `whaxon workflow --data-dir <state> plan audit-verify --id <plan> --expected-digest <64-hex-reference>`. A result of `digest_matches_reference: true` proves equality to the caller-provided reference for the documented snapshot scope only. It does **not** authenticate the source of that reference. Both subcommands are read-only.
+
+### Snapshot content verification scope
+
+The candidate E3 lifecycle digest now includes persisted plan JSON plus task input/dependency/permission/impact/timeout/idempotency contracts in addition to task states, attempt outcomes and ordered workflow events. The digest output does not expose those potentially sensitive values. Tests independently tamper with plan JSON and task inputs; both must mismatch an external reference. This remains **local candidate implementation**, not acceptance of an independently operated trust anchor.

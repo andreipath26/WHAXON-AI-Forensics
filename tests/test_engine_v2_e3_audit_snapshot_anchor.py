@@ -41,7 +41,9 @@ def test_lifecycle_audit_snapshot_is_restart_stable_and_privacy_minimal(tmp_path
     )
 
 
-@pytest.mark.parametrize("changed", ["event", "attempt", "task"])
+@pytest.mark.parametrize(
+    "changed", ["event", "attempt", "task", "plan_payload", "task_inputs"],
+)
 def test_externally_preserved_snapshot_detects_db_lifecycle_mutation(
     tmp_path, changed,
 ):
@@ -60,6 +62,16 @@ def test_externally_preserved_snapshot_detects_db_lifecycle_mutation(
             conn.execute(
                 "UPDATE task_attempts SET status='failed' WHERE id=?",
                 (claim["attempt_id"],),
+            )
+        elif changed == "plan_payload":
+            conn.execute(
+                "UPDATE workflow_plans SET plan_json=? WHERE id='p'",
+                ('{"tampered": true}',),
+            )
+        elif changed == "task_inputs":
+            conn.execute(
+                "UPDATE workflow_tasks SET inputs_json=? WHERE plan_id='p'",
+                ('{"tampered": true}',),
             )
         else:
             conn.execute(
