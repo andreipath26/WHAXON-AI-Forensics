@@ -30,7 +30,8 @@ class _Runner:
 class _Store:
     def get(self, job_id):
         return {
-            "id": job_id, "status": "finished", "exit_code": 0,
+            "id": job_id, "tool": "nmap", "target": "192.0.2.10",
+            "status": "finished", "exit_code": 0,
             "duration_s": 0.25, "error": None,
         }
 
@@ -55,7 +56,10 @@ def test_catalog_adapter_provider_executes_through_core_runner(monkeypatch):
 
     import asyncio
     result = asyncio.run(provider.dispatch(
-        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+        WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ),
     ))
 
     assert result["tool_id"] == "nmap"
@@ -76,7 +80,11 @@ def test_catalog_adapter_provider_rejects_dynamic_cli_arguments(monkeypatch):
     with pytest.raises(ValueError, match="no dynamic inputs"):
         import asyncio
         asyncio.run(provider.dispatch(
-            WorkflowTask("scan", "tool.nmap", "192.0.2.10", inputs={"extra_args": "-p-"}),
+            WorkflowTask(
+                "scan", "tool.nmap", "192.0.2.10",
+                inputs={"extra_args": "-p-"}, permissions=("network.scan",),
+                impact="moderate",
+            ),
         ))
 
 
@@ -91,7 +99,10 @@ def test_catalog_adapter_provider_refuses_missing_binary(monkeypatch):
     with pytest.raises(RuntimeError, match="not installed"):
         import asyncio
         asyncio.run(provider.dispatch(
-            WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+            WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ),
         ))
 
 
@@ -364,3 +375,349 @@ def test_engine_v2_scope_revocation_from_another_process_takes_effect(tmp_path):
     assert core.authorize_workflow_task(task) is False
     scope_path.write_text("{invalid", encoding="utf-8")
     assert core.authorize_workflow_task(task) is False
+
+
+@pytest.mark.parametrize("target, expected", [
+    ("192.0.2.10", "ip"),
+    ("2001:db8::1", "ip"),
+    ("lab.example", "hostname"),
+    ("https://lab.example/path", "url"),
+])
+def test_catalog_target_type_classification_is_pure(target, expected):
+    from whaxon.core.providers import _target_type
+    assert _target_type(target) == expected
+
+
+@pytest.mark.parametrize("target", [
+    "", " lab.example", "lab.example/path", "user@lab.example",
+    "https://user:secret@lab.example/", "https://lab.example/#fragment",
+    "ftp://lab.example/", "lab.example?query=1",
+])
+def test_catalog_target_type_rejects_ambiguous_or_credential_targets(target):
+    from whaxon.core.providers import _target_type
+    with pytest.raises(ValueError):
+        _target_type(target)
+
+
+def test_catalog_provider_selects_bound_adapter_over_third_party_registry_entry(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(), registry=registry,
+    )
+    # Higher-readiness third-party provider cannot be used as a catalog adapter.
+    registry.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="other.provider",
+        provider_version="1", transports=("local_process",),
+        target_types=("ip",), readiness="end_to_end_verified",
+    ))
+    result = asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        )))
+    assert result["tool_id"] == "nmap"
+    assert len(runner.calls) == 1
+
+
+def test_catalog_provider_rejects_unsupported_target_type_before_dispatch(monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(), registry=registry,
+    )
+    # Explicit resolver contract: a provider limited to hostnames must not
+    # match a URL task, even when the capability identifier is identical.
+    with pytest.raises(CapabilityUnavailable):
+        registry.resolve("tool.nmap", __import__(
+            "whaxon.core.capabilities", fromlist=["CapabilityRequirements"]
+        ).CapabilityRequirements(target_type="unsupported-target"))
+    assert runner.calls == []
+
+
+def test_catalog_dispatch_rejects_undeclared_task_permissions(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    with pytest.raises(CapabilityUnavailable, match="permissions"):
+        asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("credentials.read",), impact="moderate",
+        )))
+    assert runner.calls == []
+
+
+def test_catalog_dispatch_pins_bound_version_against_newer_registry_entry(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(), registry=registry,
+    )
+    registry.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v3", transports=("local_process",),
+        target_types=("hostname", "ip", "url"), permissions=("network.scan",),
+        impact="moderate", readiness="end_to_end_verified",
+    ))
+    result = asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        )))
+    assert result["tool_id"] == "nmap"
+    assert len(runner.calls) == 1
+
+
+def test_catalog_dispatch_rejects_job_identity_mismatch(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+
+    class WrongJobStore(_Store):
+        def get(self, job_id):
+            return {**super().get(job_id), "tool": "nikto", "target": "192.0.2.99"}
+
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=_Runner(),
+        store=WrongJobStore(), registry=CapabilityRegistry(),
+    )
+    with pytest.raises(RuntimeError, match="identity"):
+        asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        )))
+
+
+def test_core_authorization_rejects_provider_without_local_transport():
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest
+
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="tool.fixture", provider_id="remote.fixture",
+        provider_version="1", transports=("remote_agent",),
+        target_types=("ip",), impact="low",
+    ))
+    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    assert core.authorize_workflow_task(
+        WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low"),
+    ) is False
+
+
+def test_provider_inventory_reports_installed_and_missing_without_false_validation(monkeypatch):
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    catalog = _Catalog([_tool("nmap", available=True), _tool("nikto", available=False)])
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=registry,
+    )
+    inventory = {item["capability_id"]: item for item in provider.inventory()}
+    assert inventory["tool.nmap"]["executable"] is True
+    assert inventory["tool.nmap"]["readiness"] == "installed"
+    assert inventory["tool.nikto"]["executable"] is False
+    assert inventory["tool.nikto"]["reason"] == "binary_not_installed"
+    assert not any(item["lab_validated"] for item in inventory.values())
+    assert registry.list("tool.nmap")[0].readiness == "registered"
+
+
+def test_catalog_provider_ignores_unbound_newer_manifest_when_pinned_version_available(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=_Runner(), store=_Store(),
+        registry=registry,
+    )
+    registry.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v2", transports=("local_process",),
+        target_types=("hostname", "ip", "url"), permissions=("network.scan",),
+        impact="moderate", readiness="end_to_end_verified",
+    ))
+    result = asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        )))
+    assert result["tool_id"] == "nmap"
+
+
+@pytest.mark.parametrize("tool_id, target, expected", [
+    ("nmap", "192.0.2.10", True),
+    ("nmap", "https://lab.example", False),
+    ("gobuster", "lab.example", True),
+    ("gobuster", "https://lab.example", False),
+    ("ffuf", "https://lab.example", True),
+    ("ffuf", "lab.example", False),
+    ("sqlmap", "https://lab.example/?id=1", True),
+    ("sqlmap", "192.0.2.10", False),
+    ("dnsrecon", "lab.example", True),
+    ("dnsrecon", "https://lab.example", False),
+])
+def test_resolver_matches_packaged_target_templates(monkeypatch, tool_id, target, expected):
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool(tool_id)]), runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    task = WorkflowTask("scan", f"tool.{tool_id}", target, permissions=("network.scan",), impact="moderate")
+    if expected:
+        assert provider.resolve_task(task).manifest.capability_id == f"tool.{tool_id}"
+    else:
+        with pytest.raises(CapabilityUnavailable):
+            provider.resolve_task(task)
+
+
+@pytest.mark.parametrize("target", [
+    "example.com:abc", "example.com:123", "localhost:80", "bad..example",
+    "https://example.com:abc/", "https://example.com:99999/",
+    "http://[::1", "https://example.com/hello world",
+    "example.com/../../", "foo_bar.example",
+])
+def test_target_classifier_fails_closed_on_malformed_authorities(target):
+    from whaxon.core.providers import _target_type
+
+    with pytest.raises(ValueError):
+        _target_type(target)
+
+
+def test_provider_inventory_checks_live_binary(monkeypatch):
+    import whaxon.adapters
+    import whaxon.core.providers as provider_module
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    tool = SimpleNamespace(id="nmap", available=True, binary="nmap", transport="cli")
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([tool]), runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    monkeypatch.setattr(provider_module.shutil, "which", lambda binary: None)
+    item = provider.inventory()[0]
+    assert item["installed"] is False
+    assert item["executable"] is False
+    assert item["reason"] == "binary_not_installed"
+    assert item["smoke_tested"] is False
+
+
+def test_catalog_argv_changes_require_new_version_on_restart(tmp_path, monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+    from whaxon.core.store import JobStore
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    store = JobStore(tmp_path / "catalog-version.db")
+    first = SimpleNamespace(id="nmap", args="-sT {target}", binary="nmap", transport="cli", available=True)
+    catalog = _Catalog([first])
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(store),
+    )
+    task = WorkflowTask("scan", "tool.nmap", "192.0.2.10", permissions=("network.scan",), impact="moderate")
+    original = provider.resolve_task(task).manifest
+    catalog.tools["nmap"] = SimpleNamespace(
+        id="nmap", args="-sV {target}", binary="nmap", transport="cli", available=True,
+    )
+    with pytest.raises(CapabilityUnavailable, match="changed"):
+        provider.resolve_task(task)
+    restored = CapabilityRegistry(store)
+    rebound = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=restored,
+    )
+    current = rebound.resolve_task(task).manifest
+    assert current.provider_version != original.provider_version
+    assert len(restored.list("tool.nmap")) == 2
+
+
+def test_direct_provider_dispatch_rejects_missing_permission_and_impact(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    with pytest.raises(CapabilityUnavailable):
+        asyncio.run(provider.dispatch(
+            WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+        ))
+    assert runner.calls == []
+
+
+def test_runner_job_id_mismatch_is_not_reported_as_success(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+
+    class OtherRunner(_Runner):
+        async def run_tool(self, **kwargs):
+            self.calls.append(kwargs)
+            return "wrong-job"
+
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=OtherRunner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    task = WorkflowTask("scan", "tool.nmap", "192.0.2.10", permissions=("network.scan",), impact="moderate")
+    with pytest.raises(RuntimeError, match="mismatched execution identity"):
+        asyncio.run(provider.dispatch(task))
+
+
+def test_missing_persisted_provider_job_identity_fails_closed(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+
+    class IncompleteStore(_Store):
+        def get(self, job_id):
+            return {"id": job_id, "status": "finished", "exit_code": 0}
+
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=_Runner(), store=IncompleteStore(),
+        registry=CapabilityRegistry(),
+    )
+    task = WorkflowTask("scan", "tool.nmap", "192.0.2.10", permissions=("network.scan",), impact="moderate")
+    with pytest.raises(RuntimeError, match="identity"):
+        asyncio.run(provider.dispatch(task))

@@ -296,13 +296,41 @@ class Core:
             "tasks": self.store.list_workflow_tasks(plan_id),
         }
 
+    def capability_inventory(self):
+        """Return truthful live provider readiness without changing manifests."""
+        return self.providers.inventory()
+
     def authorize_workflow_task(self, task) -> bool:
         """Fail-closed default policy for scoped, read-only catalog scans."""
         from .capabilities import CapabilityUnavailable
 
         try:
-            manifest = self.capabilities.resolve(task.capability_id).manifest
-        except (CapabilityUnavailable, ValueError):
+            from .capabilities import CapabilityRequirements
+            from .providers import _target_type
+
+            bound = getattr(self, "providers", None)
+            if bound is not None:
+                # The production policy and execution must bind the same
+                # in-process adapter manifest, not a persisted-only claim.
+                manifest = bound.resolve_task(
+                    task, require_installed=True,
+                ).manifest
+            else:
+                # Small policy-only tests instantiate Core without providers.
+                candidates = self.capabilities.list(task.capability_id)
+                target_type = _target_type(task.target) if any(
+                    item.target_types for item in candidates
+                ) else ""
+                manifest = self.capabilities.resolve(
+                    task.capability_id,
+                    CapabilityRequirements(
+                        target_type=target_type,
+                        required_permissions=tuple(task.permissions),
+                        transport="local_process",
+                        allowed_versions=("catalog-v1",) if task.capability_id.startswith("tool.") else (),
+                    ),
+                ).manifest
+        except (CapabilityUnavailable, ValueError, TypeError, RuntimeError):
             return False
         impact_rank = {
             "read_only": 0, "low": 1, "moderate": 2, "high": 3, "critical": 4,

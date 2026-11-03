@@ -500,6 +500,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     # Engine V2 read-only API. All operations use the same Core contracts
     # consumed by the CLI; inherited application auth/rate gates apply.
+    @app.get("/api/v2/capabilities")
+    def workflow_v2_capabilities():
+        return jsonify([item.to_dict() for item in core.capabilities.list()])
+
+    @app.get("/api/v2/providers")
+    def workflow_v2_providers():
+        return jsonify(core.capability_inventory())
+
     @app.route("/api/v2/missions", methods=["GET", "POST"])
     def workflow_v2_missions():
         if request.method == "POST":
