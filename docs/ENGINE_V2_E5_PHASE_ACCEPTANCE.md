@@ -38,3 +38,20 @@ One integration owner coordinates changes to shared Core and service contracts. 
 Authorized real-scanner laboratory, production-like host/service/container and multi-worker recovery, full backup/restore of evidence/configuration, independent external audit anchor, and complete cross-client end-to-end deployment/operator sign-off are mandatory at the final Engine V2 deployment gate under the 2026-11-03 operator decision. They are **not** waived and no phase freeze implies production readiness.
 
 **Next implementation target:** complete S1/S2/S3 source-level contract inventory and build coordinated functional and adversarial changes, not standalone documentation or superficial test-count milestones.
+
+
+### Shared reconnect contract — engineering implementation in progress
+
+The Core `workflow_run_snapshot(request_id)` contract returns the persisted
+request and its durable workflow progress with explicit
+`worker_liveness_verified=false` and `automatic_uncertain_replay=false`.
+The web route `GET /api/v2/workflow-runs/<request_id>/snapshot` and
+`whaxon plan run-snapshot --id <request_id>` consume this same Core
+contract. A request is not proof of execution, and the read models are
+individually persisted views, not an atomic cross-table snapshot.
+
+Adversarial tests cover restart/reconnect, duplicate-submission fencing,
+lease-token secrecy, bounded stale recovery, and durable-health fail-closed
+behavior. **All test results and E5 gates remain unverified until exact-head
+CI and applicable integration evidence are recorded.** No production or
+deployment acceptance is claimed.

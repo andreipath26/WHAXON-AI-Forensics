@@ -260,3 +260,11 @@ def test_e5_worker_poll_uses_monotonic_deadline(tmp_path, monkeypatch):
     assert len(observed) == 3
     assert observed[1] >= observed[0]
     assert observed[2] >= observed[1]
+
+
+def test_e5_headless_cli_exposes_shared_run_snapshot_contract():
+    options = _parser().parse_args([
+        "plan", "run-snapshot", "--id", "persisted-request",
+    ])
+    assert options.plan_command == "run-snapshot"
+    assert options.id == "persisted-request"

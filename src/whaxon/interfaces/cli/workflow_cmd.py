@@ -210,6 +210,10 @@ def _parser() -> argparse.ArgumentParser:
         "run-request", help="inspect persisted V2 execution request status",
     )
     request_status.add_argument("--id", required=True)
+    snapshot = plan_commands.add_parser(
+        "run-snapshot", help="inspect persisted request and workflow progress",
+    )
+    snapshot.add_argument("--id", required=True)
     run = plan_commands.add_parser("run", help="execute a plan through scoped Core providers")
     run.add_argument("--id", required=True)
     run.add_argument("--max-tasks", type=int, default=100)
@@ -445,6 +449,13 @@ def main(args: list[str] | None = None) -> int:
             return 0
         if options.command == "plan" and options.plan_command == "run-request":
             state = core.workflow_run_request(options.id)
+            if state is None:
+                print("unknown workflow run request", file=sys.stderr)
+                return 1
+            print(json.dumps(state, indent=2, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "run-snapshot":
+            state = core.workflow_run_snapshot(options.id)
             if state is None:
                 print("unknown workflow run request", file=sys.stderr)
                 return 1
