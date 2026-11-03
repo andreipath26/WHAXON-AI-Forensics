@@ -176,3 +176,61 @@ time.sleep(60)
     assert restarted.workflow_requests.reconcile_stale(older_than_s=60) == 1
     assert restarted.workflow_run_request(request["id"])["status"] == "uncertain"
     assert restarted.workflow_requests.claim("restarted-worker") is None
+
+
+
+def test_graceful_stop_prevents_claiming_remainder_of_current_batch(tmp_path, monkeypatch):
+    """A SIGTERM-like event stops NEW claims, not the current execution."""
+    core = _core(tmp_path)
+    core.save_workflow_plan(
+        "p2", WorkflowPlan("m", (
+            WorkflowTask("scan2", "unsupported.fixture", "192.0.2.11"),
+        )),
+    )
+    first = core.enqueue_workflow_run("p")
+    second = core.enqueue_workflow_run("p2")
+    stop = threading.Event()
+    called = []
+
+    async def complete_one(plan_id, **_kwargs):
+        called.append(plan_id)
+        stop.set()
+        return {"complete": True}
+
+    monkeypatch.setattr(core, "run_workflow_plan", complete_one)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        total = pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(
+                stop, poll_interval_s=0.05, max_runs_per_batch=20,
+            ),
+        )).result(timeout=10)
+
+    assert total == 1
+    assert called == ["p"]
+    assert core.workflow_run_request(first["id"])["status"] == "completed"
+    assert core.workflow_run_request(second["id"])["status"] == "queued"
+
+
+def test_drain_refuses_new_claims_after_stop_without_changing_queue(tmp_path):
+    core = _core(tmp_path)
+    queued = core.enqueue_workflow_run("p")
+    stop = threading.Event()
+    stop.set()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        count = pool.submit(lambda: asyncio.run(
+            core.drain_workflow_run_requests(stop_event=stop),
+        )).result(timeout=10)
+
+    assert count == 0
+    assert core.workflow_run_request(queued["id"])["status"] == "queued"
+
+
+def test_drain_rejects_invalid_stop_object(tmp_path):
+    core = _core(tmp_path)
+    with ThreadPoolExecutor(max_workers=1) as pool, pytest.raises(
+        TypeError, match="stop_event",
+    ):
+        pool.submit(lambda: asyncio.run(
+            core.drain_workflow_run_requests(stop_event=object()),
+        )).result(timeout=10)
