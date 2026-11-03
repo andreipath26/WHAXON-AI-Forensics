@@ -303,7 +303,7 @@ async def test_cancellation_while_authorizing_prevents_provider_dispatch(tmp_pat
 
 
 @_run_async_test
-async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_path):
+async def test_scheduler_blocks_dependants_when_dispatch_outcome_is_uncertain(tmp_path):
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
 
@@ -320,7 +320,7 @@ async def test_scheduler_blocks_dependants_when_dependency_exhausts_retries(tmp_
     result = await scheduler.run("p", max_attempts=1)
     assert calls == ["recon"]
     assert result["tasks"] == [
-        {"id": "recon", "status": "failed"},
+        {"id": "recon", "status": "uncertain"},
         {"id": "web", "status": "blocked"},
     ]
     assert result["complete"] is True
@@ -1051,7 +1051,7 @@ def test_workflow_approval_rejects_expired_and_cancelled_plan(tmp_path):
 
 
 @_run_async_test
-async def test_scheduler_does_not_claim_failed_retryable_workflow_complete(tmp_path):
+async def test_scheduler_does_not_replay_unknown_post_dispatch_outcome(tmp_path):
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
     from whaxon.core.workflow import WorkflowPlan, WorkflowTask
@@ -1070,9 +1070,11 @@ async def test_scheduler_does_not_claim_failed_retryable_workflow_complete(tmp_p
     )
     first = await scheduler.run("p", max_tasks=1, max_attempts=2)
     assert first["attempts"] == 1
-    assert first["complete"] is False
+    assert first["tasks"][0]["status"] == "uncertain"
+    assert first["complete"] is True
     second = await scheduler.run("p", max_tasks=1, max_attempts=2)
-    assert second["attempts"] == 1
+    assert second["attempts"] == 0
+    assert second["tasks"][0]["status"] == "uncertain"
     assert second["complete"] is True
 
 
@@ -1735,3 +1737,47 @@ def test_malformed_direct_workflow_task_and_plan_construction_fails_closed():
         WorkflowTask(id="a", capability_id="x", target="host", permissions="network.scan")
     with pytest.raises(TypeError, match="plan tasks must be an array"):
         WorkflowPlan(mission_id="m", tasks="not a task list")
+
+
+@_run_async_test
+async def test_provider_exception_after_external_effect_is_not_automatically_retried(
+    tmp_path,
+):
+    """An external effect may have happened before an exception was raised."""
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "provider-unknown-effect.db")
+    store.create_mission("mission", "controlled regression")
+    store.save_workflow_plan(
+        "plan", WorkflowPlan("mission", (
+            WorkflowTask("task", "fixture", "192.0.2.10"),
+        )),
+    )
+    external_effects = []
+
+    async def dispatch(_task):
+        external_effects.append("effect-started")
+        raise RuntimeError("provider lost connection after external operation")
+
+    scheduler = WorkflowScheduler(
+        store, authorize=lambda _task: True, dispatch=dispatch,
+    )
+    first = await scheduler.run("plan", max_tasks=1, max_attempts=5)
+    assert first["outcomes"][0]["status"] == "uncertain"
+    assert len(external_effects) == 1
+    attempts = store.list_workflow_attempts("plan")
+    assert len(attempts) == 1
+    assert attempts[0]["status"] == "uncertain"
+    assert "reconcile before retry" in attempts[0]["error"]
+
+    # Reopening storage or increasing the allowed attempts cannot change the
+    # uncertain effect into a new automatically executable task.
+    reopened = JobStore(store.path)
+    again = await WorkflowScheduler(
+        reopened, authorize=lambda _task: True, dispatch=dispatch,
+    ).run("plan", max_tasks=5, max_attempts=5)
+    assert again["attempts"] == 0
+    assert len(external_effects) == 1
+    assert reopened.list_workflow_attempts("plan")[0]["status"] == "uncertain"
