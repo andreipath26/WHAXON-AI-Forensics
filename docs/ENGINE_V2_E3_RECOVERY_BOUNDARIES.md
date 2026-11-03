@@ -31,3 +31,9 @@
 - The terminal write transaction now checks both the cancellation state **and the original bound plan digest**. A changed plan digest cannot produce `completed`, `incomplete` or `failed` final status under the obsolete intent. The run is `uncertain`, its original digest is preserved, and an audit event is committed atomically.
 - A worker explicitly reporting `uncertain` also produces exactly one transactional, bounded reason-coded `workflow_run_uncertain` event. Raw provider error text is not copied into the audit detail. Audit insertion failure rolls back the queue transition.
 - Missing source plans remain uncertain but cannot write a plan-scoped event to a nonexistent plan; the queue row retains the failure reason. This is an explicit operational limitation, not proof of independent auditing.
+
+## Audit semantic integrity and readiness
+
+- The internal, non-cryptographic workflow audit consistency check now rejects terminal event names that disagree with their attempt's persisted terminal status, terminal events attached to still-running attempts, duplicate dispatch-intent events and events referencing unknown attempt IDs. All findings fail readiness closed. This does not independently prove that an attacker did not modify **both** the event table and attempt table.
+- The readiness flag `requires_manual_reconciliation` now reports whether an in-flight or uncertain attempt actually needs manual reconciliation, rather than returning true for every ordinary healthy pre-dispatch attempt. In-flight effects after dispatch remain explicitly in need of reconciliation until confirmed.
+- Regressions mutate real SQLite rows (not fake mocks), then check both audit diagnostics and success readiness.

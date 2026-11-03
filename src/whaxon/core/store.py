@@ -1868,28 +1868,52 @@ class JobStore:
                 "SELECT attempt_id, event_type FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
+            attempt_by_id = {row["id"]: row["status"] for row in attempts}
             claims = {}
             terminal = {}
+            dispatch = {}
+            mismatched = set()
+            unknown = set()
             for event in events:
-                if event["event_type"] == "task_claimed":
-                    claims[event["attempt_id"]] = claims.get(event["attempt_id"], 0) + 1
-                if event["event_type"] in (
+                attempt_id = event["attempt_id"]
+                kind = event["event_type"]
+                if attempt_id not in attempt_by_id:
+                    unknown.add(attempt_id)
+                    continue
+                if kind == "task_claimed":
+                    claims[attempt_id] = claims.get(attempt_id, 0) + 1
+                if kind == "dispatch_started":
+                    dispatch[attempt_id] = dispatch.get(attempt_id, 0) + 1
+                if kind in (
                     "task_succeeded", "task_failed", "task_cancelled",
                     "task_blocked", "task_uncertain",
                 ):
-                    terminal[event["attempt_id"]] = terminal.get(event["attempt_id"], 0) + 1
+                    terminal[attempt_id] = terminal.get(attempt_id, 0) + 1
+                    if kind != "task_" + attempt_by_id[attempt_id]:
+                        mismatched.add(attempt_id)
             missing_claims = sorted(
                 row["id"] for row in attempts if claims.get(row["id"], 0) != 1
             )
             missing_terminal = sorted(
                 row["id"] for row in attempts
-                if row["status"] != "running" and terminal.get(row["id"], 0) != 1
+                if (terminal.get(row["id"], 0) != 1
+                    if row["status"] != "running"
+                    else terminal.get(row["id"], 0) != 0)
+            )
+            duplicate_dispatch = sorted(
+                attempt_id for attempt_id, count in dispatch.items() if count > 1
             )
             return {
                 "plan_id": plan_id, "attempts": len(attempts),
                 "missing_or_duplicate_claims": missing_claims,
                 "missing_or_duplicate_terminal_events": missing_terminal,
-                "consistent": not missing_claims and not missing_terminal,
+                "mismatched_terminal_events": sorted(mismatched),
+                "duplicate_dispatch_events": duplicate_dispatch,
+                "unknown_attempt_events": sorted(unknown),
+                "consistent": not (
+                    missing_claims or missing_terminal or mismatched
+                    or duplicate_dispatch or unknown
+                ),
             }
         finally:
             c.close()
@@ -1920,7 +1944,9 @@ class JobStore:
                 snapshot["counts"].get("succeeded", 0)
             ),
             "audit_consistent": audit["consistent"],
-            "requires_manual_reconciliation": bool(reconciliation),
+            "requires_manual_reconciliation": any(
+                item["manual_reconciliation_required"] for item in reconciliation
+            ),
             "blockers": sorted(set(blockers)),
             "ready_to_report_success": not blockers and snapshot["complete"]
             and snapshot["total_tasks"] == snapshot["counts"].get("succeeded", 0),
