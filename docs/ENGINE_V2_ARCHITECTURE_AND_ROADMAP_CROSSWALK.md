@@ -701,3 +701,16 @@ findings-page assertion is a route/DOM smoke test and no longer depends
 on the exact count of mutable session-scoped seeded findings. Source
 and API/behavior acceptance tests still own true finding-count and
 evidence correctness. This does **not** accept E6 supplied UI controls.
+
+
+### E5 integration status — merged 2026-11-03
+
+- **Merged:** PR #120, squash commit `15fd5e4058377abaea2f0103f849f3817f050ba8` on `main`.
+- **Exact-head CI:** 10 of 10 checks successful on PR head `435725b7bb1ac3415a122b220491a0378f880acb` before merge.
+- **Integrated scope:** independent supervised durable V2 request worker,
+  restricted and persistent systemd service state, web/worker unit packaging
+  in source and wheel artifacts, SQLite database-only snapshot/restore and
+  stale-worker no-replay regressions, plus cross-phase test corrections.
+- **Acceptance limits:** no claim of an actual systemd host deployment,
+  production disaster-recovery validation, complete backup of non-database
+  evidence/configuration, or final Engine V2 E0–E6 acceptance.
