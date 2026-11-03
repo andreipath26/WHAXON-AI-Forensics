@@ -203,6 +203,16 @@ class Core:
     def workflow_event_cursor(self, plan_id: str, consumer_id: str):
         return self.store.get_workflow_event_cursor(plan_id, consumer_id)
 
+    def deliver_workflow_outbox_events(
+        self, plan_id: str, consumer_id: str, publish, *, limit: int = 100,
+    ):
+        """At-least-once event delivery with post-publish durable acknowledgement."""
+        from .outbox import WorkflowEventOutbox
+
+        return WorkflowEventOutbox(self.store).deliver(
+            plan_id, consumer_id, publish, limit=limit,
+        )
+
     def workflow_event_inbox(self, plan_id: str, consumer_id: str, *, limit: int = 100):
         return self.store.list_unacknowledged_workflow_events(
             plan_id, consumer_id, limit=limit,

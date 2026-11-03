@@ -14,7 +14,7 @@
 | E3-F | Actual controlled external HTTP side effect, worker hard kill and response disconnect; no retry | `tests/test_engine_v2_e3_external_effect_crash.py` | NEW TEST DEFINED, CI pending |
 | E3-G | Corrupt run-request limit/digest, plan drift and missing source fail closed | `tests/test_engine_v2_e3_e5_queue_integrity.py`; `tests/test_engine_v2_e3_completion_identity.py` | SOURCE_PRESENT, acceptance open |
 | E3-H | Audit event/state write failure rolls back all related transitions | `tests/test_engine_v2_e3_queue_atomicity.py` | NEW TEST DEFINED, CI pending |
-| E3-I | Event cursors monotone and persisted; at-least-once replay after unacknowledged delivery | `tests/test_workflow.py::test_workflow_event_cursor_is_durable_monotone_and_plan_scoped` | SOURCE_PRESENT, full delivery lab open |
+| E3-I | Event cursors monotone and persisted; at-least-once delivery, post-effect failure redelivery and independent consumer isolation | `src/whaxon/core/outbox.py`; `tests/test_workflow.py`; `tests/test_engine_v2_e3_outbox_delivery.py` | NEW DELIVERY TESTS DEFINED, CI pending; external transport acceptance open |
 | E3-J | Semantic audit integrity cross-check and fail-closed reporting | `tests/test_engine_v2_e3_audit_semantic_integrity.py` | NEW TEST DEFINED, CI pending |
 | E3-K | Lifecycle snapshot stable across restart; changed event/attempt/task detected against caller-held digest | `tests/test_engine_v2_e3_audit_snapshot_anchor.py`; `tests/test_engine_v2_e3_audit_cli.py` | NEW TEST DEFINED, CI pending |
 | E3-L | Independently protected trust anchor, retention and deletion contract verified under database tampering | Operator-controlled external anchor and witness evidence required | **OPEN: NOT IMPLEMENTATION-ACCEPTED** |

@@ -48,3 +48,9 @@
 
 - `Core.workflow_audit_snapshot()` and `Core.verify_workflow_audit_snapshot()` surface the store's read-only versioned lifecycle digest. `whaxon workflow plan audit-snapshot --id ...` prints the digest; `audit-verify --id ... --expected-digest ...` returns nonzero on mismatch.
 - The CLI explicitly emits `independent_anchor_verified: false` even on a matching caller-provided digest. Operator-managed independent retention and a recorded witness are mandatory for external trust assurance. See `docs/ENGINE_V2_E3_PHASE_ACCEPTANCE.md`.
+
+## At-least-once lifecycle outbox delivery
+
+- `WorkflowEventOutbox.deliver()` and shared `Core.deliver_workflow_outbox_events()` deliver a bounded page of persisted events to a caller-provided trusted transport callback, checkpointing its consumer cursor **only after** each callback returns successfully. A failed callback never advances its event checkpoint. Each consumer has an independently durable cursor across restarts.
+- A simulated downstream effect followed by an exception leaves the event deliberately unacknowledged and proves duplicate delivery on retry; receivers **must** deduplicate by `(plan_id, event.id)`. An internally inconsistent workflow audit refuses publication. The service makes no exactly-once claims and does not configure or authenticate an external transport by itself.
+- Remaining E3 acceptance requires an actual independently supervised publisher process/transport, authenticated downstream sink, external receipt evidence, fault/restart tests and external protected audit anchor.
