@@ -397,9 +397,11 @@ class WorkflowRunQueue:
                 stale = conn.execute(
                     "SELECT id,plan_id FROM workflow_run_requests "
                     "WHERE status='running' AND "
-                    "(heartbeat_at IS NULL OR heartbeat_at<?)",
+                    "(heartbeat_at IS NULL OR heartbeat_at<?) "
+                    "ORDER BY COALESCE(heartbeat_at, started_at, submitted_at), id "
+                    "LIMIT 128",
                     (now - older_than_s,),
-                ).fetchmany(128)
+                ).fetchall()
                 for row in stale:
                     conn.execute(
                         "UPDATE workflow_run_requests SET status='uncertain',"
