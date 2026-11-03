@@ -13,7 +13,6 @@ from whaxon.core.providers import BoundProviderRouter
 from whaxon.core.store import JobStore
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
-
 _CAPABILITY = "service.http.enumerate"
 
 
