@@ -392,3 +392,39 @@ def test_e5_queue_summary_failure_rolls_back_read_transaction(tmp_path, monkeypa
     assert newer["counts"]["queued"] == 0
     assert newer["counts"]["running"] == 1
     assert newer["total"] == 1
+
+
+def test_e5_run_snapshot_reconnect_and_lease_secrecy(tmp_path, monkeypatch):
+    core = _core(tmp_path)
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+    response = app.test_client().post("/api/v2/workflows/p/run", json={})
+    assert response.status_code == 202
+    run_id = response.get_json()["run_request_id"]
+
+    restarted = Core(tmp_path)
+    recovered = restarted.workflow_run_snapshot(run_id)
+    assert recovered["schema_version"] == "whaxon.workflow-run-snapshot.v1"
+    assert recovered["request"]["id"] == run_id
+    assert recovered["worker_liveness_verified"] is False
+    assert recovered["automatic_uncertain_replay"] is False
+    assert "lease_token" not in recovered["request"]
+    assert recovered["progress"] == restarted.workflow_progress("p")
+    second = create_app(
+        restarted, JobRegistry(restarted), AsyncRunner(restarted),
+    )
+    second.config["TESTING"] = True
+    client = second.test_client()
+    snapshot = client.get(f"/api/v2/workflow-runs/{run_id}/snapshot")
+    assert snapshot.status_code == 200
+    assert snapshot.get_json()["request"]["id"] == run_id
+    assert client.get("/api/v2/workflow-runs/unknown/snapshot").status_code == 404
+
+    claimed = restarted.workflow_requests.claim("worker")
+    assert claimed is not None
+    assert claimed["id"] == run_id
+    running = client.get(f"/api/v2/workflow-runs/{run_id}/snapshot").get_json()
+    assert running["request"]["status"] == "running"
+    assert "lease_token" not in running["request"]
+    assert claimed["lease_token"] not in str(running)

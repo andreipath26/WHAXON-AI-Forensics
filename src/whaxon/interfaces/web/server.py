@@ -624,6 +624,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             jsonify({"error": "unknown workflow run request"}), 404
         )
 
+    @app.get("/api/v2/workflow-runs/<request_id>/snapshot")
+    def workflow_v2_run_snapshot(request_id):
+        """Reconnect to one durable request and its persisted task progress."""
+        row = core.workflow_run_snapshot(request_id)
+        return (jsonify(row), 200) if row else (
+            jsonify({"error": "unknown workflow run request"}), 404
+        )
+
     @app.get("/api/v2/workflows/<plan_id>")
     def workflow_v2_plan_details(plan_id):
         try:
