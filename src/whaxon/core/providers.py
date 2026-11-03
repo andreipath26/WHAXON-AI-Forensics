@@ -737,7 +737,7 @@ class BoundProviderRouter:
                     ),
                     "selection_explicit": preferred is not None,
                     "manifest_fingerprint": (
-                        selected.fingerprint if is_selected else None
+                        selected.fingerprint if is_selected and selected is not None else None
                     ),
                     "authorization_required": True,
                     "smoke_tested": False,
