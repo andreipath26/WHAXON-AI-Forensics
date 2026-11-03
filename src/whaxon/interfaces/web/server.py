@@ -475,24 +475,40 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/health")
     def health_probe():
-        """Readiness probe: returns 200 when OK, 503 when MSF is down."""
-        import time
+        """Core readiness is independent of optional Metasploit availability."""
+        from tempfile import NamedTemporaryFile
+
         checks = {}
         try:
-            checks["msf"] = "up" if registry.core.msf.is_up() else "down"
-        except Exception as e:
-            checks["msf"] = f"error: {e}"
+            conn = core.store._conn()
+            try:
+                conn.execute("SELECT 1").fetchone()
+            finally:
+                conn.close()
+            checks["database"] = "ready"
+        except Exception:
+            checks["database"] = "unavailable"
         try:
-            data_dir = Path(os.environ.get("WHAXON_DATA", "data"))
-            data_dir.mkdir(parents=True, exist_ok=True)
-            probe = data_dir / ".healthz"
-            probe.write_text(str(time.time()))
-            probe.unlink()
+            data_dir = Path(core.data_dir)
+            with NamedTemporaryFile(prefix=".healthz-", dir=data_dir) as probe:
+                probe.write(b"1")
+                probe.flush()
             checks["data"] = "writable"
-        except Exception as e:
-            checks["data"] = f"error: {e}"
-        ok = checks.get("msf") == "up" and checks.get("data") == "writable"
-        return jsonify({"status": "ok" if ok else "degraded", "checks": checks}), (200 if ok else 503)
+        except OSError:
+            checks["data"] = "unavailable"
+        try:
+            checks["msf"] = "up" if core.msf.is_up() else "down"
+        except Exception:
+            checks["msf"] = "unavailable"
+
+        ready = checks["database"] == "ready" and checks["data"] == "writable"
+        optional_degraded = ["msf"] if checks["msf"] != "up" else []
+        return jsonify({
+            "status": "ok" if ready else "degraded",
+            "core_ready": ready,
+            "optional_degraded": optional_degraded,
+            "checks": checks,
+        }), (200 if ready else 503)
 
     @app.get("/api/health/simple")
     def health_simple():
