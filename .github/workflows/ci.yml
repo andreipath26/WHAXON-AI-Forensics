@@ -62,7 +62,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q -ra
 
       - name: Build distributions and validate metadata
         run: |
@@ -463,3 +463,58 @@ jobs:
           nmap -sn -n 127.0.0.1
           python tests/smoke_external_tools.py
 
+  engine-v2-e1-security-regressions:
+    name: Engine V2 E1 security and recovery regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev,web]"
+      - name: Run E1 correctness and security regressions with skip reasons
+        run: |
+          python -m pytest -ra --strict-markers --junitxml=engine-v2-e1-results.xml \
+            tests/test_initialize_drain.py \
+            tests/test_cli_initialization_isolation.py \
+            tests/test_e1_nikto_regressions.py \
+            tests/test_engine_v2_e1_boundary.py \
+            tests/test_scope_failclosed.py \
+            tests/test_scope_policy.py \
+            tests/test_validator_security_regressions.py \
+            tests/test_validator_retest.py \
+            tests/test_executor_target_lock.py \
+            tests/test_executor_session.py \
+            tests/test_workflow.py \
+            tests/test_worker.py \
+            tests/test_providers.py \
+            tests/test_server_workflow_v2.py
+      - name: Record exact E1 result counts
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+
+          path = Path("engine-v2-e1-results.xml")
+          if not path.is_file():
+              print("E1 suite did not produce JUnit results.")
+              raise SystemExit(1)
+          root = ElementTree.parse(path).getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          if suite is None:
+              raise SystemExit("E1 JUnit suite is missing")
+          counts = {key: int(suite.get(key, "0")) for key in ("tests", "failures", "errors", "skipped")}
+          summary = f"Engine V2 E1: {counts['tests']} tests; {counts['failures']} failures; {counts['errors']} errors; {counts['skipped']} skipped"
+          print(summary)
+          summary_file = Path(__import__("os").environ.get("GITHUB_STEP_SUMMARY", "engine-v2-e1-summary.md"))
+          with summary_file.open("a", encoding="utf-8") as output:
+              output.write(f"### {summary}\n")
+              output.write("This is targeted regression evidence, not sign-off for all E1 acceptance criteria.\n")
+          if counts["failures"] or counts["errors"]:
+              raise SystemExit(1)
+          PY
