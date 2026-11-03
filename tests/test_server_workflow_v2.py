@@ -466,3 +466,25 @@ def test_provider_and_capability_api_share_core_inventory(tmp_path, monkeypatch)
     assert manifests.status_code == 200
     assert manifests.get_json() == [item.to_dict() for item in core.capabilities.list()]
     assert all("readiness" in item for item in response.get_json())
+
+
+
+def test_e4_portfolio_audit_matches_cli_and_api(tmp_path, monkeypatch, capsys):
+    """Read-only registry reconciliation has one contract across clients."""
+    import json
+
+    from whaxon.interfaces.cli.workflow_cmd import main as workflow_main
+
+    client, core = _client(tmp_path, monkeypatch)
+    api_response = client.get("/api/v2/providers/portfolio-audit")
+    assert api_response.status_code == 200
+    api_report = api_response.get_json()
+    assert api_report["schema_version"] == "whaxon.portfolio-audit.v1"
+    assert api_report["execution_enabled_by_audit"] is False
+    assert core.capability_portfolio_audit() == api_report
+
+    assert workflow_main(["--data-dir", str(tmp_path), "portfolio-audit"]) == 0
+    cli_report = json.loads(capsys.readouterr().out)
+    assert cli_report == api_report
+    assert sum(cli_report["summary"].values()) == len(cli_report["rows"])
+    assert client.post("/api/v2/providers/portfolio-audit").status_code == 405

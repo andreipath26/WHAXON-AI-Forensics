@@ -508,6 +508,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def workflow_v2_providers():
         return jsonify(core.capability_inventory())
 
+    @app.get("/api/v2/providers/portfolio-audit")
+    def workflow_v2_portfolio_audit():
+        return jsonify(core.capability_portfolio_audit())
+
     @app.route("/api/v2/missions", methods=["GET", "POST"])
     def workflow_v2_missions():
         if request.method == "POST":

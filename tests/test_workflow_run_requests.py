@@ -143,3 +143,52 @@ def test_cancel_closes_queued_run_request_without_executing(tmp_path):
     assert core.workflow_run_request(request["id"])["status"] == "cancelled"
     assert core.workflow_requests.claim("worker") is None
     assert core.workflow_progress("p")["cancellation_requested"] is True
+
+
+
+def test_e4_blocked_execution_never_enters_followup_planner(tmp_path, monkeypatch):
+    """Review-only E4 planning must not poison E3 request completion."""
+    core = _core(tmp_path)
+    request = core.enqueue_workflow_run("p")
+
+    def forbidden(_plan_id):
+        raise AssertionError("blocked tasks cannot produce follow-up proposals")
+
+    monkeypatch.setattr(core, "propose_workflow_followups", forbidden)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        assert executor.submit(
+            lambda: asyncio.run(core.drain_workflow_run_requests()),
+        ).result(timeout=15) == 1
+    assert core.workflow_run_request(request["id"])["status"] == "completed"
+    assert core.workflow_progress("p")["counts"]["blocked"] == 1
+
+
+def test_e4_secondary_planner_error_preserves_successful_scheduler_result(
+    tmp_path, monkeypatch,
+):
+    """An optional follow-up fault cannot change a completed source effect."""
+    core = _core(tmp_path)
+
+    class StubScheduler:
+        async def run(self, *_args, **_kwargs):
+            return {
+                "plan_id": "p", "attempts": 1,
+                "complete": True,
+                "tasks": [{"id": "recon", "status": "succeeded"}],
+            }
+
+    monkeypatch.setattr(
+        core, "workflow_scheduler", lambda **_kwargs: StubScheduler(),
+    )
+
+    def failed_planner(_plan_id):
+        raise OSError("evidence store temporarily unavailable")
+
+    monkeypatch.setattr(core, "propose_workflow_followups", failed_planner)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = executor.submit(
+            lambda: asyncio.run(core.run_workflow_plan("p")),
+        ).result(timeout=15)
+    assert result["complete"] is True
+    assert result["tasks"][0]["status"] == "succeeded"
+    assert result["followup_error"] == "OSError"

@@ -8,12 +8,15 @@ import json
 import re
 import shutil
 import uuid
+from dataclasses import replace
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 from .capabilities import (
     CapabilityManifest,
     CapabilityRegistry,
     CapabilityRequirements,
+    CapabilityResolution,
     CapabilityUnavailable,
 )
 from .workflow import WorkflowTask
@@ -35,6 +38,27 @@ _CATALOG_TARGETS = {
     "dnsrecon": ("hostname",),
     "arjun": ("url",),
 }
+# Stable operation identities (not scanner or executable names). These are
+# conservative aliases for the currently admitted, fixed-argv local adapters.
+# An alias has no permission/validation authority of its own.
+SEMANTIC_OPERATION_IDS = {
+    "nmap": "network.services.discover",
+    "nikto": "web.server.audit",
+    "gobuster": "web.directories.enumerate",
+    "ffuf": "web.paths.fuzz",
+    "nuclei": "web.templates.assess",
+    "wpscan": "web.wordpress.audit",
+    "sqlmap": "web.sql_injection.assess",
+    "whois": "domain.registration.lookup",
+    "dig": "dns.records.query",
+    "whatweb": "web.technologies.identify",
+    "theharvester": "osint.domain.contacts.search",
+    "dnsrecon": "dns.records.enumerate",
+    "arjun": "web.parameters.discover",
+}
+if set(SEMANTIC_OPERATION_IDS) != set(_CATALOG_TARGETS):
+    raise RuntimeError("semantic operation map and admitted adapter list differ")
+
 _ADAPTER_SERIES = "catalog-v2"
 _HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
@@ -112,11 +136,15 @@ class CatalogAdapterProvider:
     are therefore shared with the existing CLI and UI.
     """
 
-    def __init__(self, *, catalog, runner, store, registry: CapabilityRegistry):
+    def __init__(
+        self, *, catalog, runner, store, registry: CapabilityRegistry,
+        suppress_legacy_followup=None,
+    ):
         self.catalog = catalog
         self.runner = runner
         self.store = store
         self.registry = registry
+        self._suppress_legacy_followup = suppress_legacy_followup
         self._tool_by_provider: dict[str, str] = {}
         self._manifest_by_provider: dict[str, CapabilityManifest] = {}
         from ..adapters import get_adapter
@@ -151,6 +179,115 @@ class CatalogAdapterProvider:
             registry.register(manifest)
             self._tool_by_provider[provider_id] = tool.id
             self._manifest_by_provider[provider_id] = manifest
+
+    def bindings(self) -> tuple[CapabilityManifest, ...]:
+        """Trusted in-process registrations, not arbitrary persisted manifests."""
+        return tuple(
+            self._manifest_by_provider[key]
+            for key in sorted(self._manifest_by_provider)
+        )
+
+    def portfolio_inventory(self) -> list[dict]:
+        """Account for EVERY catalog entry, including unsupported execution paths.
+
+        This is read-only reconciliation. Presence in the catalog, a working
+        adapter, or an installed executable never grants execution permission.
+        """
+        from ..adapters import get_adapter
+
+        bound_ids = set(self._tool_by_provider.values())
+        rows: list[dict[str, Any]] = []
+        for tool in sorted(self.catalog.list(), key=lambda entry: entry.id):
+            if tool.id in bound_ids:
+                continue
+            transport = getattr(tool, "transport", "cli")
+            if transport != "cli":
+                reason = "unsupported_transport"
+            elif tool.id not in _CATALOG_TARGETS:
+                reason = "not_admitted_for_engine_v2"
+            elif get_adapter(tool.id) is None:
+                reason = "no_supported_adapter"
+            else:
+                reason = "catalog_changed_requires_provider_reload"
+            rows.append({
+                "capability_id": f"tool.{tool.id}",
+                "provider_id": None,
+                "provider_version": None,
+                "manifest_fingerprint": None,
+                "transport": transport,
+                "target_types": [],
+                "registry_digest": self.registry.digest,
+                "registered": False,
+                "installed": _tool_available(tool) if transport == "cli" else False,
+                "executable": False,
+                "readiness": "unsupported",
+                "reason": reason,
+                "authorization_required": True,
+                "smoke_tested": False,
+                "lab_validated": False,
+                "end_to_end_verified": False,
+            })
+        return rows
+
+    def portfolio_audit(self) -> dict:
+        """Read-only crosswalk of all catalog tools AND registered adapters.
+
+        No binary execution, provider registration, approval, or new plugin
+        loading is performed by this inspection.
+        """
+        from ..adapters import list_adapters
+
+        catalog = {tool.id: tool for tool in self.catalog.list()}
+        adapters = set(list_adapters())
+        bound = set(self._tool_by_provider.values())
+        rows: list[dict[str, Any]] = []
+        for tool_id in sorted(set(catalog) | adapters):
+            tool = catalog.get(tool_id)
+            has_adapter = tool_id in adapters
+            is_bound = tool_id in bound
+            if tool is None:
+                state = "adapter_only"
+                reason = "adapter_not_in_catalog"
+            elif is_bound:
+                state = "bound"
+                reason = "registered_not_lab_verified"
+            elif getattr(tool, "transport", "cli") != "cli":
+                state = "unsupported_transport"
+                reason = "requires_separate_transport_provider"
+            elif tool_id not in _CATALOG_TARGETS:
+                state = "not_admitted"
+                reason = "no_engine_v2_execution_admission"
+            elif not has_adapter:
+                state = "catalog_only"
+                reason = "no_registered_adapter"
+            else:
+                state = "unbound"
+                reason = "catalog_or_binding_changed"
+            rows.append({
+                "tool_id": tool_id,
+                "catalog_present": tool is not None,
+                "adapter_registered": has_adapter,
+                "transport": getattr(tool, "transport", None) if tool else None,
+                "v2_provider_bound": is_bound,
+                "state": state,
+                "reason": reason,
+                "authorization_required": True,
+                "smoke_tested": False,
+                "lab_validated": False,
+                "end_to_end_verified": False,
+            })
+        summary = {state: sum(row["state"] == state for row in rows) for state in (
+            "bound", "catalog_only", "adapter_only", "not_admitted",
+            "unsupported_transport", "unbound",
+        )}
+        return {
+            "schema_version": "whaxon.portfolio-audit.v1",
+            "catalog_count": len(catalog),
+            "adapter_count": len(adapters),
+            "rows": rows,
+            "summary": summary,
+            "execution_enabled_by_audit": False,
+        }
 
     def inventory(self) -> list[dict]:
         """Live readiness is observational and never rewrites versioned manifests."""
@@ -243,6 +380,10 @@ class CatalogAdapterProvider:
                 "task permission/impact differs from the bound provider contract",))
         tool_id = self._tool_by_provider[expected.provider_id]
         job_id = uuid.uuid4().hex[:12]
+        # Fail closed if the old Automator cannot be fenced. The fence must
+        # happen before ToolRunner may publish any findings.
+        if self._suppress_legacy_followup is not None:
+            self._suppress_legacy_followup(job_id)
         timeout_s = min(float(task.timeout_s), expected.timeout_s)
         returned_id = await self.runner.run_tool(
             tool_id=tool_id,
@@ -286,3 +427,294 @@ class CatalogAdapterProvider:
             "registry_digest": resolution.registry_digest,
             "transport": "local_process",
         }
+
+
+class SemanticOperationProvider:
+    """Trusted V2 operation aliases around the existing local adapter bridge.
+
+    The same ToolRunner, authorization, artifact store and parser still execute
+    the task. A versioned semantic manifest is distinct from the legacy alias,
+    so approvals can pin an operation independently of a tool's name.
+    """
+
+    def __init__(self, bridge: CatalogAdapterProvider, registry: CapabilityRegistry):
+        self.bridge = bridge
+        self.registry = registry
+        self._operations: dict[str, tuple[CapabilityManifest, CapabilityManifest]] = {}
+        for legacy in bridge.bindings():
+            tool_id = bridge._tool_by_provider[legacy.provider_id]
+            operation_id = SEMANTIC_OPERATION_IDS[tool_id]
+            semantic = replace(
+                legacy, capability_id=operation_id,
+                limitations=(
+                    *legacy.limitations,
+                    "Semantic alias of the admitted catalog adapter; independent lab validation remains required.",
+                ),
+            )
+            registry.register(semantic)
+            self._operations[operation_id] = (semantic, legacy)
+
+    def bindings(self) -> tuple[CapabilityManifest, ...]:
+        return tuple(
+            self._operations[key][0] for key in sorted(self._operations)
+        )
+
+    def _legacy_task(self, task: WorkflowTask) -> tuple[WorkflowTask, CapabilityManifest]:
+        if not isinstance(task, WorkflowTask):
+            raise TypeError("operation task must be a WorkflowTask")
+        pair = self._operations.get(task.capability_id)
+        if pair is None:
+            raise CapabilityUnavailable(task.capability_id, ("unbound semantic operation",))
+        semantic, legacy = pair
+        return replace(task, capability_id=legacy.capability_id), semantic
+
+    def resolve_task(self, task: WorkflowTask, *, require_installed: bool = False):
+        original, expected = self._legacy_task(task)
+        legacy_result = self.bridge.resolve_task(
+            original, require_installed=require_installed,
+        )
+        registered = next((
+            item for item in self.registry.list(task.capability_id)
+            if item.provider_id == expected.provider_id
+            and item.provider_version == expected.provider_version
+        ), None)
+        if registered is None or registered.fingerprint != expected.fingerprint:
+            raise CapabilityUnavailable(
+                task.capability_id, ("semantic provider manifest changed",),
+            )
+        if legacy_result.manifest.provider_id != expected.provider_id or (
+            legacy_result.manifest.provider_version != expected.provider_version
+        ):
+            raise RuntimeError("semantic alias provider identity drift")
+        return CapabilityResolution(
+            manifest=expected, registry_digest=self.registry.digest,
+            considered=len(self.registry.list(task.capability_id)),
+            rejected=(),
+        )
+
+    async def dispatch(self, task: WorkflowTask) -> dict:
+        resolved = self.resolve_task(task, require_installed=True)
+        original, expected = self._legacy_task(task)
+        result = await self.bridge.dispatch(original)
+        legacy = self._operations[task.capability_id][1]
+        if (
+            result.get("provider_id") != legacy.provider_id
+            or result.get("provider_version") != legacy.provider_version
+            or result.get("manifest_fingerprint") != legacy.fingerprint
+        ):
+            raise RuntimeError("semantic adapter returned mismatched legacy identity")
+        return {
+            **result,
+            "capability_id": expected.capability_id,
+            "legacy_capability_id": legacy.capability_id,
+            "manifest_fingerprint": expected.fingerprint,
+            "registry_digest": resolved.registry_digest,
+        }
+
+    def inventory(self) -> list[dict]:
+        legacy_rows = {
+            item["capability_id"]: item for item in self.bridge.inventory()
+        }
+        rows = []
+        for operation_id, (semantic, legacy) in sorted(self._operations.items()):
+            original = legacy_rows[legacy.capability_id]
+            rows.append({
+                **original,
+                "capability_id": operation_id,
+                "provider_id": semantic.provider_id,
+                "manifest_fingerprint": semantic.fingerprint,
+                "legacy_capability_id": legacy.capability_id,
+                "semantic_operation": True,
+            })
+        return rows
+
+
+class ProviderContract(Protocol):
+    """Trusted in-process provider interface; manifests alone cannot execute."""
+
+    def bindings(self) -> tuple[CapabilityManifest, ...]: ...
+
+    def resolve_task(
+        self, task: WorkflowTask, *, require_installed: bool = False,
+    ) -> Any: ...
+
+    async def dispatch(self, task: WorkflowTask) -> dict: ...
+
+    def inventory(self) -> list[dict]: ...
+
+
+class BoundProviderRouter:
+    """Capability-to-provider routing without coupling the scheduler to tools.
+
+    Only explicitly constructed, trusted provider adapters may register.
+    Persisted manifests alone never create dispatchable providers. A capability
+    must have exactly one bound execution implementation; ambiguity fails closed.
+    """
+
+    def __init__(self, providers=(), *, preferred_providers=None):
+        # Multiple providers for an operation require an explicit, trusted
+        # deployment choice. Never silently switch the implementation after
+        # authorization simply because a new provider was registered.
+        self._preferred: dict[str, str] = dict(preferred_providers or {})
+        if not all(
+            isinstance(capability, str) and capability
+            and isinstance(provider_id, str) and provider_id
+            for capability, provider_id in self._preferred.items()
+        ):
+            raise ValueError("preferred provider map requires non-empty identities")
+        self._routes: dict[str, ProviderContract] = {}
+        self._providers: list[ProviderContract] = []
+        self._bindings: dict[str, CapabilityManifest] = {}
+        self._alternatives: dict[str, set[str]] = {}
+        self._contracts: dict[str, CapabilityManifest] = {}
+        for provider in providers:
+            self.register(provider)
+
+    def register(self, provider: ProviderContract) -> None:
+        if not all(callable(getattr(provider, name, None)) for name in (
+            "bindings", "resolve_task", "dispatch", "inventory",
+        )):
+            raise TypeError("provider must implement the bound provider contract")
+        manifests = tuple(provider.bindings())
+        # A catalog may contain zero admitted capabilities; still expose its
+        # unsupported entries through the inventory without enabling them.
+        seen: set[str] = set()
+        for manifest in manifests:
+            if not isinstance(manifest, CapabilityManifest):
+                raise TypeError("provider binding must be a CapabilityManifest")
+            capability = manifest.capability_id
+            if capability in seen:
+                raise ValueError(f"ambiguous bound capability: {capability}")
+            existing = self._contracts.get(capability)
+            if existing is not None:
+                if (
+                    capability not in self._preferred
+                    or existing.provider_id == manifest.provider_id
+                ):
+                    raise ValueError(f"ambiguous bound capability: {capability}")
+                # Same identity string is not proof of equivalent semantics.
+                # Enforce the operation's typed/effect contract at admission,
+                # while allowing providers to differ in transport/readiness.
+                contract_fields = (
+                    "input_schema", "output_schema", "permissions",
+                    "side_effects", "impact", "target_types",
+                    "protocols", "auth_methods",
+                )
+                if any(
+                    getattr(existing, field) != getattr(manifest, field)
+                    for field in contract_fields
+                ):
+                    raise ValueError(
+                        f"incompatible providers for capability: {capability}"
+                    )
+            seen.add(capability)
+        for manifest in manifests:
+            capability = manifest.capability_id
+            self._contracts.setdefault(capability, manifest)
+            self._alternatives.setdefault(capability, set()).add(manifest.provider_id)
+            selected = self._preferred.get(capability)
+            if selected is None or selected == manifest.provider_id:
+                self._routes[capability] = provider
+                self._bindings[capability] = manifest
+        self._providers.append(provider)
+
+    def manifest_for(self, capability_id: str) -> CapabilityManifest:
+        """Select only the explicitly trusted and bound provider manifest."""
+        manifest = self._bindings.get(capability_id)
+        selected = self._preferred.get(capability_id)
+        if manifest is None:
+            reason = (
+                "preferred execution provider is not registered"
+                if selected else "no trusted execution provider"
+            )
+            raise CapabilityUnavailable(capability_id, (reason,))
+        if selected and manifest.provider_id != selected:
+            raise CapabilityUnavailable(
+                capability_id, ("preferred execution provider is not registered",),
+            )
+        return manifest
+
+    def plan_binding_valid(self, task: WorkflowTask, metadata: dict) -> bool:
+        """Require immutable-plan provider pinning for interchangeable adapters.
+
+        Adding a second implementation later must not change an already
+        approved plan's execution identity.
+        """
+        options = self._alternatives.get(task.capability_id, set())
+        if not isinstance(metadata, dict):
+            return False
+        # Only an absent field means an old plan. An explicit null or
+        # malformed binding is not a legitimate legacy-compatibility signal.
+        has_bindings = "provider_bindings" in metadata
+        bindings = metadata.get("provider_bindings")
+        # Historical plans may lack provider pins while a capability has one
+        # trusted implementation. New explicitly pinned plans must always
+        # retain their exact approved provider identity, even if registration
+        # changes leave only one implementation installed.
+        if not has_bindings:
+            # Newly introduced operation-level identities always need a
+            # pinned provider, even when today's registry has one candidate.
+            return len(options) == 1 and task.capability_id.startswith("tool.")
+        if not isinstance(bindings, dict):
+            return False
+        expected = bindings.get(task.id)
+        if not isinstance(expected, dict):
+            return False
+        try:
+            manifest = self.manifest_for(task.capability_id)
+        except CapabilityUnavailable:
+            return False
+        return (
+            expected.get("provider_id") == manifest.provider_id
+            and expected.get("manifest_fingerprint") == manifest.fingerprint
+        )
+
+    def resolve_task(self, task: WorkflowTask, *, require_installed: bool = False):
+        if not isinstance(task, WorkflowTask):
+            raise TypeError("provider task must be a WorkflowTask")
+        manifest = self.manifest_for(task.capability_id)
+        provider = self._routes[task.capability_id]
+        resolution = provider.resolve_task(task, require_installed=require_installed)
+        if resolution.manifest.fingerprint != manifest.fingerprint:
+            raise RuntimeError("selected provider binding changed")
+        return resolution
+
+    async def dispatch(self, task: WorkflowTask) -> dict:
+        # Resolver rechecks the actual provider readiness and manifest binding.
+        resolution = self.resolve_task(task, require_installed=True)
+        provider = self._routes[task.capability_id]
+        result = await provider.dispatch(task)
+        if not isinstance(result, dict):
+            raise RuntimeError("provider dispatch must return a typed result object")
+        if result.get("provider_id") != resolution.manifest.provider_id or (
+            result.get("provider_version") != resolution.manifest.provider_version
+            or result.get("manifest_fingerprint") != resolution.manifest.fingerprint
+        ):
+            raise RuntimeError("provider result identity does not match resolved manifest")
+        return result
+
+    def portfolio_audit(self) -> dict:
+        """Aggregate read-only provider inventories without enabling adapters."""
+        audits = []
+        for provider in self._providers:
+            optional_audit = getattr(provider, "portfolio_audit", None)
+            if callable(optional_audit):
+                audits.append(optional_audit())
+        if len(audits) == 1:
+            return audits[0]
+        return {
+            "schema_version": "whaxon.portfolio-audit.v1",
+            "provider_audits": audits,
+            "execution_enabled_by_audit": False,
+        }
+
+    def inventory(self) -> list[dict]:
+        rows: list[dict] = []
+        for provider in self._providers:
+            rows.extend(provider.inventory())
+            portfolio = getattr(provider, "portfolio_inventory", None)
+            if callable(portfolio):
+                rows.extend(portfolio())
+        return sorted(rows, key=lambda item: (
+            item["capability_id"], item.get("provider_id") or "",
+        ))

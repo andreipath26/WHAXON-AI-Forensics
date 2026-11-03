@@ -46,6 +46,7 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("capabilities", help="list registered Engine v2 capabilities")
     commands.add_parser("providers", help="inspect live provider readiness")
+    commands.add_parser("portfolio-audit", help="reconcile catalog and adapters (read-only)")
 
     mission = commands.add_parser("mission", help="manage missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
@@ -120,6 +121,13 @@ def _parser() -> argparse.ArgumentParser:
     save = plan_commands.add_parser("save", help="validate and persist a JSON workflow plan")
     save.add_argument("--id", required=True, help="immutable persisted plan identifier")
     save.add_argument("--file", required=True, type=Path, help="JSON file containing a WorkflowPlan")
+    followups = plan_commands.add_parser(
+        "followups", help="propose tasks from verified workflow evidence",
+    )
+    followups.add_argument("--source-id", required=True)
+    followups.add_argument("--max-tasks", type=int, default=16)
+    followups.add_argument("--save", action="store_true",
+                           help="persist but never approve or run the proposal")
     show = plan_commands.add_parser("show", help="show a plan and its durable task states")
     show.add_argument("--id", required=True)
     reconcile_report = plan_commands.add_parser(
@@ -210,6 +218,9 @@ def main(args: list[str] | None = None) -> int:
         if options.command == "providers":
             print(json.dumps(core.capability_inventory(), indent=2, sort_keys=True))
             return 0
+        if options.command == "portfolio-audit":
+            print(json.dumps(core.capability_portfolio_audit(), indent=2, sort_keys=True))
+            return 0
         if options.command == "mission" and options.mission_command == "cost-limit":
             core.configure_mission_cost_limit(
                 options.id, max_cost_microusd=options.max_cost_microusd,
@@ -282,6 +293,16 @@ def main(args: list[str] | None = None) -> int:
                 )
                 print(json.dumps({"approval_id": options.approval_id, "revoked": revoked}))
                 return 0
+        if options.command == "plan" and options.plan_command == "followups":
+            proposal = core.propose_workflow_followups(
+                options.source_id, max_tasks=options.max_tasks,
+            )
+            created = False
+            if options.save and proposal.plan is not None:
+                created = core.save_workflow_plan(proposal.plan_id, proposal.plan)
+            print(json.dumps({**proposal.to_dict(), "created": bool(created)},
+                             indent=2, sort_keys=True))
+            return 0 if proposal.plan is not None else 1
         if options.command == "plan" and options.plan_command == "save":
             raw = json.loads(options.file.read_text(encoding="utf-8"))
             workflow = WorkflowPlan.from_dict(raw)
