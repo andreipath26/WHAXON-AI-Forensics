@@ -317,6 +317,10 @@ class Core:
             "max_concurrency": max_concurrency,
         })
 
+    def workflow_run_queue_summary(self):
+        """Shared read-only queue diagnostics for API, CLI and headless."""
+        return self.workflow_requests.summary()
+
     def workflow_run_request(self, request_id: str):
         return self.workflow_requests.get(request_id)
 
