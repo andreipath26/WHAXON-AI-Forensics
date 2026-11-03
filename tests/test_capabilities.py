@@ -116,3 +116,42 @@ def test_capability_manifest_rejects_non_finite_timeout():
 
     with pytest.raises(ValueError, match="finite"):
         _manifest("provider.nan", timeout_s=math.nan)
+
+
+def test_resolver_enforces_permissions_impact_and_schema_compatibility():
+    import pytest
+    registry = CapabilityRegistry()
+    registry.register(_manifest(
+        "provider.a", readiness="smoke_tested", permissions=("network.scan",),
+        impact="moderate", input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    ))
+    valid = CapabilityRequirements(
+        required_permissions=("network.scan",), maximum_impact="moderate",
+        required_input_schema={"type": "object"},
+        required_output_schema={"type": "object"},
+    )
+    assert registry.resolve("network.port_scan", valid).manifest.provider_id == "provider.a"
+    for bad in (
+        CapabilityRequirements(required_permissions=("credentials.read",)),
+        CapabilityRequirements(maximum_impact="low"),
+        CapabilityRequirements(required_input_schema={"type": "array"}),
+        CapabilityRequirements(required_output_schema={"type": "array"}),
+        CapabilityRequirements(maximum_timeout_s=301),
+    ):
+        with pytest.raises(CapabilityUnavailable):
+            registry.resolve("network.port_scan", bad)
+
+
+def test_resolver_rejects_invalid_resource_constraints():
+    import math
+    import pytest
+    registry = CapabilityRegistry()
+    registry.register(_manifest("provider.a"))
+    for value in (0, -1, math.nan, math.inf, True):
+        with pytest.raises(ValueError):
+            registry.resolve("network.port_scan", CapabilityRequirements(maximum_timeout_s=value))
+    with pytest.raises(ValueError):
+        registry.resolve("network.port_scan", CapabilityRequirements(maximum_impact="unbounded"))
+    with pytest.raises(TypeError):
+        registry.resolve("network.port_scan", CapabilityRequirements(required_input_schema=[]))

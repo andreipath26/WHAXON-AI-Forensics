@@ -144,6 +144,11 @@ class CapabilityRequirements:
     transport: str = ""
     minimum_readiness: str = "registered"
     allowed_providers: tuple[str, ...] = ()
+    required_permissions: tuple[str, ...] = ()
+    maximum_impact: str = ""
+    maximum_timeout_s: float | None = None
+    required_input_schema: dict[str, Any] | None = None
+    required_output_schema: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -206,6 +211,20 @@ class CapabilityRegistry:
         requirements = requirements or CapabilityRequirements()
         if requirements.minimum_readiness not in _READINESS:
             raise ValueError(f"unsupported minimum readiness: {requirements.minimum_readiness}")
+        if requirements.maximum_impact and requirements.maximum_impact not in (
+            "read_only", "low", "moderate", "high", "critical",
+        ):
+            raise ValueError("unsupported maximum impact")
+        if requirements.maximum_timeout_s is not None and (
+            isinstance(requirements.maximum_timeout_s, bool)
+            or not isinstance(requirements.maximum_timeout_s, (int, float))
+            or not math.isfinite(requirements.maximum_timeout_s)
+            or requirements.maximum_timeout_s <= 0
+        ):
+            raise ValueError("maximum_timeout_s must be finite and positive")
+        for schema in (requirements.required_input_schema, requirements.required_output_schema):
+            if schema is not None and not isinstance(schema, dict):
+                raise TypeError("required schemas must be objects")
         candidates = self.list(capability_id)
         rejected: list[str] = []
         eligible: list[CapabilityManifest] = []
@@ -215,6 +234,19 @@ class CapabilityRegistry:
                 reason = f"{manifest.provider_id}: readiness {manifest.readiness} is below {requirements.minimum_readiness}"
             elif requirements.allowed_providers and manifest.provider_id not in requirements.allowed_providers:
                 reason = f"{manifest.provider_id}: provider is not allowlisted"
+            elif not set(requirements.required_permissions).issubset(manifest.permissions):
+                reason = f"{manifest.provider_id}: required permissions are not declared"
+            elif requirements.maximum_impact and (
+                ("read_only", "low", "moderate", "high", "critical").index(manifest.impact)
+                > ("read_only", "low", "moderate", "high", "critical").index(requirements.maximum_impact)
+            ):
+                reason = f"{manifest.provider_id}: impact exceeds permitted maximum"
+            elif requirements.maximum_timeout_s is not None and manifest.timeout_s < requirements.maximum_timeout_s:
+                reason = f"{manifest.provider_id}: provider timeout is below required task budget"
+            elif requirements.required_input_schema is not None and _canonical(manifest.input_schema) != _canonical(requirements.required_input_schema):
+                reason = f"{manifest.provider_id}: incompatible input schema"
+            elif requirements.required_output_schema is not None and _canonical(manifest.output_schema) != _canonical(requirements.required_output_schema):
+                reason = f"{manifest.provider_id}: incompatible output schema"
             else:
                 for field_name in (
                     "target_type", "protocol", "platform", "auth_method", "transport",

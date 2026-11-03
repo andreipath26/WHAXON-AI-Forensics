@@ -88,6 +88,7 @@ class CatalogAdapterProvider:
             CapabilityRequirements(
                 transport="local_process",
                 target_type=_target_type(task.target),
+                required_permissions=tuple(task.permissions),
                 minimum_readiness="registered",
                 allowed_providers=tuple(self._tool_by_provider),
             ),

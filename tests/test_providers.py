@@ -429,3 +429,22 @@ def test_catalog_provider_rejects_unsupported_target_type_before_dispatch(monkey
             "whaxon.core.capabilities", fromlist=["CapabilityRequirements"]
         ).CapabilityRequirements(target_type="unsupported-target"))
     assert runner.calls == []
+
+
+def test_catalog_dispatch_rejects_undeclared_task_permissions(monkeypatch):
+    import asyncio
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    with pytest.raises(CapabilityUnavailable, match="permissions"):
+        asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("credentials.read",), impact="moderate",
+        )))
+    assert runner.calls == []
