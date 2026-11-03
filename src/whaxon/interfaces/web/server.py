@@ -512,7 +512,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/health/simple")
     def health_simple():
-        return {"ok": True, "tools": len(core.catalog.list())}
+        """Do not advertise a healthy service when durable state is unavailable.
+
+        The lightweight endpoint shares the full probe's authoritative
+        database/data-dir readiness decision. Optional tools are not gates.
+        """
+        full_response, status = health_probe()
+        return jsonify({
+            "ok": status == 200,
+            "tools": len(core.catalog.list()),
+            "core_ready": full_response.get_json()["core_ready"],
+        }), status
 
     # Engine V2 read-only API. All operations use the same Core contracts
     # consumed by the CLI; inherited application auth/rate gates apply.
