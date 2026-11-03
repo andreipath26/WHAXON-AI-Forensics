@@ -1,6 +1,6 @@
 # Engine v2 E1 — Correctness and security acceptance
 
-Status: **OPEN**. Working branch only. Do not merge before all criteria have passing evidence on the exact candidate commit.
+Status: **OPEN for formal E1 acceptance**. Current `main` at `f0b25d3629d776b433f72c83db679bb41313c812` already includes a number of E1 security and recovery implementation slices and source tests. The previous 'working branch only' claim is historical; do not use it to infer unmerged code.
 
 ## Required gates
 
@@ -13,4 +13,4 @@ Status: **OPEN**. Working branch only. Do not merge before all criteria have pas
 - [ ] Adversarial tests for unauthorized execution, malformed targets and policy changes
 - [ ] Full CI, static analysis, supported platform smoke and exact-SHA acceptance evidence
 
-All E1 changes remain on `fix/engine-v2-e1-acceptance-2026-11-02`. One PR and one merge into `main` only after acceptance. E2–E6 are out of scope.
+Historical E1 branch note (2026-11-02): `fix/engine-v2-e1-acceptance-2026-11-02` was a work-in-progress snapshot, **not** the current implementation source of truth. Related E1 source/tests are already on `main` alongside E2–E5 work. Do not reopen resolved bugs from this dated branch-only note. Formal E1 acceptance remains open until exact candidate-SHA adversarial tests, deployment and evidence are recorded. See `ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md` for the updated bounded checkpoint breakdown.
