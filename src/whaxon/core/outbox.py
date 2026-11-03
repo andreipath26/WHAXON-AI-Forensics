@@ -7,8 +7,8 @@ must deduplicate by (plan_id, event.id); exactly-once is NOT guaranteed.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
 import inspect
+from collections.abc import Callable
 from typing import Any
 
 
