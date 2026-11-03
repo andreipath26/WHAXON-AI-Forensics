@@ -389,3 +389,27 @@ def test_e5_cli_run_snapshot_is_shared_core_contract(monkeypatch, capsys):
         "plan", "run-snapshot", "--id", "missing",
     ]) == 1
     assert "unknown workflow run request" in capsys.readouterr().err
+
+
+def test_e5_cli_cancel_request_uses_core_barrier(monkeypatch, capsys):
+    class CancelCore(_FakeCore):
+        def cancel_workflow_run_request(self, request_id):
+            if request_id == "missing":
+                raise ValueError("unknown workflow run request")
+            return {
+                "run_request_id": request_id,
+                "cancellation_requested": True,
+                "external_effects_stopped": False,
+            }
+
+    monkeypatch.setattr(workflow_cmd, "Core", CancelCore)
+    assert workflow_cmd.main([
+        "plan", "cancel-request", "--id", "run-123",
+    ]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["run_request_id"] == "run-123"
+    assert data["external_effects_stopped"] is False
+    assert workflow_cmd.main([
+        "plan", "cancel-request", "--id", "missing",
+    ]) == 1
+    assert "unknown workflow run request" in capsys.readouterr().err

@@ -516,3 +516,28 @@ def test_e5_lease_loss_visible_after_reconnect_without_credential_leak(tmp_path)
     assert claimed["lease_token"] not in str(data)
     assert data["automatic_uncertain_replay"] is False
     assert restarted.workflow_requests.claim("replacement-worker") is None
+
+
+def test_e5_request_identity_cancel_api_is_durable_and_fails_closed(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    assert client.post(
+        "/api/v2/workflow-runs/unknown/cancel",
+    ).status_code == 404
+    accepted = client.post("/api/v2/workflows/p/run", json={})
+    request_id = accepted.get_json()["run_request_id"]
+    response = client.post(
+        f"/api/v2/workflow-runs/{request_id}/cancel"
+    )
+    assert response.status_code == 200
+    result = response.get_json()
+    assert result["run_request_id"] == request_id
+    assert result["external_effects_stopped"] is False
+    assert result["request"]["status"] == "cancelled"
+    assert Core(tmp_path).workflow_run_request(request_id)["status"] == "cancelled"
+    assert Core(tmp_path).workflow_requests.claim("worker") is None
