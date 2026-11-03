@@ -53,10 +53,19 @@ class WorkflowRunQueue:
                for key in expected):
             raise ValueError("workflow execution limits must be positive and bounded")
 
-    @staticmethod
-    def _format(row):
+    @classmethod
+    def _format(cls, row):
         data = dict(row)
-        data["limits"] = json.loads(data.pop("limits_json"))
+        raw = data.pop("limits_json")
+        try:
+            limits = json.loads(raw)
+            cls._check_limits(limits)
+        except (TypeError, ValueError):
+            data["limits"] = None
+            data["limits_integrity"] = "invalid"
+        else:
+            data["limits"] = limits
+            data["limits_integrity"] = "valid"
         return data
 
     @classmethod
@@ -88,7 +97,14 @@ class WorkflowRunQueue:
                     (plan_id,),
                 ).fetchone()
                 if existing is not None:
-                    if json.loads(existing["limits_json"]) != limits:
+                    try:
+                        persisted_limits = json.loads(existing["limits_json"])
+                        self._check_limits(persisted_limits)
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(
+                            "active workflow request has invalid persisted limits"
+                        ) from exc
+                    if persisted_limits != limits:
                         raise ValueError("active workflow request has different limits")
                     conn.execute("COMMIT")
                     return self._public_record(existing)
@@ -176,6 +192,26 @@ class WorkflowRunQueue:
                             "completed_at=?,error='plan cancelled before run claim' "
                             "WHERE id=? AND status='queued'",
                             (time.time(), row["id"]),
+                        )
+                        continue
+                    try:
+                        persisted_limits = json.loads(row["limits_json"])
+                        self._check_limits(persisted_limits)
+                    except (TypeError, ValueError):
+                        now = time.time()
+                        conn.execute(
+                            "UPDATE workflow_run_requests SET status='uncertain', "
+                            "completed_at=?,error='invalid persisted execution limits' "
+                            "WHERE id=? AND status='queued'",
+                            (now, row["id"]),
+                        )
+                        conn.execute(
+                            "INSERT INTO workflow_events "
+                            "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                            (row["plan_id"], "workflow_run_uncertain",
+                             json.dumps({"request_id": row["id"],
+                                         "reason": "invalid_execution_limits"},
+                                        sort_keys=True), now),
                         )
                         continue
                     token = uuid.uuid4().hex
