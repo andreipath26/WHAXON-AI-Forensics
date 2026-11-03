@@ -10,7 +10,6 @@ import asyncio
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 from whaxon.core.scheduler import WorkflowScheduler
 from whaxon.core.store import JobStore
