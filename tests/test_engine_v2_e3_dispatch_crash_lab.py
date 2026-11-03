@@ -10,6 +10,7 @@ import asyncio
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 from whaxon.core.scheduler import WorkflowScheduler
 from whaxon.core.store import JobStore
@@ -95,9 +96,13 @@ def test_hard_kill_after_dispatch_requires_manual_reconciliation(tmp_path):
         unexpectedly_dispatched.append(True)
         raise AssertionError("unknown outcome must never be replayed")
 
-    result = asyncio.run(WorkflowScheduler(
-        JobStore(database), authorize=lambda task: True, dispatch=forbidden,
-    ).run("plan", max_tasks=5, max_attempts=5))
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        result = pool.submit(
+            lambda: asyncio.run(WorkflowScheduler(
+                JobStore(database), authorize=lambda task: True,
+                dispatch=forbidden,
+            ).run("plan", max_tasks=5, max_attempts=5)),
+        ).result(timeout=15)
     assert result["attempts"] == 0
     assert unexpectedly_dispatched == []
     assert result["tasks"][0]["status"] == "uncertain"
