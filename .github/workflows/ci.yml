@@ -482,6 +482,7 @@ jobs:
             tests/test_initialize_drain.py \
             tests/test_cli_initialization_isolation.py \
             tests/test_e1_nikto_regressions.py \
+            tests/test_engine_v2_e1_boundary.py \
             tests/test_scope_failclosed.py \
             tests/test_scope_policy.py \
             tests/test_validator_security_regressions.py \
