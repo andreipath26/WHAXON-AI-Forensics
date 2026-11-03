@@ -67,6 +67,12 @@ class _FakeCore:
     def workflow_readiness(self, plan_id):
         return {"plan_id": plan_id, "ready_to_report_success": False}
 
+    def workflow_evidence(self, plan_id, *, limit=100):
+        return {
+            "plan_id": plan_id, "all_evidence_recorded": False,
+            "attempts": [], "limit_seen": limit,
+        }
+
     def workflow_resource_summary(self, plan_id):
         return {"plan_id": plan_id, "cost_usd": None, "cost_accounting_available": False}
 
@@ -345,3 +351,13 @@ def test_cli_mission_deadline_returns_persisted_cutoff_not_budget(monkeypatch, c
     assert json.loads(capsys.readouterr().out) == {
         "mission_id": "m", "deadline_at": 2000000000.0,
     }
+
+
+def test_workflow_cli_exposes_only_persisted_evidence(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "evidence", "--id", "p", "--limit", "5"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["plan_id"] == "p"
+    assert data["limit_seen"] == 5
+    assert data["all_evidence_recorded"] is False
+    assert data["attempts"] == []

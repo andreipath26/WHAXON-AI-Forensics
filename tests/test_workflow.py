@@ -1708,3 +1708,30 @@ def test_mission_rate_limit_cannot_be_bypassed_by_manual_attempt(tmp_path):
     with pytest.raises(ValueError, match="mission rate budget exhausted"):
         store.start_task_attempt("a2", "scan", 1, plan_id="p2")
     assert store.claim_ready_workflow_task("p2", "worker") is None
+
+
+@pytest.mark.parametrize("payload, error", [
+    (None, "workflow plan must be an object"),
+    ({}, "missing required field: mission_id"),
+    ({"mission_id": "m"}, "missing required field: tasks"),
+    ({"mission_id": 42, "tasks": []}, "mission_id is required"),
+    ({"mission_id": "m", "tasks": {}}, "tasks must be an array"),
+    ({"mission_id": "m", "tasks": [None]}, "workflow task must be an object"),
+    ({"mission_id": "m", "tasks": [{}]}, "missing required field: id"),
+    ({"mission_id": "m", "tasks": [{"id": "a", "capability_id": "x", "target": 9}]}, "task id, capability_id and target are required"),
+    ({"mission_id": "m", "tasks": [{"id": "a", "capability_id": "x", "target": "host", "inputs": []}]}, "task inputs must be an object"),
+    ({"mission_id": "m", "tasks": [{"id": "a", "capability_id": "x", "target": "host", "depends_on": "another"}]}, "dependencies and permissions must be arrays"),
+    ({"mission_id": "m", "tasks": [{"id": "a", "capability_id": "x", "target": "host", "permissions": [None]}]}, "dependencies and permissions must be non-empty strings"),
+    ({"mission_id": "m", "tasks": [{"id": "a", "capability_id": "x", "target": "host", "idempotency_key": 10}]}, "idempotency_key must be a string"),
+    ({"mission_id": "m", "tasks": [{"id": "a", "capability_id": "x", "target": "host"}], "metadata": []}, "plan metadata must be an object"),
+])
+def test_malformed_workflow_contracts_fail_with_actionable_validation(payload, error):
+    with pytest.raises((TypeError, ValueError), match=error):
+        WorkflowPlan.from_dict(payload)
+
+
+def test_malformed_direct_workflow_task_and_plan_construction_fails_closed():
+    with pytest.raises(TypeError, match="dependencies and permissions must be arrays"):
+        WorkflowTask(id="a", capability_id="x", target="host", permissions="network.scan")
+    with pytest.raises(TypeError, match="plan tasks must be an array"):
+        WorkflowPlan(mission_id="m", tasks="not a task list")

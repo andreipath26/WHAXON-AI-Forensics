@@ -256,6 +256,10 @@ class Core:
     def workflow_readiness(self, plan_id: str):
         return self.store.get_workflow_readiness(plan_id)
 
+    def workflow_evidence(self, plan_id: str, *, limit: int = 100):
+        """Return real, cross-checked workflow-to-tool evidence for reporting."""
+        return self.store.get_workflow_evidence(plan_id, limit=limit)
+
     def workflow_resource_summary(self, plan_id: str):
         return self.store.get_workflow_resource_summary(plan_id)
 
