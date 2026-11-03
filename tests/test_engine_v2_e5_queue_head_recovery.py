@@ -111,3 +111,33 @@ def test_e5_all_invalid_queued_requests_fail_without_fake_success(tmp_path):
     assert core.workflow_requests.claim("worker") is None
     assert core.workflow_run_request(first["id"])["status"] == "uncertain"
     assert core.workflow_run_request(second["id"])["status"] == "uncertain"
+
+
+def test_e5_stale_worker_fenced_after_reconciliation_and_next_job_survives(tmp_path):
+    core, first, second = _queued_pair(tmp_path)
+    claimed = core.workflow_requests.claim("lost-worker")
+    assert claimed is not None and claimed["id"] == first["id"]
+    token = claimed["lease_token"]
+
+    # Simulate a crashed worker: a stale heartbeat must not authorize a
+    # late completion after a separate Core instance reconciles the lease.
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=1 WHERE id=?",
+            (first["id"],),
+        )
+    finally:
+        conn.close()
+    restarted = Core(tmp_path)
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=120) == 1
+    assert restarted.workflow_run_request(first["id"])["status"] == "uncertain"
+    assert not core.workflow_requests.heartbeat(first["id"], token)
+    assert not core.workflow_requests.finish(
+        first["id"], token, status="completed",
+    )
+    assert restarted.workflow_run_request(first["id"])["status"] == "uncertain"
+    next_claim = restarted.workflow_requests.claim("replacement-worker")
+    assert next_claim is not None and next_claim["id"] == second["id"]
+    assert next_claim["lease_token"] != token
+    assert "lease_token" not in restarted.workflow_run_request(first["id"])
