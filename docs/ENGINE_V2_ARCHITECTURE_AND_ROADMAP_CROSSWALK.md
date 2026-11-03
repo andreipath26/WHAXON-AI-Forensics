@@ -501,4 +501,6 @@ The remaining E1/E3 operational acceptance, E4 complete provider migration, E5 s
 
 **Acceptance remaining:** Exact-commit Ruff/mypy/Python 3.11–3.13 CI; controlled process-kill/restart and concurrent-worker tests, bounded shutdown latency for long-running tasks, task-outcome reconciliation, service-mode startup/health diagnostics and audit/outbox failure tests. This worker command is not a claim that the web server is independently supervising it or that all advertised daemon/systemd/container modes are accepted.
 
+**Implementation refinement (2026-11-03):** A long-lived service now initializes Core once instead of re-running startup reconciliation every polling cycle. It checks the stop signal at least every 250 ms while idle, even with a long configured poll interval. Added explicit regressions for both behaviors. This is still a worker-lifecycle slice, not whole-engine or deployment acceptance.
+
 **Next-session checkpoint:** Verify branch head and CI; fix test/runtime failures; merge only if checks pass and update this section with the exact SHA, CI run and remaining limitations. Continue E3/E5 service lifecycle and E4 provider reconciliation against the latest \`main\`, without recreating the merged request queue. PR #96 is still separate until reconciled.
