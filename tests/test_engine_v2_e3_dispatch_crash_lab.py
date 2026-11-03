@@ -89,7 +89,7 @@ def test_hard_kill_after_dispatch_requires_manual_reconciliation(tmp_path):
     attempts = after.list_workflow_attempts("plan")
     assert attempts[0]["status"] == "uncertain"
     assert "uncertain" in attempts[0]["error"]
-    assert after.get_workflow_readiness("plan")["ready"] is False
+    assert after.get_workflow_readiness("plan")["ready_to_report_success"] is False
 
     unexpectedly_dispatched = []
 
