@@ -192,3 +192,73 @@ def test_e4_secondary_planner_error_preserves_successful_scheduler_result(
     assert result["complete"] is True
     assert result["tasks"][0]["status"] == "succeeded"
     assert result["followup_error"] == "OSError"
+
+def test_queue_summary_reports_stale_and_uncertain_without_claiming_live_workers(
+    tmp_path,
+):
+    core = _core(tmp_path)
+    empty = core.workflow_run_queue_summary()
+    assert empty["total"] == 0
+    assert empty["worker_liveness_verified"] is False
+    queued = core.enqueue_workflow_run("p")
+    summary = Core(tmp_path).workflow_run_queue_summary()
+    assert summary["counts"]["queued"] == 1
+    assert summary["oldest_queued_age_s"] >= 0
+    assert summary["requires_reconciliation_count"] == 0
+    claim = core.workflow_requests.claim("worker")
+    assert claim["id"] == queued["id"]
+    live = core.workflow_run_queue_summary()
+    assert live["counts"]["running"] == 1
+    assert live["stale_running_count"] == 0
+    assert live["worker_liveness_verified"] is False
+    assert "lease_token" not in live
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=? WHERE id=?",
+            (time.time() - 1000, queued["id"]),
+        )
+    finally:
+        conn.close()
+    stale = core.workflow_run_queue_summary()
+    assert stale["stale_running_count"] == 1
+    assert stale["requires_reconciliation_count"] == 1
+    # Inspection is never a mutation or a retry.
+    assert core.workflow_run_request(queued["id"])["status"] == "running"
+    assert core.workflow_requests.reconcile_stale() == 1
+    uncertain = core.workflow_run_queue_summary()
+    assert uncertain["counts"]["uncertain"] == 1
+    assert uncertain["requires_reconciliation_count"] == 1
+    assert uncertain["automatic_uncertain_replay"] is False
+
+
+@pytest.mark.parametrize("value", [True, 0, -1, float("nan"), float("inf")])
+def test_queue_summary_rejects_invalid_stale_threshold(tmp_path, value):
+    core = _core(tmp_path)
+    with pytest.raises(ValueError, match="finite and positive"):
+        core.workflow_requests.summary(stale_after_s=value)
+
+
+def test_queue_summary_cli_api_share_persisted_state(tmp_path, monkeypatch, capsys):
+    import json
+
+    from whaxon.interfaces.cli.workflow_cmd import main as workflow_main
+
+    core = _core(tmp_path)
+    core.enqueue_workflow_run("p")
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    response = client.get("/api/v2/workflow-runs/summary")
+    assert response.status_code == 200
+    assert response.get_json()["counts"]["queued"] == 1
+    assert workflow_main([
+        "--data-dir", str(tmp_path), "plan", "queue-summary",
+    ]) == 0
+    cli_state = json.loads(capsys.readouterr().out)
+    api_state = response.get_json()
+    assert cli_state["counts"] == api_state["counts"]
+    assert cli_state["requires_reconciliation_count"] == api_state[
+        "requires_reconciliation_count"
+    ]
+    assert client.post("/api/v2/workflow-runs/summary").status_code == 405

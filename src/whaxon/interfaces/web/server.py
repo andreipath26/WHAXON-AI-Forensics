@@ -587,6 +587,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             "run_request_url": f"/api/v2/workflow-runs/{queued['id']}",
         }), 202
 
+    @app.get("/api/v2/workflow-runs/summary")
+    def workflow_v2_run_queue_summary():
+        return jsonify(core.workflow_run_queue_summary())
+
     @app.get("/api/v2/workflow-runs/<request_id>")
     def workflow_v2_run_request_status(request_id):
         row = core.workflow_run_request(request_id)
