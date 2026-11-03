@@ -362,6 +362,40 @@ class Core:
             processed += 1
         return processed
 
+    async def serve_workflow_run_requests(
+        self, stop_event, *, poll_interval_s: float = 1.0,
+        max_runs_per_batch: int = 20,
+    ) -> int:
+        """Continuously service durable V2 intents until graceful stop.
+
+        stop_event is a threading.Event, so foreground services can handle
+        SIGTERM/SIGINT without assuming they own the asyncio event loop.
+        A stop signal prevents new claims after the current batch, without
+        falsely claiming that an in-flight external operation stopped.
+        """
+        import asyncio
+        import math
+
+        if isinstance(poll_interval_s, bool) or not isinstance(
+            poll_interval_s, (int, float)
+        ) or not math.isfinite(poll_interval_s) or not 0.05 <= poll_interval_s <= 3600:
+            raise ValueError("poll interval must be finite and in [0.05, 3600]")
+        if type(max_runs_per_batch) is not int or not 1 <= max_runs_per_batch <= 100:
+            raise ValueError("max_runs_per_batch must be in range 1..100")
+        if not callable(getattr(stop_event, "is_set", None)):
+            raise TypeError("stop_event must expose is_set()")
+        total = 0
+        while not stop_event.is_set():
+            total += await self.drain_workflow_run_requests(
+                max_runs=max_runs_per_batch,
+            )
+            if stop_event.is_set():
+                break
+            # Bounded idle polling; a new process can claim a queued request
+            # on the next iteration even if a web-thread wakeup was lost.
+            await asyncio.sleep(poll_interval_s)
+        return total
+
     def capability_inventory(self):
         """Return truthful live provider readiness without changing manifests."""
         return self.providers.inventory()
