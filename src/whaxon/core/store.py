@@ -1913,8 +1913,8 @@ class JobStore:
                     "capability_id": row["capability_id"],
                     "attempt_id": row["attempt_id"], "attempt_no": row["attempt_no"],
                     "attempt_status": row["status"], "job_id": None,
-                    "evidence_status": "unavailable", "finding_count": 0,
-                    "findings": [],
+                    "evidence_status": "unavailable", "integrity_status": "unsealed",
+                    "finding_count": 0, "findings": [],
                 }
                 if row["status"] != "succeeded":
                     entry["evidence_status"] = "not_successful"
@@ -1942,6 +1942,24 @@ class JobStore:
                             entry["findings"] = [dict(finding) for finding in findings]
                             entry["finding_count"] = len(findings)
                             entry["evidence_status"] = "recorded"
+                            seal = c.execute(
+                                "SELECT job_id, digest FROM workflow_evidence_seals "
+                                "WHERE attempt_id=?", (row["attempt_id"],),
+                            ).fetchone()
+                            if seal is not None:
+                                current = _workflow_evidence_digest(
+                                    c, attempt_id=row["attempt_id"], job_id=job_id,
+                                    target=row["target"], capability_id=row["capability_id"],
+                                    plan_digest=plan["digest"],
+                                )
+                                entry["integrity_status"] = (
+                                    "verified" if seal["job_id"] == job_id
+                                    and current == seal["digest"] else "changed"
+                                )
+                                if entry["integrity_status"] == "changed":
+                                    entry["evidence_status"] = "integrity_mismatch"
+                                    entry["findings"] = []
+                                    entry["finding_count"] = 0
                         else:
                             entry["evidence_status"] = "job_not_verified"
                 evidence.append(entry)
@@ -1951,6 +1969,9 @@ class JobStore:
                 "attempts": evidence,
                 "all_evidence_recorded": bool(evidence) and all(
                     item["evidence_status"] == "recorded" for item in evidence
+                ),
+                "all_evidence_integrity_verified": bool(evidence) and all(
+                    item["integrity_status"] == "verified" for item in evidence
                 ),
             }
         finally:
