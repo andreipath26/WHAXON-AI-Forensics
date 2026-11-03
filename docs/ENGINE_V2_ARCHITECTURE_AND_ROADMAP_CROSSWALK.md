@@ -732,3 +732,12 @@ evidence correctness. This does **not** accept E6 supplied UI controls.
 10. **Finish the phase before merging, then move on.** The sole phase PR should contain implementation, integration tests, adversarial checks, operational evidence and reconciled docs. Integrate and merge only after the required exact-head gates pass; report genuinely unverified acceptance obligations as open rather than declaring success.
 
 **Conflict resolution:** These phase-level batching and single-PR requirements take precedence over any suggestion elsewhere in this document that a small isolated implementation slice should be merged before phase acceptance. Existing instructions to test individual components early and commit coherent internal changes remain valid *within the one phase PR*. The master roadmap's actual safety and dependency gates always remain binding.
+
+
+## Engine V2 E0–E9 phase-freeze policy (operator decision, 2026-11-03)
+
+For **every Engine V2 phase E0–E9**, engineering completion, phase merge and freeze are distinct from final integrated-engine deployment acceptance. A phase may be frozen after its required implementation and interfaces are complete, applicable automated unit/integration/adversarial/security tests and supported exact-head CI pass, residual integration obligations are recorded, and engineering sign-off is documented. Preserve the one-phase/one-branch/one-PR/one-final-merge rule. Do not infer acceptance from source presence or older CI.
+
+**Deferred to the final full Engine V2 deployment gate, not waived:** authorized real-scanner controlled-target laboratory runs, externally protected audit-anchor/witness and retention validation, production-like service and multi-worker operation, host/network crash and recovery, backup/restore, complete cross-client end-to-end validation, and deployment/operator sign-off. These remain explicitly **NOT PASSED** until evidenced. No frozen phase, green CI or mock test implies production readiness or closes the overall release gates. Security authorization, fail-closed behavior, uncertain-effect reconciliation and audit integrity remain mandatory implementation requirements. Reopen a frozen phase only for evidenced correctness/security defects or necessary cross-phase integration repairs with regression coverage.
+
+This operator decision supersedes earlier requirements to finish deployment-level tests *before phase engineering freeze*, but does not supersede final release safety and acceptance gates.
