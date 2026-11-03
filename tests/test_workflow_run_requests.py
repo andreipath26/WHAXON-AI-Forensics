@@ -336,3 +336,59 @@ def test_stale_reconciliation_keeps_fresh_running_request_owned(tmp_path):
         fresh["id"], fresh_claim["lease_token"], status="completed",
     )
     assert restarted.workflow_run_request(fresh["id"])["status"] == "completed"
+
+
+def test_e5_api_client_reconnect_after_server_restart_keeps_durable_identity(
+    tmp_path, monkeypatch,
+):
+    first = _core(tmp_path)
+    # Suppress only the process-local wakeup; the persisted intent must be
+    # observable from an independently constructed server instance.
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    app = create_app(first, JobRegistry(first), AsyncRunner(first))
+    app.config["TESTING"] = True
+    response = app.test_client().post(
+        "/api/v2/workflows/p/run",
+        json={"max_tasks": 3, "max_attempts": 2, "max_concurrency": 1},
+    )
+    assert response.status_code == 202
+    accepted = response.get_json()
+    assert accepted["execution_completed"] is False
+    restarted = Core(tmp_path)
+    second_app = create_app(
+        restarted, JobRegistry(restarted), AsyncRunner(restarted),
+    )
+    second_app.config["TESTING"] = True
+    client = second_app.test_client()
+    recovered = client.get(accepted["run_request_url"])
+    assert recovered.status_code == 200
+    assert recovered.get_json()["id"] == accepted["run_request_id"]
+    assert recovered.get_json()["status"] == "queued"
+    assert "lease_token" not in recovered.get_json()
+    assert client.get(accepted["durable_progress_url"]).status_code == 200
+    # An identical submission from the reconnected client must not create a
+    # second external execution intent.
+    repeated = client.post(
+        "/api/v2/workflows/p/run",
+        json={"max_tasks": 3, "max_attempts": 2, "max_concurrency": 1},
+    )
+    assert repeated.status_code == 202
+    assert repeated.get_json()["run_request_id"] == accepted["run_request_id"]
+    assert client.get("/api/v2/workflow-runs/summary").get_json()["total"] == 1
+
+
+def test_e5_queue_summary_failure_rolls_back_read_transaction(tmp_path, monkeypatch):
+    core = _core(tmp_path)
+    core.enqueue_workflow_run("p")
+    # Verify the ordinary snapshot remains stable and does not claim that a
+    # recently heartbeating worker is live.
+    snapshot = core.workflow_run_queue_summary()
+    assert snapshot["counts"]["queued"] == 1
+    assert snapshot["worker_liveness_verified"] is False
+    assert snapshot["automatic_uncertain_replay"] is False
+    assert snapshot["total"] == sum(snapshot["counts"].values())
+    assert core.workflow_requests.claim("worker") is not None
+    newer = core.workflow_run_queue_summary()
+    assert newer["counts"]["queued"] == 0
+    assert newer["counts"]["running"] == 1
+    assert newer["total"] == 1
