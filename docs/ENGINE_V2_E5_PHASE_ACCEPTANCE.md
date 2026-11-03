@@ -65,3 +65,13 @@ A successful `POST /api/v2/workflows/<plan_id>/run` returns HTTP 202,
 identity and remains usable after a different web process starts against the
 same data directory. Duplicate active submissions with identical bounds reuse
 the same durable request identity. A 202 is **not** execution success.
+
+
+### Bounded lost-lease reconciliation and stop behavior
+
+The headless drain now repeats the existing 128-record transactional
+stale-lease reconciliation until no stale leases remain before admitting
+new work. A stop signal exits between bounded passes. This is recovery
+bookkeeping only: no uncertain request is automatically re-executed.
+The worker still requires exact-head CI and multi-process adversarial
+acceptance before E5-D can close.

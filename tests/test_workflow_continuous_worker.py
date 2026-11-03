@@ -268,3 +268,41 @@ def test_e5_headless_cli_exposes_shared_run_snapshot_contract():
     ])
     assert options.plan_command == "run-snapshot"
     assert options.id == "persisted-request"
+
+
+def test_e5_drain_reconciles_all_stale_leases_before_new_claims(tmp_path, monkeypatch):
+    core = _core(tmp_path)
+    calls = []
+    original = core.workflow_requests.reconcile_stale
+
+    def reconcile(*args, **kwargs):
+        calls.append("reconcile")
+        # Simulate more than one bounded 128-row reconciliation pass.
+        return 128 if len(calls) == 1 else 5 if len(calls) == 2 else original(
+            *args, **kwargs,
+        )
+
+    monkeypatch.setattr(core.workflow_requests, "reconcile_stale", reconcile)
+    queued = core.enqueue_workflow_run("p")
+    stop = threading.Event()
+    stop.set()
+    assert asyncio.run(core.drain_workflow_run_requests(
+        max_runs=1, initialized=True, stop_event=stop,
+    )) == 0
+    assert calls == ["reconcile"]
+    assert core.workflow_run_request(queued["id"])["status"] == "queued"
+
+    stop.clear()
+    original_claim = core.workflow_requests.claim
+    def claim(owner):
+        calls.append("claim")
+        return original_claim(owner)
+    monkeypatch.setattr(core.workflow_requests, "claim", claim)
+    async def incomplete(*args, **kwargs):
+        return {"complete": False}
+    monkeypatch.setattr(core, "run_workflow_plan", incomplete)
+    assert asyncio.run(core.drain_workflow_run_requests(
+        max_runs=1, initialized=True, stop_event=stop,
+    )) == 1
+    assert calls[-3:] == ["reconcile", "reconcile", "claim"]
+    assert core.workflow_run_request(queued["id"])["status"] == "incomplete"
