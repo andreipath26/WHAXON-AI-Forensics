@@ -7,6 +7,9 @@ Type=simple
 User=whaxon
 Group=whaxon
 WorkingDirectory=/opt/whaxon
+StateDirectory=whaxon
+StateDirectoryMode=0700
+RequiresMountsFor=/var/lib/whaxon
 EnvironmentFile=-/etc/whaxon.env
 Environment=WHAXON_DATA=/var/lib/whaxon/data
 ExecStart=/opt/whaxon/.venv/bin/gunicorn \
