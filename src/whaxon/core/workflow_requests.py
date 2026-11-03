@@ -59,6 +59,13 @@ class WorkflowRunQueue:
         data["limits"] = json.loads(data.pop("limits_json"))
         return data
 
+    @classmethod
+    def _public_record(cls, row) -> dict:
+        """Client-facing queue records never expose worker lease credentials."""
+        value = cls._format(row)
+        value.pop("lease_token", None)
+        return value
+
     def enqueue(self, plan_id: str, *, limits: dict) -> dict:
         self._check_limits(limits)
         now = time.time()
@@ -84,7 +91,7 @@ class WorkflowRunQueue:
                     if json.loads(existing["limits_json"]) != limits:
                         raise ValueError("active workflow request has different limits")
                     conn.execute("COMMIT")
-                    return self._format(existing)
+                    return self._public_record(existing)
                 conn.execute(
                     "INSERT INTO workflow_run_requests "
                     "(id,plan_id,plan_digest,limits_json,submitted_at) "
@@ -97,7 +104,7 @@ class WorkflowRunQueue:
                     (request_id,),
                 ).fetchone()
                 conn.execute("COMMIT")
-                return self._format(row)
+                return self._public_record(row)
             except Exception:
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")
@@ -115,9 +122,7 @@ class WorkflowRunQueue:
             ).fetchone()
             if row is None:
                 return None
-            value = self._format(row)
-            value.pop("lease_token", None)
-            return value
+            return self._public_record(row)
         finally:
             conn.close()
 
@@ -171,6 +176,25 @@ class WorkflowRunQueue:
                             "completed_at=?,error='plan cancelled before run claim' "
                             "WHERE id=? AND status='queued'",
                             (time.time(), row["id"]),
+                        )
+                        continue
+                    try:
+                        self._check_limits(json.loads(row["limits_json"]))
+                    except (ValueError, TypeError):
+                        now = time.time()
+                        conn.execute(
+                            "UPDATE workflow_run_requests SET status='uncertain', "
+                            "completed_at=?,error='invalid persisted execution limits' "
+                            "WHERE id=? AND status='queued'",
+                            (now, row["id"]),
+                        )
+                        conn.execute(
+                            "INSERT INTO workflow_events "
+                            "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                            (row["plan_id"], "workflow_run_uncertain",
+                             json.dumps({"request_id": row["id"],
+                                         "reason": "invalid_execution_limits"},
+                                        sort_keys=True), now),
                         )
                         continue
                     token = uuid.uuid4().hex

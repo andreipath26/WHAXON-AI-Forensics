@@ -598,3 +598,20 @@ subobjects remain supported; stable round trips keep the same digest.
 This is an E2 source-contract safety improvement, not a migration of all
 legacy finding/evidence schemas or full E2 acceptance. Regression tests
 verify fail-closed validation at construction and digest boundaries.
+
+### E1/E3/E5 integrated boundary and crash-recovery acceptance batch (2026-11-03)
+
+The private durable request lease credential is returned **only** from
+worker claim, never through Core enqueue/re-enqueue/status or the web API.
+Running requests require the original lease credential for heartbeat/finish.
+Persisted execution limits are validated again inside the atomic claim
+transaction; invalid JSON, missing/extra fields, booleans and out-of-range
+values are quarantined as uncertain with a same-transaction audit event,
+allowing valid requests behind them to run.
+
+A separate real-process synthetic-dispatch kill lab demonstrates that task
+attempts whose external effects are unknown become `uncertain` and are not
+automatically replayed by another worker. That lab uses a harmless test
+callback, not a real external scanner. This is a coordinated E1/E3/E5
+acceptance **candidate**, not signed-off E0–E6 or real-tool crash acceptance.
+Existing E4 provider and E6 supplied-UI work is unchanged by the batch.
