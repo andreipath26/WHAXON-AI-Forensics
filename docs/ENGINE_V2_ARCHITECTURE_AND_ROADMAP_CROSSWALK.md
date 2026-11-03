@@ -567,3 +567,21 @@ The remaining E1/E3 operational acceptance, E4 complete provider migration, E5 s
 **Implementation branch:** `engine-v2/e5-run-queue-observability-batch` based on `main` after merged stop-aware durable worker. Added read-only `WorkflowRunQueue.summary()`, `Core.workflow_run_queue_summary()`, CLI `whaxon workflow plan queue-summary`, and API `GET /api/v2/workflow-runs/summary`. They expose counts of queued/running/uncertain/terminal requests, age of oldest queued intent, stale-running count and actionable reconciliation count. Summary never reports actual worker liveness, exposes no fencing token, never mutates a queue row, and never auto-retries unknown external effects. Regression tests cover cross-Core visibility, stale/uncertain, read-only inspection, invalid thresholds, and CLI/API parity. **Not accepted until exact-commit CI passes; not a daemon supervision implementation.** E4 PR #96 is a separate concurrently developed batch; reconcile against E4 after merge, retaining both provider work and E5 Core/API/CLI interfaces. This is the session continuity checkpoint.
 
 **Integration checkpoint:** This E5 batch has been reconciled on merged E4 `main` (781246b87575), retaining E4 semantic provider contracts, report API, CLI and all provider regression tests while layering queue diagnostics only. No worker scheduling, approval or retry behavior changed. The E5 branch is reissued as exactly one commit ahead of current main. Verify Ruff/mypy/Python 3.11–3.13 and headless/cross-platform checks on the NEW revision before merging. Actual liveness supervision and guaranteed task recovery remain open.
+
+
+### E5 durable queue-head quarantine and bounded continuation (2026-11-03)
+
+The run-request claim transaction now inspects queued requests in order and
+**quarantines** missing-plan or changed-plan-digest requests as `uncertain`
+without dispatch. It also closes queued requests whose persisted plan is
+already `cancel_requested`. Instead of stopping at the first invalid queue
+head, the claim searches for eligible work within the same SQLite transaction,
+with a limit of 64 entries per invocation to avoid an unbounded database lock.
+A larger invalid backlog is handled over subsequent worker polls.
+
+This fixes a potential one-shot drain starvation case and preserves existing
+lease fencing, strict plan identity, no automatic uncertain-effect replay, and
+the distinction between persistence and actual service liveness. Regression
+tests cover valid work behind a corrupt or cancelled request, two competing
+workers and all-invalid queues. **It is not proof of external-tool crash
+reconciliation or an accepted E5 service-mode deployment.**

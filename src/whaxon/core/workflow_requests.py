@@ -128,41 +128,59 @@ class WorkflowRunQueue:
             conn = self.store._conn()
             try:
                 conn.execute("BEGIN IMMEDIATE")
-                row = conn.execute(
-                    "SELECT q.* FROM workflow_run_requests q "
-                    "JOIN workflow_plans p ON p.id=q.plan_id "
-                    "WHERE q.status='queued' AND p.status!='cancel_requested' "
-                    "ORDER BY q.submitted_at,q.id LIMIT 1",
-                ).fetchone()
-                if row is None:
-                    conn.execute("COMMIT")
-                    return None
-                plan = conn.execute(
-                    "SELECT digest FROM workflow_plans WHERE id=?",
-                    (row["plan_id"],),
-                ).fetchone()
-                if plan is None or plan["digest"] != row["plan_digest"]:
+                # Quarantine bounded malformed/obsolete queue heads instead of
+                # starving valid requests behind them. All decisions and the
+                # eventual claim share this one SQLite write transaction.
+                for _ in range(64):
+                    row = conn.execute(
+                        "SELECT * FROM workflow_run_requests "
+                        "WHERE status='queued' "
+                        "ORDER BY submitted_at,id LIMIT 1",
+                    ).fetchone()
+                    if row is None:
+                        conn.execute("COMMIT")
+                        return None
+                    plan = conn.execute(
+                        "SELECT digest,status FROM workflow_plans WHERE id=?",
+                        (row["plan_id"],),
+                    ).fetchone()
+                    if plan is None or plan["digest"] != row["plan_digest"]:
+                        reason = (
+                            "source plan missing before dispatch"
+                            if plan is None else "plan digest changed before dispatch"
+                        )
+                        conn.execute(
+                            "UPDATE workflow_run_requests SET status='uncertain', "
+                            "completed_at=?,error=? WHERE id=? AND status='queued'",
+                            (time.time(), reason, row["id"]),
+                        )
+                        continue
+                    if plan["status"] == "cancel_requested":
+                        conn.execute(
+                            "UPDATE workflow_run_requests SET status='cancelled', "
+                            "completed_at=?,error='plan cancelled before run claim' "
+                            "WHERE id=? AND status='queued'",
+                            (time.time(), row["id"]),
+                        )
+                        continue
+                    token = uuid.uuid4().hex
+                    now = time.time()
                     conn.execute(
-                        "UPDATE workflow_run_requests SET status='uncertain', "
-                        "error='plan digest changed before dispatch' WHERE id=?",
-                        (row["id"],),
+                        "UPDATE workflow_run_requests SET status='running', "
+                        "owner=?,lease_token=?,started_at=?,heartbeat_at=? "
+                        "WHERE id=? AND status='queued'",
+                        (owner, token, now, now, row["id"]),
                     )
+                    claimed = conn.execute(
+                        "SELECT * FROM workflow_run_requests WHERE id=?",
+                        (row["id"],),
+                    ).fetchone()
                     conn.execute("COMMIT")
-                    return None
-                token = uuid.uuid4().hex
-                now = time.time()
-                conn.execute(
-                    "UPDATE workflow_run_requests SET status='running', "
-                    "owner=?,lease_token=?,started_at=?,heartbeat_at=? "
-                    "WHERE id=? AND status='queued'",
-                    (owner, token, now, now, row["id"]),
-                )
-                claimed = conn.execute(
-                    "SELECT * FROM workflow_run_requests WHERE id=?",
-                    (row["id"],),
-                ).fetchone()
+                    return self._format(claimed)
+                # A poisoned backlog larger than one bounded pass is
+                # reconciled by subsequent polls; no unbounded lock hold.
                 conn.execute("COMMIT")
-                return self._format(claimed)
+                return None
             except Exception:
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")
