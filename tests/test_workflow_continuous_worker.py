@@ -66,13 +66,14 @@ def test_headless_worker_stops_before_claiming_when_signalled(tmp_path):
 @pytest.mark.parametrize("interval", [0, -1, float("nan"), float("inf"), True, 3601])
 def test_headless_worker_rejects_invalid_poll_interval(tmp_path, interval):
     core = _core(tmp_path)
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        with pytest.raises(ValueError, match="poll interval"):
-            pool.submit(lambda: asyncio.run(
-                core.serve_workflow_run_requests(
-                    threading.Event(), poll_interval_s=interval,
-                ),
-            )).result(timeout=5)
+    with ThreadPoolExecutor(max_workers=1) as pool, pytest.raises(
+        ValueError, match="poll interval",
+    ):
+        pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(
+                threading.Event(), poll_interval_s=interval,
+            ),
+        )).result(timeout=5)
 
 
 def test_headless_worker_cli_argument_contract():
