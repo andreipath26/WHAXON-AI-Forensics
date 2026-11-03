@@ -119,14 +119,23 @@ class Core:
         # as the existing interfaces. The provider bridge is intentionally
         # limited to read-only scanners until dedicated approval models exist.
         from .capabilities import CapabilityRegistry
-        from .providers import CatalogAdapterProvider
+        from .providers import (
+            BoundProviderRouter,
+            CatalogAdapterProvider,
+            SemanticOperationProvider,
+        )
         self.capabilities = CapabilityRegistry(self.store)
-        self.providers = CatalogAdapterProvider(
+        catalog_provider = CatalogAdapterProvider(
             catalog=self.catalog,
             runner=self.runner,
             store=self.store,
             registry=self.capabilities,
+            suppress_legacy_followup=self.automator.suppress_legacy_followup,
         )
+        self.providers = BoundProviderRouter((
+            catalog_provider,
+            SemanticOperationProvider(catalog_provider, self.capabilities),
+        ))
 
     def _wire_store(self) -> None:
         """Subscribe the store to every job event so history persists."""
@@ -410,6 +419,18 @@ class Core:
                 remaining -= delay
         return total
 
+    def propose_workflow_followups(self, source_plan_id: str, *, max_tasks: int = 16):
+        """Compile reviewable follow-ups from sealed, persisted evidence."""
+        from .followups import EvidenceFollowupPlanner
+
+        return EvidenceFollowupPlanner(
+            store=self.store, providers=self.providers, scope=self.scope,
+        ).propose(source_plan_id, max_tasks=max_tasks)
+
+    def capability_portfolio_audit(self):
+        """Expose catalog/adapter gaps without registering execution routes."""
+        return self.providers.portfolio_audit()
+
     def capability_inventory(self):
         """Return truthful live provider readiness without changing manifests."""
         return self.providers.inventory()
@@ -492,6 +513,10 @@ class Core:
             if not any(candidate == task for candidate in plan.tasks):
                 return False
             self.store.verify_workflow_plan_integrity(plan_id)
+            provider = getattr(self, "providers", None)
+            check_binding = getattr(provider, "plan_binding_valid", None)
+            if callable(check_binding) and check_binding(task, plan.metadata) is not True:
+                return False
             if not self.authorize_workflow_task(task):
                 return False
             if task.impact in ("moderate", "high", "critical"):
@@ -530,16 +555,35 @@ class Core:
         max_concurrency: int = 4,
     ):
         """Run a persisted plan; all authorization and dispatch stay injected."""
+        discover_followups = authorize is None and dispatch is None
         if authorize is None:
             def authorize(task):
                 return self.authorize_workflow_task_for_plan(plan_id, task)
         scheduler = self.workflow_scheduler(
             plan_id=plan_id, authorize=authorize, dispatch=dispatch, worker_id=worker_id,
         )
-        return await scheduler.run(
+        result = await scheduler.run(
             plan_id, max_tasks=max_tasks, max_attempts=max_attempts,
             max_concurrency=max_concurrency,
         )
+        # E4 only proposes and persists a NEW plan from sealed evidence. It
+        # cannot approve or execute it. Existing E3 scheduling stays unchanged.
+        if (
+            discover_followups
+            and result.get("complete")
+            and any(item["status"] == "succeeded" for item in result["tasks"])
+        ):
+            try:
+                proposal = self.propose_workflow_followups(plan_id)
+                if proposal.plan is not None:
+                    self.save_workflow_plan(proposal.plan_id, proposal.plan)
+                result["followup"] = proposal.to_dict()
+            except Exception as exc:
+                # Follow-up discovery is a secondary, review-only activity.
+                # A planner failure cannot reclassify a completed source
+                # workflow as an uncertain external execution.
+                result["followup_error"] = type(exc).__name__
+        return result
 
     async def initialize(self, drain: bool = True) -> None:
         """Called once by any interface. Awaitable inside a splash screen.

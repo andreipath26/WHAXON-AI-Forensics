@@ -34,11 +34,25 @@ class Automator:
         self.runner = runner
         self._inflight: set[tuple[str, int]] = set()
         self._lock = threading.Lock()
+        # V2 ownership is persisted in JobStore, never a bounded in-memory
+        # flag that is consumed on the first findings event.
+
+    def suppress_legacy_followup(self, job_id: str) -> None:
+        """Persist a V2-origin fence before ToolRunner can emit findings."""
+        self.store.mark_engine_v2_execution_job(job_id)
 
     def attach(self) -> None:
         self.bus.subscribe(JobFindings, self._on_findings)
 
     def _on_findings(self, e: JobFindings) -> None:
+        # Missing durable ownership metadata must not be guessed from a
+        # transient callback. If provenance storage is unavailable, do not
+        # initiate legacy follow-up work.
+        try:
+            if self.store.is_engine_v2_execution_job(e.job_id):
+                return
+        except Exception:
+            return
         if not _autochain_enabled():
             return
         try:

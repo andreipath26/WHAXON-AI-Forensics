@@ -721,3 +721,576 @@ def test_missing_persisted_provider_job_identity_fails_closed(monkeypatch):
     task = WorkflowTask("scan", "tool.nmap", "192.0.2.10", permissions=("network.scan",), impact="moderate")
     with pytest.raises(RuntimeError, match="identity"):
         asyncio.run(provider.dispatch(task))
+
+
+def test_router_dispatches_through_registered_provider_not_scheduler(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    catalog = _Catalog([_tool("nmap")])
+    runner = _Runner()
+    bound = CatalogAdapterProvider(
+        catalog=catalog, runner=runner, store=_Store(), registry=CapabilityRegistry(),
+    )
+    router = BoundProviderRouter((bound,))
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    assert router.resolve_task(task).manifest.provider_id == "whaxon.adapter.nmap"
+    result = asyncio.run(router.dispatch(task))
+    assert result["tool_id"] == "nmap"
+    assert len(runner.calls) == 1
+
+
+def test_router_rejects_duplicate_capabilities_and_untrusted_registry_only(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    first = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(),
+        store=_Store(), registry=registry,
+    )
+    router = BoundProviderRouter((first,))
+    other = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(),
+        store=_Store(), registry=registry,
+    )
+    with pytest.raises(ValueError, match="ambiguous bound capability"):
+        router.register(other)
+    with pytest.raises(CapabilityUnavailable, match="trusted execution provider"):
+        asyncio.run(router.dispatch(WorkflowTask(
+            "scan", "tool.unknown", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        )))
+
+
+def test_catalog_portfolio_reconciles_unsupported_tools_without_registering(monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    catalog = _Catalog([
+        _tool("nmap"),
+        _tool("hydra"),
+        SimpleNamespace(id="ssh_cmd", available=True, transport="ssh", binary=""),
+    ])
+    registry = CapabilityRegistry()
+    bridge = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=registry,
+    )
+    rows = {item["capability_id"]: item for item in BoundProviderRouter((bridge,)).inventory()}
+    assert rows["tool.nmap"]["registered"] is True
+    assert rows["tool.hydra"]["reason"] == "not_admitted_for_engine_v2"
+    assert rows["tool.ssh_cmd"]["reason"] == "unsupported_transport"
+    assert rows["tool.hydra"]["executable"] is False
+    assert rows["tool.ssh_cmd"]["executable"] is False
+    assert [x.capability_id for x in registry.list()] == ["tool.nmap"]
+
+
+def test_router_refuses_changed_catalog_and_unbound_provider_impostor(monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    tool = SimpleNamespace(
+        id="nmap", args="-sT {target}", binary="nmap", transport="cli",
+        available=True,
+    )
+    catalog = _Catalog([tool])
+    registry = CapabilityRegistry()
+    bridge = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=registry,
+    )
+    router = BoundProviderRouter((bridge,))
+    registry.register(CapabilityManifest(
+        capability_id="tool.danger",
+        provider_id="untrusted.external", provider_version="1",
+        transports=("local_process",), permissions=("network.scan",),
+        impact="moderate", readiness="end_to_end_verified",
+    ))
+    with pytest.raises(CapabilityUnavailable):
+        router.resolve_task(WorkflowTask(
+            "scan", "tool.danger", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ))
+    catalog.tools["nmap"] = SimpleNamespace(
+        id="nmap", args="-sT -p- {target}", binary="nmap",
+        transport="cli", available=True,
+    )
+    with pytest.raises(CapabilityUnavailable, match="catalog executable/argv changed"):
+        router.resolve_task(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ))
+
+
+def test_router_accepts_catalog_with_no_admitted_execution_providers(monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    bridge = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("operator_custom")]), runner=_Runner(),
+        store=_Store(), registry=CapabilityRegistry(),
+    )
+    router = BoundProviderRouter((bridge,))
+    assert router.inventory()[0]["reason"] == "not_admitted_for_engine_v2"
+    with pytest.raises(CapabilityUnavailable):
+        router.resolve_task(WorkflowTask(
+            "custom", "tool.operator_custom", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ))
+
+
+def test_catalog_v2_provider_fences_legacy_before_dispatch(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, 'get_adapter', lambda _tool: object())
+    fenced = []
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner,
+        store=_Store(), registry=CapabilityRegistry(),
+        suppress_legacy_followup=lambda job_id: fenced.append(job_id),
+    )
+    asyncio.run(provider.dispatch(WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )))
+    assert len(fenced) == 1
+    assert runner.calls[0]['job_id'] == fenced[0]
+
+
+def test_catalog_v2_provider_fails_closed_if_autochain_fence_fails(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, 'get_adapter', lambda _tool: object())
+    runner = _Runner()
+
+    def reject(_job_id):
+        raise RuntimeError('fence unavailable')
+
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner,
+        store=_Store(), registry=CapabilityRegistry(),
+        suppress_legacy_followup=reject,
+    )
+    with pytest.raises(RuntimeError, match='fence unavailable'):
+        asyncio.run(provider.dispatch(WorkflowTask(
+            "scan", "tool.nmap", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        )))
+    assert runner.calls == []
+
+
+def test_router_selects_explicit_provider_for_shared_semantic_capability():
+    """A new provider is admitted without changing the scheduler contract."""
+    import asyncio
+
+    from whaxon.core.capabilities import CapabilityManifest
+    from whaxon.core.providers import BoundProviderRouter
+
+    class Trusted:
+        def __init__(self, provider_id):
+            self.manifest = CapabilityManifest(
+                "service.http.enumerate", provider_id, "1", ("local_process",),
+                target_types=("hostname",), permissions=("network.scan",),
+                impact="moderate",
+            )
+            self.calls = 0
+
+        def bindings(self):
+            return (self.manifest,)
+
+        def resolve_task(self, task, *, require_installed=False):
+            assert task.capability_id == self.manifest.capability_id
+            assert task.target == "example.test"
+            return SimpleNamespace(manifest=self.manifest)
+
+        async def dispatch(self, task):
+            self.calls += 1
+            return {
+                "provider_id": self.manifest.provider_id,
+                "provider_version": self.manifest.provider_version,
+                "manifest_fingerprint": self.manifest.fingerprint,
+                "status": "succeeded",
+            }
+
+        def inventory(self):
+            return [{"capability_id": self.manifest.capability_id,
+                     "provider_id": self.manifest.provider_id}]
+
+    primary = Trusted("trusted.primary")
+    alternate = Trusted("trusted.alternate")
+    router = BoundProviderRouter(
+        (primary, alternate),
+        preferred_providers={"service.http.enumerate": "trusted.alternate"},
+    )
+    task = WorkflowTask(
+        "http", "service.http.enumerate", "example.test",
+        permissions=("network.scan",), impact="moderate",
+    )
+    assert router.manifest_for(task.capability_id).provider_id == "trusted.alternate"
+    assert asyncio.run(router.dispatch(task))["provider_id"] == "trusted.alternate"
+    assert primary.calls == 0
+    assert alternate.calls == 1
+    assert len(router.inventory()) == 2
+
+
+def test_router_missing_explicit_provider_fails_closed():
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+
+    class Provider:
+        def bindings(self):
+            return (CapabilityManifest(
+                "service.http.enumerate", "trusted.only", "1", ("local_process",),
+            ),)
+
+        def resolve_task(self, task, *, require_installed=False):
+            raise AssertionError("unselected provider must not be called")
+
+        async def dispatch(self, task):
+            raise AssertionError("unselected provider must not dispatch")
+
+        def inventory(self):
+            return []
+
+    router = BoundProviderRouter(
+        (Provider(),),
+        preferred_providers={"service.http.enumerate": "trusted.missing"},
+    )
+    with pytest.raises(CapabilityUnavailable, match="preferred execution provider"):
+        router.manifest_for("service.http.enumerate")
+    with pytest.raises(CapabilityUnavailable):
+        router.resolve_task(WorkflowTask("http", "service.http.enumerate", "example.test"))
+
+
+def test_multi_provider_execution_requires_approval_bound_manifest(tmp_path):
+    """Immutable plan metadata protects approved operations from provider swap."""
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest
+    from whaxon.core.providers import BoundProviderRouter
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan
+
+    class Provider:
+        def __init__(self, provider_id):
+            self.manifest = CapabilityManifest(
+                "service.http.enumerate", provider_id, "1", ("local_process",),
+                target_types=("hostname",), impact="low",
+            )
+
+        def bindings(self):
+            return (self.manifest,)
+
+        def resolve_task(self, task, *, require_installed=False):
+            return SimpleNamespace(manifest=self.manifest)
+
+        async def dispatch(self, task):
+            raise AssertionError("policy tests must not dispatch")
+
+        def inventory(self):
+            return []
+
+    first = Provider("trusted.alpha")
+    second = Provider("trusted.beta")
+    task = WorkflowTask(
+        "http", "service.http.enumerate", "lab.example", impact="low",
+    )
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "selection.db")
+    core.store.create_mission("m", "controlled lab")
+    core.providers = BoundProviderRouter(
+        (first, second),
+        preferred_providers={"service.http.enumerate": "trusted.beta"},
+    )
+    core.scope = SimpleNamespace(
+        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+    )
+    core.store.save_workflow_plan("unpinned", WorkflowPlan("m", (task,)))
+    assert core.authorize_workflow_task_for_plan("unpinned", task) is False
+
+    pinned = {
+        "provider_bindings": {
+            "http": {
+                "provider_id": second.manifest.provider_id,
+                "manifest_fingerprint": second.manifest.fingerprint,
+            },
+        },
+    }
+    core.store.save_workflow_plan("pinned", WorkflowPlan("m", (task,), metadata=pinned))
+    assert core.authorize_workflow_task_for_plan("pinned", task) is True
+
+    core.providers = BoundProviderRouter(
+        (first, second),
+        preferred_providers={"service.http.enumerate": "trusted.alpha"},
+    )
+    assert core.authorize_workflow_task_for_plan("pinned", task) is False
+
+
+def test_router_refuses_incompatible_semantic_provider_contracts():
+    """A shared name alone must never authorize a different operation."""
+    from whaxon.core.capabilities import CapabilityManifest
+    from whaxon.core.providers import BoundProviderRouter
+
+    class Provider:
+        def __init__(self, name, output_schema):
+            self.manifest = CapabilityManifest(
+                "service.http.enumerate", name, "1", ("local_process",),
+                target_types=("hostname",), impact="low",
+                output_schema=output_schema,
+            )
+
+        def bindings(self):
+            return (self.manifest,)
+
+        def resolve_task(self, task, *, require_installed=False):
+            return SimpleNamespace(manifest=self.manifest)
+
+        async def dispatch(self, task):
+            raise AssertionError("incompatible provider cannot dispatch")
+
+        def inventory(self):
+            return []
+
+    trusted = Provider("trusted.alpha", {"type": "object"})
+    incompatible = Provider("trusted.beta", {"type": "array"})
+    with pytest.raises(ValueError, match="incompatible providers"):
+        BoundProviderRouter(
+            (trusted, incompatible),
+            preferred_providers={"service.http.enumerate": "trusted.beta"},
+        )
+
+
+
+def test_provider_pin_remains_required_after_alternative_is_removed(monkeypatch):
+    """Pinned plans must not silently change identity with one provider left."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _tool: object())
+    adapter = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(),
+        store=_Store(), registry=CapabilityRegistry(),
+    )
+    router = BoundProviderRouter((adapter,))
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    selected = router.manifest_for("tool.nmap")
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": {
+            "scan": {"provider_id": selected.provider_id,
+                     "manifest_fingerprint": selected.fingerprint},
+        },
+    }) is True
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": {
+            "scan": {"provider_id": "replaced.provider",
+                     "manifest_fingerprint": selected.fingerprint},
+        },
+    }) is False
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": {
+            "scan": {"provider_id": selected.provider_id,
+                     "manifest_fingerprint": "stale-fingerprint"},
+        },
+    }) is False
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": {},
+    }) is False
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": "invalid",
+    }) is False
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": None,
+    }) is False
+    # Existing, unpinned single-provider plans remain compatible.
+    assert router.plan_binding_valid(task, {}) is True
+
+
+
+def test_e4_portfolio_audit_reconciles_catalog_and_adapter_only(monkeypatch):
+    """An adapter without a catalog entry is visible, not executable."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(
+        whaxon.adapters, "list_adapters",
+        lambda: ["nmap", "adapter_without_catalog", "hydra"],
+    )
+    catalog = _Catalog([
+        _tool("nmap"), _tool("hydra"),
+        SimpleNamespace(
+            id="msf_session_operation", available=True,
+            transport="msf_session", binary="",
+        ),
+        _tool("no_adapter"),
+    ])
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    router = BoundProviderRouter((provider,))
+    before = tuple(manifest.fingerprint for manifest in provider.bindings())
+    report = router.portfolio_audit()
+    rows = {row["tool_id"]: row for row in report["rows"]}
+    assert report["schema_version"] == "whaxon.portfolio-audit.v1"
+    assert report["execution_enabled_by_audit"] is False
+    assert report["catalog_count"] == 4
+    assert report["adapter_count"] == 3
+    assert rows["nmap"]["state"] == "bound"
+    assert rows["adapter_without_catalog"]["state"] == "adapter_only"
+    assert rows["hydra"]["state"] == "not_admitted"
+    assert rows["msf_session_operation"]["state"] == "unsupported_transport"
+    assert rows["no_adapter"]["state"] == "not_admitted"
+    assert not rows["adapter_without_catalog"]["v2_provider_bound"]
+    assert not rows["msf_session_operation"]["v2_provider_bound"]
+    assert tuple(manifest.fingerprint for manifest in provider.bindings()) == before
+
+
+def test_e4_portfolio_audit_reports_missing_adapter_without_admission(monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: None)
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: [])
+    bridge = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    report = BoundProviderRouter((bridge,)).portfolio_audit()
+    assert report["summary"]["catalog_only"] == 1
+    assert report["rows"][0]["state"] == "catalog_only"
+    assert report["rows"][0]["v2_provider_bound"] is False
+
+
+def test_router_unknown_capability_has_no_trusted_provider_error():
+    from whaxon.core.capabilities import CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+
+    router = BoundProviderRouter(())
+    with pytest.raises(CapabilityUnavailable, match="no trusted execution provider"):
+        router.manifest_for("operation.unknown")
+
+
+
+def test_e4_optional_portfolio_audit_preserves_minimal_provider_contract():
+    """Previously admitted trusted providers need no new audit method."""
+    from whaxon.core.capabilities import CapabilityManifest
+    from whaxon.core.providers import BoundProviderRouter
+
+    class MinimalProvider:
+        def bindings(self):
+            return (
+                CapabilityManifest(
+                    "operation.example", "trusted.minimal", "1",
+                    ("local_process",),
+                ),
+            )
+
+        def resolve_task(self, task, *, require_installed=False):
+            raise AssertionError("inspection must not resolve a task")
+
+        async def dispatch(self, task):
+            raise AssertionError("inspection must not dispatch")
+
+        def inventory(self):
+            return []
+
+    router = BoundProviderRouter((MinimalProvider(),))
+    report = router.portfolio_audit()
+    assert report == {
+        "schema_version": "whaxon.portfolio-audit.v1",
+        "provider_audits": [],
+        "execution_enabled_by_audit": False,
+    }
+
+
+
+def test_semantic_operation_and_legacy_alias_use_same_guarded_runner(monkeypatch):
+    """Semantic IDs keep the V2 runner, evidence, version and authorization."""
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.providers import (
+        BoundProviderRouter,
+        CatalogAdapterProvider,
+        SemanticOperationProvider,
+    )
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _tool: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    bridge = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=runner,
+        store=_Store(), registry=registry,
+    )
+    semantic = SemanticOperationProvider(bridge, registry)
+    router = BoundProviderRouter((bridge, semantic))
+    task = WorkflowTask(
+        "scan", "network.services.discover", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    selected = router.manifest_for("network.services.discover")
+    assert selected.provider_id == router.manifest_for("tool.nmap").provider_id
+    assert selected.fingerprint != router.manifest_for("tool.nmap").fingerprint
+    assert router.plan_binding_valid(task, {}) is False
+    assert router.plan_binding_valid(task, {
+        "provider_bindings": {
+            "scan": {"provider_id": selected.provider_id,
+                     "manifest_fingerprint": selected.fingerprint},
+        },
+    }) is True
+    output = asyncio.run(router.dispatch(task))
+    assert output["capability_id"] == "network.services.discover"
+    assert output["legacy_capability_id"] == "tool.nmap"
+    assert output["tool_id"] == "nmap"
+    assert output["manifest_fingerprint"] == selected.fingerprint
+    assert len(runner.calls) == 1
+    assert runner.calls[0]["tool_id"] == "nmap"
+    assert "tool.nmap" in {m.capability_id for m in registry.list()}
+    assert "network.services.discover" in {m.capability_id for m in registry.list()}
+
+
+def test_semantic_operation_rejects_changed_registry_manifest(monkeypatch):
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+    from whaxon.core.providers import CatalogAdapterProvider, SemanticOperationProvider
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _tool: object())
+    registry = CapabilityRegistry()
+    bridge = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(),
+        store=_Store(), registry=registry,
+    )
+    semantic = SemanticOperationProvider(bridge, registry)
+    task = WorkflowTask(
+        "scan", "network.services.discover", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    assert semantic.resolve_task(task).manifest.capability_id == "network.services.discover"
+    registry._manifests.pop((
+        "network.services.discover", "whaxon.adapter.nmap",
+        semantic.bindings()[0].provider_version,
+    ))
+    with pytest.raises(CapabilityUnavailable, match="semantic provider manifest changed"):
+        semantic.resolve_task(task)

@@ -6,6 +6,12 @@ import time
 from pathlib import Path
 
 SCHEMA = """
+-- The engine that owns a job is durable, not a process-local event hint.
+-- Registered V2 jobs must never be dispatched by legacy follow-up rules.
+CREATE TABLE IF NOT EXISTS engine_v2_execution_jobs (
+    job_id TEXT PRIMARY KEY,
+    marked_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, tool TEXT DEFAULT '', target TEXT DEFAULT '', status TEXT DEFAULT 'starting', exit_code INTEGER, error TEXT, started_at REAL, finished_at REAL, duration_s REAL, lease_owner TEXT, lease_token TEXT, heartbeat_at REAL);
 CREATE TABLE IF NOT EXISTS lines (job_id TEXT, seq INTEGER, stream TEXT, text TEXT, PRIMARY KEY (job_id, seq));
 CREATE TABLE IF NOT EXISTS findings (job_id TEXT, seq INTEGER, kind TEXT, severity TEXT, source TEXT, data_json TEXT, raw_line TEXT, enrichment_json TEXT DEFAULT '{}', verification_status TEXT DEFAULT 'candidate', verified_by TEXT DEFAULT 'engine', verification_reason TEXT DEFAULT '', PRIMARY KEY (job_id, seq));
@@ -326,6 +332,34 @@ class JobStore:
         c.execute("PRAGMA synchronous=NORMAL")
         c.row_factory = sqlite3.Row
         return c
+    def mark_engine_v2_execution_job(self, job_id: str) -> None:
+        """Persist V2 job ownership before any external process starts."""
+        if not isinstance(job_id, str) or not job_id:
+            raise ValueError("valid V2 job identity required")
+        with self._lock:
+            conn = self._conn()
+            try:
+                conn.execute(
+                    "INSERT OR IGNORE INTO engine_v2_execution_jobs "
+                    "(job_id, marked_at) VALUES (?, ?)",
+                    (job_id, time.time()),
+                )
+            finally:
+                conn.close()
+
+    def is_engine_v2_execution_job(self, job_id: str) -> bool:
+        """Read durable origin even across multiple findings and restarts."""
+        if not isinstance(job_id, str) or not job_id:
+            return False
+        conn = self._conn()
+        try:
+            return conn.execute(
+                "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
+                (job_id,),
+            ).fetchone() is not None
+        finally:
+            conn.close()
+
     def create(self, job_id):
         with self._lock:
             c = self._conn()
