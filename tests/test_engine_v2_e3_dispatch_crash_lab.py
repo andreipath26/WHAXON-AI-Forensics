@@ -15,7 +15,6 @@ from whaxon.core.scheduler import WorkflowScheduler
 from whaxon.core.store import JobStore
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
-
 _WORKER = """
 import asyncio
 import sys
