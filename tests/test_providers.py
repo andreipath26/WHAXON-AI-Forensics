@@ -1346,6 +1346,19 @@ def test_e4_portfolio_audit_reports_removed_adapter_and_registry_binding(monkeyp
     assert missing_adapter["adapter_count"] == 0
     assert missing_adapter["execution_enabled_by_audit"] is False
 
+    # A stale source inventory is not just a warning: actual execution
+    # resolution also must fail before reaching the external tool runner.
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: None)
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    with pytest.raises(CapabilityUnavailable, match="no longer registered"):
+        router.resolve_task(task, require_installed=True)
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
     monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
     registry._manifests.clear()
     changed_registry = router.portfolio_audit()
