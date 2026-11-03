@@ -19,3 +19,9 @@
 
 - `mark_workflow_dispatch_started()` can refuse dispatch due to cancellation **or** a newly expired deadline/tightened mission or plan budget. The scheduler now records a non-cancellation refusal as **blocked** rather than falsely labelling it **cancelled**. A true durable cancellation remains **cancelled**. No refused task invokes a provider.
 - Parameterized scheduler tests tighten the plan deadline, exhaust mission cost permission and request cancellation *after the second policy check but before external dispatch*. These verify exact terminal status and absence of `dispatch_started` evidence.
+
+## Controlled external network side-effect crash validation
+
+- `tests/test_engine_v2_e3_external_effect_crash.py` uses a bound 127.0.0.1 HTTP server, not a simulated local-file-only callback. A child process sends a real POST, receives HTTP 204, and is killed before reporting an attempt result. Stale lease reconciliation must mark the external outcome **uncertain**, refuse retry, keep readiness unaccepted, and leave the receiver's side effect count at exactly one.
+- A second test has the HTTP receiver accept the POST and deliberately disconnect without a response. The scheduler must record an **uncertain** post-dispatch exception; subsequent invocations must not retry.
+- These tests are **controlled local-only network effects**, not proof of behavior with production scanners, live pivoting, remote servers or a verified independent trust anchor. They are designed to execute in the existing exact-head Python CI matrix.
