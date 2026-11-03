@@ -124,3 +124,18 @@ Full E4 catalog/transport/interface parity, provider substitution in a
 controlled lab, and retirement of legacy bypasses are still separate gates.
 
 The catalog/adapter portfolio audit also now checks the live catalog argv-version digest and the currently registered manifest fingerprint before calling a provider `bound`. Catalog drift or missing/changed manifest registration is reported `unbound` with `catalog_or_binding_changed`, rather than retaining a stale admission label. This affects inventory reporting only; the dispatch boundary retains its separate runtime revalidation. Regression tests cover both forms of drift.
+
+## Execution selection versus installation readiness
+
+The shared `BoundProviderRouter.inventory()` now decorates each provider inventory
+row with `selected_for_execution`. A provider may be registered and installed,
+yet **not dispatchable** because a different trusted provider was explicitly
+selected for that semantic capability. Such an unselected row preserves the
+underlying `installed` status but reports `executable: false` and
+`reason: provider_not_selected_for_execution`. This does not mutate the
+provider's own inventory record or change approval/scheduling decisions.
+
+A missing preferred provider cannot silently fall back to an installed
+alternative. A selected provider with a missing binary remains non-executable.
+These claims have synthetic-provider regression coverage and do not certify
+external tool readiness, parity or a full E4 acceptance gate.
