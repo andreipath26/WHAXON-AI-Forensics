@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sqlite3
 import threading
@@ -116,8 +117,52 @@ CREATE TABLE IF NOT EXISTS task_attempts (
     UNIQUE(task_id, attempt_no)
 );
 CREATE INDEX IF NOT EXISTS idx_task_attempts_task ON task_attempts(task_id, attempt_no);
+CREATE TABLE IF NOT EXISTS workflow_evidence_seals (
+    attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, digest TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1, sealed_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_evidence_seals_job ON workflow_evidence_seals(job_id);
 """
 
+
+
+
+def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id, plan_digest):
+    """Hash a canonical persisted database snapshot for drift detection.
+
+    A local SHA-256 baseline is not a tamper-proof external audit signature.
+    Evidence file paths are covered as metadata, not file contents.
+    """
+    job = conn.execute(
+        "SELECT id, tool, target, status, exit_code, error, started_at, finished_at, "
+        "duration_s FROM jobs WHERE id=?", (job_id,),
+    ).fetchone()
+    if (
+        job is None or not capability_id.startswith("tool.")
+        or job["tool"] != capability_id.removeprefix("tool.")
+        or job["target"] != target or job["status"] != "finished"
+        or job["exit_code"] != 0
+    ):
+        return None
+    snapshot = {
+        "version": 1, "attempt_id": attempt_id, "plan_digest": plan_digest,
+        "capability_id": capability_id, "target": target, "job": dict(job),
+    }
+    for table, columns in (
+        ("lines", "seq, stream, text"),
+        ("findings", "seq, kind, severity, source, data_json, raw_line, "
+                     "enrichment_json, verification_status, verified_by, verification_reason"),
+        ("coverage", "seq, tool_id, target, kind, detail, phase, at"),
+        ("evidence", "seq, kind, name, path, note, added_at"),
+    ):
+        snapshot[table] = [
+            dict(row) for row in conn.execute(
+                f"SELECT {columns} FROM {table} WHERE job_id=? ORDER BY seq",
+                (job_id,),
+            )
+        ]
+    encoded = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _signature_for(kind: str, data: dict) -> str:
@@ -1868,8 +1913,8 @@ class JobStore:
                     "capability_id": row["capability_id"],
                     "attempt_id": row["attempt_id"], "attempt_no": row["attempt_no"],
                     "attempt_status": row["status"], "job_id": None,
-                    "evidence_status": "unavailable", "finding_count": 0,
-                    "findings": [],
+                    "evidence_status": "unavailable", "integrity_status": "unsealed",
+                    "finding_count": 0, "findings": [],
                 }
                 if row["status"] != "succeeded":
                     entry["evidence_status"] = "not_successful"
@@ -1897,6 +1942,24 @@ class JobStore:
                             entry["findings"] = [dict(finding) for finding in findings]
                             entry["finding_count"] = len(findings)
                             entry["evidence_status"] = "recorded"
+                            seal = c.execute(
+                                "SELECT job_id, digest FROM workflow_evidence_seals "
+                                "WHERE attempt_id=?", (row["attempt_id"],),
+                            ).fetchone()
+                            if seal is not None:
+                                current = _workflow_evidence_digest(
+                                    c, attempt_id=row["attempt_id"], job_id=job_id,
+                                    target=row["target"], capability_id=row["capability_id"],
+                                    plan_digest=plan["digest"],
+                                )
+                                entry["integrity_status"] = (
+                                    "verified" if seal["job_id"] == job_id
+                                    and current == seal["digest"] else "changed"
+                                )
+                                if entry["integrity_status"] == "changed":
+                                    entry["evidence_status"] = "integrity_mismatch"
+                                    entry["findings"] = []
+                                    entry["finding_count"] = 0
                         else:
                             entry["evidence_status"] = "job_not_verified"
                 evidence.append(entry)
@@ -1906,6 +1969,9 @@ class JobStore:
                 "attempts": evidence,
                 "all_evidence_recorded": bool(evidence) and all(
                     item["evidence_status"] == "recorded" for item in evidence
+                ),
+                "all_evidence_integrity_verified": bool(evidence) and all(
+                    item["integrity_status"] == "verified" for item in evidence
                 ),
             }
         finally:
@@ -2938,6 +3004,32 @@ class JobStore:
                     (plan_row["plan_id"], row["task_id"], attempt_id,
                      "task_" + status, json.dumps({"error": error}), now),
                 )
+                # Seal matching tool evidence inside the terminal-outcome transaction.
+                # Missing, in-progress or cross-target jobs remain unsealed.
+                if status == "succeeded" and isinstance(result, dict):
+                    job_id = result.get("job_id")
+                    task = c.execute(
+                        "SELECT t.target, t.capability_id, p.digest FROM workflow_tasks t "
+                        "JOIN workflow_plans p ON p.id=t.plan_id WHERE t.id=?",
+                        (row["task_id"],),
+                    ).fetchone()
+                    if (
+                        isinstance(job_id, str) and bool(job_id)
+                        and result.get("target") == task["target"]
+                        and result.get("tool_id") == task["capability_id"].removeprefix("tool.")
+                    ):
+                        digest = _workflow_evidence_digest(
+                            c, attempt_id=attempt_id, job_id=job_id,
+                            target=task["target"], capability_id=task["capability_id"],
+                            plan_digest=task["digest"],
+                        )
+                        if digest is not None:
+                            c.execute(
+                                "INSERT INTO workflow_evidence_seals "
+                                "(attempt_id, job_id, digest, version, sealed_at) "
+                                "VALUES (?, ?, ?, 1, ?)",
+                                (attempt_id, job_id, digest, now),
+                            )
                 c.execute("COMMIT")
                 return True
             except Exception:
