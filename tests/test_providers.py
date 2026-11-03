@@ -432,6 +432,7 @@ def test_catalog_provider_rejects_unsupported_target_type_before_dispatch(monkey
 
 def test_catalog_dispatch_rejects_undeclared_task_permissions(monkeypatch):
     import asyncio
+
     import whaxon.adapters
     from whaxon.core.capabilities import CapabilityUnavailable
 

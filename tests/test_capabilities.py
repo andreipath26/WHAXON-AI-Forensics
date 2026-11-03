@@ -145,6 +145,7 @@ def test_resolver_enforces_permissions_impact_and_schema_compatibility():
 
 def test_resolver_rejects_invalid_resource_constraints():
     import math
+
     import pytest
     registry = CapabilityRegistry()
     registry.register(_manifest("provider.a"))
