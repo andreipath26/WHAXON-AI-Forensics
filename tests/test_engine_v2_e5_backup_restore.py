@@ -24,9 +24,11 @@ def _create_source(path: Path):
 def _backup_database(source: Core, destination: Path):
     """Use SQLite's online backup API rather than unsafe live-file copying."""
     destination.mkdir(parents=True, exist_ok=True)
-    with closing(source.store._conn()) as existing:
-        with closing(sqlite3.connect(destination / "whaxon.db")) as snapshot:
-            existing.backup(snapshot)
+    with (
+        closing(source.store._conn()) as existing,
+        closing(sqlite3.connect(destination / "whaxon.db")) as snapshot,
+    ):
+        existing.backup(snapshot)
 
 
 def test_e5_restored_queued_request_keeps_exact_mission_and_plan(tmp_path):
