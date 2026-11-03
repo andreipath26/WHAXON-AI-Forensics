@@ -84,3 +84,40 @@ def test_headless_worker_cli_argument_contract():
     assert opts.plan_command == "serve-requests"
     assert opts.poll_interval == 0.5
     assert opts.max_runs_per_batch == 3
+
+
+def test_continuous_worker_initializes_only_once(tmp_path, monkeypatch):
+    core = _core(tmp_path)
+    stop = threading.Event()
+    original = core.initialize
+    calls = []
+
+    async def counted(*, drain=True):
+        calls.append(drain)
+        return await original(drain=drain)
+
+    monkeypatch.setattr(core, "initialize", counted)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(stop, poll_interval_s=0.05),
+        ))
+        import time
+
+        time.sleep(0.22)
+        stop.set()
+        assert future.result(timeout=5) == 0
+    assert calls == [False]
+
+
+def test_continuous_worker_quickly_handles_stop_with_long_poll(tmp_path):
+    core = _core(tmp_path)
+    stop = threading.Event()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(stop, poll_interval_s=60),
+        ))
+        import time
+
+        time.sleep(0.1)
+        stop.set()
+        assert future.result(timeout=3) == 0
