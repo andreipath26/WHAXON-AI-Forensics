@@ -21,12 +21,31 @@ class FollowupRule:
     services: tuple[str, ...] = ()
 
     def __post_init__(self):
-        if not all((self.id, self.sources, self.finding_kind, self.capability_id)):
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (self.id, self.finding_kind, self.capability_id)
+        ):
             raise ValueError("follow-up rule requires explicit identity and sources")
+        if (
+            not isinstance(self.sources, tuple) or not self.sources
+            or any(not isinstance(source, str) or not source.strip()
+                   for source in self.sources)
+        ):
+            raise ValueError("follow-up rule requires non-empty source identities")
         if self.target_mode not in ("source", "http_origin"):
             raise ValueError("unsupported follow-up target mode")
-        if any(type(n) is not int or not 1 <= n <= 65535 for n in self.ports):
+        if (
+            not isinstance(self.ports, tuple)
+            or any(type(n) is not int or not 1 <= n <= 65535
+                   for n in self.ports)
+        ):
             raise ValueError("invalid follow-up port")
+        if (
+            not isinstance(self.services, tuple)
+            or any(not isinstance(value, str) or not value.strip()
+                   for value in self.services)
+        ):
+            raise ValueError("invalid follow-up service names")
 
     def match(self, source: str, finding: dict) -> bool:
         if source not in self.sources or finding.get("kind") != self.finding_kind:
@@ -180,8 +199,21 @@ class EvidenceFollowupPlanner:
                                 json.dumps([source_plan_id, job_id, rule.id, target]).encode()
                             ).hexdigest(),
                         )
-                        self.providers.resolve_task(task, require_installed=True)
-                    except (ValueError, TypeError, RuntimeError, LookupError, KeyError) as exc:
+                        resolved = self.providers.resolve_task(
+                            task, require_installed=True,
+                        )
+                        selected = resolved.manifest
+                        if (
+                            selected.capability_id != manifest.capability_id
+                            or selected.provider_id != manifest.provider_id
+                            or selected.provider_version != manifest.provider_version
+                            or selected.fingerprint != manifest.fingerprint
+                        ):
+                            raise ValueError("provider resolution changed the bound manifest")
+                    except (
+                        ValueError, TypeError, RuntimeError, LookupError,
+                        KeyError, AttributeError,
+                    ) as exc:
                         blocked.append({
                             "source_task": key, "rule_id": rule.id,
                             "reason": "provider_or_scope_blocked",
