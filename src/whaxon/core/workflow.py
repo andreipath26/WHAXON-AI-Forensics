@@ -46,8 +46,48 @@ def _freeze(value: Any) -> Any:
     return value
 
 
+def _require_json_contract(value: Any, *, label: str, depth: int = 0,
+                           active: set[int] | None = None) -> None:
+    """Validate deterministic JSON before freezing or persisting a contract."""
+    if depth > 64:
+        raise ValueError(f"{label} exceeds maximum nesting depth")
+    if value is None or type(value) in (str, bool, int):
+        return
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError(f"{label} must contain only finite numbers")
+        return
+    if not isinstance(value, (dict, list, tuple)):
+        raise TypeError(f"{label} must contain only JSON-compatible values")
+    if active is None:
+        active = set()
+    identity = id(value)
+    if identity in active:
+        raise ValueError(f"{label} must not contain circular references")
+    active.add(identity)
+    try:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise TypeError(f"{label} mapping keys must be strings")
+                _require_json_contract(
+                    item, label=label, depth=depth + 1, active=active,
+                )
+        else:
+            for item in value:
+                _require_json_contract(
+                    item, label=label, depth=depth + 1, active=active,
+                )
+    finally:
+        active.remove(identity)
+
+
 def _canonical(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    _require_json_contract(value, label="workflow contract")
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"),
+        ensure_ascii=False, allow_nan=False,
+    )
 
 
 @dataclass(frozen=True)
@@ -90,6 +130,7 @@ class WorkflowTask:
         object.__setattr__(self, "permissions", permissions)
         if not isinstance(self.inputs, dict):
             raise TypeError("task inputs must be an object")
+        _require_json_contract(self.inputs, label="task inputs")
         object.__setattr__(self, "inputs", _freeze(self.inputs))
 
     def to_dict(self) -> dict[str, Any]:
@@ -139,6 +180,7 @@ class WorkflowPlan:
             raise ValueError("mission_id is required")
         if not isinstance(self.metadata, dict):
             raise TypeError("plan metadata must be an object")
+        _require_json_contract(self.metadata, label="plan metadata")
         object.__setattr__(self, "metadata", _freeze(self.metadata))
         ids = [task.id for task in self.tasks]
         if not ids or len(ids) != len(set(ids)):
