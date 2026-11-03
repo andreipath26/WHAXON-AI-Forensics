@@ -319,3 +319,136 @@ The first provider-backed task uses a capability such as `tool.nmap`, with `perm
 ### 2026-11-02 scheduler deadline correction
 
 A task's declared timeout now covers both deterministic authorization and provider dispatch. Synchronous callbacks execute in worker threads rather than blocking the event loop, preserving lease heartbeats and independent task progress. Authorization timeout fails closed as `blocked` and never dispatches; provider timeout remains `uncertain` because cancelling an await or timing out a worker thread cannot prove that an external effect stopped. Regression tests cover synchronous and asynchronous authorization timeouts. This closes a scheduler correctness gap, not the remaining mission-wide budget, cancellation, audit/outbox or recovery acceptance gates.
+---
+
+## 14. Whole-engine roadmap implementation plan — 2026-11-03
+
+**Scope and decision:** This section consolidates the approved full-engine direction across E0–E9, not just E4. **E0, E1, E2 and E3 are UNFROZEN**, as are E4–E9. Their implementation, contracts, scheduling, persistence, policy and other foundations may be repaired or refactored when necessary for the integrated architecture. Reuse correct, tested code; do not rebuild simply because a phase is open. No phase is considered accepted merely because its code or tests exist.
+
+**Priority and source order:** (1) the CURRENT master roadmap \`WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md\`, especially §0, P0–P8, §38, §49–50; (2) this architecture specification and its E0–E9 gates; (3) \`docs/ENGINEERING_EXECUTION_MODEL.md\`; (4) scoped designs such as \`docs/TOOL_INTELLIGENCE_AND_ONBOARDING.md\`, \`docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md\`, \`docs/bounty-addon.md\` and the remediation addendum. Older roadmap detail is retained only where not superseded by the current master; historical estimates, completion claims, tool quotas and conflicting implementation instructions are not current authority.
+
+**Architectural objective:** Deliver WHAXON's **single long-lived, capability-driven, policy-controlled, durable execution engine**. New tools, providers, transport implementations, automation modes and approved product features must normally attach through versioned extension contracts, without new scheduler branches, alternative permission authorities, independent evidence stores or client-owned execution engines. “Build once” means stable and migratable boundaries, not a guarantee that unspecified future requirements can never change a contract or a requirement to ship every future provider today.
+
+### 14.1 Phase-to-roadmap ownership and action
+
+| Engine phase | Current master roadmap responsibility | Foundation or product work required | Acceptance boundary |
+|---|---|---|---|
+| **E0 — Baseline and architectural decisions** | P0; §0; §49; G01/G10 | Keep a current exhaustive execution/caller/adapter/tool/transport/permission/data/dependency map; record schema, queue, storage, audit, trust-anchor, provider-selection and cutover decisions. Correct stale assumptions when implementation changes. | Exact source-to-feature inventory, migration dependency graph and reviewed decisions; old E0 snapshot is historical. |
+| **E1 — Correctness and security** | P1; §0 invariants; G02–G04 | Complete fail-closed scope/DNS/redirect/session/pivot/replay/follow-up checks; exact action/consent, startup no-unrelated-dispatch, cancellation boundaries, parser/evidence integrity and adversarial coverage. Preserve existing corrections. | Controlled negative/positive authorization, evidence and recovery tests; no unauthorized effect; explicit limitations for external tool networking. |
+| **E2 — Versioned domain contracts** | P2; §49; G01/G05 | Complete and version canonical mission, authorization, plan/task/attempt, manifest/provider, policy/approval, budget/context, observation/finding/verification, evidence/audit/readiness contracts; migrations and compatibility façades. | Schema/version/backward compatibility, immutable digests, explicit unsupported results, no implicit authorizations. |
+| **E3 — Durable operations** | P2; G02/G04/G05 | Finish mission-wide rate/time/request/resource/cost/concurrency limits, leases, cancellation/emergency stop, retry/reconciliation, outbox/audit integrity and failures, crash/restart safety and bounded work. Adapt existing scheduler/store rather than introducing a second one. | Real worker crash, duplicate delivery, lease loss, cancellation, queue/store/audit failures and recovery without unsafe replay. |
+| **E4 — Capability migration** | P0/P2, §49–50; tool-intelligence portfolio audit; G01/G02 | Reconcile every existing catalog, adapter, entry point, local/session/RPC transport, parser, runner dispatch path and advertised UI/API/CLI capability; stable operation-level capability IDs independent of product/tool names; provider-neutral deterministic routing; capability-specific readiness; evidence-driven follow-up and no hard-coded chains; demonstrate another compatible provider without modifying scheduler. | Complete mismatch/unsupported inventory; truthful authorization/readiness; provider substitution and bounded follow-up equivalence; no legacy bypass. |
+| **E5 — Shared services and headless** | P2/P3; G05/G07 | One mission/approval/run/progress/evidence/verification service for CLI, API, supplied web UI and headless; durable execution ownership and process restart behavior; health/readiness, deployment/secrets, installation state and client reconnect. | Client disconnect/server crash does not lose accepted work; supported daemon/systemd/container, backup/restore and clean-install acceptance. |
+| **E6 — Solo v1.0 and supplied UI** | P4/P5; §38 G01–G10 | Integrate supplied design with **zero redesign**, preserve distinct source variants, wire visible controls to real service contracts, report blocked/untested accurately; prove authorized scope→recon→enumeration→supported initial access→verification→evidence/report→retest. | Visual/accessibility/API parity, controlled seeded lab, truthful evidence/report/export, packaging and exact-candidate release decision. |
+| **E7 — Independent bounty and bounded autonomy** | P6; G02/G04/G05 | Separate programme/engagement policy and state; provenanced source ingestion, review/activation, envelope-aware manual/guided/supervised/autonomous campaigns, stop/reapproval and verified follow-ups. | Customer/bounty isolation, no scope expansion by inference, bounded operation and adverse-input tests; never self-approval. |
+| **E8 — Multi-target and measurement** | P7; §38 applicable gates | Canonical URL/domain/IP/CIDR/mixed assets, scoped bounded fan-out/fan-in, per-target policy and quotas, isolated failures, aggregation, reachability/pivot constraints; reproducible seeded comparative measurement. | Cancellation/recovery/partial coverage per asset and sourced benchmark with known-ground-truth limitations. |
+| **E9 — Selective advanced expansion** | P8; §50 retained §§20, 35–37, 39, 45–52 | Add only justified Metasploit/Armitage breadth, new scanner/API/browser/cloud/code/container/Kubernetes/SBOM providers, remediation, graph/retrieval, monitoring, team/PTaaS/enterprise integrations through existing contracts. | Per-provider requirements, license, compatibility, risk, trust, cost, isolation, lifecycle, tests and specific product gate; deferred features do not block solo v1.0. |
+
+**Phase ordering:** Master roadmap P0–P5, §0 dependency and §38 release gates remain binding; P6–P8 are gated expansions. Unfreezing E0–E3 permits necessary foundation repair, **not** bypass of those dependencies. Work may run in parallel only with stable contracts, bounded ownership, explicit integration order and independent verification. Do not report approximate percentages as accepted coverage.
+
+### 14.2 Permanent engine ownership and boundaries
+
+One authority owns each concern. The intended dependency path is:
+
+\`\`\`text
+CLI / API / supplied UI / headless / optional integrations
+                    |
+          Versioned application services
+                    |
+Mission/engagement/programme + campaign objective/mode/budgets
+                    |
+Typed plan compiler -> deterministic policy -> exact approval
+                    |
+          Durable task graph and scheduler
+                    |
+   Versioned capability resolver + trusted provider bindings
+                    |
+    Explicit typed execution adapters and bounded workers
+                    |
+Raw artifacts -> normalized observations -> independent verification
+                    |
+  Coverage / audit / recovery / report / operator progress
+\`\`\`
+
+- **Planning:** support typed input/output, DAG dependencies, conditional branches, bounded loops, fan-out/fan-in/joins, human gates, validated constraints, plan digests and versioned replanning. No model or UI can bypass the compiler.
+- **Security:** distinct customer and bounty policy engines; target/identity/route/session/redirect/scope revalidation at the actual effect boundary; consent bound to actor, plan/task, parameters, impact, budgets, manifest/policy versions and expiry. All new transports reapply it.
+- **Durable runtime:** persistent task/attempt/lease/approval/budget/checkpoint/stop/event/evidence state; fenced ownership, no unsafe retry of unknown effects, explicit outcomes, bounded concurrency/time/requests/storage/cost and audit failure semantics. Queue and database changes must preserve transaction boundaries and recovery semantics.
+- **Evidence:** raw output and source identity, parser/normalizer version, asset, timestamps, hash/provenance, redaction/retention and independent verification. Neither exit code 0 nor tool/AI confidence is proof of a finding.
+- **Service clients:** no browser request, desktop process, TUI or model session owns long-running execution, permissions or authoritative result state; clients can disconnect, reconnect and inspect recovery honestly.
+- **Forward compatibility:** schema-version all durable and provider-facing contracts, define deprecation/migration rules and feature negotiation, and test that new compatible providers do not require mission/scheduler/evidence-core modifications.
+
+### 14.3 Tool- and provider-independent capability model
+
+Do not equate \`tool.nmap\`, \`tool.nikto\` or another executable name with a permanent semantic operation. Maintain migration aliases where necessary, but canonical capability IDs describe an **operation and its semantics**; different providers may implement that operation with compatible typed schemas and evidence guarantees. Compatibility must be demonstrated rather than assumed: overlapping tools are not automatically interchangeable.
+
+The **single canonical CapabilityManifest/ProviderRegistration model** must be able to represent:
+
+1. Stable capability/operation ID; provider, tool and upstream identity/version/edition; module or sub-operation identity when relevant; provenance and deprecation.
+2. Typed input, output, pre/postconditions and schema versions; target, protocol, platform, architecture, identity, authentication and session applicability.
+3. Explicit execution kind (local argv, session/transport, HTTP/API, browser, cloud SDK, local analysis) with its own boundary-specific credential, network, cancellation, cleanup, timeout and evidence contract.
+4. Prerequisites, dependencies, environment, platform/installation checks, secret **references**, privilege, supported versions and optional features.
+5. Permissions, side effects, impact and risk, rate/concurrency/compute/storage/cost limits, idempotency, retry and reconciliation semantics.
+6. Raw evidence formats, parser/normalizer versions, provenance, verification methods, limitations and known blind spots.
+7. Capability-specific readiness at a named environment/version: discovered/researched/installed/registered/smoke-tested/lab-validated/end-to-end-verified/degraded/stale/unsupported, with timestamps and linked proof. Do not collapse these into a single \`available\` Boolean.
+8. Resolution trace explaining compatible candidates, rejections, tie-break and policy restrictions; pin provider identity/manifest digest to an approved task and revalidate before execution.
+
+**Registration never grants execution authority.** Persisted or imported metadata cannot become an executable provider merely by claiming a safe label. Loading external plugins, remote MCP descriptions or downloaded candidate code is not automatic discovery.
+
+### 14.4 Complete current-portfolio reconciliation and future-tool admission
+
+**E4/P0/P2 migration prerequisite:** reconcile packaged catalog, internal/entry-point adapters, parsers, local runner, legacy Automator, sequential AI executor, worker, session/SSH/SMB/WMI paths, Metasploit RPC, existing passive recon, validators, CLI/API/UI exposure, dependency checks, platform limitations, audit/evidence and tests. Identify all catalog-only, adapter-only, import-only, duplicate, stale, unavailable, unregistered, unreachable-dispatch, partially supported, supported-but-untested and intentionally excluded cases. A catalog listing is not proof of supported capability.
+
+**Future tool pipeline** (P8 implementation only after prerequisites): discover -> source-backed research -> extract capabilities -> normalize into existing manifest -> compare gaps/overlap -> assess license/version/maintenance/platform/security/credentials/cost -> operator decision -> implement adapter -> independently validate -> enable with separate runtime policy. Versioned Tool Capability Reports preserve upstream claims, WHAXON implemented behavior, environment-specific test/readiness, and current authorization as four **separate** states. Reassess upstream drift; never silently upgrade, install, load a plugin, broaden scope or activate an operation.
+
+The provider seam must support at least one independently authored second provider for an already supported semantic capability and prove deterministic selection/explicit rejection under missing readiness, incompatible schema, version, target, platform or policy. Generic provider fallback is not permitted to lower safety requirements or change test meaning.
+
+### 14.5 Future product compatibility without premature implementation
+
+| Roadmap direction | Shared contract to support from the foundation | Feature delivery rule |
+|---|---|---|
+| New scanners, recon and passive intelligence | Operation-level capability, bounded discovery, parser/provenance, readiness | Add approved providers under E4/P8 admission; no fixed tool count. |
+| Metasploit / Armitage / shells / Meterpreter / pivots | Dynamic Framework/version/module/option discovery; typed job/console/session/handler/route/loot operations; identity/approval/evidence and reconciliation | Follow detailed Metasploit design and lab gates; do not hard-code module totals or self-authorize exploit/post work. |
+| Authenticated APIs / browser workflows | Explicit auth/identity/session/reference, redirect/DNS/network boundaries, versioned I/O, recording, cancellation | Each transport needs its own approved adapter and lifecycle/evidence tests. |
+| Cloud / containers / code / SBOM / Kubernetes | Account/project/region/cluster/resource identity, role/privilege, secret refs, cost and inventory provenance | Typed SDK/source-analysis providers under P8, not general CLI-string escape hatches. |
+| Bug bounty and autonomy | Independent activated programme policy, bounded consent envelope, human gates, plan versioning, stop/recovery | P6/E7 only after foundation and isolation acceptance. |
+| Multi-target / subnet work | Canonical assets, scope proofs, bounded graph fan-out/joins, per-asset budgets, aggregation and partial outcomes | P7/E8 after supplied UI and solo gates. |
+| Remediation and retest | Finding/evidence identity, reviewable patch/action, isolated validation, separate application approval, rollback and original-test replay | P8; current dependency remediation planner is not the full vulnerability patch workflow. |
+| Team/enterprise/PTaaS/MCP/graph/RAG/multi-agent | Tenant/actor/role, immutable audit, services and proposal interfaces; integration never creates policy authority | Defer broad features until approved need and specific acceptance; no cross-project product dependency. |
+| Offline/on-prem/headless/deployment scaling | Local-first optional dependencies, durable service, storage/queue adapters, secrets, health, upgrades/backup | Verify advertised platform/deployment combinations; no unjustified microservice dependency. |
+
+Preserve approved exclusions (§4); the repository name alone does not authorize digital forensics, malware, wireless, social engineering, mobile app testing or unrestricted post-exploitation work.
+
+### 14.6 Legacy cutover policy
+
+The intended destination is **one Engine V2**. Preserve legacy ToolRunner/parsers/store compatibility, Automator, old workers, AI executor and legacy interface designs only until all affected consumers, state and workflows have verified replacement paths. Avoid dual ownership while migrating: V2-originating observations must not silently trigger an extra legacy follow-up, and legacy authorization must not bypass V2 plan approval when V2 owns the workflow.
+
+Before retiring an old runtime path require: complete caller and persisted-record inventory; parity of supported operations and outputs; scope/approval/credential/pivot checks; migration/rollback strategy; no bypass or duplicate effects; controlled restart/cancellation/evidence tests; then deliberate removal. **Do not remove legacy code merely because a router exists.** Preserve supplied UI designs exactly; old UI reference source is not an implementation target.
+
+### 14.7 Delivery and verification order
+
+1. **Reconcile E0/P0 and unblock E1 correctness** as needed against the current main baseline; scope changes narrowly and preserve fixed behavior. All phases are editable.
+2. **Stabilize E2 contracts and E3 durability** required for later transport, service and operational guarantees; close actual gaps, not historical defects that are already fixed.
+3. **Complete E4 as an integrated capability migration**, including stable semantic capabilities, full portfolio reconciliation, trusted provider routing, truthful readiness, provider addition without scheduler changes and independently authorized evidence-driven follow-ups.
+4. **Complete E5 shared durable lifecycle**, eliminating process-local execution ownership; verify service clients and headless/container/service restart and reconciliation on an exact revision.
+5. **Complete E6/P4/P5 and §38 G01–G10**, using supplied UI without redesign and a reproducible controlled-lab solo workflow with honest report and validation results.
+6. **Activate E7, E8 and E9 only at P6–P8 gates**, using the same authority, capability, audit and evidence boundaries. Treat all major transport/product additions as independently accepted extensions.
+
+Record each work item with roadmap section, architecture owner, affected source paths, consumer/dependency, exact implementation acceptance test, test environment/commit, failure modes and migration impact. Perform source changes and actual test execution; a requirements spreadsheet or passing unrelated tests are **not** implementation evidence. Integrate contract-compatible work in bounded batches under \`docs/ENGINEERING_EXECUTION_MODEL.md\`; do not manufacture unrelated tests or paperwork as substitutes for missing functionality.
+
+### 14.8 Release and acceptance invariants
+
+- **G01:** complete crosswalk of advertised capabilities/interfaces/transports to actual code, contracts, authorization, tests and limitations.
+- **G02–G04:** adversarial fail-closed authorization, independently verified findings and reproducible raw evidence/coverage/audit with explicit trust-anchor limitations.
+- **G05:** consistent durable missions/approvals/tasks/progress, cancellation, budgets, reconnect and crash/reconciliation across CLI/API/web/headless.
+- **G06–G07:** zero-redesign UI controls/accessibility/deployment parity, clean install/upgrade/offline/headless and supported platform/service recovery.
+- **G08–G10:** Python 3.11–3.13 tests/static/build/browser acceptance on the exact candidate; version/tag/publication identity; documentation/known-risk/release decision.
+
+Use the architecture §11 adversarial matrix and relevant Metasploit/Tool Intelligence/provider acceptance matrices. A failed/skipped/missing check is not a pass. Keep **implemented**, **tested**, **accepted**, **partial**, **deferred**, **unsupported** and **blocked** distinct; do not calculate unvalidated overall percentages.
+
+### 14.9 Source-confirmed blockers at the time of this plan
+
+This is a dated snapshot, not a permanent claim: on 2026-11-03, \`main\` was \`8aa91bf659e4208f2de7fec7256254e431653603\`. Engine V2 already has immutable DAG/manifest/approval contracts, persisted plans and attempts, the scheduler, per-plan controls and an initial catalog adapter bridge. Its local-process provider bridge is explicitly limited and does not prove all catalog, session or API transports are V2-dispatchable. The old Automator retains a hard-coded Nmap-to-Nikto follow-up. The V2 web run endpoint presently submits to a **process-local** runner and explicitly does not guarantee that a submitted task survives a server crash.
+
+PR #96 (\`engine-v2/e4-complete-provider-abstraction\`) is **open, not integrated into main** at this snapshot. Its then-current head \`b94d534c7278ffd14831a9ce0942d9044a5eb667\` adds initial router and evidence-derived follow-up planning, but CI Python 3.11–3.13 type checking failed (four errors reported in \`src/whaxon/core/providers.py\`). This PR does not close the semantic-capability, complete-portfolio, legacy-bypass or lifecycle gates. Repair, reconcile with main and rerun checks before considering merge; do not label it E4 accepted.
+
+The remaining E1/E3 operational acceptance, E4 complete provider migration, E5 service lifecycle, E6 UI/solo release acceptance, and gated E7–E9 expansion remain independently tracked. **Unfrozen** means eligible for correction and integration—not automatically complete.
