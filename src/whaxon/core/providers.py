@@ -36,7 +36,7 @@ def _target_type(target: str) -> str:
         return "ip"
     except ValueError:
         if any(c in target for c in "/?#@\\\\") or any(c.isspace() for c in target):
-            raise ValueError("invalid hostname target")
+            raise ValueError("invalid hostname target") from None
         return "hostname"
 
 

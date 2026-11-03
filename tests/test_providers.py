@@ -390,8 +390,9 @@ def test_catalog_target_type_rejects_ambiguous_or_credential_targets(target):
 
 def test_catalog_provider_rejects_unbound_registry_provider_without_dispatch(monkeypatch):
     import asyncio
+
     import whaxon.adapters
-    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+    from whaxon.core.capabilities import CapabilityManifest
 
     monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
     registry = CapabilityRegistry()
@@ -411,7 +412,6 @@ def test_catalog_provider_rejects_unbound_registry_provider_without_dispatch(mon
 
 
 def test_catalog_provider_rejects_unsupported_target_type_before_dispatch(monkeypatch):
-    import asyncio
     import whaxon.adapters
     from whaxon.core.capabilities import CapabilityUnavailable
 
@@ -423,7 +423,6 @@ def test_catalog_provider_rejects_unsupported_target_type_before_dispatch(monkey
     )
     # Explicit resolver contract: a provider limited to hostnames must not
     # match a URL task, even when the capability identifier is identical.
-    manifest = registry.list("tool.nmap")[0]
     with pytest.raises(CapabilityUnavailable):
         registry.resolve("tool.nmap", __import__(
             "whaxon.core.capabilities", fromlist=["CapabilityRequirements"]
