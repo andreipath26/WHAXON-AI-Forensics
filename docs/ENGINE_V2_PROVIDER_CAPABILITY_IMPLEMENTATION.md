@@ -99,3 +99,26 @@ The `whaxon workflow portfolio-audit` CLI and `GET /api/v2/providers/portfolio-a
 ## First-class semantic operation aliases (E4 development)
 
 `SemanticOperationProvider` provides stable operation identities for fixed-argv, admitted local tool adapters without changing the legacy provider implementation or scheduler. Both legacy `tool.<id>` and operation-level `network.services.discover`, `web.server.audit`, etc. remain available for migration. The same policy permissions, targets, effects, parser and execution runner apply; output identity is checked against the legacy provider before the semantic identity is surfaced. New semantic plans must pin provider ID and semantic manifest fingerprint, regardless of candidate count. This compatibility layer does **not** imply that arbitrary providers share equivalent results, nor enable unsupported tools or transports. Future alternatives must pass exact contract checks, explicit preferred selection and separate lab/evidence gates.
+
+## E4 provider binding reconciliation (2026-11-03 batch)
+
+The read-only `BoundProviderRouter.operation_reconciliation()` audits every trusted
+in-process capability binding at **operation level**, including explicit preferred
+provider identity and compatible but **unselected** alternatives. When the
+selected provider is missing, it records `preferred_provider_missing` rather
+than silently falling back. The provider portfolio audit also carries
+`operation_bindings` when an auditable provider exposes a portfolio report,
+preserving existing catalog/adapter rows and the legacy empty-audit response.
+
+A row marked `selected` means only that the trusted router has chosen that
+in-process implementation. **It does not attest executable readiness, source
+authorization, test execution, lab validation or external transport support.**
+This inventory never registers or loads a provider, changes plan approvals,
+dispatches a tool, or discloses non-selected manifest fingerprints.
+
+The regression batch `tests/test_engine_v2_e4_provider_reconciliation.py` covers
+two compatible implementations with explicit selection, missing configured
+providers with and without other trusted implementations, the rule requiring
+immutable semantic plan provider pins, and unconfigured ambiguity failing closed.
+Full E4 catalog/transport/interface parity, provider substitution in a
+controlled lab, and retirement of legacy bypasses are still separate gates.
