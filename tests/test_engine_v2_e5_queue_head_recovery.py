@@ -175,3 +175,51 @@ def test_e5_stale_reconciliation_is_bounded_and_drains_all_batches(tmp_path):
     summary = restarted.workflow_run_queue_summary()
     assert summary["uncertain_count"] == 133
     assert summary["stale_running_count"] == 0
+
+
+def test_e5_poisoned_backlog_is_bounded_and_eventually_reaches_valid_tail(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("large", "bounded poisoned-head recovery")
+    # More than the 64-entry quarantine bound: one claim may yield no work,
+    # but subsequent polls must reach a valid tail without executing poison.
+    conn = core.store._conn()
+    try:
+        for index in range(66):
+            plan_id = f"backlog-{index:03d}"
+            core.save_workflow_plan(
+                plan_id, WorkflowPlan("large", (WorkflowTask(
+                    f"task-{index}", "unsupported.fixture", "192.0.2.1",
+                ),)),
+            )
+            req = core.enqueue_workflow_run(plan_id)
+            conn.execute(
+                "UPDATE workflow_run_requests SET submitted_at=? WHERE id=?",
+                (float(index + 1), req["id"]),
+            )
+            if index < 65:
+                conn.execute(
+                    "UPDATE workflow_run_requests SET plan_digest='poison' "
+                    "WHERE id=?",
+                    (req["id"],),
+                )
+            else:
+                valid_id = req["id"]
+    finally:
+        conn.close()
+
+    worker = Core(tmp_path)
+    assert worker.workflow_requests.claim("worker") is None
+    summary = worker.workflow_run_queue_summary()
+    assert summary["uncertain_count"] == 64
+    assert summary["counts"]["queued"] == 2
+    valid = worker.workflow_requests.claim("worker")
+    assert valid is not None and valid["id"] == valid_id
+    summary = worker.workflow_run_queue_summary()
+    assert summary["uncertain_count"] == 65
+    assert summary["counts"]["running"] == 1
+    assert summary["counts"]["queued"] == 0
+    assert worker.workflow_requests.claim("other") is None
+    assert worker.workflow_requests.finish(
+        valid_id, valid["lease_token"], status="completed",
+    )
+    assert worker.workflow_run_request(valid_id)["status"] == "completed"
