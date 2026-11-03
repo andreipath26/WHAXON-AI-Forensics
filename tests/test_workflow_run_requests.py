@@ -262,3 +262,77 @@ def test_queue_summary_cli_api_share_persisted_state(tmp_path, monkeypatch, caps
         "requires_reconciliation_count"
     ]
     assert client.post("/api/v2/workflow-runs/summary").status_code == 405
+
+
+def test_missing_running_heartbeat_is_uncertain_and_never_replayed(tmp_path):
+    """A running request with missing heartbeat must not be stuck forever."""
+    core = _core(tmp_path)
+    request = core.enqueue_workflow_run("p")
+    claimed = core.workflow_requests.claim("worker-lost")
+    assert claimed["id"] == request["id"]
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=NULL WHERE id=?",
+            (request["id"],),
+        )
+    finally:
+        conn.close()
+
+    restarted = Core(tmp_path)
+    before = restarted.workflow_run_queue_summary()
+    assert before["stale_running_count"] == 1
+    assert before["requires_reconciliation_count"] == 1
+
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=60) == 1
+    after = restarted.workflow_run_queue_summary()
+    assert after["counts"]["running"] == 0
+    assert after["counts"]["uncertain"] == 1
+    assert after["stale_running_count"] == 0
+    assert after["requires_reconciliation_count"] == 1
+
+    assert restarted.workflow_requests.claim("new-worker") is None
+    assert not core.workflow_requests.heartbeat(
+        request["id"], claimed["lease_token"],
+    )
+    assert not core.workflow_requests.finish(
+        request["id"], claimed["lease_token"], status="completed",
+    )
+
+
+def test_stale_reconciliation_keeps_fresh_running_request_owned(tmp_path):
+    """Recovery must isolate stale workers from still-live independent plans."""
+    core = _core(tmp_path)
+    core.save_workflow_plan(
+        "p2", WorkflowPlan(
+            "m", (WorkflowTask("recon2", "fixture", "192.0.2.11"),),
+        ),
+    )
+    old = core.enqueue_workflow_run("p")
+    fresh = core.enqueue_workflow_run("p2")
+    old_claim = core.workflow_requests.claim("old-worker")
+    fresh_claim = core.workflow_requests.claim("fresh-worker")
+    assert old_claim["id"] == old["id"]
+    assert fresh_claim["id"] == fresh["id"]
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=NULL WHERE id=?",
+            (old["id"],),
+        )
+    finally:
+        conn.close()
+
+    restarted = Core(tmp_path)
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=60) == 1
+    assert restarted.workflow_run_request(old["id"])["status"] == "uncertain"
+    assert restarted.workflow_run_request(fresh["id"])["status"] == "running"
+    assert restarted.workflow_requests.heartbeat(
+        fresh["id"], fresh_claim["lease_token"],
+    )
+    assert restarted.workflow_requests.finish(
+        fresh["id"], fresh_claim["lease_token"], status="completed",
+    )
+    assert restarted.workflow_run_request(fresh["id"])["status"] == "completed"
