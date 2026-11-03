@@ -611,6 +611,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             "execution_completed": False,
             "durable_progress_url": f"/api/v2/workflows/{plan_id}/progress",
             "run_request_url": f"/api/v2/workflow-runs/{queued['id']}",
+            "run_snapshot_url": f"/api/v2/workflow-runs/{queued['id']}/snapshot",
         }), 202
 
     @app.get("/api/v2/workflow-runs/summary")

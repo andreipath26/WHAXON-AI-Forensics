@@ -428,3 +428,30 @@ def test_e5_run_snapshot_reconnect_and_lease_secrecy(tmp_path, monkeypatch):
     assert running["request"]["status"] == "running"
     assert "lease_token" not in running["request"]
     assert claimed["lease_token"] not in str(running)
+
+
+def test_e5_submission_advertises_reconnect_snapshot_without_execution_claim(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    accepted = client.post("/api/v2/workflows/p/run", json={})
+    assert accepted.status_code == 202
+    body = accepted.get_json()
+    assert body["execution_completed"] is False
+    assert body["request_status"] == "queued"
+    assert body["run_snapshot_url"].endswith(
+        f"/{body['run_request_id']}/snapshot"
+    )
+    snapshot = client.get(body["run_snapshot_url"])
+    assert snapshot.status_code == 200
+    assert snapshot.get_json()["request"]["id"] == body["run_request_id"]
+    assert snapshot.get_json()["request"]["status"] == "queued"
+    assert snapshot.get_json()["worker_liveness_verified"] is False
+    duplicate = client.post("/api/v2/workflows/p/run", json={})
+    assert duplicate.status_code == 202
+    assert duplicate.get_json()["run_request_id"] == body["run_request_id"]
+    assert core.workflow_run_queue_summary()["total"] == 1

@@ -55,3 +55,13 @@ lease-token secrecy, bounded stale recovery, and durable-health fail-closed
 behavior. **All test results and E5 gates remain unverified until exact-head
 CI and applicable integration evidence are recorded.** No production or
 deployment acceptance is claimed.
+
+
+### Accepted-intent reconnect discovery
+
+A successful `POST /api/v2/workflows/<plan_id>/run` returns HTTP 202,
+`run_request_id`, `run_request_url`, `run_snapshot_url`, and the existing
+`durable_progress_url`. The snapshot URL derives from the persisted request
+identity and remains usable after a different web process starts against the
+same data directory. Duplicate active submissions with identical bounds reuse
+the same durable request identity. A 202 is **not** execution success.
