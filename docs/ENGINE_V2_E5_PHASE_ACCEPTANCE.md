@@ -104,3 +104,13 @@ The allowed cancellation/claim race outcomes are either cancellation before
 claim or a previously claimed run with a durable stop barrier; neither permits
 a second claim. These are engineering tests pending exact-head CI, not
 production multi-host proof.
+
+
+### Poisoned backlog progress in one-shot drains
+
+The Core drain now retries a bounded number of claim passes when a
+64-record poison quarantine yields no claim but queued intents remain.
+This prevents one-shot headless/CLI drains from mistaking a bounded
+quarantine yield for an empty queue. Retries are capped at 16 passes
+per requested run to prevent starvation from an unbounded producer.
+No uncertain intent is automatically replayed.

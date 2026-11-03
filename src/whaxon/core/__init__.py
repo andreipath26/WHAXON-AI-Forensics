@@ -410,7 +410,20 @@ class Core:
             # external effect is allowed to finish or become uncertain.
             if stop_event is not None and stop_event.is_set():
                 break
-            request = self.workflow_requests.claim(owner)
+            # Claim quarantines at most 64 poisoned heads per transaction.
+            # One-shot CLI drains must not mistake that bounded yield for
+            # an empty queue and strand valid work behind corrupted heads.
+            # Cap retries to prevent a continuously poisoned producer from
+            # monopolizing the worker forever.
+            request = None
+            for _claim_pass in range(16):
+                if stop_event is not None and stop_event.is_set():
+                    break
+                request = self.workflow_requests.claim(owner)
+                if request is not None:
+                    break
+                if self.workflow_requests.queued_count() == 0:
+                    break
             if request is None:
                 break
             token = request["lease_token"]

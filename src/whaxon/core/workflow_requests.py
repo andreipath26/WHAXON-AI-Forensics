@@ -150,6 +150,16 @@ class WorkflowRunQueue:
         finally:
             conn.close()
 
+    def queued_count(self) -> int:
+        """Count remaining queued intents without claiming or executing them."""
+        conn = self.store._conn()
+        try:
+            return int(conn.execute(
+                "SELECT COUNT(*) FROM workflow_run_requests WHERE status='queued'",
+            ).fetchone()[0])
+        finally:
+            conn.close()
+
     def claim(self, owner: str) -> dict | None:
         if not isinstance(owner, str) or not owner.strip():
             raise ValueError("worker owner required")
