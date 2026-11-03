@@ -1,5 +1,7 @@
 import hashlib
+import hmac
 import json
+import math
 import sqlite3
 import threading
 import time
@@ -1600,9 +1602,14 @@ class JobStore:
         """Mark orphaned attempts uncertain; optionally preserve fresh worker leases."""
         now = time.time()
         if stale_after_s is not None:
-            stale_after_s = float(stale_after_s)
-            if stale_after_s <= 0:
-                raise ValueError("stale_after_s must be positive")
+            if isinstance(stale_after_s, bool):
+                raise ValueError("stale_after_s must be finite and positive")
+            try:
+                stale_after_s = float(stale_after_s)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("stale_after_s must be finite and positive") from exc
+            if not math.isfinite(stale_after_s) or stale_after_s <= 0:
+                raise ValueError("stale_after_s must be finite and positive")
             stale_before = now - stale_after_s
         with self._lock:
             c = self._conn()
@@ -1610,12 +1617,15 @@ class JobStore:
                 c.execute("BEGIN IMMEDIATE")
                 if stale_after_s is None:
                     rows = c.execute(
-                        "SELECT id, task_id FROM task_attempts WHERE status='running'"
+                        "SELECT id, task_id FROM task_attempts "
+                        "WHERE status='running' ORDER BY started_at, id"
                     ).fetchall()
                 else:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
-                        "WHERE status='running' AND COALESCE(heartbeat_at, started_at) < ?",
+                        "WHERE status='running' "
+                        "AND COALESCE(heartbeat_at, started_at) < ? "
+                        "ORDER BY started_at, id",
                         (stale_before,),
                     ).fetchall()
                 for row in rows:
@@ -1841,6 +1851,83 @@ class JobStore:
         finally:
             c.close()
 
+    def get_workflow_audit_snapshot(self, plan_id):
+        """Digest a consistent lifecycle snapshot for *external* anchoring.
+
+        This read-only SHA-256 digest is NOT an immutable audit log or an
+        independent trust anchor. An operator must preserve the returned
+        digest outside the database and independently verify later snapshots.
+        Values and raw event details are hashed, not returned to the caller.
+        """
+        version = "whaxon.workflow-audit-snapshot.v1"
+        digest = hashlib.sha256()
+        digest.update((version + "\n").encode("utf-8"))
+
+        def record(kind, values):
+            payload = json.dumps(
+                [kind, list(values)], sort_keys=True,
+                ensure_ascii=True, allow_nan=False, separators=(",", ":"),
+            )
+            digest.update(payload.encode("utf-8") + b"\n")
+
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            plan = c.execute(
+                "SELECT id, mission_id, digest, status, schema_version, plan_json "
+                "FROM workflow_plans WHERE id=?", (plan_id,),
+            ).fetchone()
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            record("plan", tuple(plan))
+            counts = {}
+            streams = (
+                ("tasks", "SELECT id, task_key, capability_id, target, "
+                 "inputs_json, depends_on_json, permissions_json, impact, "
+                 "timeout_s, idempotency_key, status, active_attempt_id, "
+                 "error, result_json FROM workflow_tasks "
+                 "WHERE plan_id=? ORDER BY id"),
+                ("attempts", "SELECT a.id, a.task_id, a.attempt_no, a.status, "
+                 "a.worker_id, a.idempotency_key, a.started_at, "
+                 "a.heartbeat_at, a.finished_at, a.result_json, a.error "
+                 "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                 "WHERE t.plan_id=? ORDER BY a.id"),
+                ("events", "SELECT id, task_ref, attempt_id, event_type, "
+                 "detail_json, at FROM workflow_events WHERE plan_id=? "
+                 "ORDER BY id"),
+            )
+            for name, query in streams:
+                cursor = c.execute(query, (plan_id,))
+                count = 0
+                for row in cursor:
+                    record(name, tuple(row))
+                    count += 1
+                counts[name] = count
+            return {
+                "schema_version": version,
+                "plan_id": plan_id,
+                "plan_digest": plan["digest"],
+                "algorithm": "sha256",
+                "digest": digest.hexdigest(),
+                "event_count": counts["events"],
+                "task_count": counts["tasks"],
+                "attempt_count": counts["attempts"],
+                "independent_anchor_verified": False,
+            }
+        finally:
+            c.close()
+
+    def verify_workflow_audit_snapshot(self, plan_id, expected_digest):
+        """Compare lifecycle state with a caller-held external snapshot digest."""
+        if (
+            not isinstance(expected_digest, str)
+            or len(expected_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in expected_digest)
+        ):
+            raise ValueError("expected_digest must be 64 lowercase hex characters")
+        actual = self.get_workflow_audit_snapshot(plan_id)["digest"]
+        return hmac.compare_digest(actual, expected_digest)
+
     def get_workflow_audit_integrity(self, plan_id):
         """Check that every persisted attempt has exactly one claim event.
 
@@ -1859,28 +1946,52 @@ class JobStore:
                 "SELECT attempt_id, event_type FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
+            attempt_by_id = {row["id"]: row["status"] for row in attempts}
             claims = {}
             terminal = {}
+            dispatch = {}
+            mismatched = set()
+            unknown = set()
             for event in events:
-                if event["event_type"] == "task_claimed":
-                    claims[event["attempt_id"]] = claims.get(event["attempt_id"], 0) + 1
-                if event["event_type"] in (
+                attempt_id = event["attempt_id"]
+                kind = event["event_type"]
+                if attempt_id not in attempt_by_id:
+                    unknown.add(attempt_id)
+                    continue
+                if kind == "task_claimed":
+                    claims[attempt_id] = claims.get(attempt_id, 0) + 1
+                if kind == "dispatch_started":
+                    dispatch[attempt_id] = dispatch.get(attempt_id, 0) + 1
+                if kind in (
                     "task_succeeded", "task_failed", "task_cancelled",
                     "task_blocked", "task_uncertain",
                 ):
-                    terminal[event["attempt_id"]] = terminal.get(event["attempt_id"], 0) + 1
+                    terminal[attempt_id] = terminal.get(attempt_id, 0) + 1
+                    if kind != "task_" + attempt_by_id[attempt_id]:
+                        mismatched.add(attempt_id)
             missing_claims = sorted(
                 row["id"] for row in attempts if claims.get(row["id"], 0) != 1
             )
             missing_terminal = sorted(
                 row["id"] for row in attempts
-                if row["status"] != "running" and terminal.get(row["id"], 0) != 1
+                if (terminal.get(row["id"], 0) != 1
+                    if row["status"] != "running"
+                    else terminal.get(row["id"], 0) != 0)
+            )
+            duplicate_dispatch = sorted(
+                attempt_id for attempt_id, count in dispatch.items() if count > 1
             )
             return {
                 "plan_id": plan_id, "attempts": len(attempts),
                 "missing_or_duplicate_claims": missing_claims,
                 "missing_or_duplicate_terminal_events": missing_terminal,
-                "consistent": not missing_claims and not missing_terminal,
+                "mismatched_terminal_events": sorted(mismatched),
+                "duplicate_dispatch_events": duplicate_dispatch,
+                "unknown_attempt_events": sorted(unknown),
+                "consistent": not (
+                    missing_claims or missing_terminal or mismatched
+                    or duplicate_dispatch or unknown
+                ),
             }
         finally:
             c.close()
@@ -1911,7 +2022,9 @@ class JobStore:
                 snapshot["counts"].get("succeeded", 0)
             ),
             "audit_consistent": audit["consistent"],
-            "requires_manual_reconciliation": bool(reconciliation),
+            "requires_manual_reconciliation": any(
+                item["manual_reconciliation_required"] for item in reconciliation
+            ),
             "blockers": sorted(set(blockers)),
             "ready_to_report_success": not blockers and snapshot["complete"]
             and snapshot["total_tasks"] == snapshot["counts"].get("succeeded", 0),

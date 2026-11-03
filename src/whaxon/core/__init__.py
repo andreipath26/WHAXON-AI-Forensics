@@ -203,6 +203,16 @@ class Core:
     def workflow_event_cursor(self, plan_id: str, consumer_id: str):
         return self.store.get_workflow_event_cursor(plan_id, consumer_id)
 
+    def deliver_workflow_outbox_events(
+        self, plan_id: str, consumer_id: str, publish, *, limit: int = 100,
+    ):
+        """At-least-once event delivery with post-publish durable acknowledgement."""
+        from .outbox import WorkflowEventOutbox
+
+        return WorkflowEventOutbox(self.store).deliver(
+            plan_id, consumer_id, publish, limit=limit,
+        )
+
     def workflow_event_inbox(self, plan_id: str, consumer_id: str, *, limit: int = 100):
         return self.store.list_unacknowledged_workflow_events(
             plan_id, consumer_id, limit=limit,
@@ -276,6 +286,14 @@ class Core:
 
     def workflow_audit_integrity(self, plan_id: str):
         return self.store.get_workflow_audit_integrity(plan_id)
+
+    def workflow_audit_snapshot(self, plan_id: str):
+        """Read-only lifecycle digest; external anchoring is operator-owned."""
+        return self.store.get_workflow_audit_snapshot(plan_id)
+
+    def verify_workflow_audit_snapshot(self, plan_id: str, expected_digest: str):
+        """Compare current lifecycle state against an externally retained digest."""
+        return self.store.verify_workflow_audit_snapshot(plan_id, expected_digest)
 
     def workflow_attempts(
         self, plan_id: str, *, after_started: float = 0.0, limit: int = 100,
