@@ -25,3 +25,9 @@
 - `tests/test_engine_v2_e3_external_effect_crash.py` uses a bound 127.0.0.1 HTTP server, not a simulated local-file-only callback. A child process sends a real POST, receives HTTP 204, and is killed before reporting an attempt result. Stale lease reconciliation must mark the external outcome **uncertain**, refuse retry, keep readiness unaccepted, and leave the receiver's side effect count at exactly one.
 - A second test has the HTTP receiver accept the POST and deliberately disconnect without a response. The scheduler must record an **uncertain** post-dispatch exception; subsequent invocations must not retry.
 - These tests are **controlled local-only network effects**, not proof of behavior with production scanners, live pivoting, remote servers or a verified independent trust anchor. They are designed to execute in the existing exact-head Python CI matrix.
+
+## Completion-time plan identity and worker uncertainty
+
+- The terminal write transaction now checks both the cancellation state **and the original bound plan digest**. A changed plan digest cannot produce `completed`, `incomplete` or `failed` final status under the obsolete intent. The run is `uncertain`, its original digest is preserved, and an audit event is committed atomically.
+- A worker explicitly reporting `uncertain` also produces exactly one transactional, bounded reason-coded `workflow_run_uncertain` event. Raw provider error text is not copied into the audit detail. Audit insertion failure rolls back the queue transition.
+- Missing source plans remain uncertain but cannot write a plan-scoped event to a nonexistent plan; the queue row retains the failure reason. This is an explicit operational limitation, not proof of independent auditing.

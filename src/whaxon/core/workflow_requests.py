@@ -285,7 +285,8 @@ class WorkflowRunQueue:
             try:
                 conn.execute("BEGIN IMMEDIATE")
                 row = conn.execute(
-                    "SELECT r.plan_id, p.status AS plan_status "
+                    "SELECT r.plan_id, r.plan_digest, p.digest AS current_digest, "
+                    "p.status AS plan_status "
                     "FROM workflow_run_requests r "
                     "LEFT JOIN workflow_plans p ON p.id=r.plan_id "
                     "WHERE r.id=? AND r.status='running' AND r.lease_token=?",
@@ -297,10 +298,16 @@ class WorkflowRunQueue:
                 reason = None
                 if row["plan_status"] is None:
                     status, error = "uncertain", "source plan missing at completion"
+                elif row["current_digest"] != row["plan_digest"]:
+                    status = "uncertain"
+                    error = "source plan digest changed during execution; reconcile effects"
+                    reason = "plan_digest_changed_during_run"
                 elif row["plan_status"] == "cancel_requested":
                     status = "uncertain"
                     error = "workflow cancelled during execution; reconcile external effects"
                     reason = "plan_cancelled_during_run"
+                elif status == "uncertain":
+                    reason = "worker_reported_uncertain"
                 now = time.time()
                 cursor = conn.execute(
                     "UPDATE workflow_run_requests SET status=?,error=?,"
