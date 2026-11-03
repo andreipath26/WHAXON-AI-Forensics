@@ -223,3 +223,44 @@ def test_e5_poisoned_backlog_is_bounded_and_eventually_reaches_valid_tail(tmp_pa
         valid_id, valid["lease_token"], status="completed",
     )
     assert worker.workflow_run_request(valid_id)["status"] == "completed"
+
+
+def test_e5_one_shot_drain_reaches_valid_tail_beyond_poison_bound(
+    tmp_path, monkeypatch,
+):
+    import asyncio
+    core = Core(tmp_path)
+    core.create_mission("many", "one-shot poison recovery")
+    for index in range(67):
+        plan_id = f"one-shot-{index:03d}"
+        core.save_workflow_plan(
+            plan_id, WorkflowPlan("many", (WorkflowTask(
+                f"task-{index}", "unsupported.fixture", "192.0.2.1",
+            ),)),
+        )
+        req = core.enqueue_workflow_run(plan_id)
+        conn = core.store._conn()
+        try:
+            conn.execute(
+                "UPDATE workflow_run_requests SET submitted_at=? WHERE id=?",
+                (float(index + 1), req["id"]),
+            )
+            if index < 66:
+                conn.execute(
+                    "UPDATE workflow_run_requests SET plan_digest='poison' "
+                    "WHERE id=?", (req["id"],),
+                )
+            else:
+                valid_id = req["id"]
+        finally:
+            conn.close()
+    async def incomplete(*args, **kwargs):
+        return {"complete": False}
+    monkeypatch.setattr(core, "run_workflow_plan", incomplete)
+    assert asyncio.run(core.drain_workflow_run_requests(
+        max_runs=1, initialized=True,
+    )) == 1
+    assert core.workflow_run_request(valid_id)["status"] == "incomplete"
+    summary = core.workflow_run_queue_summary()
+    assert summary["uncertain_count"] == 66
+    assert summary["counts"]["queued"] == 0

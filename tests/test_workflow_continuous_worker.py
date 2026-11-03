@@ -306,3 +306,21 @@ def test_e5_drain_reconciles_all_stale_leases_before_new_claims(tmp_path, monkey
     )) == 1
     assert calls[-3:] == ["reconcile", "reconcile", "claim"]
     assert core.workflow_run_request(queued["id"])["status"] == "incomplete"
+
+
+def test_e5_one_shot_claim_retry_is_bounded_under_poisoned_producer(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    attempts = []
+    monkeypatch.setattr(
+        core.workflow_requests, "claim",
+        lambda owner: attempts.append(owner) or None,
+    )
+    monkeypatch.setattr(
+        core.workflow_requests, "queued_count", lambda: 1,
+    )
+    assert asyncio.run(core.drain_workflow_run_requests(
+        max_runs=1, initialized=True,
+    )) == 0
+    assert len(attempts) == 16
