@@ -80,6 +80,40 @@ class CatalogAdapterProvider:
             self._tool_by_provider[provider_id] = tool.id
             self._manifest_by_provider[provider_id] = manifest
 
+    def inventory(self) -> list[dict]:
+        """Live readiness is observational and never rewrites versioned manifests."""
+        inventory = []
+        for provider_id, expected in sorted(self._manifest_by_provider.items()):
+            tool_id = self._tool_by_provider[provider_id]
+            tool = self.catalog.get(tool_id)
+            current = next((
+                item for item in self.registry.list(expected.capability_id)
+                if item.provider_id == provider_id
+                and item.provider_version == expected.provider_version
+            ), None)
+            bound = current is not None and current.fingerprint == expected.fingerprint
+            installed = bool(tool is not None and tool.available)
+            inventory.append({
+                "capability_id": expected.capability_id,
+                "provider_id": provider_id,
+                "provider_version": expected.provider_version,
+                "manifest_fingerprint": expected.fingerprint,
+                "transport": "local_process",
+                "registered": bound,
+                "installed": installed,
+                "executable": bound and installed,
+                "readiness": "installed" if bound and installed else "registered" if bound else "blocked",
+                "reason": (
+                    "ready_for_local_execution" if bound and installed
+                    else "binary_not_installed" if bound
+                    else "manifest_binding_mismatch"
+                ),
+                "smoke_tested": False,
+                "lab_validated": False,
+                "end_to_end_verified": False,
+            })
+        return inventory
+
     async def dispatch(self, task: WorkflowTask) -> dict:
         if task.inputs:
             raise ValueError(
@@ -93,6 +127,7 @@ class CatalogAdapterProvider:
                 required_permissions=tuple(task.permissions),
                 minimum_readiness="registered",
                 allowed_providers=(f"whaxon.adapter.{task.capability_id.removeprefix('tool.')}",),
+                allowed_versions=("catalog-v1",),
             ),
         )
         tool_id = self._tool_by_provider.get(resolution.manifest.provider_id)

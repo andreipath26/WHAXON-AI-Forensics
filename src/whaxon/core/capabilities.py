@@ -149,6 +149,7 @@ class CapabilityRequirements:
     maximum_timeout_s: float | None = None
     required_input_schema: dict[str, Any] | None = None
     required_output_schema: dict[str, Any] | None = None
+    allowed_versions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -234,6 +235,8 @@ class CapabilityRegistry:
                 reason = f"{manifest.provider_id}: readiness {manifest.readiness} is below {requirements.minimum_readiness}"
             elif requirements.allowed_providers and manifest.provider_id not in requirements.allowed_providers:
                 reason = f"{manifest.provider_id}: provider is not allowlisted"
+            elif requirements.allowed_versions and manifest.provider_version not in requirements.allowed_versions:
+                reason = f"{manifest.provider_id}: provider version is not allowlisted"
             elif not set(requirements.required_permissions).issubset(manifest.permissions):
                 reason = f"{manifest.provider_id}: required permissions are not declared"
             elif requirements.maximum_impact and (

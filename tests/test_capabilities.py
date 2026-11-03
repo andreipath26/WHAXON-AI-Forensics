@@ -156,3 +156,17 @@ def test_resolver_rejects_invalid_resource_constraints():
         registry.resolve("network.port_scan", CapabilityRequirements(maximum_impact="unbounded"))
     with pytest.raises(TypeError):
         registry.resolve("network.port_scan", CapabilityRequirements(required_input_schema=[]))
+
+
+def test_resolver_rejects_unsupported_provider_versions():
+    import pytest
+
+    registry = CapabilityRegistry()
+    registry.register(_manifest("provider.a"))
+    with pytest.raises(CapabilityUnavailable, match="version"):
+        registry.resolve("network.port_scan", CapabilityRequirements(
+            allowed_versions=("2.0.0",),
+        ))
+    assert registry.resolve("network.port_scan", CapabilityRequirements(
+        allowed_versions=("1.0.0",),
+    )).manifest.provider_version == "1.0.0"

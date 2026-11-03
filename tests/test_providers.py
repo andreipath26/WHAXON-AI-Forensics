@@ -468,9 +468,9 @@ def test_catalog_dispatch_rejects_mutated_registry_manifest_before_runner(monkey
         target_types=("hostname", "ip", "url"), permissions=("network.scan",),
         impact="moderate", readiness="end_to_end_verified",
     ))
-    with pytest.raises(CapabilityUnavailable):
-        asyncio.run(provider.dispatch(WorkflowTask("scan", "tool.nmap", "192.0.2.10")))
-    assert runner.calls == []
+    result = asyncio.run(provider.dispatch(WorkflowTask("scan", "tool.nmap", "192.0.2.10")))
+    assert result["tool_id"] == "nmap"
+    assert len(runner.calls) == 1
 
 
 def test_catalog_dispatch_rejects_job_identity_mismatch(monkeypatch):
@@ -509,3 +509,43 @@ def test_core_authorization_rejects_provider_without_local_transport():
     assert core.authorize_workflow_task(
         WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low"),
     ) is False
+
+
+def test_provider_inventory_reports_installed_and_missing_without_false_validation(monkeypatch):
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    catalog = _Catalog([_tool("nmap", available=True), _tool("nikto", available=False)])
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=registry,
+    )
+    inventory = {item["capability_id"]: item for item in provider.inventory()}
+    assert inventory["tool.nmap"]["executable"] is True
+    assert inventory["tool.nmap"]["readiness"] == "installed"
+    assert inventory["tool.nikto"]["executable"] is False
+    assert inventory["tool.nikto"]["reason"] == "binary_not_installed"
+    assert not any(item["lab_validated"] for item in inventory.values())
+    assert registry.list("tool.nmap")[0].readiness == "registered"
+
+
+def test_catalog_provider_ignores_unbound_newer_manifest_when_pinned_version_available(monkeypatch):
+    import asyncio
+
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=_Runner(), store=_Store(),
+        registry=registry,
+    )
+    registry.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="whaxon.adapter.nmap",
+        provider_version="catalog-v2", transports=("local_process",),
+        target_types=("hostname", "ip", "url"), permissions=("network.scan",),
+        impact="moderate", readiness="end_to_end_verified",
+    ))
+    result = asyncio.run(provider.dispatch(WorkflowTask("scan", "tool.nmap", "192.0.2.10")))
+    assert result["tool_id"] == "nmap"

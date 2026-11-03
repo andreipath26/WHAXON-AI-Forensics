@@ -296,6 +296,10 @@ class Core:
             "tasks": self.store.list_workflow_tasks(plan_id),
         }
 
+    def capability_inventory(self):
+        """Return truthful live provider readiness without changing manifests."""
+        return self.providers.inventory()
+
     def authorize_workflow_task(self, task) -> bool:
         """Fail-closed default policy for scoped, read-only catalog scans."""
         from .capabilities import CapabilityUnavailable
@@ -303,12 +307,17 @@ class Core:
         try:
             from .capabilities import CapabilityRequirements
             from .providers import _target_type
+            candidates = self.capabilities.list(task.capability_id)
+            target_type = _target_type(task.target) if any(
+                item.target_types for item in candidates
+            ) else ""
             manifest = self.capabilities.resolve(
                 task.capability_id,
                 CapabilityRequirements(
-                    target_type=_target_type(task.target),
+                    target_type=target_type,
                     required_permissions=tuple(task.permissions),
-                    transport="local_process",
+                    transport="local_process" if task.capability_id.startswith("tool.") else "",
+                    allowed_versions=("catalog-v1",) if task.capability_id.startswith("tool.") else (),
                 ),
             ).manifest
         except (CapabilityUnavailable, ValueError):
