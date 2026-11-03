@@ -169,12 +169,19 @@ class WorkflowScheduler:
             if lease_lost.is_set():
                 return {"task_id": task.id, "status": "uncertain"}
             _log.exception("workflow task %s failed", task.id)
-            # Once an external dispatch began, a later cancellation cannot
-            # prove whether the provider produced side effects.
-            cancelled = self.store.workflow_cancellation_requested(row["plan_id"])
-            outcome = "uncertain" if dispatch_started and cancelled else "failed"
+            # A provider may have produced external effects before raising.
+            # The scheduler cannot distinguish a pre-effect provider failure
+            # from a post-effect disconnect. Never make either automatically
+            # retryable after dispatch crossed the durable intent boundary.
+            # Only failures known to precede dispatch can be safely retried.
+            outcome = "uncertain" if dispatch_started else "failed"
+            error = (
+                f"provider outcome unknown after dispatch: {type(exc).__name__}; "
+                "reconcile before retry"
+                if dispatch_started else f"{type(exc).__name__}: {exc}"
+            )
             self.store.finish_task_attempt(
-                attempt_id, outcome, error=f"{type(exc).__name__}: {exc}",
+                attempt_id, outcome, error=error,
             )
             committed = self.store.get_workflow_attempt_status(attempt_id)
             return {"task_id": task.id, "status": committed}
