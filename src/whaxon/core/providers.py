@@ -245,9 +245,23 @@ class CatalogAdapterProvider:
             tool = catalog.get(tool_id)
             has_adapter = tool_id in adapters
             is_bound = tool_id in bound
+            bound_manifest = next((
+                manifest for provider_id, manifest in self._manifest_by_provider.items()
+                if self._tool_by_provider[provider_id] == tool_id
+            ), None)
+            stale_contract = (
+                is_bound and bound_manifest is not None and tool is not None
+                and _catalog_version(tool) != bound_manifest.provider_version
+            )
             if tool is None:
                 state = "adapter_only"
                 reason = "adapter_not_in_catalog"
+            elif is_bound and (stale_contract or not has_adapter):
+                state = "stale_binding"
+                reason = (
+                    "catalog_contract_changed" if stale_contract
+                    else "registered_adapter_disappeared"
+                )
             elif is_bound:
                 state = "bound"
                 reason = "registered_not_lab_verified"
@@ -269,6 +283,12 @@ class CatalogAdapterProvider:
                 "adapter_registered": has_adapter,
                 "transport": getattr(tool, "transport", None) if tool else None,
                 "v2_provider_bound": is_bound,
+                "bound_provider_id": (
+                    bound_manifest.provider_id if bound_manifest is not None else None
+                ),
+                "bound_manifest_fingerprint": (
+                    bound_manifest.fingerprint if bound_manifest is not None else None
+                ),
                 "state": state,
                 "reason": reason,
                 "authorization_required": True,
@@ -278,7 +298,7 @@ class CatalogAdapterProvider:
             })
         summary = {state: sum(row["state"] == state for row in rows) for state in (
             "bound", "catalog_only", "adapter_only", "not_admitted",
-            "unsupported_transport", "unbound",
+            "unsupported_transport", "unbound", "stale_binding",
         )}
         return {
             "schema_version": "whaxon.portfolio-audit.v1",
