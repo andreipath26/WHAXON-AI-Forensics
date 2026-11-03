@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sqlite3
 import threading
@@ -116,8 +117,52 @@ CREATE TABLE IF NOT EXISTS task_attempts (
     UNIQUE(task_id, attempt_no)
 );
 CREATE INDEX IF NOT EXISTS idx_task_attempts_task ON task_attempts(task_id, attempt_no);
+CREATE TABLE IF NOT EXISTS workflow_evidence_seals (
+    attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, digest TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1, sealed_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_evidence_seals_job ON workflow_evidence_seals(job_id);
 """
 
+
+
+
+def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id, plan_digest):
+    """Hash a canonical persisted database snapshot for drift detection.
+
+    A local SHA-256 baseline is not a tamper-proof external audit signature.
+    Evidence file paths are covered as metadata, not file contents.
+    """
+    job = conn.execute(
+        "SELECT id, tool, target, status, exit_code, error, started_at, finished_at, "
+        "duration_s FROM jobs WHERE id=?", (job_id,),
+    ).fetchone()
+    if (
+        job is None or not capability_id.startswith("tool.")
+        or job["tool"] != capability_id.removeprefix("tool.")
+        or job["target"] != target or job["status"] != "finished"
+        or job["exit_code"] != 0
+    ):
+        return None
+    snapshot = {
+        "version": 1, "attempt_id": attempt_id, "plan_digest": plan_digest,
+        "capability_id": capability_id, "target": target, "job": dict(job),
+    }
+    for table, columns in (
+        ("lines", "seq, stream, text"),
+        ("findings", "seq, kind, severity, source, data_json, raw_line, "
+                     "enrichment_json, verification_status, verified_by, verification_reason"),
+        ("coverage", "seq, tool_id, target, kind, detail, phase, at"),
+        ("evidence", "seq, kind, name, path, note, added_at"),
+    ):
+        snapshot[table] = [
+            dict(row) for row in conn.execute(
+                f"SELECT {columns} FROM {table} WHERE job_id=? ORDER BY seq",
+                (job_id,),
+            )
+        ]
+    encoded = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _signature_for(kind: str, data: dict) -> str:
