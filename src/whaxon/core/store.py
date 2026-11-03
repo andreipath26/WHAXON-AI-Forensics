@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import json
 import math
 import sqlite3
@@ -1849,6 +1850,81 @@ class JobStore:
             ]
         finally:
             c.close()
+
+    def get_workflow_audit_snapshot(self, plan_id):
+        """Digest a consistent lifecycle snapshot for *external* anchoring.
+
+        This read-only SHA-256 digest is NOT an immutable audit log or an
+        independent trust anchor. An operator must preserve the returned
+        digest outside the database and independently verify later snapshots.
+        Values and raw event details are hashed, not returned to the caller.
+        """
+        version = "whaxon.workflow-audit-snapshot.v1"
+        digest = hashlib.sha256()
+        digest.update((version + "\n").encode("utf-8"))
+
+        def record(kind, values):
+            payload = json.dumps(
+                [kind, list(values)], sort_keys=True,
+                ensure_ascii=True, allow_nan=False, separators=(",", ":"),
+            )
+            digest.update(payload.encode("utf-8") + b"\n")
+
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            plan = c.execute(
+                "SELECT id, mission_id, digest, status, schema_version "
+                "FROM workflow_plans WHERE id=?", (plan_id,),
+            ).fetchone()
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            record("plan", tuple(plan))
+            counts = {}
+            streams = (
+                ("tasks", "SELECT id, task_key, capability_id, target, status, "
+                 "active_attempt_id, error, result_json FROM workflow_tasks "
+                 "WHERE plan_id=? ORDER BY id"),
+                ("attempts", "SELECT a.id, a.task_id, a.attempt_no, a.status, "
+                 "a.worker_id, a.idempotency_key, a.started_at, "
+                 "a.heartbeat_at, a.finished_at, a.result_json, a.error "
+                 "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                 "WHERE t.plan_id=? ORDER BY a.id"),
+                ("events", "SELECT id, task_ref, attempt_id, event_type, "
+                 "detail_json, at FROM workflow_events WHERE plan_id=? "
+                 "ORDER BY id"),
+            )
+            for name, query in streams:
+                cursor = c.execute(query, (plan_id,))
+                count = 0
+                for row in cursor:
+                    record(name, tuple(row))
+                    count += 1
+                counts[name] = count
+            return {
+                "schema_version": version,
+                "plan_id": plan_id,
+                "plan_digest": plan["digest"],
+                "algorithm": "sha256",
+                "digest": digest.hexdigest(),
+                "event_count": counts["events"],
+                "task_count": counts["tasks"],
+                "attempt_count": counts["attempts"],
+                "independent_anchor_verified": False,
+            }
+        finally:
+            c.close()
+
+    def verify_workflow_audit_snapshot(self, plan_id, expected_digest):
+        """Compare lifecycle state with a caller-held external snapshot digest."""
+        if (
+            not isinstance(expected_digest, str)
+            or len(expected_digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in expected_digest)
+        ):
+            raise ValueError("expected_digest must be 64 lowercase hex characters")
+        actual = self.get_workflow_audit_snapshot(plan_id)["digest"]
+        return hmac.compare_digest(actual, expected_digest)
 
     def get_workflow_audit_integrity(self, plan_id):
         """Check that every persisted attempt has exactly one claim event.
