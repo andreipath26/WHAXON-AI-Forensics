@@ -2983,6 +2983,32 @@ class JobStore:
                     (plan_row["plan_id"], row["task_id"], attempt_id,
                      "task_" + status, json.dumps({"error": error}), now),
                 )
+                # Seal matching tool evidence inside the terminal-outcome transaction.
+                # Missing, in-progress or cross-target jobs remain unsealed.
+                if status == "succeeded" and isinstance(result, dict):
+                    job_id = result.get("job_id")
+                    task = c.execute(
+                        "SELECT t.target, t.capability_id, p.digest FROM workflow_tasks t "
+                        "JOIN workflow_plans p ON p.id=t.plan_id WHERE t.id=?",
+                        (row["task_id"],),
+                    ).fetchone()
+                    if (
+                        isinstance(job_id, str) and bool(job_id)
+                        and result.get("target") == task["target"]
+                        and result.get("tool_id") == task["capability_id"].removeprefix("tool.")
+                    ):
+                        digest = _workflow_evidence_digest(
+                            c, attempt_id=attempt_id, job_id=job_id,
+                            target=task["target"], capability_id=task["capability_id"],
+                            plan_digest=task["digest"],
+                        )
+                        if digest is not None:
+                            c.execute(
+                                "INSERT INTO workflow_evidence_seals "
+                                "(attempt_id, job_id, digest, version, sealed_at) "
+                                "VALUES (?, ?, ?, 1, ?)",
+                                (attempt_id, job_id, digest, now),
+                            )
                 c.execute("COMMIT")
                 return True
             except Exception:
