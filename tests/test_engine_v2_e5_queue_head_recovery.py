@@ -141,3 +141,37 @@ def test_e5_stale_worker_fenced_after_reconciliation_and_next_job_survives(tmp_p
     assert next_claim is not None and next_claim["id"] == second["id"]
     assert next_claim["lease_token"] != token
     assert "lease_token" not in restarted.workflow_run_request(first["id"])
+
+
+def test_e5_stale_reconciliation_is_bounded_and_drains_all_batches(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("many", "bounded lease reconciliation")
+    # Simulate persisted, already-claimed requests with lost worker heartbeats.
+    # Every batch must make progress, and a late worker cannot finish a
+    # reconciled request. No external tool is invoked.
+    conn = core.store._conn()
+    try:
+        for index in range(133):
+            plan_id = f"stale-plan-{index}"
+            core.save_workflow_plan(
+                plan_id,
+                WorkflowPlan("many", (WorkflowTask(
+                    f"task-{index}", "unsupported.fixture", "192.0.2.1",
+                ),)),
+            )
+            req = core.enqueue_workflow_run(plan_id)
+            claimed = core.workflow_requests.claim(f"worker-{index}")
+            assert claimed is not None and claimed["id"] == req["id"]
+            conn.execute(
+                "UPDATE workflow_run_requests SET heartbeat_at=1 WHERE id=?",
+                (req["id"],),
+            )
+    finally:
+        conn.close()
+    restarted = Core(tmp_path)
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=120) == 128
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=120) == 5
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=120) == 0
+    summary = restarted.workflow_run_queue_summary()
+    assert summary["uncertain_count"] == 133
+    assert summary["stale_running_count"] == 0
