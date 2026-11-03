@@ -793,12 +793,31 @@ class BoundProviderRouter:
         }
 
     def inventory(self) -> list[dict]:
+        """Report deployable routing, not just independently installed providers.
+
+        Multiple trusted providers can individually be installed while only one
+        is eligible to execute a capability. Surface that distinction for the
+        Core/API/CLI clients, without modifying provider-owned readiness data.
+        """
         rows: list[dict] = []
         for provider in self._providers:
             rows.extend(provider.inventory())
             portfolio = getattr(provider, "portfolio_inventory", None)
             if callable(portfolio):
                 rows.extend(portfolio())
-        return sorted(rows, key=lambda item: (
+        result: list[dict] = []
+        for item in rows:
+            row = dict(item)
+            bound = self._bindings.get(row["capability_id"])
+            selected = (
+                bound is not None
+                and row.get("provider_id") == bound.provider_id
+            )
+            row["selected_for_execution"] = selected
+            if not selected and row.get("executable") is True:
+                row["executable"] = False
+                row["reason"] = "provider_not_selected_for_execution"
+            result.append(row)
+        return sorted(result, key=lambda item: (
             item["capability_id"], item.get("provider_id") or "",
         ))
