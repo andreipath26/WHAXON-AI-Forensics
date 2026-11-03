@@ -585,3 +585,16 @@ the distinction between persistence and actual service liveness. Regression
 tests cover valid work behind a corrupt or cancelled request, two competing
 workers and all-invalid queues. **It is not proof of external-tool crash
 reconciliation or an accepted E5 service-mode deployment.**
+
+### E2 deterministic JSON contract construction (2026-11-03)
+
+`WorkflowTask.inputs` and `WorkflowPlan.metadata` now reject unsupported
+Python objects, non-string mapping keys, NaN/infinite floating-point values,
+circular containers and excessive nesting **before** a workflow can be saved
+or approved. Canonical approval/plan digests use strict JSON serialization
+with `allow_nan=False`. Legitimate nested lists/tuples and shared-but-acyclic
+subobjects remain supported; stable round trips keep the same digest.
+
+This is an E2 source-contract safety improvement, not a migration of all
+legacy finding/evidence schemas or full E2 acceptance. Regression tests
+verify fail-closed validation at construction and digest boundaries.
