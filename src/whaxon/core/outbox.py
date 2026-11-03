@@ -8,6 +8,7 @@ must deduplicate by (plan_id, event.id); exactly-once is NOT guaranteed.
 from __future__ import annotations
 
 from collections.abc import Callable
+import inspect
 from typing import Any
 
 
@@ -39,7 +40,13 @@ class WorkflowEventOutbox:
         for event in events:
             # If the callback raises after a remote effect, do NOT ack it:
             # subsequent calls may deliver the same event again.
-            publish(event)
+            result = publish(event)
+            if inspect.isawaitable(result):
+                # A coroutine object does not mean publication completed.
+                # Do not acknowledge an asynchronous callback not awaited.
+                if inspect.iscoroutine(result):
+                    result.close()
+                raise TypeError("publish must be synchronous; async result not delivered")
             self.store.acknowledge_workflow_events(
                 plan_id, consumer_id, event["id"],
             )

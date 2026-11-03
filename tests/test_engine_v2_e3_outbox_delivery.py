@@ -107,3 +107,15 @@ def test_outbox_rejects_missing_callback(tmp_path):
     core = _ready(tmp_path)
     with pytest.raises(TypeError, match="publish"):
         core.deliver_workflow_outbox_events("plan", "sink", None)
+
+
+@pytest.mark.asyncio
+async def test_async_publish_callback_cannot_ack_undelivered_event(tmp_path):
+    core = _ready(tmp_path)
+
+    async def publish(_event):
+        return True
+
+    with pytest.raises(TypeError, match="synchronous"):
+        core.deliver_workflow_outbox_events("plan", "async-sink", publish)
+    assert core.store.get_workflow_event_cursor("plan", "async-sink") == 0
