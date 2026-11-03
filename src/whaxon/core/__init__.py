@@ -312,7 +312,8 @@ class Core:
         return self.workflow_requests.get(request_id)
 
     async def drain_workflow_run_requests(self, *, max_runs: int = 20,
-                                          initialized: bool = False) -> int:
+                                          initialized: bool = False,
+                                          stop_event=None) -> int:
         """Claim persistent V2 run requests; never replay uncertain executions.
 
         A CLI, headless daemon or web service can call this after restart.
@@ -323,12 +324,19 @@ class Core:
 
         if type(max_runs) is not int or not 1 <= max_runs <= 100:
             raise ValueError("max_runs must be between 1 and 100")
+        if stop_event is not None and not callable(getattr(stop_event, "is_set", None)):
+            raise TypeError("stop_event must expose is_set()")
         if not initialized:
             await self.initialize(drain=False)
         self.workflow_requests.reconcile_stale()
         owner = "workflow-run-worker-" + uuid.uuid4().hex
         processed = 0
         for _ in range(max_runs):
+            # Stop admits no additional request after a graceful shutdown
+            # signal, even inside a multi-request batch. An already claimed
+            # external effect is allowed to finish or become uncertain.
+            if stop_event is not None and stop_event.is_set():
+                break
             request = self.workflow_requests.claim(owner)
             if request is None:
                 break
@@ -372,7 +380,7 @@ class Core:
 
         stop_event is a threading.Event, so foreground services can handle
         SIGTERM/SIGINT without assuming they own the asyncio event loop.
-        A stop signal prevents new claims after the current batch, without
+        A stop signal prevents new claims within the current batch, without
         falsely claiming that an in-flight external operation stopped.
         """
         import asyncio
@@ -391,6 +399,7 @@ class Core:
         while not stop_event.is_set():
             total += await self.drain_workflow_run_requests(
                 max_runs=max_runs_per_batch, initialized=True,
+                stop_event=stop_event,
             )
             # Check shutdown at least every 250 ms even if configured
             # polling is long. Do not terminate in-flight task executions.
