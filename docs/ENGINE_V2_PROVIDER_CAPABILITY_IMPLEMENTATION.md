@@ -99,3 +99,20 @@ The `whaxon workflow portfolio-audit` CLI and `GET /api/v2/providers/portfolio-a
 ## First-class semantic operation aliases (E4 development)
 
 `SemanticOperationProvider` provides stable operation identities for fixed-argv, admitted local tool adapters without changing the legacy provider implementation or scheduler. Both legacy `tool.<id>` and operation-level `network.services.discover`, `web.server.audit`, etc. remain available for migration. The same policy permissions, targets, effects, parser and execution runner apply; output identity is checked against the legacy provider before the semantic identity is surfaced. New semantic plans must pin provider ID and semantic manifest fingerprint, regardless of candidate count. This compatibility layer does **not** imply that arbitrary providers share equivalent results, nor enable unsupported tools or transports. Future alternatives must pass exact contract checks, explicit preferred selection and separate lab/evidence gates.
+
+
+## E4 portfolio drift visibility — 2026-11-03 batch
+
+The read-only portfolio reconciliation now distinguishes a registered local provider
+whose **catalog execution contract has changed** from one with its original
+binding intact. It also exposes a previously bound adapter that has disappeared
+from the registered adapter list. These rows report `stale_binding` with
+`catalog_contract_changed` or `registered_adapter_disappeared`; the original
+trusted provider identity and manifest fingerprint remain visible for review.
+The audit does not reload, enable or execute any adapter, and it never
+silently upgrades the immutable manifest. Tests exercise both drift cases and
+prove that the audit leaves the registry digest unchanged.
+
+This does **not** prove every provider or transport is supported, that
+readiness is smoke/lab verified, or that all legacy dispatch paths have migrated.
+The E4 roadmap gate remains open until those separate acceptance criteria pass.
