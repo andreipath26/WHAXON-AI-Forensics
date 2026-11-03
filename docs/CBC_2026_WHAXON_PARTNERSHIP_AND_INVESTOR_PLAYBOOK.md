@@ -58,6 +58,55 @@ An exhibitor announcement confirms the organization, not that its CEO, founder o
 
 ---
 
+### Event intelligence consolidated from the supplementary CBC brief (3 November 2026)
+
+The supplementary *CBC Intelligence Brief* adds operational context to this field guide. Treat it as planning intelligence, **not** independent proof of official attendance, programme specifics, or WHAXON feature completion. The evidence rules above override any unqualified claims in that brief.
+
+| Item | Working information | Verification/action |
+|---|---|---|
+| Event | CBC — Cybersecurity Business Convention, described as its 8th edition | Confirm edition against the official 2026 event site |
+| Dates | 25–26 November 2026 | Already used throughout this playbook; recheck event updates |
+| Venue | MEETT — Parc des Expositions et Centre de Conventions & Congrès de Toulouse Métropole, Aussonne, greater Toulouse | Verify entrance, registration, transport and access instructions before departure |
+| Organizer | Dépêche Events, associated with *La Dépêche du Midi* | Verify current contacts through official CBC/organizer channels |
+| Event-scale planning figures | Approximately 3,500 qualified visitors and 220 exhibitors/partners, as stated in the supplementary brief | **Unverified estimates/targets**, not attendance counts or guaranteed business reach; do not use in an investor deck without an official dated source |
+| Buyer profiles | CISOs, CIOs, DPOs, SME/ETI and large-company leaders, cyber providers and security decision-makers | Use as audience hypotheses; prioritize hands-on security-services decision-makers |
+| Sector lenses | Industrial/OT security, aerospace and defense supply chains, EU governance and digital resilience | Conversation relevance only; not proof WHAXON supports OT, embedded, AI-Act, post-quantum or defense-specific assessments |
+
+**Programme framing:** The supplementary brief describes day 1 as digital strategy/governance (EU regulation, AI Act, sovereign cloud and digital risk) and day 2 as Europe/cyberdefense (critical industries, space supply chains, post-quantum, embedded systems and resilience). This is a **thematic planning summary, not a verified day-by-day agenda**. For actual dates, speakers and times, use §6 and the official CBC programme. Do not rearrange confirmed meetings or promise attendance at a session on the basis of these themes alone.
+
+**Commercial interpretation:** Toulouse's aerospace and industrial ecosystem can make deterministic, auditable assessment evidence a strong conversation opener. Do **not** claim WHAXON has certified OT, defense, aerospace, embedded-system or post-quantum capabilities. First ask whether the prospective partner's use case falls inside WHAXON's *currently demonstrated and authorized* workflow. If it does not, record the requirement as potential roadmap input, not a feature or pilot deliverable.
+
+### Organizer and exhibitor-services contacts (supplementary intelligence; verify before use)
+
+These contacts are **event-operational leads**, not proven CBC attendees or WHAXON buyers. The names, roles and contact details below come from the supplementary brief and have not been individually verified against current organizer pages.
+
+| Function | Name | Contact/detail from brief | Appropriate use |
+|---|---|---|---|
+| Exhibitor / sales management | Léthilie Fonroques | lethilie.fonroques@ladepeche.fr · +33 6 07 73 36 39 | Ask about exhibitor packages, matchmaking, startup participation and current directory |
+| Commercial / sales lead | Nicolas Sabatté | nicolas.sabatte@ladepeche.fr · +33 7 63 79 08 68 | Confirm commercial participation routes and pricing before making commitments |
+| Project management | Mathieu Bezombes | Project manager (*chef de projets*); no direct details supplied | Ask organizer to route programme/logistics questions |
+| Exhibitor services | Marlène Gineste | Exhibitor service manager; no direct details supplied | Ask about stand services and exhibitor access only if relevant |
+| Event direction | Aurélie Courouleau | Director of Dépêche Events; no direct details supplied | Escalation/partnership route when a specific reason exists |
+
+**First questions for organizers:** Is there a startup/innovation or independent-builder access route? Is there a business-meeting platform for registered visitors? Can a visitor request appointments with the named exhibitors? Is there a public current exhibitor and speaker directory? Are any relevant sessions or regional-delegation introductions suitable for WHAXON? Avoid buying a stand without a defensible cost/benefit case.
+
+### Ecosystem and media landscape
+
+The supplementary brief additionally flags **AD'OCC, La Mêlée, CEFCYS, AFCDP, CESIN and the Gendarmerie Nationale**, alongside Cyber'Occ and Digital 113 already covered here. Treat organizations as *networks or potential introductions*, not confirmed individual meetings. For AD'OCC, investigate founder/innovation programmes and referrals; for La Mêlée and professional associations, seek introductions to assessment practitioners or customer discovery contacts; for public-sector bodies, follow appropriate formal channels and authorization rules. The brief also names *La Dépêche du Midi, La Dépêche Éco, Midi Libre, La Lettre M, MISC* and *Connect* as media context. A media affiliation is **not** editorial coverage or an endorsement. Verify current partnership status before making a claim.
+
+### Strategic segmentation refinement
+
+The original priority list remains the working target list. Within that list:
+
+1. **First commercial wedge:** Toulouse/Occitanie MSSPs, boutique pentest consultancies and technical service-delivery owners with a repeatable assessment, validation, triage, evidence or report-production problem. They are more likely than large-enterprise CISOs to evaluate a narrow, operator-run workflow quickly.
+2. **Second wedge:** infrastructure and services partners that can offer a controlled deployment environment, technical review or customer access.
+3. **Third wedge:** regional organizations and industry networks that can provide warm introductions, including aerospace/industrial supply-chain contacts where WHAXON's *actual* support fits.
+4. **Later-stage path:** enterprise procurement and equity investors, once technical evaluation, legal readiness and commercial traction justify their longer decision cycles.
+
+**Trust-layer language:** The brief proposes a pitch centered on a fail-closed SQLite DAG and a `candidate → verified/inconclusive` triage state machine. Treat these as **architecture points to demonstrate only if confirmed in the current repository and acceptance evidence**, not as blanket guarantees. Never say WHAXON *eliminates hallucinations*, *eliminates scanner false positives*, or validates *all* findings. A safer buyer statement is: “WHAXON aims to help operators distinguish supported, evidence-backed validation outcomes from unresolved candidates while preserving a reproducible audit trail.” Use exact implementation terminology only when the live demonstrated engine version supports it.
+
+
+
 ## 3. Priority order
 
 ### Priority A — contact before the event and request a meeting
@@ -932,6 +981,12 @@ Do not measure success by the number of stands visited or cards collected.
 
 ---
 
+### Merge provenance and evidence boundaries (3 November 2026)
+
+This file is the consolidated working playbook, merging its original 1 November 2026 structure with *CBC Intelligence Brief.md* supplied on 3 November 2026. The original target-by-target research, event attendance labels, meeting scripts, financing caveats and follow-up tracker remain authoritative **within this document**. New brief-derived operational details are explicitly labeled unverified where independent confirmation was not established. Nothing in this merge establishes actual attendance, booked meetings, commercial traction, production readiness or new WHAXON capabilities. Before outbound outreach, validate the CBC event directory, programme, organizer details and the current product demonstration state.
+
+
+
 ## 18. Final operating principle
 
 **Make WHAXON the reason someone wants to meet you; make the commercial opportunity the reason they agree to a next step.**
@@ -1060,6 +1115,23 @@ Use this as the concrete offer to Advens, ITrust, CHEOPS or another qualified pr
 - Do not sign an NDA, exclusivity, IP assignment, reseller agreement, investment term sheet or customer contract on the spot. Take time to review it and obtain appropriate legal advice.
 
 ---
+
+### Optional 30-day design-partner evaluation framework (supplementary brief integration)
+
+The supplementary brief proposes a **30-day sandbox evaluation** with selected technical directors. Treat 30 days as a *negotiable trial window*, not an already offered or generally available product programme. It supplements the scoped pilot in §21; it does not replace its authorization, security and support conditions.
+
+| Phase | Proposed activity | Evidence/decision gate |
+|---|---|---|
+| Days 1–5 | Agree evaluator, objectives, authorized lab/sandbox, tool list, scope and data-handling rules | Written rules of engagement and supported-capability inventory |
+| Days 6–15 | Run a bounded WHAXON workflow on supported targets; retain actual execution evidence | Reproducible commands/jobs, observed results and known limitations |
+| Days 16–23 | Compare operator time, duplicate/unsupported findings, evidence completeness, deterministic validation where implemented, and reporting effort against existing practice | Baseline and measured observations; **no invented improvement percentages** |
+| Days 24–30 | Technical debrief, prioritization of defects and requests, commercial suitability review | Named buyer/evaluator, go/no-go decision and agreed next step |
+
+**Mutual exchange:** evaluator supplies structured feedback, use-case constraints and a decision meeting; WHAXON supplies the explicitly agreed working build, documentation and support capacity. Do not promise free custom features, unlimited support, production access, third-party tool licenses or guaranteed release dates. A design partner is **not** automatically a paying customer or reference customer. If the current implementation or founder capacity cannot safely support 30 days, shorten or defer the evaluation.
+
+**Roadmap discipline:** log requests about OT/industrial networks, aerospace/defense, regulatory mapping, integrations or future tools as discovery findings. Evaluate them against the governing WHAXON roadmap and engine-v2 specification before prioritization; they are not committed features and must not be implied as part of the current demo.
+
+
 
 ## 22. Difficult questions: prepared, honest answers
 
