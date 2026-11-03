@@ -244,7 +244,25 @@ class CatalogAdapterProvider:
         for tool_id in sorted(set(catalog) | adapters):
             tool = catalog.get(tool_id)
             has_adapter = tool_id in adapters
-            is_bound = tool_id in bound
+            bound_provider_id = f"whaxon.adapter.{tool_id}"
+            expected = self._manifest_by_provider.get(bound_provider_id)
+            current = (
+                next((
+                    item for item in self.registry.list(expected.capability_id)
+                    if item.provider_id == expected.provider_id
+                    and item.provider_version == expected.provider_version
+                ), None)
+                if expected is not None else None
+            )
+            is_bound = (
+                tool is not None
+                and tool_id in bound
+                and expected is not None
+                and current is not None
+                and current.fingerprint == expected.fingerprint
+                and _catalog_version(tool) == expected.provider_version
+                and getattr(tool, "transport", "cli") == "cli"
+            )
             if tool is None:
                 state = "adapter_only"
                 reason = "adapter_not_in_catalog"
