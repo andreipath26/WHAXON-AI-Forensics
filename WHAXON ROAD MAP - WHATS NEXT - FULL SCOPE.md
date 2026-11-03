@@ -1,5 +1,7 @@
 # WHAXON — Product trajectory and release gates
 
+> **Engine V2 current-head evidence note (2026-11-03):** At main `f0b25d3629d776b433f72c83db679bb41313c812`, the [dated source audit](docs/ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md) and [checkpoint ledger](docs/ENGINE_V2_AUDIT_CHECKPOINTS_2026-11-03.csv) reconcile 33 source-backed of 48 *selected unweighted checkpoints* (68.75% sampled presence), including newer E2–E5 changes and merged E5 service-unit work. This is **not** a whole-engine completeness or v1.0 release percentage. The roadmap's priority/acceptance requirements below remain authoritative and no E0–E6 phase has formal full-gate sign-off. The earlier 25/40 audit is historical.
+
 > **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](docs/UI_CONTROL_INVENTORY.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
 
 
