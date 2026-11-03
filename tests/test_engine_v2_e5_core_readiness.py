@@ -79,3 +79,34 @@ def test_e5_optional_msf_probe_exception_is_informational_not_service_failure(tm
     assert state["core_ready"] is True
     assert state["checks"]["msf"] == "unavailable"
     assert state["optional_degraded"] == ["msf"]
+
+
+def test_e5_simple_health_fails_closed_on_durable_database_failure(tmp_path, monkeypatch):
+    client, core = _client(tmp_path)
+    core.msf = SimpleNamespace(is_up=lambda: True)
+    assert client.get("/api/health/simple").status_code == 200
+
+    def fail_database():
+        raise OSError("private database path must not leak")
+
+    monkeypatch.setattr(core.store, "_conn", fail_database)
+    simple = client.get("/api/health/simple")
+    assert simple.status_code == 503
+    assert simple.get_json()["ok"] is False
+    assert simple.get_json()["core_ready"] is False
+    assert "private database path" not in simple.get_data(as_text=True)
+
+
+def test_e5_simple_health_ignores_optional_tool_outage_but_checks_storage(tmp_path):
+    client, core = _client(tmp_path)
+    core.msf = SimpleNamespace(is_up=lambda: False)
+    response = client.get("/api/health/simple")
+    assert response.status_code == 200
+    assert response.get_json()["ok"] is True
+    assert response.get_json()["core_ready"] is True
+    non_directory = tmp_path / "unwritable-storage"
+    non_directory.write_text("file", encoding="utf-8")
+    core.data_dir = non_directory
+    degraded = client.get("/api/health/simple")
+    assert degraded.status_code == 503
+    assert degraded.get_json()["ok"] is False
