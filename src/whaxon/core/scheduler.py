@@ -131,10 +131,19 @@ class WorkflowScheduler:
             if lease_lost.is_set() or not self.store.workflow_attempt_owned(attempt_id):
                 return {"task_id": task.id, "status": "uncertain"}
             if not self.store.mark_workflow_dispatch_started(row["plan_id"], attempt_id):
-                self.store.finish_task_attempt(
-                    attempt_id, "cancelled", error="cancelled before provider dispatch",
+                # This gate may close for cancellation, deadline, resource or
+                # mission budget reasons. A budget refusal is NOT cancellation.
+                cancelled = self.store.workflow_cancellation_requested(row["plan_id"])
+                outcome = "cancelled" if cancelled else "blocked"
+                error = (
+                    "cancelled before provider dispatch" if cancelled
+                    else "durable execution gate closed before provider dispatch"
                 )
-                return {"task_id": task.id, "status": "cancelled"}
+                self.store.finish_task_attempt(attempt_id, outcome, error=error)
+                return {
+                    "task_id": task.id,
+                    "status": self.store.get_workflow_attempt_status(attempt_id),
+                }
             dispatch_started = True
             result = await self._invoke(self.dispatch, task, deadline)
             if lease_lost.is_set():
