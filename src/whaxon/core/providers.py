@@ -254,19 +254,32 @@ class CatalogAdapterProvider:
                 ), None)
                 if expected is not None else None
             )
-            is_bound = (
+            binding_current = (
                 tool is not None
                 and tool_id in bound
+                and has_adapter
                 and expected is not None
                 and current is not None
                 and current.fingerprint == expected.fingerprint
                 and _catalog_version(tool) == expected.provider_version
                 and getattr(tool, "transport", "cli") == "cli"
             )
+            was_bound = tool_id in bound
             if tool is None:
                 state = "adapter_only"
                 reason = "adapter_not_in_catalog"
-            elif is_bound:
+            elif was_bound and not binding_current:
+                state = "stale_binding"
+                reason = (
+                    "registered_adapter_disappeared" if not has_adapter
+                    else "catalog_contract_changed"
+                    if expected is not None and _catalog_version(tool) != expected.provider_version
+                    else "manifest_binding_mismatch"
+                    if current is None or expected is None
+                    or current.fingerprint != expected.fingerprint
+                    else "unsupported_transport"
+                )
+            elif binding_current:
                 state = "bound"
                 reason = "registered_not_lab_verified"
             elif getattr(tool, "transport", "cli") != "cli":
@@ -286,7 +299,11 @@ class CatalogAdapterProvider:
                 "catalog_present": tool is not None,
                 "adapter_registered": has_adapter,
                 "transport": getattr(tool, "transport", None) if tool else None,
-                "v2_provider_bound": is_bound,
+                "v2_provider_bound": binding_current,
+                "binding_current": binding_current,
+                "previously_bound": was_bound,
+                "bound_provider_id": expected.provider_id if expected else None,
+                "bound_manifest_fingerprint": expected.fingerprint if expected else None,
                 "state": state,
                 "reason": reason,
                 "authorization_required": True,
@@ -295,8 +312,8 @@ class CatalogAdapterProvider:
                 "end_to_end_verified": False,
             })
         summary = {state: sum(row["state"] == state for row in rows) for state in (
-            "bound", "catalog_only", "adapter_only", "not_admitted",
-            "unsupported_transport", "unbound",
+            "bound", "stale_binding", "catalog_only", "adapter_only",
+            "not_admitted", "unsupported_transport", "unbound",
         )}
         return {
             "schema_version": "whaxon.portfolio-audit.v1",
@@ -367,6 +384,12 @@ class CatalogAdapterProvider:
                 "catalog executable/argv changed since provider registration",))
         if getattr(tool, "transport", "cli") != "cli":
             raise CapabilityUnavailable(task.capability_id, ("local transport unavailable",))
+        from ..adapters import get_adapter
+
+        if get_adapter(tool.id) is None:
+            raise CapabilityUnavailable(
+                task.capability_id, ("bound tool adapter is no longer registered",),
+            )
         target_type = _target_type(task.target)
         if tool.id == "ffuf" and target_type == "url" and urlsplit(task.target).query:
             raise CapabilityUnavailable(task.capability_id, (
