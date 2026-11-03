@@ -1,5 +1,13 @@
 # WHAXON — Product trajectory and release gates
 
+## Engine V2 E0–E9 phase-freeze policy (operator decision, 2026-11-03)
+
+For **every Engine V2 phase E0–E9**, engineering completion, phase merge and freeze are distinct from final integrated-engine deployment acceptance. A phase may be frozen after its required implementation and interfaces are complete, applicable automated unit/integration/adversarial/security tests and supported exact-head CI pass, residual integration obligations are recorded, and engineering sign-off is documented. Preserve the one-phase/one-branch/one-PR/one-final-merge rule. Do not infer acceptance from source presence or older CI.
+
+**Deferred to the final full Engine V2 deployment gate, not waived:** authorized real-scanner controlled-target laboratory runs, externally protected audit-anchor/witness and retention validation, production-like service and multi-worker operation, host/network crash and recovery, backup/restore, complete cross-client end-to-end validation, and deployment/operator sign-off. These remain explicitly **NOT PASSED** until evidenced. No frozen phase, green CI or mock test implies production readiness or closes the overall release gates. Security authorization, fail-closed behavior, uncertain-effect reconciliation and audit integrity remain mandatory implementation requirements. Reopen a frozen phase only for evidenced correctness/security defects or necessary cross-phase integration repairs with regression coverage.
+
+This operator decision supersedes earlier requirements to finish deployment-level tests *before phase engineering freeze*, but does not supersede final release safety and acceptance gates.
+
 > **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](docs/UI_CONTROL_INVENTORY.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
 
 
