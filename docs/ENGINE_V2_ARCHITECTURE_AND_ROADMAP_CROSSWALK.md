@@ -617,3 +617,27 @@ continuation and worker fencing.
 **Acceptance boundary:** This is E3/E5 durability and truthful reconciliation
 behavior, not proof of safe replay of unknown external effects or complete
 service/container acceptance. Full E0–E6 gates and exact-revision CI remain open.
+
+### E4 current provider-binding and adapter disappearance gate (2026-11-03)
+
+This batch consolidates the still-useful E4 provider migration differences
+from overlapping historical PRs #104 and #110 on top of current `main`.
+The read-only catalog/adapter crosswalk now distinguishes a **previously
+registered** `tool.*` provider whose adapter, immutable manifest or versioned
+argv contract has drifted (`stale_binding`) from a binding that is **currently
+eligible for resolution**. Each row exposes `previously_bound`,
+`binding_current`, `bound_provider_id` and the originally registered
+manifest fingerprint. A stale row is never counted as `v2_provider_bound`.
+Audits neither reload nor enable providers and never approve or execute tasks.
+
+Crucially, `CatalogAdapterProvider.resolve_task()` also checks the live
+adapter registration before dispatch; an installed binary and a historical
+manifest are not permission to dispatch a missing adapter. This addresses
+an E4 migration/cutover safety requirement rather than adding a new tool or
+transport. Tests cover adapter removal, registry-manifest removal and argv
+drift, preserving the original trusted registry digest. Existing live
+provider selection and immutable-plan approval remain independent gates.
+
+**Still open:** exhaustive catalog/CLI/API/supplied UI control/transport
+migration crosswalk, external-provider lab equivalence, and the explicit
+legacy-autochain cutover decision. No E4 phase acceptance is asserted.

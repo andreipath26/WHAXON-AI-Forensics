@@ -31,10 +31,12 @@ def test_findings_page_loads(page, live_server):
     page.goto(f"{live_server}/ui")
     page.click('.sb-item[data-page="findings"]')
     page.wait_for_selector("#findings-tbody", timeout=5000)
-    # The seeded store has 3 findings, so the tbody should have rows.
+    # The tbody is initially rendered with a single loading/empty row.
+    # Wait for the seeded findings rather than mistaking that placeholder
+    # for completed asynchronous data loading.
     page.wait_for_function(
-        "() => document.querySelectorAll('#findings-tbody tr').length > 0",
-        timeout=5000,
+        "() => document.querySelectorAll('#findings-tbody tr').length >= 3",
+        timeout=15000,
     )
     rows = page.locator("#findings-tbody tr")
     assert rows.count() >= 3

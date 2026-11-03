@@ -1317,9 +1317,9 @@ def test_e4_catalog_audit_does_not_claim_bound_after_catalog_drift(monkeypatch):
     # argv contract until a deliberately reviewed provider is reloaded.
     tool.args = ["--new-argv"]
     report = router.portfolio_audit()
-    assert report["rows"][0]["state"] == "unbound"
+    assert report["rows"][0]["state"] == "stale_binding"
     assert report["rows"][0]["v2_provider_bound"] is False
-    assert report["rows"][0]["reason"] == "catalog_or_binding_changed"
+    assert report["rows"][0]["reason"] == "catalog_contract_changed"
     assert report["execution_enabled_by_audit"] is False
 
 
@@ -1340,6 +1340,6 @@ def test_e4_catalog_audit_does_not_claim_bound_after_registry_drift(monkeypatch)
 
     monkeypatch.setattr(registry, "list", lambda _capability=None: [])
     report = router.portfolio_audit()
-    assert report["rows"][0]["state"] == "unbound"
+    assert report["rows"][0]["state"] == "stale_binding"
     assert report["rows"][0]["v2_provider_bound"] is False
     assert report["execution_enabled_by_audit"] is False
