@@ -455,3 +455,64 @@ def test_e5_submission_advertises_reconnect_snapshot_without_execution_claim(
     assert duplicate.status_code == 202
     assert duplicate.get_json()["run_request_id"] == body["run_request_id"]
     assert core.workflow_run_queue_summary()["total"] == 1
+
+
+def test_e5_cancelled_intent_stays_cancelled_across_api_restart(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+    client = app.test_client()
+    accepted = client.post("/api/v2/workflows/p/run", json={})
+    assert accepted.status_code == 202
+    run_id = accepted.get_json()["run_request_id"]
+    cancelled = client.post("/api/v2/workflows/p/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.get_json()["external_effects_stopped"] is False
+    assert core.workflow_run_request(run_id)["status"] == "cancelled"
+
+    restarted = Core(tmp_path)
+    second = create_app(
+        restarted, JobRegistry(restarted), AsyncRunner(restarted),
+    )
+    second.config["TESTING"] = True
+    snapshot = second.test_client().get(
+        f"/api/v2/workflow-runs/{run_id}/snapshot"
+    )
+    assert snapshot.status_code == 200
+    assert snapshot.get_json()["request"]["status"] == "cancelled"
+    assert snapshot.get_json()["automatic_uncertain_replay"] is False
+    assert restarted.workflow_requests.claim("replacement-worker") is None
+
+
+def test_e5_lease_loss_visible_after_reconnect_without_credential_leak(tmp_path):
+    core = _core(tmp_path)
+    queued = core.enqueue_workflow_run("p")
+    claimed = core.workflow_requests.claim("lost-worker")
+    assert claimed is not None
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=1 WHERE id=?",
+            (queued["id"],),
+        )
+    finally:
+        conn.close()
+    restarted = Core(tmp_path)
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=120) == 1
+    app = create_app(
+        restarted, JobRegistry(restarted), AsyncRunner(restarted),
+    )
+    app.config["TESTING"] = True
+    result = app.test_client().get(
+        f"/api/v2/workflow-runs/{queued['id']}/snapshot"
+    )
+    assert result.status_code == 200
+    data = result.get_json()
+    assert data["request"]["status"] == "uncertain"
+    assert "lease_token" not in data["request"]
+    assert claimed["lease_token"] not in str(data)
+    assert data["automatic_uncertain_replay"] is False
+    assert restarted.workflow_requests.claim("replacement-worker") is None

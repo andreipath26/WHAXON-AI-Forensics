@@ -75,3 +75,12 @@ new work. A stop signal exits between bounded passes. This is recovery
 bookkeeping only: no uncertain request is automatically re-executed.
 The worker still requires exact-head CI and multi-process adversarial
 acceptance before E5-D can close.
+
+
+### Cancellation and lease-loss reconnect tests
+
+The cross-process API acceptance suite now exercises queued cancellation,
+durable cancellation after Core restart, stale-worker reconciliation, and
+credential-free inspection of an uncertain request. These tests require
+execution and exact-head CI evidence; their presence alone does not close
+E5-C or E5-D.
