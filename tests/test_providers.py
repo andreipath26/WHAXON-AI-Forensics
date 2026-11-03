@@ -364,3 +364,68 @@ def test_engine_v2_scope_revocation_from_another_process_takes_effect(tmp_path):
     assert core.authorize_workflow_task(task) is False
     scope_path.write_text("{invalid", encoding="utf-8")
     assert core.authorize_workflow_task(task) is False
+
+
+@pytest.mark.parametrize("target, expected", [
+    ("192.0.2.10", "ip"),
+    ("2001:db8::1", "ip"),
+    ("lab.example", "hostname"),
+    ("https://lab.example/path", "url"),
+])
+def test_catalog_target_type_classification_is_pure(target, expected):
+    from whaxon.core.providers import _target_type
+    assert _target_type(target) == expected
+
+
+@pytest.mark.parametrize("target", [
+    "", " lab.example", "lab.example/path", "user@lab.example",
+    "https://user:secret@lab.example/", "https://lab.example/#fragment",
+    "ftp://lab.example/", "lab.example?query=1",
+])
+def test_catalog_target_type_rejects_ambiguous_or_credential_targets(target):
+    from whaxon.core.providers import _target_type
+    with pytest.raises(ValueError):
+        _target_type(target)
+
+
+def test_catalog_provider_rejects_unbound_registry_provider_without_dispatch(monkeypatch):
+    import asyncio
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(), registry=registry,
+    )
+    # Higher-readiness third-party provider cannot be used as a catalog adapter.
+    registry.register(CapabilityManifest(
+        capability_id="tool.nmap", provider_id="other.provider",
+        provider_version="1", transports=("local_process",),
+        target_types=("ip",), readiness="end_to_end_verified",
+    ))
+    result = asyncio.run(provider.dispatch(WorkflowTask("scan", "tool.nmap", "192.0.2.10")))
+    assert result["tool_id"] == "nmap"
+    assert len(runner.calls) == 1
+
+
+def test_catalog_provider_rejects_unsupported_target_type_before_dispatch(monkeypatch):
+    import asyncio
+    import whaxon.adapters
+    from whaxon.core.capabilities import CapabilityUnavailable
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    registry = CapabilityRegistry()
+    runner = _Runner()
+    CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(), registry=registry,
+    )
+    # Explicit resolver contract: a provider limited to hostnames must not
+    # match a URL task, even when the capability identifier is identical.
+    manifest = registry.list("tool.nmap")[0]
+    with pytest.raises(CapabilityUnavailable):
+        registry.resolve("tool.nmap", __import__(
+            "whaxon.core.capabilities", fromlist=["CapabilityRequirements"]
+        ).CapabilityRequirements(target_type="unsupported-target"))
+    assert runner.calls == []
