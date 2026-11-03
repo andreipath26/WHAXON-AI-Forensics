@@ -206,3 +206,83 @@ def test_e4_semantic_evidence_proposes_only_pinned_semantic_followup():
         binding = proposal.plan.metadata["provider_bindings"][task.id]
         assert binding["provider_id"] == "trusted.semantic.web"
         assert binding["manifest_fingerprint"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("sources", "tool.nmap", "source identities"),
+        ("sources", ("",), "source identities"),
+        ("sources", ("tool.nmap", None), "source identities"),
+        ("ports", [443], "port"),
+        ("ports", (True,), "port"),
+        ("services", "https", "service names"),
+        ("services", (None,), "service names"),
+        ("id", 123, "identity"),
+        ("finding_kind", None, "identity"),
+    ],
+)
+def test_e4_rule_contract_rejects_ambiguous_or_malformed_inputs(
+    field, value, message,
+):
+    """No string membership aliases or malformed matching rules are admitted."""
+    fields = {
+        "id": "web.v1",
+        "sources": ("tool.nmap",),
+        "finding_kind": "open_port",
+        "capability_id": "tool.nikto",
+        "target_mode": "http_origin",
+        "ports": (443,),
+        "services": ("https",),
+    }
+    fields[field] = value
+    with pytest.raises(ValueError, match=message):
+        FollowupRule(**fields)
+
+
+def test_e4_source_match_requires_exact_capability_identity():
+    rule = FollowupRule(
+        "web.v1", ("tool.nmap",), "open_port",
+        "tool.nikto", "http_origin", ports=(443,),
+    )
+    finding = {"kind": "open_port", "data": {"port": 443}}
+    assert rule.match("tool.nmap", finding)
+    assert not rule.match("tool.nma", finding)
+    assert not rule.match("tool.nmap.extra", finding)
+
+
+def test_e4_followup_planner_blocks_resolver_manifest_drift():
+    """Resolver identity cannot drift after the planner selects its provider."""
+    class DriftingProvider(Provider):
+        def resolve_task(self, task, *, require_installed=False):
+            from whaxon.core.capabilities import CapabilityManifest
+
+            incompatible = CapabilityManifest(
+                "tool.nikto", "untrusted.replacement", "1",
+                ("local_process",), target_types=("url",),
+                permissions=("network.scan",), impact="moderate",
+            )
+            return SimpleNamespace(manifest=incompatible)
+
+    proposal = planner(provider=DriftingProvider()).propose("source")
+    assert proposal.plan is None
+    assert proposal.plan_id is None
+    assert proposal.blocked
+    assert all(
+        entry["reason"] == "provider_or_scope_blocked"
+        for entry in proposal.blocked
+    )
+
+
+def test_e4_followup_planner_rejects_missing_or_wrong_resolver_contract():
+    class MissingIdentityProvider(Provider):
+        def resolve_task(self, task, *, require_installed=False):
+            return SimpleNamespace()
+
+    proposal = planner(provider=MissingIdentityProvider()).propose("source")
+    assert proposal.plan is None
+    assert proposal.blocked
+    assert all(
+        entry["error_type"] == "AttributeError"
+        for entry in proposal.blocked
+    )
