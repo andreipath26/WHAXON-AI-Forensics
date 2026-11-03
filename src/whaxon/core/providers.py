@@ -366,6 +366,14 @@ class CatalogAdapterProvider:
                 "catalog executable/argv changed since provider registration",))
         if getattr(tool, "transport", "cli") != "cli":
             raise CapabilityUnavailable(task.capability_id, ("local transport unavailable",))
+        # Adapter registration can change after provider startup. An old
+        # manifest is not authorization to dispatch a missing adapter.
+        from ..adapters import get_adapter
+
+        if get_adapter(tool.id) is None:
+            raise CapabilityUnavailable(
+                task.capability_id, ("bound tool adapter is no longer registered",),
+            )
         target_type = _target_type(task.target)
         if tool.id == "ffuf" and target_type == "url" and urlsplit(task.target).query:
             raise CapabilityUnavailable(task.capability_id, (
