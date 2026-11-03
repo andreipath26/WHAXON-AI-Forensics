@@ -23,18 +23,18 @@ def test_audit_cli_snapshot_and_verify_use_same_core_state(tmp_path, capsys):
     core = _seed(tmp_path)
     from_core = core.workflow_audit_snapshot("plan")
     args = ["--data-dir", str(tmp_path), "plan"]
-    assert workflow_cmd.main(args + ["audit-snapshot", "--id", "plan"]) == 0
+    assert workflow_cmd.main([*args, "audit-snapshot", "--id", "plan"]) == 0
     from_cli = json.loads(capsys.readouterr().out)
     assert from_cli == from_core
     assert from_cli["independent_anchor_verified"] is False
-    assert workflow_cmd.main(args + [
+    assert workflow_cmd.main([*args,
         "audit-verify", "--id", "plan",
         "--expected-digest", from_core["digest"],
     ]) == 0
     accepted = json.loads(capsys.readouterr().out)
     assert accepted["digest_matches_reference"] is True
     assert accepted["independent_anchor_verified"] is False
-    assert workflow_cmd.main(args + [
+    assert workflow_cmd.main([*args,
         "audit-verify", "--id", "plan",
         "--expected-digest", "0" * 64,
     ]) == 1
