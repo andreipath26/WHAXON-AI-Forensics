@@ -1294,3 +1294,58 @@ def test_semantic_operation_rejects_changed_registry_manifest(monkeypatch):
     ))
     with pytest.raises(CapabilityUnavailable, match="semantic provider manifest changed"):
         semantic.resolve_task(task)
+
+
+def test_e4_portfolio_audit_detects_stale_catalog_contract_without_rebinding(monkeypatch):
+    """A changed binary/argv contract may not keep a truthful 'bound' label."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    tool = _tool("nmap")
+    catalog = _Catalog([tool])
+    registry = CapabilityRegistry()
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(), registry=registry,
+    )
+    router = BoundProviderRouter((provider,))
+    before = registry.digest
+    original = router.portfolio_audit()["rows"][0]
+    assert original["state"] == "bound"
+    assert original["bound_provider_id"] == "whaxon.adapter.nmap"
+    assert original["bound_manifest_fingerprint"]
+
+    tool.args = ["--altered"]
+    stale = router.portfolio_audit()
+    row = stale["rows"][0]
+    assert row["state"] == "stale_binding"
+    assert row["reason"] == "catalog_contract_changed"
+    assert row["v2_provider_bound"] is True
+    assert row["bound_manifest_fingerprint"] == original["bound_manifest_fingerprint"]
+    assert stale["summary"]["stale_binding"] == 1
+    assert stale["execution_enabled_by_audit"] is False
+    assert registry.digest == before
+
+
+def test_e4_portfolio_audit_marks_disappeared_adapter_stale_without_dispatch(monkeypatch):
+    """A registered provider is not healthy when its adapter is no longer present."""
+    import whaxon.adapters
+    from whaxon.core.providers import BoundProviderRouter
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda _id: object())
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: ["nmap"])
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool("nmap")]), runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    router = BoundProviderRouter((provider,))
+    assert router.portfolio_audit()["rows"][0]["state"] == "bound"
+
+    monkeypatch.setattr(whaxon.adapters, "list_adapters", lambda: [])
+    snapshot = router.portfolio_audit()
+    assert snapshot["rows"][0]["state"] == "stale_binding"
+    assert snapshot["rows"][0]["reason"] == "registered_adapter_disappeared"
+    assert snapshot["rows"][0]["adapter_registered"] is False
+    assert snapshot["summary"]["stale_binding"] == 1
+    assert snapshot["execution_enabled_by_audit"] is False
