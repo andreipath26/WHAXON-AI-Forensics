@@ -122,3 +122,57 @@ def test_continuous_worker_quickly_handles_stop_with_long_poll(tmp_path):
         time.sleep(0.1)
         stop.set()
         assert future.result(timeout=3) == 0
+
+
+
+def test_killed_worker_request_requires_reconciliation_before_replay(tmp_path):
+    """A real child-process termination cannot silently requeue an effect."""
+    import subprocess
+    import sys
+    import time
+
+    primary = _core(tmp_path)
+    request = primary.enqueue_workflow_run("p")
+    marker = tmp_path / "claimed.txt"
+    program = """
+import sys
+import time
+from pathlib import Path
+from whaxon.core import Core
+core = Core(Path(sys.argv[1]))
+claim = core.workflow_requests.claim("separate-process")
+if claim is None:
+    raise SystemExit(3)
+Path(sys.argv[2]).write_text(claim["id"], encoding="utf-8")
+time.sleep(60)
+"""
+    proc = subprocess.Popen(
+        [sys.executable, "-c", program, str(tmp_path), str(marker)],
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+    )
+    try:
+        deadline = time.monotonic() + 15
+        while not marker.exists() and proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert marker.exists(), "child worker did not claim the request"
+        assert marker.read_text(encoding="utf-8") == request["id"]
+        assert primary.workflow_run_request(request["id"])["status"] == "running"
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+        proc.communicate(timeout=10)
+
+    restarted = Core(tmp_path)
+    assert restarted.workflow_requests.claim("restarted-worker") is None
+    # Advance the stale-lease clock instead of waiting out a real timeout.
+    conn = restarted.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=? WHERE id=?",
+            (time.time() - 500, request["id"]),
+        )
+    finally:
+        conn.close()
+    assert restarted.workflow_requests.reconcile_stale(older_than_s=60) == 1
+    assert restarted.workflow_run_request(request["id"])["status"] == "uncertain"
+    assert restarted.workflow_requests.claim("restarted-worker") is None
