@@ -380,3 +380,14 @@ def test_v2_evidence_api_rejects_bad_bounds_and_unknown_plans(tmp_path, monkeypa
     )))
     for limit in ("0", "-1", "1001", "invalid"):
         assert client.get(f"/api/v2/workflows/p/evidence?limit={limit}").status_code == 400
+
+
+def test_provider_and_capability_api_share_core_inventory(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    response = client.get("/api/v2/providers")
+    assert response.status_code == 200
+    assert response.get_json() == core.capability_inventory()
+    manifests = client.get("/api/v2/capabilities")
+    assert manifests.status_code == 200
+    assert manifests.get_json() == [item.to_dict() for item in core.capabilities.list()]
+    assert all("readiness" in item for item in response.get_json())

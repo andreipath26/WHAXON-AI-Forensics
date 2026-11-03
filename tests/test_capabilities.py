@@ -170,3 +170,62 @@ def test_resolver_rejects_unsupported_provider_versions():
     assert registry.resolve("network.port_scan", CapabilityRequirements(
         allowed_versions=("1.0.0",),
     )).manifest.provider_version == "1.0.0"
+
+
+def test_resolver_enforces_manifest_fingerprint_and_side_effect_allowlist():
+    import pytest
+
+    registry = CapabilityRegistry()
+    manifest = _manifest(
+        "provider.a", permissions=("network.scan",),
+        side_effects=("network_traffic", "target_logs"),
+    )
+    registry.register(manifest)
+    for constraints in (
+        CapabilityRequirements(allowed_side_effects=()),
+        CapabilityRequirements(allowed_side_effects=("network_traffic",)),
+        CapabilityRequirements(allowed_fingerprints=("0" * 64,)),
+    ):
+        with pytest.raises(CapabilityUnavailable):
+            registry.resolve("network.port_scan", constraints)
+    selected = registry.resolve(
+        "network.port_scan",
+        CapabilityRequirements(
+            allowed_side_effects=("network_traffic", "target_logs"),
+            allowed_fingerprints=(manifest.fingerprint,),
+        ),
+    )
+    assert selected.manifest.fingerprint == manifest.fingerprint
+
+
+def test_manifest_collection_contract_rejects_scalar_strings():
+    import pytest
+
+    with pytest.raises(ValueError, match="array"):
+        CapabilityManifest(capability_id="test", provider_id="invalid", provider_version="v1", transports=("local_process",), target_types="ip")
+    with pytest.raises(ValueError, match="transport"):
+        CapabilityManifest(
+            capability_id="test", provider_id="invalid", provider_version="v1",
+            transports="local_process",
+        )
+    registry = CapabilityRegistry()
+    registry.register(_manifest("provider.a"))
+    with pytest.raises(ValueError, match="allowlists"):
+        registry.resolve("network.port_scan", CapabilityRequirements(
+            allowed_versions="1.0.0",
+        ))
+
+
+def test_registry_digest_changes_only_for_new_persisted_manifests(tmp_path):
+    from whaxon.core.store import JobStore
+
+    store = JobStore(tmp_path / "provider-revisions.db")
+    registry = CapabilityRegistry(store)
+    first = _manifest("provider.one")
+    registry.register(first)
+    digest = registry.digest
+    registry.register(first)
+    assert registry.digest == digest
+    registry.register(_manifest("provider.two"))
+    assert registry.digest != digest
+    assert CapabilityRegistry(store).digest == registry.digest

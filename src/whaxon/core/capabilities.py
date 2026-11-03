@@ -88,7 +88,7 @@ class CapabilityManifest:
         ):
             if not _IDENTIFIER.fullmatch(value):
                 raise ValueError(f"invalid {name}: {value!r}")
-        if not self.transports or any(not item for item in self.transports):
+        if not isinstance(self.transports, (list, tuple)) or not self.transports:
             raise ValueError("at least one execution transport is required")
         if self.readiness not in _READINESS:
             raise ValueError(f"unsupported readiness level: {self.readiness}")
@@ -100,8 +100,11 @@ class CapabilityManifest:
             "transports", "target_types", "protocols", "platforms", "auth_methods",
             "permissions", "side_effects", "limitations",
         ):
-            values = tuple(getattr(self, name))
-            if len(values) != len(set(values)) or any(not item for item in values):
+            original = getattr(self, name)
+            if not isinstance(original, (list, tuple)):
+                raise ValueError(f"{name} must be an array")
+            values = tuple(original)
+            if any(not isinstance(item, str) or not item for item in values) or len(values) != len(set(values)):
                 raise ValueError(f"{name} must contain unique non-empty values")
             object.__setattr__(self, name, values)
         if not isinstance(self.input_schema, dict) or not isinstance(self.output_schema, dict):
@@ -150,6 +153,8 @@ class CapabilityRequirements:
     required_input_schema: dict[str, Any] | None = None
     required_output_schema: dict[str, Any] | None = None
     allowed_versions: tuple[str, ...] = ()
+    allowed_fingerprints: tuple[str, ...] = ()
+    allowed_side_effects: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -226,6 +231,14 @@ class CapabilityRegistry:
         for schema in (requirements.required_input_schema, requirements.required_output_schema):
             if schema is not None and not isinstance(schema, dict):
                 raise TypeError("required schemas must be objects")
+        if requirements.allowed_side_effects is not None and (
+            not isinstance(requirements.allowed_side_effects, (tuple, list))
+            or any(not isinstance(item, str) for item in requirements.allowed_side_effects)
+        ):
+            raise ValueError("allowed_side_effects must be a string sequence")
+        for values in (requirements.allowed_versions, requirements.allowed_fingerprints, requirements.allowed_providers):
+            if not isinstance(values, (tuple, list)) or any(not isinstance(item, str) for item in values):
+                raise ValueError("provider allowlists must be string sequences")
         candidates = self.list(capability_id)
         rejected: list[str] = []
         eligible: list[CapabilityManifest] = []
@@ -237,6 +250,10 @@ class CapabilityRegistry:
                 reason = f"{manifest.provider_id}: provider is not allowlisted"
             elif requirements.allowed_versions and manifest.provider_version not in requirements.allowed_versions:
                 reason = f"{manifest.provider_id}: provider version is not allowlisted"
+            elif requirements.allowed_fingerprints and manifest.fingerprint not in requirements.allowed_fingerprints:
+                reason = f"{manifest.provider_id}: manifest fingerprint is not allowlisted"
+            elif requirements.allowed_side_effects is not None and not set(manifest.side_effects).issubset(requirements.allowed_side_effects):
+                reason = f"{manifest.provider_id}: side effects exceed the allowed set"
             elif not set(requirements.required_permissions).issubset(manifest.permissions):
                 reason = f"{manifest.provider_id}: required permissions are not declared"
             elif requirements.maximum_impact and (

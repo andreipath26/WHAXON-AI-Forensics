@@ -45,6 +45,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("capabilities", help="list registered Engine v2 capabilities")
+    commands.add_parser("providers", help="inspect live provider readiness")
 
     mission = commands.add_parser("mission", help="manage missions")
     mission_commands = mission.add_subparsers(dest="mission_command", required=True)
@@ -192,6 +193,9 @@ def main(args: list[str] | None = None) -> int:
         if options.command == "capabilities":
             capability_result = [manifest.to_dict() for manifest in core.capabilities.list()]
             print(json.dumps(capability_result, indent=2, sort_keys=True))
+            return 0
+        if options.command == "providers":
+            print(json.dumps(core.capability_inventory(), indent=2, sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "cost-limit":
             core.configure_mission_cost_limit(
