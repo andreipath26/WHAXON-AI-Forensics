@@ -687,3 +687,11 @@ persistent state availability and the service's restricted writable path
 without granting the worker root privileges or allowing a second queue store.
 This is configuration-level verification, not a claim that systemd has
 actually launched both units on a supported target host.
+
+**Cross-phase CI corrections on this candidate:** The sdist exclusion
+no longer strips the installed web service unit required by wheel
+force-inclusion. The hard-kill crash-test marker is published atomically
+before its parent asserts its contents. Late asynchronous reference
+approval buttons are denied after insertion unless they belong to the
+real live-approval panel; no demo operation is enabled or UI restyled.
+These are exact-head CI corrections, not a full E3/E6 acceptance claim.

@@ -580,7 +580,16 @@ Authorization: Bearer redacted_token_sess_089
    status.textContent="Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).";
   }catch(error){status.textContent="Emergency halt failed: "+error.message;}
  });
- document.querySelectorAll("main button").forEach(button=>{if(panel.contains(button))return;button.removeAttribute("onclick");button.disabled=true;button.setAttribute("aria-disabled","true");button.title="Unavailable: this approval action is not connected to a live WHAXON workflow.";});
+ const disableReferenceAction=button=>{if(panel.contains(button))return;button.removeAttribute("onclick");button.disabled=true;button.setAttribute("aria-disabled","true");button.title="Unavailable: this approval action is not connected to a live WHAXON workflow.";};
+ document.querySelectorAll("main button").forEach(disableReferenceAction);
+ // Fence reference buttons inserted asynchronously after the live panel loads.
+ new MutationObserver(records=>{
+  for(const record of records)for(const node of record.addedNodes){
+   if(node.nodeType!==1||panel.contains(node))continue;
+   if(node.matches?.("button"))disableReferenceAction(node);
+   node.querySelectorAll?.("button").forEach(disableReferenceAction);
+  }
+ }).observe(main,{childList:true,subtree:true});
  document.querySelectorAll("main [onclick]").forEach(node=>{if(panel.contains(node))return;node.removeAttribute("onclick");node.setAttribute("aria-disabled","true");node.setAttribute("tabindex","-1");node.style.pointerEvents="none";node.style.cursor="default";});
  refreshButton.addEventListener("click",()=>loadPending());
  const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165/i;

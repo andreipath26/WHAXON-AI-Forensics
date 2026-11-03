@@ -147,6 +147,5 @@ exclude = [
     "docker-compose.yml",
     "Dockerfile",
     "Makefile",
-    "whaxon.service",
     ".env.example",
 ]

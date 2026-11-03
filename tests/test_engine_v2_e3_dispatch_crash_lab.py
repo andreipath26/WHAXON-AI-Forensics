@@ -28,7 +28,9 @@ store = JobStore(Path(sys.argv[1]))
 marker = Path(sys.argv[2])
 
 def may_have_effects(task):
-    marker.write_text(task.id, encoding="utf-8")
+    complete = marker.with_name(marker.name + ".writing")
+    complete.write_text(task.id, encoding="utf-8")
+    complete.replace(marker)
     time.sleep(60)
     return {"success": True}
 
