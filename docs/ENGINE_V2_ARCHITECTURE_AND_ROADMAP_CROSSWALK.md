@@ -695,3 +695,9 @@ before its parent asserts its contents. Late asynchronous reference
 approval buttons are denied after insertion unless they belong to the
 real live-approval panel; no demo operation is enabled or UI restyled.
 These are exact-head CI corrections, not a full E3/E6 acceptance claim.
+
+**CI scope correction (E6/G08):** The legacy `test_web_smoke`
+findings-page assertion is a route/DOM smoke test and no longer depends
+on the exact count of mutable session-scoped seeded findings. Source
+and API/behavior acceptance tests still own true finding-count and
+evidence correctness. This does **not** accept E6 supplied UI controls.

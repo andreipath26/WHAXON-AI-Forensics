@@ -69,3 +69,16 @@ def test_both_service_units_are_in_release_artifact_manifests():
         assert unit in sdist
         assert wheel[unit] == f"whaxon/data/systemd/{unit}"
         assert (ROOT / unit).is_file()
+
+
+def test_systemd_units_require_operator_activated_supervision():
+    web = _unit("whaxon.service")["Service"]
+    worker = _unit("whaxon-workflow-worker.service")["Service"]
+    # The systemd worker is independently installed/enabled by the operator.
+    # Neither the web entry point nor a wheel install automatically starts
+    # an unsupervised worker or bypasses the durable queue.
+    assert "serve-requests" not in web["ExecStart"]
+    assert worker["ExecStart"].endswith(
+        "workflow plan serve-requests --poll-interval 1 --max-runs-per-batch 20"
+    )
+    assert worker["Restart"] == "on-failure"
