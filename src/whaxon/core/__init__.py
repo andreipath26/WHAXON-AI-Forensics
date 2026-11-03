@@ -311,7 +311,8 @@ class Core:
     def workflow_run_request(self, request_id: str):
         return self.workflow_requests.get(request_id)
 
-    async def drain_workflow_run_requests(self, *, max_runs: int = 20) -> int:
+    async def drain_workflow_run_requests(self, *, max_runs: int = 20,
+                                          initialized: bool = False) -> int:
         """Claim persistent V2 run requests; never replay uncertain executions.
 
         A CLI, headless daemon or web service can call this after restart.
@@ -322,7 +323,8 @@ class Core:
 
         if type(max_runs) is not int or not 1 <= max_runs <= 100:
             raise ValueError("max_runs must be between 1 and 100")
-        await self.initialize(drain=False)
+        if not initialized:
+            await self.initialize(drain=False)
         self.workflow_requests.reconcile_stale()
         owner = "workflow-run-worker-" + uuid.uuid4().hex
         processed = 0
@@ -361,6 +363,43 @@ class Core:
                 )
             processed += 1
         return processed
+
+    async def serve_workflow_run_requests(
+        self, stop_event, *, poll_interval_s: float = 1.0,
+        max_runs_per_batch: int = 20,
+    ) -> int:
+        """Continuously service durable V2 intents until graceful stop.
+
+        stop_event is a threading.Event, so foreground services can handle
+        SIGTERM/SIGINT without assuming they own the asyncio event loop.
+        A stop signal prevents new claims after the current batch, without
+        falsely claiming that an in-flight external operation stopped.
+        """
+        import asyncio
+        import math
+
+        if isinstance(poll_interval_s, bool) or not isinstance(
+            poll_interval_s, (int, float)
+        ) or not math.isfinite(poll_interval_s) or not 0.05 <= poll_interval_s <= 3600:
+            raise ValueError("poll interval must be finite and in [0.05, 3600]")
+        if type(max_runs_per_batch) is not int or not 1 <= max_runs_per_batch <= 100:
+            raise ValueError("max_runs_per_batch must be in range 1..100")
+        if not callable(getattr(stop_event, "is_set", None)):
+            raise TypeError("stop_event must expose is_set()")
+        await self.initialize(drain=False)
+        total = 0
+        while not stop_event.is_set():
+            total += await self.drain_workflow_run_requests(
+                max_runs=max_runs_per_batch, initialized=True,
+            )
+            # Check shutdown at least every 250 ms even if configured
+            # polling is long. Do not terminate in-flight task executions.
+            remaining = float(poll_interval_s)
+            while remaining > 0 and not stop_event.is_set():
+                delay = min(remaining, 0.25)
+                await asyncio.sleep(delay)
+                remaining -= delay
+        return total
 
     def capability_inventory(self):
         """Return truthful live provider readiness without changing manifests."""

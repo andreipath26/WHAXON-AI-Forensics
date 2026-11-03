@@ -177,6 +177,11 @@ def _parser() -> argparse.ArgumentParser:
     limits.add_argument("--max-total-attempts", type=int, required=True)
     limits.add_argument("--max-concurrency", type=int, required=True)
 
+    service = plan_commands.add_parser(
+        "serve-requests", help="continuously process durable V2 run requests",
+    )
+    service.add_argument("--poll-interval", type=float, default=1.0)
+    service.add_argument("--max-runs-per-batch", type=int, default=20)
     drain = plan_commands.add_parser(
         "drain-requests", help="claim queued V2 workflow requests after restart",
     )
@@ -395,6 +400,29 @@ def main(args: list[str] | None = None) -> int:
                 return 1
             print(json.dumps(state, indent=2, sort_keys=True))
             return 0
+        if options.command == "plan" and options.plan_command == "serve-requests":
+            import signal
+
+            stop = threading.Event()
+            previous = {}
+            def _stop(_signum, _frame):
+                stop.set()
+
+            try:
+                for sig in (signal.SIGINT, signal.SIGTERM):
+                    previous[sig] = signal.getsignal(sig)
+                    signal.signal(sig, _stop)
+                total = _run_async(core.serve_workflow_run_requests(
+                    stop,
+                    poll_interval_s=options.poll_interval,
+                    max_runs_per_batch=options.max_runs_per_batch,
+                ))
+                print(json.dumps({"processed_requests": total, "stopped": True},
+                                 sort_keys=True))
+                return 0
+            finally:
+                for sig, old in previous.items():
+                    signal.signal(sig, old)
         if options.command == "plan" and options.plan_command == "drain-requests":
             count = _run_async(core.drain_workflow_run_requests(max_runs=options.max_runs))
             print(json.dumps({"processed_requests": count}, sort_keys=True))
