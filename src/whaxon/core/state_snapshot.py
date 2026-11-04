@@ -111,7 +111,8 @@ def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
                 continue
             target = stage / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(source.read_bytes())
+            # Stream large evidence instead of loading it entirely into RAM.
+            shutil.copyfile(source, target)
             target.chmod(0o600)
         with (
             closing(sqlite3.connect(f"file:{state_dir / _DB}?mode=ro", uri=True)) as db_source,
@@ -159,7 +160,8 @@ def restore_offline_snapshot(snapshot: Path, destination: Path, *,
                 continue
             target = stage / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(source.read_bytes())
+            # Stream large evidence instead of loading it entirely into RAM.
+            shutil.copyfile(source, target)
             target.chmod(0o600)
         _validate_database(stage / _DB)
         os.replace(stage, destination)

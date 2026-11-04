@@ -157,3 +157,15 @@ workflow result. This strengthens E5-D beyond thread-only tests. It uses an
 unsupported fixture capability, **never** an actual scanner or target. The
 whole gate remains OPEN until exact-head CI and wider failure injection,
 restart and recovery evidence are accepted.
+
+### E5 offline recovery verification expansion (pending exact-head CI)
+
+A full-state restore regression now preserves a previously claimed request,
+forces an expired lease after restore, and requires the outcome to become
+`uncertain`. The restored worker cannot reclaim or mark that external effect
+completed using the old fencing token. Scope and binary evidence are checked
+alongside the same persisted run identity. Separate tests reject missing and
+unexpected snapshot files. Evidence copies use bounded-memory streaming.
+This does **not** simulate an actual power loss, prove host quiescence, establish
+external evidence authenticity, or close E5-D/E5-E without the required
+real-service recovery acceptance.

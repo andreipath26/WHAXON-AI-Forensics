@@ -1,5 +1,6 @@
 """E5 cold state recovery includes evidence/config and rejects tampering."""
 import sqlite3
+import time
 from pathlib import Path
 
 import pytest
@@ -127,3 +128,60 @@ def test_e5_snapshot_rejects_broken_database(tmp_path):
     with pytest.raises(sqlite3.DatabaseError):
         create_offline_snapshot(root, tmp_path / "snapshot")
     assert not (tmp_path / "snapshot").exists()
+
+
+def test_e5_full_state_restore_fences_inflight_worker_without_automatic_replay(tmp_path):
+    original = tmp_path / "original"
+    original.mkdir()
+    request = _make_state(original)
+    source = Core(original)
+    claimed = source.workflow_requests.claim("worker-before-crash")
+    assert claimed is not None and claimed["id"] == request["id"]
+    conn = source.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=? WHERE id=?",
+            (time.time() - 500, request["id"]),
+        )
+    finally:
+        conn.close()
+    backup = tmp_path / "snapshot"
+    created = create_offline_snapshot(original, backup)
+    recovered_dir = tmp_path / "recovered"
+    restore_offline_snapshot(
+        backup, recovered_dir,
+        expected_manifest_sha256=created["manifest_sha256"],
+    )
+    recovered = Core(recovered_dir)
+    assert recovered.workflow_run_request(request["id"])["status"] == "running"
+    assert recovered.workflow_requests.reconcile_stale(older_than_s=60) == 1
+    state = recovered.workflow_run_request(request["id"])
+    assert state["status"] == "uncertain"
+    assert "lease_token" not in state
+    assert recovered.workflow_requests.claim("worker-after-restore") is None
+    assert not recovered.workflow_requests.finish(
+        request["id"], claimed["lease_token"], status="completed",
+    )
+    assert (recovered_dir / "scope.json").read_bytes() == (
+        original / "scope.json"
+    ).read_bytes()
+    assert (recovered_dir / "evidence" / "proof.bin").read_bytes() == (
+        original / "evidence" / "proof.bin"
+    ).read_bytes()
+
+
+def test_e5_snapshot_rejects_inventory_addition_or_missing_file(tmp_path):
+    original = tmp_path / "original"
+    original.mkdir()
+    _make_state(original)
+    first = tmp_path / "first"
+    create_offline_snapshot(original, first)
+    (first / "unexpected-artifact").write_bytes(b"unexpected")
+    with pytest.raises(ValueError, match="inventory mismatch"):
+        verify_offline_snapshot(first)
+    second = tmp_path / "second"
+    create_offline_snapshot(original, second)
+    (second / "evidence" / "proof.bin").unlink()
+    with pytest.raises(ValueError, match="inventory mismatch"):
+        restore_offline_snapshot(second, tmp_path / "should-not-exist")
+    assert not (tmp_path / "should-not-exist").exists()
