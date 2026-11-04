@@ -201,6 +201,7 @@ No unapproved real scanner or target execution, no externally retained immutable
 **Review source SHA:** `557311dfa12504b22c5d3f32da1f949ac6ae0abd` (all **12/12 GitHub CI jobs successful** in [run #41815823360](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41815823360)).
 **Environment:** CI Python 3.11–3.13 + macOS/Windows/Ubuntu setup, Linux headless, Ubuntu systemd supervised real service units installed from a wheel, paired Docker web+worker with a shared volume, approved inert unsupported-capability task, state restoration, E1 security regressions.
 **Reviewer:** engineering source/test/evidence reconciliation conducted in the E5 integration workflow; **no independent production-operator approval claimed**.
+**Independence boundary:** no independent external security audit or human production-operator authorization was performed by this engineering review; those remain mandatory at final integrated deployment.
 **Decision:** E5 engineering scope below is accepted as a **phase-freeze candidate** for the supported V2 durable lifecycle, **subject to final exact-PR-head CI and review/merge record**. The operator's existing E0–E9 phase-freeze policy permits separately recorded residual integrated-engine obligations, not false production readiness.
 
 | Gate | Bounded engineering decision | Residual obligation |
