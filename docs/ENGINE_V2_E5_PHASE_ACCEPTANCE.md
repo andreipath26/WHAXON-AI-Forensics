@@ -169,3 +169,29 @@ unexpected snapshot files. Evidence copies use bounded-memory streaming.
 This does **not** simulate an actual power loss, prove host quiescence, establish
 external evidence authenticity, or close E5-D/E5-E without the required
 real-service recovery acceptance.
+
+## Engineering exit review — 2026-11-04, E5 PR #124
+
+**Decision state:** ENGINEERING ACCEPTANCE CANDIDATE; **NOT YET FROZEN OR MERGED**.
+The implementation must pass exact-final-commit CI, and the reviewer must record
+the complete SHA, check results and explicit decision before phase freeze.
+Production release and final integrated Engine V2 deployment acceptance remain
+separate, open milestones under the roadmap's E0–E9 phase-freeze policy.
+
+### Whole-phase evidence and remaining boundaries
+
+| Gate | Source and evidence | Engineering assessment |
+|---|---|---|
+| E5-A — shared execution authority | `src/whaxon/interfaces/web/server.py` `WHAXON_V2_EXTERNAL_WORKER=1` prevents web-owned V2 draining; `Core.enqueue_workflow_run`, `WorkflowRunQueue.claim`, `whaxon workflow plan submit-run`; `tests/test_workflow_run_requests.py`; `docs/ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md`; Docker CI stops worker, tests HTTP 202 remains queued and starts worker separately | One durable **V2** queue authority in paired deployment is implemented. **Legacy direct CLI/web/AI execution has NOT migrated**. It remains an explicitly enumerated P2/E4 cross-phase and final integration obligation; do not claim platform-wide single authority |
+| E5-B — shared service model | Core methods for mission, approval, persisted plan/run/progress/evidence/audit/readiness; CLI `workflow_cmd.py` and web `server.py`; `tests/test_workflow_cli.py`, `tests/test_server_workflow_v2.py`, cross-client request parity in `tests/test_workflow_run_requests.py` | Supported V2 requests share the persisted Core authority; complete legacy frontend parity, all advertised features and independent verification are NOT inferred |
+| E5-C — reconnect and cancellation | `test_e5_api_client_reconnect_after_server_restart_keeps_durable_identity`, `test_e5_run_snapshot_reconnect_and_lease_secrecy`, `test_e5_cancelled_intent_stays_cancelled_across_api_restart`; paired Docker and systemd smoke | Durable identity and bounded stop semantics supported; HTTP 202 never implies execution success |
+| E5-D — adversarial worker safety | `tests/test_engine_v2_e5_process_claims.py` starts two independent Python processes; `tests/test_workflow_continuous_worker.py` kills a child worker; `tests/test_engine_v2_e5_queue_head_recovery.py` exercises poisoned heads and stale leases; `tests/test_engine_v2_e5_state_snapshot.py` checks restored stale claims never replay | Bounded claim, fencing and uncertain-effect tests; no exactly-once guarantee or production external-effect proof |
+| E5-E — deployment candidate | `whaxon.service`, `whaxon-workflow-worker.service`, `docker-compose.e5.yml`, `Dockerfile`, `.dockerignore`, `docs/deployment.md`; CI paired-container job and actual Ubuntu systemd-host job use installed wheel and restore offline state | Supported engineering deployment smoke on ephemeral CI host/container. Network/TLS/secrets, production host, independent audit witness and real disaster-recovery acceptance remain OPEN |
+| E5-F — exact-head validation | `.github/workflows/ci.yml` Python 3.11–3.13, Ruff, mypy, packaging, headless, cross-platform setup, E1 security, Docker, systemd. [11/11 passing on `11190f737`](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41814000683). New host test passed on `3e5f5fb` but full matrix had a timing-race failure in `test_killed_worker_request_requires_reconciliation_before_replay`; test updated to wait for complete child output on `7c6ba849` | **OPEN until all checks pass on exact final PR HEAD**, after this documentation update |
+| E5-G — review and controlled freeze | This register, caller inventory/rollback, offline recovery runbook and limitations; master roadmap and `docs/ENGINEERING_EXECUTION_MODEL.md` remain binding | Await exact-head proof and an explicit dated engineering-review/freeze record. No implied sign-off |
+
+### Explicit release deferrals, never waived
+
+No unapproved real scanner or target execution, no externally retained immutable audit witness in a controlled enterprise environment, no independent production host crash/failover and network service recovery, and no end-to-end parity claim for retained legacy execution surfaces. Those are **not passed**. The engineering smoke is limited to inert unsupported fixture workflows and isolated ephemeral CI runners.
+
+**Merge rule:** mark this PR ready and merge only after documented E5 engineering gates are passed for the supported V2 service scope and exact-final-head CI is green. Even then, E5 engineering freeze **does not authorize production deployment** or close the master roadmap's G01–G10 gates. Keep residual legacy migration assigned to E4/P2 and integrated validation to the final Engine V2 release gate.
