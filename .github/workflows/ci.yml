@@ -84,6 +84,44 @@ jobs:
           assert created["mission_id"] == "e5-ci-shared-state"
           assert any(row["id"] == "e5-ci-shared-state" for row in missions)
           PY
+          # Prove the independent worker really processes a persisted V2
+          # request end-to-end. An unregistered fixture capability is blocked
+          # without launching a scanner or touching an external target.
+          docker compose -f docker-compose.e5.yml exec -T web python - <<'PY'
+          import json
+          from pathlib import Path
+          from whaxon.core import Core
+          from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+          core = Core(Path("/data"))
+          core.create_mission("e5-ci-no-external-effects", "safe durable worker smoke")
+          core.save_workflow_plan(
+              "e5-ci-no-external-effects-plan",
+              WorkflowPlan(
+                  "e5-ci-no-external-effects",
+                  (WorkflowTask("unsupported", "unsupported.fixture", "192.0.2.10"),),
+              ),
+          )
+          request = core.enqueue_workflow_run("e5-ci-no-external-effects-plan")
+          assert request["status"] == "queued"
+          assert "lease_token" not in request
+          print(json.dumps({"submitted": request["id"]}))
+          PY
+          docker compose -f docker-compose.e5.yml exec -T web python - <<'PY'
+          import time
+          from pathlib import Path
+          from whaxon.core import Core
+          core = Core(Path("/data"))
+          deadline = time.monotonic() + 60
+          while time.monotonic() < deadline:
+              progress = core.workflow_progress("e5-ci-no-external-effects-plan")
+              if progress["counts"]["blocked"] == 1:
+                  break
+              time.sleep(0.5)
+          else:
+              raise SystemExit("durable E5 worker did not process inert blocked task")
+          assert progress["counts"]["succeeded"] == 0
+          print("Independent E5 worker processed a safe blocked task")
+          PY
           docker compose -f docker-compose.e5.yml restart workflow-worker
           docker compose -f docker-compose.e5.yml exec -T web \
             whaxon workflow mission list > e5-missions-after.json
