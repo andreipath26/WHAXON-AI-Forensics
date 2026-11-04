@@ -5,11 +5,9 @@ import json
 import subprocess
 import sys
 import time
-from pathlib import Path
 
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
-
 
 CHILD = """
 import asyncio
