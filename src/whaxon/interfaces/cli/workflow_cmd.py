@@ -194,6 +194,13 @@ def _parser() -> argparse.ArgumentParser:
     limits.add_argument("--max-total-attempts", type=int, required=True)
     limits.add_argument("--max-concurrency", type=int, required=True)
 
+    submit = plan_commands.add_parser(
+        "submit-run", help="persist a bounded V2 run intent for the durable worker",
+    )
+    submit.add_argument("--id", required=True)
+    submit.add_argument("--max-tasks", type=int, default=100)
+    submit.add_argument("--max-attempts", type=int, default=2)
+    submit.add_argument("--max-concurrency", type=int, default=4)
     service = plan_commands.add_parser(
         "serve-requests", help="continuously process durable V2 run requests",
     )
@@ -446,6 +453,20 @@ def main(args: list[str] | None = None) -> int:
             print(json.dumps({
                 "plan_id": options.id, "max_total_attempts": options.max_total_attempts,
                 "max_concurrency": options.max_concurrency,
+            }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "submit-run":
+            queued = core.enqueue_workflow_run(
+                options.id, max_tasks=options.max_tasks,
+                max_attempts=options.max_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            print(json.dumps({
+                "plan_id": queued["plan_id"],
+                "run_request_id": queued["id"],
+                "request_status": queued["status"],
+                "execution_completed": False,
+                "automatic_uncertain_replay": False,
             }, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "queue-summary":

@@ -132,3 +132,14 @@ the manifest does not authenticate itself and external evidence anchoring,
 backup rotation, off-host retention and host-level disaster recovery remain
 unaccepted. All additions are **candidates pending exact-head CI** and the
 final E5-A through E5-G review; no deployment or phase sign-off is asserted.
+
+### Durable run submission parity — implementation candidate
+
+The E5 integration branch adds CLI `plan submit-run` using the same Core
+`enqueue_workflow_run()` transaction and limits as API
+`POST /api/v2/workflows/<plan_id>/run`. A cross-client test verifies that
+identical CLI/API submissions deduplicate to one durable request and changed
+limits fail closed, without starting external effects. This is *bounded run
+submission parity*, not evidence that all legacy CLI direct execution paths
+have migrated. E5-A and E5-B remain open pending exact-head CI and full
+caller inventory.

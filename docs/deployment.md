@@ -232,3 +232,16 @@ container recovery path only. An operator must still verify off-host backup
 retention, service credentials, host-specific failure injection, ownership,
 real environment recovery and external audit anchoring before production
 acceptance.
+
+### Durable E5 run submission from headless CLI
+
+Use `whaxon workflow --data-dir /var/lib/whaxon/data plan submit-run
+--id <existing-plan-id>` to persist a bounded request for the supervised
+worker without launching a second execution loop. Optional `--max-tasks`,
+`--max-attempts` and `--max-concurrency` have the same values and validation
+as the V2 run API. Repeating the same plan and limits returns the same active
+request ID; differing limits fail closed. Inspect with `plan run-request` or
+`plan run-snapshot` using the returned ID. `plan run` remains the existing
+legacy direct execution command for backward compatibility and is **not**
+considered proof of a single execution authority; avoid it during paired
+supervised deployment until caller migration and phase review are complete.

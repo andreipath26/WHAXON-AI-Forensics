@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -10,6 +11,7 @@ import pytest
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app, create_app_factory
+from whaxon.interfaces.cli import workflow_cmd
 
 
 def _core(tmp_path):
@@ -97,6 +99,37 @@ def test_drain_queued_work_after_restart_without_unsafe_reexecution(tmp_path):
         assert executor.submit(
             lambda: asyncio.run(second.drain_workflow_run_requests()),
         ).result() == 0
+
+
+def test_e5_cli_and_api_submit_same_bounded_durable_intent(
+    tmp_path, monkeypatch, capsys,
+):
+    original = _core(tmp_path)
+    args = [
+        "--data-dir", str(tmp_path), "plan", "submit-run",
+        "--id", "p", "--max-tasks", "3",
+        "--max-attempts", "2", "--max-concurrency", "1",
+    ]
+    assert workflow_cmd.main(args) == 0
+    submitted = json.loads(capsys.readouterr().out)
+    request_id = submitted["run_request_id"]
+    assert submitted["execution_completed"] is False
+    assert submitted["request_status"] == "queued"
+    assert original.workflow_run_request(request_id)["status"] == "queued"
+    assert workflow_cmd.main(args) == 0
+    assert json.loads(capsys.readouterr().out)["run_request_id"] == request_id
+
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: None)
+    web_core = Core(tmp_path)
+    app = create_app(web_core, JobRegistry(web_core), AsyncRunner(web_core))
+    app.config["TESTING"] = True
+    response = app.test_client().post("/api/v2/workflows/p/run", json={
+        "max_tasks": 3, "max_attempts": 2, "max_concurrency": 1,
+    })
+    assert response.status_code == 202
+    assert response.get_json()["run_request_id"] == request_id
+    assert workflow_cmd.main([*args[:-1], "2"]) == 2
+    assert "different limits" in capsys.readouterr().err
 
 
 def test_api_202_is_persisted_before_worker_wakeup(tmp_path, monkeypatch):
