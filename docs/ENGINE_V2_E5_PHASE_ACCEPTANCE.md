@@ -143,3 +143,7 @@ limits fail closed, without starting external effects. This is *bounded run
 submission parity*, not evidence that all legacy CLI direct execution paths
 have migrated. E5-A and E5-B remain open pending exact-head CI and full
 caller inventory.
+
+## Caller-inventory and rollback checkpoint
+
+Read [E5 caller and execution-authority inventory](ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md) before any claim of E5-A/G completion. It distinguishes the sole supervised V2 queue worker from preserved legacy CLI/web/AI tool execution and specifies fail-closed rollback and full-state recovery. As of this document update, **E5-A through E5-G remain OPEN** pending exact-head CI, remaining migration decisions and operator acceptance.
