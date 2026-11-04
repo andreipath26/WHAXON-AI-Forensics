@@ -152,10 +152,18 @@ time.sleep(60)
     )
     try:
         deadline = time.monotonic() + 15
-        while not marker.exists() and proc.poll() is None and time.monotonic() < deadline:
+        observed = ""
+        # The child creates the marker before write_text finishes writing;
+        # existence alone can race with an empty/partial file on CI.
+        while proc.poll() is None and time.monotonic() < deadline:
+            if marker.is_file():
+                observed = marker.read_text(encoding="utf-8")
+                if observed == request["id"]:
+                    break
             time.sleep(0.05)
-        assert marker.exists(), "child worker did not claim the request"
-        assert marker.read_text(encoding="utf-8") == request["id"]
+        assert observed == request["id"], (
+            f"child did not publish the full claimed request ID: {observed!r}"
+        )
         assert primary.workflow_run_request(request["id"])["status"] == "running"
     finally:
         if proc.poll() is None:
