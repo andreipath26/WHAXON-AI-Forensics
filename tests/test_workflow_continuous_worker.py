@@ -286,9 +286,10 @@ def test_e5_drain_reconciles_all_stale_leases_before_new_claims(tmp_path, monkey
     queued = core.enqueue_workflow_run("p")
     stop = threading.Event()
     stop.set()
-    assert asyncio.run(core.drain_workflow_run_requests(
-        max_runs=1, initialized=True, stop_event=stop,
-    )) == 0
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(lambda: asyncio.run(core.drain_workflow_run_requests(
+            max_runs=1, initialized=True, stop_event=stop,
+        ))).result(timeout=10) == 0
     assert calls == ["reconcile"]
     assert core.workflow_run_request(queued["id"])["status"] == "queued"
 
@@ -301,9 +302,10 @@ def test_e5_drain_reconciles_all_stale_leases_before_new_claims(tmp_path, monkey
     async def incomplete(*args, **kwargs):
         return {"complete": False}
     monkeypatch.setattr(core, "run_workflow_plan", incomplete)
-    assert asyncio.run(core.drain_workflow_run_requests(
-        max_runs=1, initialized=True, stop_event=stop,
-    )) == 1
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(lambda: asyncio.run(core.drain_workflow_run_requests(
+            max_runs=1, initialized=True, stop_event=stop,
+        ))).result(timeout=10) == 1
     assert calls[-3:] == ["reconcile", "reconcile", "claim"]
     assert core.workflow_run_request(queued["id"])["status"] == "incomplete"
 
@@ -320,7 +322,8 @@ def test_e5_one_shot_claim_retry_is_bounded_under_poisoned_producer(
     monkeypatch.setattr(
         core.workflow_requests, "queued_count", lambda: 1,
     )
-    assert asyncio.run(core.drain_workflow_run_requests(
-        max_runs=1, initialized=True,
-    )) == 0
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(lambda: asyncio.run(core.drain_workflow_run_requests(
+            max_runs=1, initialized=True,
+        ))).result(timeout=10) == 0
     assert len(attempts) == 16
