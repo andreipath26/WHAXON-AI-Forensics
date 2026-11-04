@@ -69,7 +69,30 @@ jobs:
           assert state["worker_liveness_verified"] is False
           assert state["automatic_uncertain_replay"] is False
           PY
+          # Create one inert mission through the worker CLI. Its metadata
+          # must be visible from the independent web container after restart,
+          # proving both services use the same durable state volume.
+          docker compose -f docker-compose.e5.yml exec -T workflow-worker \
+            whaxon workflow mission create --id e5-ci-shared-state --objective "inert persistence check" > e5-mission-created.json
+          docker compose -f docker-compose.e5.yml exec -T web \
+            whaxon workflow mission list > e5-missions-before.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          created = json.loads(Path("e5-mission-created.json").read_text())
+          missions = json.loads(Path("e5-missions-before.json").read_text())
+          assert created["mission_id"] == "e5-ci-shared-state"
+          assert any(row["id"] == "e5-ci-shared-state" for row in missions)
+          PY
           docker compose -f docker-compose.e5.yml restart workflow-worker
+          docker compose -f docker-compose.e5.yml exec -T web \
+            whaxon workflow mission list > e5-missions-after.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          missions = json.loads(Path("e5-missions-after.json").read_text())
+          assert any(row["id"] == "e5-ci-shared-state" for row in missions)
+          PY
           docker compose -f docker-compose.e5.yml exec -T workflow-worker \
             whaxon workflow plan queue-summary > e5-queue-after.json
           python - <<'PY'
