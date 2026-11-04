@@ -19,9 +19,11 @@ def test_canonical_findings_page_loads_live_report(page, live_server):
 
 def test_canonical_findings_page_inspects_real_finding(page, live_server):
     page.goto(f"{live_server}/ui-v2/findings")
+    # The asynchronous seeded finding list can take longer under CI xdist
+    # contention. Keep the same real-data assertion before interacting.
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=5000,
+        timeout=15000,
     )
     page.locator("#whaxon-findings-list [data-finding-index]").first.click()
     detail = page.locator("#whaxon-detail")
