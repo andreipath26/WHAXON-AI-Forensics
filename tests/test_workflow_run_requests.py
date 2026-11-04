@@ -10,8 +10,8 @@ import pytest
 
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
-from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app, create_app_factory
 from whaxon.interfaces.cli import workflow_cmd
+from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app, create_app_factory
 
 
 def _core(tmp_path):
