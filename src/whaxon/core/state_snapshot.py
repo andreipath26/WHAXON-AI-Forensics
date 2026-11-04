@@ -114,11 +114,11 @@ def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
             target.write_bytes(source.read_bytes())
             target.chmod(0o600)
         with (
-            closing(sqlite3.connect(f"file:{state_dir / _DB}?mode=ro", uri=True)) as source,
-            closing(sqlite3.connect(stage / _DB)) as target,
+            closing(sqlite3.connect(f"file:{state_dir / _DB}?mode=ro", uri=True)) as db_source,
+            closing(sqlite3.connect(stage / _DB)) as db_target,
         ):
-            source.backup(target)
-            target.commit()
+            db_source.backup(db_target)
+            db_target.commit()
         (stage / _DB).chmod(0o600)
         _validate_database(stage / _DB)
         copies = _inventory(stage)

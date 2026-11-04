@@ -119,7 +119,7 @@ jobs:
               time.sleep(0.5)
           else:
               raise SystemExit("durable E5 worker did not process inert blocked task")
-          assert progress["counts"]["succeeded"] == 0
+          assert progress["counts"].get("succeeded", 0) == 0
           print("Independent E5 worker processed a safe blocked task")
           PY
           docker compose -f docker-compose.e5.yml restart workflow-worker
