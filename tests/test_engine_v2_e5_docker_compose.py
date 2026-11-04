@@ -29,3 +29,14 @@ def test_e5_compose_does_not_replace_target_lab_configuration():
     assert "whaxon-lab" not in production
     assert "ipv4_address:" not in production
     assert "NET_ADMIN" not in production
+
+
+def test_e5_container_image_avoids_baking_operator_proof_data_and_prepares_volume():
+    image = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    ignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    assert "COPY data/" not in image
+    assert "mkdir -p /data" in image
+    assert "chown -R whaxon:whaxon /app /data" in image
+    assert "USER whaxon" in image
+    assert "data/" in ignore.splitlines()
+    assert ".git" in ignore.splitlines()

@@ -17,6 +17,7 @@ services:
       - no-new-privileges:true
     environment:
       WHAXON_DATA: /data
+      HOME: /tmp
       WHAXON_AUTH_USER: ${WHAXON_AUTH_USER:?Set a non-default WHAXON_AUTH_USER}
       WHAXON_AUTH_PASS: ${WHAXON_AUTH_PASS:?Set a strong unique WHAXON_AUTH_PASS}
     volumes:
@@ -38,6 +39,7 @@ services:
       - no-new-privileges:true
     environment:
       WHAXON_DATA: /data
+      HOME: /tmp
     volumes:
       - e5-state:/data
     command:

@@ -26,13 +26,12 @@ WORKDIR /app
 # Copy project files
 COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY src/ ./src/
-COPY data/ ./data/
 
 # Install into the venv (no --break-system-packages needed)
 RUN pip install ".[web]"
 
 # Non-root user
-RUN useradd -m -u 1000 whaxon && chown -R whaxon:whaxon /app
+RUN useradd -m -u 1000 whaxon && mkdir -p /data && chown -R whaxon:whaxon /app /data
 USER whaxon
 
 EXPOSE 5001
