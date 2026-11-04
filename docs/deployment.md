@@ -146,3 +146,33 @@ nginx example:
         proxy_buffering off;
       }
     }
+
+### Opt-in Engine V2 Docker deployment
+
+The root `docker-compose.yml` defines an intentionally separate target lab;
+**do not** use it as a WHAXON production deployment. The new
+`docker-compose.e5.yml` runs two non-root services from the same built image:
+`web` and the persistent `workflow-worker`. They share the named
+`e5-state` volume at `/data`, while only the web service publishes
+`127.0.0.1:5001`. Both containers use read-only root filesystems, a
+restricted tmpfs and dropped Linux capabilities.
+
+Provide strong non-default `WHAXON_AUTH_USER` and `WHAXON_AUTH_PASS`
+values via a private operator environment (or a protected Compose env file)
+without committing credentials. Inspect the fully resolved configuration
+before starting; do not post its output because it can contain secrets.
+
+```sh
+docker compose -f docker-compose.e5.yml config --quiet
+docker compose -f docker-compose.e5.yml up -d --build
+docker compose -f docker-compose.e5.yml ps
+docker compose -f docker-compose.e5.yml logs --tail 100 workflow-worker
+```
+
+A started container does not certify worker liveness or external-effect
+recovery. Verify the shared queue and one explicitly approved controlled
+workflow before accepting the deployment. Persist and back up the named
+volume together with independently protected operational configuration and
+evidence. This Compose configuration is an **engineering candidate**;
+real Docker service, restart, recovery, secrets and backup/restore acceptance
+are still outstanding.
