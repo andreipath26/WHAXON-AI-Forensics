@@ -9,7 +9,7 @@ import pytest
 
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
-from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app
+from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app, create_app_factory
 
 
 def _core(tmp_path):
@@ -151,6 +151,26 @@ def test_e5_external_worker_mode_never_starts_web_drain(tmp_path, monkeypatch):
     claimed = separate.workflow_requests.claim("dedicated-worker")
     assert claimed is not None and claimed["id"] == body["run_request_id"]
     assert "lease_token" not in body
+
+
+def test_e5_external_worker_mode_prevents_factory_startup_local_drain(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_V2_EXTERNAL_WORKER", "1")
+    monkeypatch.setenv("WHAXON_DATA", str(tmp_path))
+    monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
+    monkeypatch.setenv("WHAXON_AUTH_USER", "whaxon")
+    monkeypatch.setenv("WHAXON_AUTH_PASS", "whaxon")
+    monkeypatch.delenv("WHAXON_AUTH_PASS_HASH", raising=False)
+    called = []
+
+    def unexpected_drain(*_args, **_kwargs):
+        called.append(True)
+        raise AssertionError("dedicated worker must own durable V2 queue")
+
+    monkeypatch.setattr(AsyncRunner, "submit", unexpected_drain)
+    app = create_app_factory()
+    app.config["TESTING"] = True
+    assert not called
+    assert app.test_client().get("/api/health").status_code == 200
 
 
 def test_cancelled_workflow_cannot_be_newly_submitted(tmp_path):

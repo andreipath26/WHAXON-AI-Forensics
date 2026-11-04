@@ -21,6 +21,13 @@ def test_e5_compose_has_separate_durable_worker_and_shared_state():
     assert "      - e5-state:/data" in content
 
 
+def test_e5_compose_disables_web_local_drain_not_external_worker():
+    content = (ROOT / "docker-compose.e5.yml").read_text(encoding="utf-8")
+    web, worker = content.split("  workflow-worker:", 1)
+    assert 'WHAXON_V2_EXTERNAL_WORKER: "1"' in web
+    assert "WHAXON_V2_EXTERNAL_WORKER:" not in worker
+
+
 def test_e5_compose_does_not_replace_target_lab_configuration():
     laboratory = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     production = (ROOT / "docker-compose.e5.yml").read_text(encoding="utf-8")
