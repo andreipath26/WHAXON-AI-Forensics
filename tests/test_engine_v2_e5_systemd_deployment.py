@@ -19,10 +19,14 @@ def test_systemd_worker_shares_web_identity_and_persistent_state():
     worker = _unit("whaxon-workflow-worker.service")["Service"]
     for key in (
         "User", "Group", "WorkingDirectory", "EnvironmentFile",
-        "Environment", "ReadWritePaths", "StateDirectory",
+        "ReadWritePaths", "StateDirectory",
         "StateDirectoryMode", "RequiresMountsFor",
     ):
         assert worker[key] == web[key], key
+    # Each unit has one Environment directive for this test parser. The
+    # web adds a dedicated-worker mode flag, while the data path is shared.
+    assert worker["Environment"] == "WHAXON_DATA=/var/lib/whaxon/data"
+    assert worker["Environment"] in web["Environment"].split()
     assert worker["StateDirectory"] == "whaxon"
     assert worker["StateDirectoryMode"] == "0700"
     assert worker["RequiresMountsFor"] == "/var/lib/whaxon"

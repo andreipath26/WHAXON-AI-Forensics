@@ -11,8 +11,7 @@ StateDirectory=whaxon
 StateDirectoryMode=0700
 RequiresMountsFor=/var/lib/whaxon
 EnvironmentFile=-/etc/whaxon.env
-Environment=WHAXON_DATA=/var/lib/whaxon/data
-Environment=WHAXON_V2_EXTERNAL_WORKER=1
+Environment=WHAXON_DATA=/var/lib/whaxon/data WHAXON_V2_EXTERNAL_WORKER=1
 ExecStart=/opt/whaxon/.venv/bin/gunicorn \
     --bind 127.0.0.1:5001 \
     --workers 2 \
