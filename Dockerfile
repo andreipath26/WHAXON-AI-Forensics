@@ -33,7 +33,7 @@ COPY whaxon.service whaxon-workflow-worker.service ./
 RUN pip install ".[web]"
 
 # Non-root user
-RUN useradd -m -u 1000 whaxon && mkdir -p /data && chown -R whaxon:whaxon /app /data
+RUN useradd -m -u 1000 whaxon && mkdir -p /data /e5-backups && chown -R whaxon:whaxon /app /data /e5-backups
 USER whaxon
 
 EXPOSE 5001

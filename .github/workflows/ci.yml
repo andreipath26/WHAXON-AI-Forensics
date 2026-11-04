@@ -142,6 +142,42 @@ jobs:
           assert after["worker_liveness_verified"] is False
           assert after["automatic_uncertain_replay"] is False
           PY
+      - name: Offline E5 state backup, verified restore and mission recovery
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          # Quiesce both services. A new one-shot container reads the existing
+          # state volume but never runs the V2 worker loop or any scanner.
+          docker compose -f docker-compose.e5.yml stop web workflow-worker
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            python -m whaxon.core.state_snapshot backup /data /e5-backups/snapshot \
+            > e5-snapshot-result.json
+          manifest_sha="$(python -c 'import json; print(json.load(open("e5-snapshot-result.json"))["manifest_sha256"])')"
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            python -m whaxon.core.state_snapshot verify /e5-backups/snapshot \
+            --expected-manifest-sha256 "$manifest_sha" > e5-verify-result.json
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            python -m whaxon.core.state_snapshot restore \
+            /e5-backups/snapshot /e5-backups/restored \
+            --expected-manifest-sha256 "$manifest_sha" > e5-restore-result.json
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            whaxon workflow --data-dir /e5-backups/restored mission list \
+            > e5-restored-missions.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          verified = json.loads(Path("e5-verify-result.json").read_text())
+          restored = json.loads(Path("e5-restore-result.json").read_text())
+          missions = json.loads(Path("e5-restored-missions.json").read_text())
+          assert verified["files_verified"] and restored["files_verified"]
+          assert verified["external_anchor_verified"] is True
+          assert restored["external_anchor_verified"] is True
+          assert any(m["id"] == "e5-ci-shared-state" for m in missions)
+          PY
       - name: Capture service diagnostics on failure
         if: failure()
         run: |

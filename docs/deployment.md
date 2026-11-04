@@ -218,3 +218,17 @@ When it is down, accepted requests remain queued, never falsely completed.
 Existing web-only users without this flag retain the prior wakeup behavior.
 This flag does not disable unrelated legacy tool/AI execution endpoints;
 those remain a separate authorization and migration obligation.
+
+### E5 containerized offline recovery test
+
+The E5 GitHub Actions deployment smoke now stops both Compose services,
+uses an isolated one-shot `workflow-worker` image to snapshot the existing
+state volume to a **separate** `e5-backups` volume, verifies an independently
+recorded manifest digest, restores into a new directory and checks that the
+persisted test mission remains readable. The auxiliary `/e5-backups` mount
+point is writable by the container's non-root user; it is not mounted by
+normal running web and worker services. CI demonstrates an isolated
+container recovery path only. An operator must still verify off-host backup
+retention, service credentials, host-specific failure injection, ownership,
+real environment recovery and external audit anchoring before production
+acceptance.

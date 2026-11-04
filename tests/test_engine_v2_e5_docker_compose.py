@@ -49,6 +49,12 @@ def test_e5_container_image_avoids_baking_operator_proof_data_and_prepares_volum
     assert ".git" in ignore.splitlines()
 
 
+def test_e5_image_prepares_separate_nonroot_offline_backup_mount():
+    image = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "mkdir -p /data /e5-backups" in image
+    assert "chown -R whaxon:whaxon /app /data /e5-backups" in image
+
+
 def test_e5_container_build_contains_all_hatch_forced_systemd_resources():
     image = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
