@@ -188,8 +188,8 @@ It does not back up secrets or host configuration outside `WHAXON_DATA`.
 
 ```sh
 python -m whaxon.core.state_snapshot backup /var/lib/whaxon/data /secure/whaxon-e5-snapshot
-python -m whaxon.core.state_snapshot verify /secure/whaxon-e5-snapshot
-python -m whaxon.core.state_snapshot restore /secure/whaxon-e5-snapshot /secure/whaxon-restored
+python -m whaxon.core.state_snapshot verify /secure/whaxon-e5-snapshot --expected-manifest-sha256 "<independently-retained-64-character-sha256>"
+python -m whaxon.core.state_snapshot restore /secure/whaxon-e5-snapshot /secure/whaxon-restored --expected-manifest-sha256 "<independently-retained-64-character-sha256>"
 ```
 
 The destination must **not exist**. Restore into a separate location, inspect
@@ -200,3 +200,10 @@ hash or copy in protected external storage with operator-controlled identity.
 Use restrictive permissions and encrypted off-host retention for sensitive
 evidence. This is an offline engineering recovery mechanism; real supervised
 host restoration and sign-off remain mandatory E5 deployment gates.
+
+The backup command outputs `manifest_sha256`; retain that value outside
+WHAXON storage using an operator-protected witness before allowing a later
+restore. Verification without `--expected-manifest-sha256` detects file drift
+against the internal manifest but **does not** protect against an attacker who
+changes the manifest itself. The external expected digest provides comparison
+only; its authenticity depends on how the operator retained it.

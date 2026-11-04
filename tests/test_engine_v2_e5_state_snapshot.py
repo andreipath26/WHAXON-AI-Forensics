@@ -94,6 +94,32 @@ def test_e5_snapshot_refuses_destination_hidden_under_symlink_parent(tmp_path):
     assert not (original / "hidden-backup").exists()
 
 
+def test_e5_externally_retained_manifest_hash_detects_manifest_replacement(tmp_path):
+    root = tmp_path / "original"
+    root.mkdir()
+    _make_state(root)
+    snapshot = tmp_path / "snapshot"
+    created = create_offline_snapshot(root, snapshot)
+    expected = created["manifest_sha256"]
+    verified = verify_offline_snapshot(
+        snapshot, expected_manifest_sha256=expected,
+    )
+    assert verified["external_anchor_verified"] is True
+    assert restore_offline_snapshot(
+        snapshot, tmp_path / "restored",
+        expected_manifest_sha256=expected,
+    )["external_anchor_verified"] is True
+    manifest = snapshot / "e5-snapshot-manifest.json"
+    modified = manifest.read_text(encoding="utf-8").replace(
+        '"external_anchor_verified": false',
+        '"external_anchor_verified": true',
+    )
+    assert modified != manifest.read_text(encoding="utf-8")
+    manifest.write_text(modified, encoding="utf-8")
+    with pytest.raises(ValueError, match="independently retained manifest digest mismatch"):
+        verify_offline_snapshot(snapshot, expected_manifest_sha256=expected)
+
+
 def test_e5_snapshot_rejects_broken_database(tmp_path):
     root = tmp_path / "invalid"
     root.mkdir()

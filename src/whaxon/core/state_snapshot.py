@@ -55,13 +55,21 @@ def _validate_database(path: Path) -> None:
         conn.close()
 
 
-def verify_offline_snapshot(snapshot: Path) -> dict:
+def verify_offline_snapshot(snapshot: Path, *, expected_manifest_sha256: str | None = None) -> dict:
     """Check every copied file against its manifest; not an external signature."""
     snapshot = Path(snapshot)
     files = _inventory(snapshot)
     manifest_path = files.pop(_MANIFEST, None)
     if manifest_path is None:
         raise ValueError("snapshot manifest missing")
+    manifest_digest = _sha256(manifest_path)
+    if expected_manifest_sha256 is not None:
+        if (not isinstance(expected_manifest_sha256, str)
+                or len(expected_manifest_sha256) != 64
+                or any(c not in "0123456789abcdef" for c in expected_manifest_sha256)):
+            raise ValueError("external manifest digest must be 64 lowercase hex characters")
+        if manifest_digest != expected_manifest_sha256:
+            raise ValueError("independently retained manifest digest mismatch")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema_version") != "whaxon.e5.offline-snapshot.v1":
         raise ValueError("unknown snapshot schema")
@@ -73,7 +81,8 @@ def verify_offline_snapshot(snapshot: Path) -> dict:
             raise ValueError(f"snapshot checksum mismatch: {name}")
     _validate_database(files[_DB] if _DB in files else snapshot / _DB)
     return {"file_count": len(files), "files_verified": True,
-            "external_anchor_verified": False}
+            "manifest_sha256": manifest_digest,
+            "external_anchor_verified": expected_manifest_sha256 is not None}
 
 
 def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
@@ -131,9 +140,12 @@ def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
     return verify_offline_snapshot(destination)
 
 
-def restore_offline_snapshot(snapshot: Path, destination: Path) -> dict:
+def restore_offline_snapshot(snapshot: Path, destination: Path, *,
+                             expected_manifest_sha256: str | None = None) -> dict:
     """Restore a verified snapshot into a new directory, never overwrite state."""
-    verified = verify_offline_snapshot(snapshot)
+    verified = verify_offline_snapshot(
+        snapshot, expected_manifest_sha256=expected_manifest_sha256,
+    )
     snapshot = Path(snapshot).resolve(strict=True)
     destination = Path(destination).resolve(strict=False)
     if destination.exists() or destination == snapshot or snapshot in destination.parents:
@@ -166,13 +178,20 @@ def main() -> int:
         action.add_argument("destination", type=Path)
     verify = command.add_parser("verify")
     verify.add_argument("source", type=Path)
+    verify.add_argument("--expected-manifest-sha256")
+    command.choices["restore"].add_argument("--expected-manifest-sha256")
     args = parser.parse_args()
     if args.command == "backup":
         result = create_offline_snapshot(args.source, args.destination)
     elif args.command == "restore":
-        result = restore_offline_snapshot(args.source, args.destination)
+        result = restore_offline_snapshot(
+            args.source, args.destination,
+            expected_manifest_sha256=args.expected_manifest_sha256,
+        )
     else:
-        result = verify_offline_snapshot(args.source)
+        result = verify_offline_snapshot(
+            args.source, expected_manifest_sha256=args.expected_manifest_sha256,
+        )
     print(json.dumps(result, sort_keys=True))
     return 0
 
