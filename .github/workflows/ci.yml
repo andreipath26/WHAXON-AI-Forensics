@@ -16,6 +16,117 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  engine-v2-e5-systemd-deployment:
+    name: Engine V2 E5 real systemd host smoke (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install wheel on isolated host and provision service account
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          python -m pip install build
+          python -m build --wheel
+          sudo useradd --system --home /opt/whaxon --shell /usr/sbin/nologin whaxon
+          sudo mkdir -p /opt/whaxon /var/lib/whaxon/data
+          sudo chown -R whaxon:whaxon /opt/whaxon /var/lib/whaxon
+          sudo python3 -m venv /opt/whaxon/.venv
+          sudo /opt/whaxon/.venv/bin/pip install "$(echo dist/*.whl)[web]"
+          printf '%s\n' 'WHAXON_AUTH_USER=ci-operator' \
+            'WHAXON_AUTH_PASS=ci-unique-secret-not-for-production-use' | sudo tee /etc/whaxon.env >/dev/null
+          sudo chmod 0600 /etc/whaxon.env
+          sudo install -m 0644 whaxon.service whaxon-workflow-worker.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+      - name: Start both services and prove shared state survives supervised restart
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          sudo systemctl start whaxon-workflow-worker.service whaxon.service
+          python - <<'PY'
+          import base64
+          import json
+          import time
+          import urllib.request
+
+          credentials = base64.b64encode(
+              b"ci-operator:ci-unique-secret-not-for-production-use"
+          ).decode()
+          deadline = time.monotonic() + 90
+          while time.monotonic() < deadline:
+              try:
+                  req = urllib.request.Request(
+                      "http://127.0.0.1:5001/api/health",
+                      headers={"Authorization": f"Basic {credentials}"},
+                  )
+                  with urllib.request.urlopen(req, timeout=4) as response:
+                      state = json.load(response)
+                  if state["core_ready"] is True:
+                      break
+              except (OSError, KeyError, ValueError):
+                  pass
+              time.sleep(2)
+          else:
+              raise SystemExit("systemd web Core readiness did not become true")
+          assert state["worker_liveness_verified"] is False if "worker_liveness_verified" in state else True
+          PY
+          sudo systemctl is-active --quiet whaxon.service
+          sudo systemctl is-active --quiet whaxon-workflow-worker.service
+          sudo -u whaxon env WHAXON_DATA=/var/lib/whaxon/data \
+            /opt/whaxon/.venv/bin/whaxon workflow mission create \
+              --id systemd-e5-durable --objective "inert systemd persistence" > e5-systemd-created.json
+          sudo systemctl restart whaxon-workflow-worker.service whaxon.service
+          sudo systemctl is-active --quiet whaxon.service
+          sudo systemctl is-active --quiet whaxon-workflow-worker.service
+          sudo -u whaxon env WHAXON_DATA=/var/lib/whaxon/data \
+            /opt/whaxon/.venv/bin/whaxon workflow mission list > e5-systemd-restored.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("e5-systemd-restored.json").read_text())
+          assert any(row["id"] == "systemd-e5-durable" for row in data), data
+          PY
+      - name: Stop paired services, snapshot complete state and verify isolated restore
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo systemctl stop whaxon.service whaxon-workflow-worker.service
+          sudo -u whaxon /opt/whaxon/.venv/bin/python - <<'PY'
+          from pathlib import Path
+          from whaxon.core import Core
+          from whaxon.core.state_snapshot import (
+              create_offline_snapshot, restore_offline_snapshot, verify_offline_snapshot,
+          )
+          source = Path("/var/lib/whaxon/data")
+          snapshot = Path("/var/lib/whaxon/e5-ci-backup")
+          destination = Path("/var/lib/whaxon/e5-ci-restored")
+          report = create_offline_snapshot(source, snapshot)
+          assert report["files_verified"]
+          anchor = report["manifest_sha256"]
+          assert verify_offline_snapshot(
+              snapshot, expected_manifest_sha256=anchor,
+          )["external_anchor_verified"]
+          restore_offline_snapshot(
+              snapshot, destination, expected_manifest_sha256=anchor,
+          )
+          restored = Core(destination)
+          assert any(
+              row["id"] == "systemd-e5-durable"
+              for row in restored.missions()
+          )
+          print("Systemd host offline restore verified; independent anchor not deployed")
+          PY
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl --no-pager status whaxon.service whaxon-workflow-worker.service || true
+          sudo journalctl --no-pager -u whaxon.service -u whaxon-workflow-worker.service -n 70 || true
+      - name: Stop services and remove CI secrets
+        if: always()
+        run: |
+          sudo systemctl stop whaxon.service whaxon-workflow-worker.service || true
+          sudo rm -f /etc/whaxon.env
+
   engine-v2-e5-docker-deployment:
     name: Engine V2 E5 paired Docker web-worker smoke
     runs-on: ubuntu-latest
