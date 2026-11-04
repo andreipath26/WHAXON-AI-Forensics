@@ -147,3 +147,13 @@ caller inventory.
 ## Caller-inventory and rollback checkpoint
 
 Read [E5 caller and execution-authority inventory](ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md) before any claim of E5-A/G completion. It distinguishes the sole supervised V2 queue worker from preserved legacy CLI/web/AI tool execution and specifies fail-closed rollback and full-state recovery. As of this document update, **E5-A through E5-G remain OPEN** pending exact-head CI, remaining migration decisions and operator acceptance.
+
+### Two independent worker processes — adversarial claim test
+
+`tests/test_engine_v2_e5_process_claims.py` now starts two independent
+Python processes against the same persisted SQLite run request, waits for
+both to be ready, releases them together and requires only one claim/blocked
+workflow result. This strengthens E5-D beyond thread-only tests. It uses an
+unsupported fixture capability, **never** an actual scanner or target. The
+whole gate remains OPEN until exact-head CI and wider failure injection,
+restart and recovery evidence are accepted.
