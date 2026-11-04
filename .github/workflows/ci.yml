@@ -198,8 +198,10 @@ jobs:
           # Prove the independent worker really processes a persisted V2
           # request end-to-end. An unregistered fixture capability is blocked
           # without launching a scanner or touching an external target.
+          # With the supervised worker stopped, HTTP 202 must persist only.
+          # No gunicorn process may create its own V2 drainer in this mode.
+          docker compose -f docker-compose.e5.yml stop workflow-worker
           docker compose -f docker-compose.e5.yml exec -T web python - <<'PY'
-          import json
           from pathlib import Path
           from whaxon.core import Core
           from whaxon.core.workflow import WorkflowPlan, WorkflowTask
@@ -212,11 +214,40 @@ jobs:
                   (WorkflowTask("unsupported", "unsupported.fixture", "192.0.2.10"),),
               ),
           )
-          request = core.enqueue_workflow_run("e5-ci-no-external-effects-plan")
-          assert request["status"] == "queued"
-          assert "lease_token" not in request
-          print(json.dumps({"submitted": request["id"]}))
           PY
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import time
+          import urllib.request
+          credentials = f"{os.environ['WHAXON_AUTH_USER']}:{os.environ['WHAXON_AUTH_PASS']}"
+          auth = base64.b64encode(credentials.encode()).decode()
+          url = "http://127.0.0.1:5001/api/v2/workflows/e5-ci-no-external-effects-plan/run"
+          req = urllib.request.Request(
+              url, data=b"{}", method="POST",
+              headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(req, timeout=10) as response:
+              assert response.status == 202
+              accepted = json.load(response)
+          assert accepted["execution_completed"] is False
+          assert accepted["request_status"] == "queued"
+          assert accepted["run_request_id"]
+          # Prove no process-local web drainer picks up the request.
+          time.sleep(1)
+          req = urllib.request.Request(
+              "http://127.0.0.1:5001" + accepted["run_request_url"],
+              headers={"Authorization": f"Basic {auth}"},
+          )
+          with urllib.request.urlopen(req, timeout=10) as response:
+              state = json.load(response)
+          assert state["id"] == accepted["run_request_id"]
+          assert state["status"] == "queued", state
+          assert "lease_token" not in state
+          print("HTTP 202 persisted a request with worker stopped; no web fallback")
+          PY
+          docker compose -f docker-compose.e5.yml start workflow-worker
           docker compose -f docker-compose.e5.yml exec -T web python - <<'PY'
           import time
           from pathlib import Path
