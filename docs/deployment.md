@@ -176,3 +176,27 @@ volume together with independently protected operational configuration and
 evidence. This Compose configuration is an **engineering candidate**;
 real Docker service, restart, recovery, secrets and backup/restore acceptance
 are still outstanding.
+
+### Offline E5 operator-state snapshot and restoration
+
+Stop **both** web and workflow-worker services before taking an offline backup;
+the utility cannot determine whether another process is modifying the state.
+The standalone tool includes the complete operator-state file tree (such as
+scope, configuration and evidence), makes a consistent SQLite backup,
+rejects symbolic links/nonregular files and generates per-file SHA-256 checks.
+It does not back up secrets or host configuration outside `WHAXON_DATA`.
+
+```sh
+python -m whaxon.core.state_snapshot backup /var/lib/whaxon/data /secure/whaxon-e5-snapshot
+python -m whaxon.core.state_snapshot verify /secure/whaxon-e5-snapshot
+python -m whaxon.core.state_snapshot restore /secure/whaxon-e5-snapshot /secure/whaxon-restored
+```
+
+The destination must **not exist**. Restore into a separate location, inspect
+its integrity and ownership, and only then coordinate a deliberate cutover
+while both services remain stopped. The snapshot's internal checksums detect
+accidental changes but are **not independently trusted**: retain its manifest
+hash or copy in protected external storage with operator-controlled identity.
+Use restrictive permissions and encrypted off-host retention for sensitive
+evidence. This is an offline engineering recovery mechanism; real supervised
+host restoration and sign-off remain mandatory E5 deployment gates.
