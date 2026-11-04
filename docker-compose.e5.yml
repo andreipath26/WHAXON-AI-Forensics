@@ -18,6 +18,7 @@ services:
     environment:
       WHAXON_DATA: /data
       HOME: /tmp
+      WHAXON_V2_EXTERNAL_WORKER: "1"
       WHAXON_AUTH_USER: ${WHAXON_AUTH_USER:?Set a non-default WHAXON_AUTH_USER}
       WHAXON_AUTH_PASS: ${WHAXON_AUTH_PASS:?Set a strong unique WHAXON_AUTH_PASS}
     volumes:

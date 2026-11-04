@@ -100,6 +100,7 @@ def test_drain_queued_work_after_restart_without_unsafe_reexecution(tmp_path):
 
 
 def test_api_202_is_persisted_before_worker_wakeup(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHAXON_V2_EXTERNAL_WORKER", raising=False)
     core = _core(tmp_path)
     recorded = []
     monkeypatch.setattr(AsyncRunner, "submit", lambda self, callback: recorded.append(callback))
@@ -128,6 +129,28 @@ def test_api_202_is_persisted_before_worker_wakeup(tmp_path, monkeypatch):
     assert client.post("/api/v2/workflows/p/run", json={
         "max_tasks": True,
     }).status_code == 400
+
+
+def test_e5_external_worker_mode_never_starts_web_drain(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_V2_EXTERNAL_WORKER", "1")
+    core = _core(tmp_path)
+
+    def unexpectedly_submitted(*_args, **_kwargs):
+        raise AssertionError("web must not start a second E5 worker")
+
+    monkeypatch.setattr(AsyncRunner, "submit", unexpectedly_submitted)
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
+    app.config["TESTING"] = True
+    response = app.test_client().post("/api/v2/workflows/p/run", json={})
+    assert response.status_code == 202
+    body = response.get_json()
+    assert body["execution_completed"] is False
+    assert core.workflow_run_request(body["run_request_id"])["status"] == "queued"
+    # A distinct Core has permission to claim the persisted intent.
+    separate = Core(tmp_path)
+    claimed = separate.workflow_requests.claim("dedicated-worker")
+    assert claimed is not None and claimed["id"] == body["run_request_id"]
+    assert "lease_token" not in body
 
 
 def test_cancelled_workflow_cannot_be_newly_submitted(tmp_path):

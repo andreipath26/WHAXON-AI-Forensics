@@ -25,6 +25,11 @@ from whaxon.core.events import (
 )
 
 
+def _v2_worker_externally_supervised() -> bool:
+    """Do not drain durable V2 work from web when a service worker is active."""
+    return os.environ.get("WHAXON_V2_EXTERNAL_WORKER", "").strip() == "1"
+
+
 def _check_execution_scope(scope, target):
     """Use the scope manager's DNS-safe execution gate when available."""
     checker = getattr(scope, "check_for_execution", None)
@@ -596,13 +601,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify({"error": str(exc)}), (
                 404 if "unknown workflow plan" in str(exc) else 409
             )
-        # The accepted intent lives in SQLite even if this process stops.
-        try:
-            runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
-        except Exception:
-            # The accepted request is already in durable storage. Worker
-            # failure must not turn that accepted submission into a false 500.
-            pass
+        # The request persists even if web exits. Only the supervised worker
+        # drains it in paired E5 deployments, never another web process.
+        if not _v2_worker_externally_supervised():
+            try:
+                runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+            except Exception:
+                # An accepted durable request must not become a false 500.
+                pass
         return jsonify({
             "plan_id": plan_id,
             "run_request_id": queued["id"],
@@ -2670,7 +2676,8 @@ def create_app_factory(host: str | None = None, port: int | None = None):
     runner = AsyncRunner(core)
     app = create_app(core, registry, runner)
     # Recover queued (not running/uncertain) requests after service restart.
-    runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+    if not _v2_worker_externally_supervised():
+        runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
     return app
 
 
@@ -2715,7 +2722,8 @@ def main(args: list[str] | None = None) -> None:
     runner = AsyncRunner(core)
 
     app = create_app(core, registry, runner)
-    runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+    if not _v2_worker_externally_supervised():
+        runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
     auth_user = os.environ.get("WHAXON_AUTH_USER", "")
     auth_on = "enabled" if auth_user else "DISABLED"
     print()

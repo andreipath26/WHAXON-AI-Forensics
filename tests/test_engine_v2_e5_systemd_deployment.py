@@ -82,3 +82,9 @@ def test_systemd_units_require_operator_activated_supervision():
         "workflow plan serve-requests --poll-interval 1 --max-runs-per-batch 20"
     )
     assert worker["Restart"] == "on-failure"
+
+def test_e5_web_unit_delegates_v2_work_to_supervised_worker():
+    web = _unit("whaxon.service")["Service"]
+    worker = _unit("whaxon-workflow-worker.service")["Service"]
+    assert "WHAXON_V2_EXTERNAL_WORKER=1" in web["Environment"]
+    assert "WHAXON_V2_EXTERNAL_WORKER=1" not in worker["Environment"]

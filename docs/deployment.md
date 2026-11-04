@@ -207,3 +207,14 @@ restore. Verification without `--expected-manifest-sha256` detects file drift
 against the internal manifest but **does not** protect against an attacker who
 changes the manifest itself. The external expected digest provides comparison
 only; its authenticity depends on how the operator retained it.
+
+### E5 dedicated-worker mode
+
+The systemd web unit and opt-in paired Docker web container set
+`WHAXON_V2_EXTERNAL_WORKER=1`. In this mode the web API durably enqueues V2
+run requests but **does not create an additional process-local queue drainer**.
+Only the separately supervised `workflow-worker` executes V2 queue work.
+When it is down, accepted requests remain queued, never falsely completed.
+Existing web-only users without this flag retain the prior wakeup behavior.
+This flag does not disable unrelated legacy tool/AI execution endpoints;
+those remain a separate authorization and migration obligation.
