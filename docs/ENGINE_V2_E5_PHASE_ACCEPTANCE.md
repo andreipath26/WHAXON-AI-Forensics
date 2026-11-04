@@ -114,3 +114,21 @@ This prevents one-shot headless/CLI drains from mistaking a bounded
 quarantine yield for an empty queue. Retries are capped at 16 passes
 per requested run to prevent starvation from an unbounded producer.
 No uncertain intent is automatically replayed.
+
+### E5 integration evidence update — backup and paired-container verification
+
+The active E5 PR #124 now includes a separated `docker-compose.e5.yml`
+web/worker deployment candidate, non-root state-volume preparation, and CI
+that starts both containers, checks Core readiness, observes persisted state
+across a worker restart, and requires an inert blocked workflow to be consumed
+without launching an external scanner. A paired service smoke does not replace
+real supported-host operation or prove production worker liveness.
+
+An offline state snapshot module `src/whaxon/core/state_snapshot.py` and
+`tests/test_engine_v2_e5_state_snapshot.py` cover SQLite plus scope/evidence
+file preservation, per-file digest verification, symlink rejection, tamper
+detection and no-overwrite restore. Services must be stopped by the operator;
+the manifest does not authenticate itself and external evidence anchoring,
+backup rotation, off-host retention and host-level disaster recovery remain
+unaccepted. All additions are **candidates pending exact-head CI** and the
+final E5-A through E5-G review; no deployment or phase sign-off is asserted.

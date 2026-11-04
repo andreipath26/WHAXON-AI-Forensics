@@ -13,6 +13,7 @@ import shutil
 import sqlite3
 import stat
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 _MANIFEST = "e5-snapshot-manifest.json"
@@ -82,7 +83,7 @@ def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
     independently preserve the returned manifest digest before use.
     """
     state_dir = Path(state_dir).resolve(strict=True)
-    destination = Path(destination).absolute()
+    destination = Path(destination).resolve(strict=False)
     if not state_dir.is_dir() or not (state_dir / _DB).is_file():
         raise ValueError("state directory or workflow database missing")
     if destination.exists() or destination == state_dir or state_dir in destination.parents:
@@ -104,10 +105,11 @@ def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
             target.write_bytes(source.read_bytes())
             target.chmod(0o600)
         with (
-            sqlite3.connect(f"file:{state_dir / _DB}?mode=ro", uri=True) as source,
-            sqlite3.connect(stage / _DB) as target,
+            closing(sqlite3.connect(f"file:{state_dir / _DB}?mode=ro", uri=True)) as source,
+            closing(sqlite3.connect(stage / _DB)) as target,
         ):
             source.backup(target)
+            target.commit()
         (stage / _DB).chmod(0o600)
         _validate_database(stage / _DB)
         copies = _inventory(stage)
@@ -133,7 +135,7 @@ def restore_offline_snapshot(snapshot: Path, destination: Path) -> dict:
     """Restore a verified snapshot into a new directory, never overwrite state."""
     verified = verify_offline_snapshot(snapshot)
     snapshot = Path(snapshot).resolve(strict=True)
-    destination = Path(destination).absolute()
+    destination = Path(destination).resolve(strict=False)
     if destination.exists() or destination == snapshot or snapshot in destination.parents:
         raise ValueError("restore destination must be new and outside snapshot")
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -84,6 +84,16 @@ def test_e5_snapshot_rejects_symlink_and_never_overwrites_state(tmp_path):
         restore_offline_snapshot(tmp_path / "snapshot", original)
 
 
+def test_e5_snapshot_refuses_destination_hidden_under_symlink_parent(tmp_path):
+    original = tmp_path / "original"
+    original.mkdir()
+    _make_state(original)
+    (tmp_path / "alias").symlink_to(original, target_is_directory=True)
+    with pytest.raises(ValueError, match="outside source state"):
+        create_offline_snapshot(original, tmp_path / "alias" / "hidden-backup")
+    assert not (original / "hidden-backup").exists()
+
+
 def test_e5_snapshot_rejects_broken_database(tmp_path):
     root = tmp_path / "invalid"
     root.mkdir()
