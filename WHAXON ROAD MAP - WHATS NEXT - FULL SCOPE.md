@@ -1,5 +1,7 @@
 # WHAXON — Product trajectory and release gates
 
+> **E5 engineering review (2026-11-04):** E5's supported durable V2 service has [bounded engineering acceptance evidence](docs/ENGINE_V2_E5_PHASE_ACCEPTANCE.md) on source SHA `557311dfa125`, [12/12 CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41815823360), and passing supervised Ubuntu systemd plus Docker worker/restore smokes. Final documentation-head CI and [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) phase-review/merge remain required. **This is not production acceptance:** legacy direct dispatch remains a recorded P2/E4 migration obligation, and G01–G10, real-target, external audit-anchor and full deployment gates remain OPEN. Earlier pre-E5 status notes below are historical.
+
 ## Engine V2 E0–E9 phase-freeze policy (operator decision, 2026-11-03)
 
 For **every Engine V2 phase E0–E9**, engineering completion, phase merge and freeze are distinct from final integrated-engine deployment acceptance. A phase may be frozen after its required implementation and interfaces are complete, applicable automated unit/integration/adversarial/security tests and supported exact-head CI pass, residual integration obligations are recorded, and engineering sign-off is documented. Preserve the one-phase/one-branch/one-PR/one-final-merge rule. Do not infer acceptance from source presence or older CI.

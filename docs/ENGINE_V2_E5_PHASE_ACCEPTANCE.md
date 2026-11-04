@@ -1,6 +1,6 @@
 # Engine V2 E5 — whole-phase engineering acceptance register
 
-**Status:** OPEN — implementation and exact-head phase acceptance not yet established.
+**Status (2026-11-04 engineering decision):** E5 **ENGINEERING-ACCEPTED FOR SUPPORTED DURABLE V2 SERVICE SCOPE**, conditional on exact final documentation-only PR-head CI and final PR review. Not production deployment-accepted. Earlier OPEN statements below are dated pre-decision evidence checkpoints and are superseded only within the bounded engineering scope set out in the final decision.
 **Authority:** master roadmap P2/P3, G05/G07; Engine V2 crosswalk §14.1, §14.2, §14.7–14.8 and binding execution rules; engineering execution model.
 **Integration branch:** `engine-v2/e5-whole-phase-integration` (one phase, one PR, one final merge).
 
@@ -195,3 +195,24 @@ separate, open milestones under the roadmap's E0–E9 phase-freeze policy.
 No unapproved real scanner or target execution, no externally retained immutable audit witness in a controlled enterprise environment, no independent production host crash/failover and network service recovery, and no end-to-end parity claim for retained legacy execution surfaces. Those are **not passed**. The engineering smoke is limited to inert unsupported fixture workflows and isolated ephemeral CI runners.
 
 **Merge rule:** mark this PR ready and merge only after documented E5 engineering gates are passed for the supported V2 service scope and exact-final-head CI is green. Even then, E5 engineering freeze **does not authorize production deployment** or close the master roadmap's G01–G10 gates. Keep residual legacy migration assigned to E4/P2 and integrated validation to the final Engine V2 release gate.
+
+## E5 engineering phase-freeze decision — 2026-11-04
+
+**Review source SHA:** `557311dfa12504b22c5d3f32da1f949ac6ae0abd` (all **12/12 GitHub CI jobs successful** in [run #41815823360](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41815823360)).
+**Environment:** CI Python 3.11–3.13 + macOS/Windows/Ubuntu setup, Linux headless, Ubuntu systemd supervised real service units installed from a wheel, paired Docker web+worker with a shared volume, approved inert unsupported-capability task, state restoration, E1 security regressions.
+**Reviewer:** engineering source/test/evidence reconciliation conducted in the E5 integration workflow; **no independent production-operator approval claimed**.
+**Decision:** E5 engineering scope below is accepted as a **phase-freeze candidate** for the supported V2 durable lifecycle, **subject to final exact-PR-head CI and review/merge record**. The operator's existing E0–E9 phase-freeze policy permits separately recorded residual integrated-engine obligations, not false production readiness.
+
+| Gate | Bounded engineering decision | Residual obligation |
+|---|---|---|
+| E5-A | Accepted for the single persisted **V2** queue dispatch authority in paired deployment, source-to-client inventory and fail-closed rollback restrictions; no web-owned V2 drainer when external worker enabled | Legacy CLI ToolRunner, web /api/run, AI and Metasploit direct execution **remain**, explicitly not certified as unified authority. P2/E4 caller migration/no-bypass required before **integrated-engine** acceptance; never claim platform-wide single authority |
+| E5-B | Accepted for supported Core/CLI/API/headless V2 mission, bounded run, approval, progress, evidence, audit and readiness contracts; cross-client submit-run and durable identity regressions | Full legacy UI/front-end operation-semantic migration and all-capability end-to-end parity remain final integration work |
+| E5-C | Accepted for persisted request IDs, client reconnect, server restart, truthful 202, cancellation barrier, blocked worker/no local web fallback | Real network failure and production client deployment testing remain final release work |
+| E5-D | Accepted for SQLite atomic claims, two independent worker processes, stale leases, crash injection, poisoned queue, uncertain-effect no-replay, restored stale worker fencing | No exactly-once external effect guarantee; controlled real external-effect and production multi-host recovery remain open |
+| E5-E | Accepted for candidate service-mode setup: real Ubuntu CI-host systemd units, Docker two-service process separation, queue/state persistence, offline full-state restore, read-only/least-privilege/container tests | Operator-owned service TLS/identity/secrets, actual supported target host/upgrade, network/storage faults, independent backup witness and production disaster recovery not accepted |
+| E5-F | Verified 12/12 at source SHA above, including Ruff, mypy, Python 3.11–3.13, cross-platform setup, packaging, E1 security, Docker and systemd | Exact **final** documentation-only commit must pass the same suite before merge; no waiver |
+| E5-G | Engineering review, impact/rollback decision, source/legacy caller inventory, test-to-gate evidence and upstream roadmap reconciliation recorded here and in PR #124 | Independent external security review and operator deployment sign-off remain separate nonwaivable final full-V2 release gates |
+
+**Final staging decision:** The E5 supported V2 durable-service candidate is suitable for a **controlled staging installation** using documented systemd or Docker paths, with only operator-approved inert/sandboxed work. It is **not certified for unrestricted production use or authorized live-scanner operation**. No E6 functionality, G01–G10 release gate, or full Engine V2 deployment gate is accepted here.
+
+**Source-of-truth ordering:** This decision supersedes earlier E5 candidate/OPEN notes within this file for the bounded engineering scope only. The master roadmap still governs final E4 legacy migration, E6 product UI and integrated deployment. The final PR review/merge record must include the documentation-only head SHA and exact-head CI run link and must refuse merge if any check fails.
