@@ -49,6 +49,70 @@ whaxon.service is included in the repo root. Install:
 
 Adjust User, WorkingDirectory, and paths to your layout.
 
+## Engine V2 durable worker alongside the web service (systemd)
+
+Engine V2 run requests are stored in SQLite and require a **separate supervised
+worker**. Running only `whaxon.service` exposes the web interface but does
+not guarantee that queued V2 work is being processed. Installing a service
+unit is configuration, not proof that a process is healthy.
+
+Use the two repository-provided units from the **same installed WHAXON
+release**: `whaxon.service` and `whaxon-workflow-worker.service`. Both
+specify `User=whaxon`, `WorkingDirectory=/opt/whaxon`,
+`WHAXON_DATA=/var/lib/whaxon/data`, and `StateDirectory=whaxon`.
+Provision the virtual environment and the protected `/etc/whaxon.env`
+before enabling services. Never use default/demo network credentials;
+restrict the environment file to administrators, and ensure the service
+identity can access only its intended persistent state. Review and adjust
+paths for the host instead of blindly copying a unit from another installation.
+
+On a supported systemd host, after reviewing units and provisioning the
+service user, application, environment and state:
+
+```sh
+sudo install -m 0644 whaxon.service whaxon-workflow-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now whaxon.service whaxon-workflow-worker.service
+sudo systemctl status whaxon.service whaxon-workflow-worker.service
+sudo journalctl -u whaxon-workflow-worker.service --no-pager -n 100
+```
+
+The web and worker services use a shared store, **not separate SQLite
+databases**. Do not start an additional ad-hoc drain worker against the same
+installation without first evaluating worker ownership and resource limits.
+The worker runs `whaxon workflow plan serve-requests` in the foreground;
+SIGTERM stops admission of additional claims. An external effect already in
+flight may remain uncertain, not automatically cancelled or replayed.
+
+For a local operational check, inspect the web's Core readiness at
+`http://127.0.0.1:5001/api/health` using the configured authentication
+when required. Core readiness does **not** prove worker liveness. Check the
+worker's systemd status/journal and, as the service account with the
+production data path, inspect `whaxon workflow plan queue-summary`.
+Verify a permitted, explicitly approved synthetic/controlled workflow
+through submission, persisted run-request inspection, restart, reconnect
+and cancellation without unauthorized external activity.
+
+### Backup, recovery and release evidence
+
+Protect the **entire** operator state: the consistent SQLite database
+transactional snapshot, protected configuration and scope/approvals,
+evidence/artifacts and installed-provider inventory. The automated
+`test_engine_v2_e5_backup_restore.py` covers a SQLite-only snapshot, not
+this full recovery. Never claim success from copying a live database file
+without a consistent backup. Before a restore, stop **both** services,
+retain the old state for investigation, restore files with service ownership
+and restrictive permissions, then bring the services back under supervision.
+Treat recovered in-flight/expired work as **uncertain** pending manual
+reconciliation; never silently requeue potentially effectful operations.
+
+Deployment acceptance requires a dated record of host OS, exact commit and
+package version, chosen systemd paths, credentials/proxy/TLS safeguards,
+start/stop/restart behavior, worker claims, approved test target, request
+IDs, queue/audit evidence, complete backup/restore, failure injection,
+known limitations, and reviewer sign-off. Until a real supported-host
+rehearsal succeeds, E5 deployment readiness remains **NOT VERIFIED**.
+
 ## Docker
 
 Hardened container:
