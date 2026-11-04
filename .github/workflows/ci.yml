@@ -16,6 +16,80 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  engine-v2-e5-docker-deployment:
+    name: Engine V2 E5 paired Docker web-worker smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WHAXON_AUTH_USER: ci-operator
+      WHAXON_AUTH_PASS: ci-only-example-long-unique-secret-not-for-deployment
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate isolated E5 Compose configuration
+        run: docker compose -f docker-compose.e5.yml config --quiet
+      - name: Build and start both supervised E5 services
+        timeout-minutes: 22
+        run: docker compose -f docker-compose.e5.yml up -d --build
+      - name: Verify web readiness, worker CLI and shared persistent state
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          credentials = f"{os.environ['WHAXON_AUTH_USER']}:{os.environ['WHAXON_AUTH_PASS']}"
+          value = base64.b64encode(credentials.encode()).decode()
+          url = "http://127.0.0.1:5001/api/health"
+          deadline = time.monotonic() + 90
+          while time.monotonic() < deadline:
+              try:
+                  request = urllib.request.Request(url, headers={"Authorization": f"Basic {value}"})
+                  with urllib.request.urlopen(request, timeout=3) as response:
+                      data = json.load(response)
+                  if data.get("core_ready") is True:
+                      break
+              except (OSError, ValueError, urllib.error.HTTPError):
+                  pass
+              time.sleep(2)
+          else:
+              raise SystemExit("paired E5 web service did not become Core-ready")
+          print("Web Core-ready (not a worker-liveness guarantee)")
+          PY
+          docker compose -f docker-compose.e5.yml exec -T workflow-worker \
+            whaxon workflow plan queue-summary > e5-queue-before.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          state = json.loads(Path("e5-queue-before.json").read_text())
+          assert state["worker_liveness_verified"] is False
+          assert state["automatic_uncertain_replay"] is False
+          PY
+          docker compose -f docker-compose.e5.yml restart workflow-worker
+          docker compose -f docker-compose.e5.yml exec -T workflow-worker \
+            whaxon workflow plan queue-summary > e5-queue-after.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          before = json.loads(Path("e5-queue-before.json").read_text())
+          after = json.loads(Path("e5-queue-after.json").read_text())
+          assert before["schema_version"] == after["schema_version"]
+          assert after["worker_liveness_verified"] is False
+          assert after["automatic_uncertain_replay"] is False
+          PY
+      - name: Capture service diagnostics on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.e5.yml ps || true
+          docker compose -f docker-compose.e5.yml logs --tail=80 || true
+      - name: Tear down without deleting evidence volume
+        if: always()
+        run: docker compose -f docker-compose.e5.yml down || true
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
