@@ -40,3 +40,12 @@ def test_e5_container_image_avoids_baking_operator_proof_data_and_prepares_volum
     assert "USER whaxon" in image
     assert "data/" in ignore.splitlines()
     assert ".git" in ignore.splitlines()
+
+
+def test_e5_container_build_contains_all_hatch_forced_systemd_resources():
+    image = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "COPY whaxon.service whaxon-workflow-worker.service ./" in image
+    assert '"whaxon.service" = "whaxon/data/systemd/whaxon.service"' in metadata
+    assert ('"whaxon-workflow-worker.service" = '
+            '"whaxon/data/systemd/whaxon-workflow-worker.service"') in metadata

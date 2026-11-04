@@ -26,6 +26,8 @@ WORKDIR /app
 # Copy project files
 COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY src/ ./src/
+# Required by pyproject.toml wheel force-include entries.
+COPY whaxon.service whaxon-workflow-worker.service ./
 
 # Install into the venv (no --break-system-packages needed)
 RUN pip install ".[web]"
