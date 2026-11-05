@@ -892,3 +892,41 @@ jobs:
           if counts["tests"] < 13 or any(counts[k] for k in ("failures", "errors", "skipped")):
               raise SystemExit("SearchSploit integration must execute all tests without skips or failures")
           PY
+
+  engine-v2-g01-controlled-lab:
+    name: Engine V2 G01 fixed controlled-lab chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate isolated fixed-address lab topology
+        run: docker compose -f docker-compose.g01-lab.yml config --quiet
+      - name: Generate ephemeral Metasploit RPC credential
+        run: echo "G01_MSF_PASS=$(python -c 'import secrets; print(secrets.token_hex(24))')" >> "$GITHUB_ENV"
+      - name: Build and start fixed .10 target, .11 runner, and .12 seeded fixture
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.g01-lab.yml up -d --build --wait --wait-timeout 1800
+      - name: Run scope through retest with persisted seals and mission report
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.g01-lab.yml exec -T g01-runner \
+            /opt/whaxon-venv/bin/python /opt/whaxon-src/scripts/g01-lab-chain.py \
+            --data-dir /var/lib/whaxon \
+            --artifact /artifacts/g01-mission-report.json
+          test -s artifacts/g01/g01-mission-report.json
+      - name: Preserve controlled-lab evidence artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: engine-v2-g01-controlled-lab-report
+          path: artifacts/g01/g01-mission-report.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Stop lab services and remove ephemeral state
+        if: always()
+        run: |
+          docker compose -f docker-compose.g01-lab.yml down -v --remove-orphans || true
+          rm -rf artifacts/g01

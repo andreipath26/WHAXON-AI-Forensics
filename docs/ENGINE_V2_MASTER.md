@@ -1442,7 +1442,7 @@ G01 is **IN PROGRESS and OPEN** on main baseline `b12470d6708ab658fd86195b9e8bc2
 
 A read-only local portfolio audit recorded 24 catalog entries, 26 discovered adapters, 12 V2-bound catalog tools, 12 unsupported catalog entries, four adapter-only integrations, and zero executable providers in that audit environment. None of the admitted providers was smoke-tested, lab-validated, or end-to-end-verified there. This is environment-specific evidence; it is not a target-host readiness claim.
 
-**G01 is not ready to freeze.** The required controlled full solo chain has not been executed, and the current V2 provider set has no admitted initial-access capability. Bounded SQLi and reflected-XSS verification/retest operations are scheduler-owned, but timing/observation paths remain uncovered and neither verifier has been independently lab-validated. Keep G01 open until the full chain and all required evidence pass. Do not start the next gate or mark this gate frozen before that acceptance record exists.
+**G01 is not ready to freeze.** The required controlled full solo chain has not been executed. A fixed, explicitly opted-in initial-access provider now binds the Metasploitable2 lab target `.10`, Samba usermap module, payload, and `.11:4444` callback. A dedicated private Compose lab and exact-head CI job now define the callback/RPC runner and seeded verifier fixture; Docker is unavailable on this workspace, so image startup, exploit compatibility, and the complete retained chain remain unverified. Bounded SQLi and reflected-XSS verification/retest operations are scheduler-owned, but timing/observation paths remain uncovered and neither verifier has been independently lab-validated. Keep G01 open until the full chain and all required evidence pass. Do not start the next gate or mark this gate frozen before that acceptance record exists.
 
 ### G01 candidate update — 2026-11-05
 
@@ -1453,24 +1453,31 @@ current working candidate also adds scheduler-owned SQLi and reflected-XSS
 verification and conservative retest tasks for sealed, same-target V2 findings,
 plus read-only `whaxon workflow plan report --id PLAN` output over only that
 plan's persisted evidence. The report labels failed, partial, or unsealed
-evidence as partial and cannot claim full-chain acceptance. The HTTP
+evidence as partial and cannot claim full-chain acceptance. The new
+`whaxon workflow mission report --id MISSION` aggregate orders scope, recon,
+enumeration, initial access, verification, its own report stage, and retest.
+It rechecks plan-bound authorization and readiness for each source plan, and
+requires recorded, integrity-verified attempts; it accepts only mission-linked
+plan IDs and synthesizes no source evidence. It is a report contract and does
+not itself satisfy G01's controlled end-to-end acceptance. The HTTP
 requests recheck scope immediately before dispatch, reject redirects and
 path changes, and accept IP literals only to prevent DNS rebinding. Results
 are written to separate V2 evidence jobs. This remains a narrow SQLi/reflected-XSS
-subset: timing and observation validation are not integrated, each operation
-is a separate plan, and no initial-access capability or controlled full-chain
-proof exists.
+subset: timing and observation validation are not integrated, and each
+verification or retest operation is a separate plan. The fixed initial-access
+provider, private lab topology, and exact-head chain job are implemented but
+not yet lab-validated; no controlled full-chain proof exists.
 
-Local focused results: **337** G01 tests pass across capability serialization,
-providers/workflows, plan reporting, API/CLI, callsite inventory, Burp import,
-SQLmap parsing, and SQLi/reflected-XSS verification. Ruff, Python compilation,
-and `git diff --check` pass. The API now serializes nested
+The latest local batches passed **416** workflow and Engine V2 tests and **70**
+additional crosswalk, verifier, scanner-fixture, and lab-provider tests.
+Ruff, Python compilation, and `git diff --check` pass. The API now serializes nested
 capability-schema arrays as JSON arrays while retaining immutable manifests.
 The previous exact-head candidate failed its SQLmap loopback smoke because the
 fixture evaluated only the first boolean conjunction. The local fixture now
-evaluates every conjunction, has direct regression tests, and the report path
-has focused component coverage; these changes await exact-head CI. G01 remains
-**OPEN** and unfrozen; the full controlled chain is still unproven.
+evaluates every conjunction, has direct regression tests, and plan/mission
+reports reject unsealed or incomplete evidence. Exact-head CI is still pending
+on the earlier candidate; the new local changes have not yet run in CI. G01
+remains **OPEN** and unfrozen; the full controlled chain is still unproven.
 
 ## Engineering delivery tracks that can proceed while UI is blocked
 

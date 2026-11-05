@@ -440,20 +440,35 @@ follows; the gaps below prevent a G01 pass.
 | --- | --- | --- |
 | Scope and bounded plan | Mission, typed plan/task, scope authorization, exact approval, limits and scheduler path in `Core`; see `test_workflow.py`, `test_providers.py`, and `test_engine_v2_e1_boundary.py`. | Implemented components; full cross-client and controlled-target acceptance is open under G02/G05. |
 | Recon and enumeration | Admitted local-process providers listed above; fixed catalog argv goes through `ToolRunner`. | Provider contracts exist, but this local environment has no installed V2 binaries and none is smoke/lab/E2E verified. |
-| Supported initial access | No provider is admitted with an initial-access capability. The admitted `sqlmap` provider is only declared as `web.sql_injection.assess`; its catalog-default invocation may detect/assess SQL injection but is not registered as an access-gaining capability or independent verification. `commix`, `impacket`, and MSF/session actions remain excluded or on legacy paths. | **Missing from V2.** Do not count SQLi assessment as initial access; the full release chain cannot currently exercise that stage through V2. |
+| Supported initial access | `lab.initial_access.samba_usermap` is a registered critical-impact provider restricted to the checked-in Metasploitable2 target `172.28.0.10`, fixed module `exploit/multi/samba/usermap_script`, fixed payload `cmd/unix/reverse_netcat`, and callback `172.28.0.11:4444`. It accepts no dynamic task inputs; requires `WHAXON_ENABLE_V2_LAB_INITIAL_ACCESS=1`, a scope reload/check, and exact plan-bound critical approval. It uses loopback MSF RPC, confirms a matching session on the fixed target, and seals the MSF remote job/session IDs as evidence; it does not execute commands or invoke legacy auto-chain. The session remains open for operator-controlled lab follow-up and must be closed through Metasploit; the G01 CI harness closes its own session after evidence capture. | **Implemented, not accepted.** Fake-client contract tests cover fixed options, opt-in, target, scope reload, RPC binding and remote-to-local evidence linkage. A new isolated `docker-compose.g01-lab.yml` pins the target image, places the RPC runner at `.11` with MSF RPC bound to loopback, and serves a seeded boolean SQLi fixture at `.12` on a private network with no published ports. A CI harness now constructs the ordered plans and approvals and retains the mission report. Source-level checks pass; Docker is unavailable on this workspace, so image build, target startup, callback/RPC connectivity, actual module compatibility and the complete chain await exact-head CI. Do not claim lab success before that run passes. |
 | Independent verification | `tool.verify_sqli`/`tool.retest_sqli` and `tool.verify_xss`/`tool.retest_xss` run bounded SQLi or reflected-XSS probes as approved V2 scheduler tasks, require a successful same-target V2 finding of the matching kind with a valid evidence seal, and write separate sealed result jobs. Every HTTP request rechecks scope and exact URL path; only IP-literal targets are accepted to avoid DNS rebinding. | **Partial.** Timing/observation paths are not covered; each operation requires a separate plan and neither verifier family has been independently lab-validated. G03 remains open. |
 | Evidence, report, retest | `Core.workflow_report` and `whaxon workflow plan report --id PLAN` render only persisted evidence linked to one named plan, excluding unsealed findings and marking failed, incomplete or truncated attempts partial. Scheduler-owned SQLi/XSS verification and retests each produce sealed jobs. | Component paths are implemented, but no accepted end-to-end chain/report/retest proof exists; legacy export/report parity also remains open under G04/G05. |
 
+`Core.workflow_mission_report` and `whaxon workflow mission report --id MISSION`
+aggregate only plan IDs persisted under that mission (or an explicitly
+selected subset of those plans). Required order is scope → recon → enumeration
+→ initial access → verification → report → retest. Scope is rechecked against
+each immutable plan's exact task authorization and readiness; stage plans must
+have complete reports with recorded, integrity-verified attempts. The aggregate
+itself supplies the report stage after sealed verification evidence, so no
+synthetic report plan or arbitrary job ID is accepted. A partial/missing stage,
+failed authorization/readiness check, truncated report, or unsealed attempt
+keeps the result partial. This is chain-report evidence only, not G01 acceptance
+or production deployment approval. See `tests/test_workflow_mission_report.py`.
+
 Existing tests establish component and client behavior; none is the required
 controlled full solo-chain run with retained, independently verified proof.
-This assessment does not authorize adding or exercising high-impact initial
-access against any target. The missing stage must be resolved through the
-reviewed capability, consent, evidence and rollback contracts before G01 can
-close.
+The opt-in provider is limited to the repository's exact lab target and plan
+approval; its presence does not establish working target compatibility or
+authorize any other target. G01 remains open until its topology, execution,
+evidence retention and complete chain satisfy controlled-lab acceptance.
 
 This matrix is not G01 closeout. It records source mappings and a local
 readiness snapshot; the required controlled full solo chain has not been
-executed. Catalog/admission/transport changes are guarded by
+executed. The initial-access provider is not accepted based on fake-client
+tests; the `.11` callback and loopback MSF RPC endpoint must be reachable in
+the deployed lab topology, and the fixed Samba module must open a matching
+session on the actual `.10` image. Catalog/admission/transport changes are guarded by
 `test_catalog_transports_and_v2_admission_are_explicit` in addition to the
 runner and service callsite guards.
 

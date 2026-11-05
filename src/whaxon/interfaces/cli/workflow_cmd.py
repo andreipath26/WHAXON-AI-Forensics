@@ -93,6 +93,15 @@ def _parser() -> argparse.ArgumentParser:
         "plans", help="list persisted plans for a mission",
     )
     mission_plans.add_argument("--id", required=True)
+    mission_report = mission_commands.add_parser(
+        "report", help="aggregate a sequenced release chain from persisted plan evidence",
+    )
+    mission_report.add_argument("--id", required=True)
+    mission_report.add_argument(
+        "--plan-id", action="append", dest="plan_ids",
+        help="plan ID in chain order; repeat once per stage (default: recorded mission plans)",
+    )
+    mission_report.add_argument("--limit", type=int, default=100)
 
     plan = commands.add_parser("plan", help="manage persisted workflow plans")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
@@ -306,6 +315,12 @@ def main(args: list[str] | None = None) -> int:
                 core.mission_workflow_plans(options.id), indent=2, sort_keys=True,
             ))
             return 0
+        if options.command == "mission" and options.mission_command == "report":
+            report = core.workflow_mission_report(
+                options.id, plan_ids=options.plan_ids, limit=options.limit,
+            )
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0 if report["status"] == "complete" else 1
         if options.command == "plan" and options.plan_command == "approval":
             if options.approval_command == "list":
                 print(json.dumps(
