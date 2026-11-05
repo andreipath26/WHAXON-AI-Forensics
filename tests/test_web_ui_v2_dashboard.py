@@ -1081,3 +1081,8 @@ def test_dashboard_uses_packaged_stylesheet_not_runtime_tailwind_cdn(page, live_
     assert page.evaluate(
         "() => getComputedStyle(document.body).backgroundColor"
     ) == "rgb(15, 19, 28)"
+
+
+def test_dashboard_document_has_descriptive_browser_and_screen_reader_title(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    assert page.title() == "WHAXON — Security Operations Dashboard"
