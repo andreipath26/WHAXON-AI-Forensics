@@ -594,15 +594,20 @@
     row.appendChild(cell);
     return cell;
   };
+  const fetchBounded = (path, options = {}) => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 5000);
+    return fetch(path, { ...options, signal: controller.signal }).finally(() => window.clearTimeout(timer));
+  };
   async function load() {
     const [historyResult, activeJobsResult, reportResult, toolsResult, scopeResult, statusResult, healthResult] = await Promise.allSettled([
-      fetch("/api/history").then(r => { if (!r.ok) throw new Error("History HTTP " + r.status); return r.json(); }),
-      fetch("/api/jobs/active").then(r => { if (!r.ok) throw new Error("Active jobs HTTP " + r.status); return r.json(); }),
-      fetch("/api/report?format=json").then(r => { if (!r.ok) throw new Error("Report HTTP " + r.status); return r.json(); }),
-      fetch("/api/tools").then(r => { if (!r.ok) throw new Error("Tools HTTP " + r.status); return r.json(); }),
-      fetch("/api/scope").then(r => { if (!r.ok) throw new Error("Scope HTTP " + r.status); return r.json(); }),
-      fetch("/api/status").then(r => { if (!r.ok) throw new Error("Status HTTP " + r.status); return r.json(); }),
-      fetch("/api/health/simple").then(r => { if (!r.ok) throw new Error("Health HTTP " + r.status); return r.json(); })
+      fetchBounded("/api/history").then(r => { if (!r.ok) throw new Error("History HTTP " + r.status); return r.json(); }),
+      fetchBounded("/api/jobs/active").then(r => { if (!r.ok) throw new Error("Active jobs HTTP " + r.status); return r.json(); }),
+      fetchBounded("/api/report?format=json").then(r => { if (!r.ok) throw new Error("Report HTTP " + r.status); return r.json(); }),
+      fetchBounded("/api/tools").then(r => { if (!r.ok) throw new Error("Tools HTTP " + r.status); return r.json(); }),
+      fetchBounded("/api/scope").then(r => { if (!r.ok) throw new Error("Scope HTTP " + r.status); return r.json(); }),
+      fetchBounded("/api/status").then(r => { if (!r.ok) throw new Error("Status HTTP " + r.status); return r.json(); }),
+      fetchBounded("/api/health/simple").then(r => { if (!r.ok) throw new Error("Health HTTP " + r.status); return r.json(); })
     ]);
     const historyAvailable = historyResult.status === "fulfilled" && Array.isArray(historyResult.value) &&
       historyResult.value.every(job => job && typeof job === "object" && !Array.isArray(job));
@@ -804,9 +809,12 @@
       }
       filterInput.dispatchEvent(new Event("input"));
     }
+    let exportInFlight = false;
     async function exportHistory() {
+      if (exportInFlight) return;
+      exportInFlight = true;
       try {
-        const response = await fetch("/api/history");
+        const response = await fetchBounded("/api/history");
         if (!response.ok) throw new Error("History HTTP " + response.status);
         const records = await response.json();
         if (!Array.isArray(records) || !records.every(job => job && typeof job === "object" && !Array.isArray(job))) {
@@ -824,6 +832,8 @@
         showActionStatus("Exported " + (Array.isArray(records) ? records.length : 0) + " recorded job(s) as JSON.", "success");
       } catch (error) {
         showActionStatus("History export failed: " + error.message, "error");
+      } finally {
+        exportInFlight = false;
       }
     }
     let haltInFlight = false;
@@ -831,7 +841,7 @@
       if (haltInFlight) return;
       haltInFlight = true;
       try {
-        const response = await fetch("/api/jobs/active");
+        const response = await fetchBounded("/api/jobs/active");
         if (!response.ok) throw new Error("Active jobs HTTP " + response.status);
         const active = await response.json();
         if (!Array.isArray(active) || !active.every(job => job && typeof job === "object" && !Array.isArray(job))) {
@@ -846,7 +856,7 @@
           try {
             const id = job.id || job.job_id;
             if (typeof id !== "string" || !id.trim()) return false;
-            const result = await fetch("/api/jobs/" + encodeURIComponent(id) + "/cancel", { method: "POST" });
+            const result = await fetchBounded("/api/jobs/" + encodeURIComponent(id) + "/cancel", { method: "POST" });
             if (!result.ok) return false;
             const body = await result.json();
             return body && body.ok === true;
@@ -864,16 +874,18 @@
         haltInFlight = false;
       }
     }
+    let importInFlight = false;
     async function uploadBurpFile(file) {
-      if (!file) return;
+      if (!file || importInFlight) return;
       if (!file.name.toLowerCase().endsWith(".xml")) {
         showActionStatus("This import currently accepts Burp XML exports (.xml) only; Nmap and scope-profile imports are not wired yet.", "error");
         return;
       }
+      importInFlight = true;
       const form = new FormData();
       form.append("file", file);
       try {
-        const response = await fetch("/api/import/burp", { method: "POST", body: form });
+        const response = await fetchBounded("/api/import/burp", { method: "POST", body: form });
         const result = await response.json();
         if (!response.ok) throw new Error(result?.error || ("Import HTTP " + response.status));
         if (!result || !Number.isSafeInteger(result.count) || result.count < 1) {
@@ -883,6 +895,8 @@
         window.location.href = "/ui-v2/findings";
       } catch (error) {
         showActionStatus("Artifact import failed: " + error.message, "error");
+      } finally {
+        importInFlight = false;
       }
     }
     function importBurpXml() {

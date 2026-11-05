@@ -903,3 +903,48 @@ def test_dashboard_error_message_is_announced_as_accessibility_alert(page, live_
         timeout=8000,
     )
     assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+
+
+def test_dashboard_api_connection_abort_is_unavailable_not_empty(page, live_server):
+    """An aborted transport must not show fabricated zero metrics."""
+    for route_path in ("/api/history", "/api/tools", "/api/jobs/active"):
+        page.route(
+            f"**{route_path}",
+            lambda route: route.abort("timedout"),
+        )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('Live job history is unavailable')",
+        timeout=8000,
+    )
+    cards = page.locator(".rounded-lg.bg-surface-container-low.p-space-md")
+    assert "STATUS UNAVAILABLE" in cards.filter(has_text="Active Scans").inner_text()
+    assert "STATUS UNAVAILABLE" in cards.filter(has_text="Active Adapters").inner_text()
+    assert page.locator("#dashboard-history-count").inner_text() == "—"
+
+
+def test_dashboard_export_is_single_flight_during_pending_request(page, live_server):
+    """Repeated Export clicks cannot cause simultaneous duplicate downloads."""
+    calls = []
+    def history(route):
+        calls.append(route)
+        # Keep export response pending until duplicate clicks have been attempted.
+        if len(calls) > 1:
+            route.fulfill(status=200, content_type="application/json", body="[]")
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.route("**/api/history", history)
+    button = page.get_by_role("button", name=re.compile("Export Archive"))
+    button.click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    button.click()
+    page.wait_for_timeout(150)
+    assert len(calls) == 1
+    calls[0].fulfill(status=200, content_type="application/json", body="[]")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Exported 0 recorded job')",
+        timeout=8000,
+    )
