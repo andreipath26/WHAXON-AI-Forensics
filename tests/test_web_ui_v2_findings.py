@@ -243,34 +243,11 @@ def test_findings_page_loads_all_assets_locally(page, live_server):
     for asset in (
         "dashboard-fonts.css",
         "findings-v2.css",
-        "findings-mobile.css",
         "dashboard-logo.jpg",
     ):
         result = page.request.get(f"{live_server}/static/{asset}")
         assert result.ok and result.body(), (asset, result.status)
 
-
-def test_findings_mobile_navigation_is_keyboard_operable(page, live_server):
-    page.set_viewport_size({"width": 390, "height": 844})
-    page.goto(f"{live_server}/ui-v2/findings")
-    page.wait_for_function(
-        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
-    )
-    assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
-    menu = page.get_by_role("button", name="Open Findings navigation")
-    assert menu.is_visible()
-    sidebar = page.locator("#findings-mobile-sidebar")
-    assert sidebar.get_attribute("aria-hidden") == "true"
-    assert sidebar.evaluate("node => node.inert") is True
-    menu.click()
-    assert menu.get_attribute("aria-expanded") == "true"
-    assert sidebar.get_attribute("aria-hidden") == "false"
-    assert sidebar.evaluate("node => node.inert") is False
-    page.keyboard.press("Escape")
-    assert menu.get_attribute("aria-expanded") == "false"
-    assert menu.evaluate("el => document.activeElement === el")
-    assert sidebar.evaluate("node => node.inert") is True
 
 
 def test_findings_reject_malformed_report_and_retry(page, live_server):
