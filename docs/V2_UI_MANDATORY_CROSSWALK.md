@@ -267,15 +267,17 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 ## Findings page
 | ID | Element | Expected | Actual | Backend | Status |
 |---|---|---|---|---|---|
-| F.01 | Findings table load | Fetch /api/report, render rows | Works | GET /api/report | PASS |
-| F.02 | Row click | Open slide-over | Works | none | PASS |
-| F.03 | Validate button | POST /api/validate | Wired | POST /api/validate/<job>/<seq> | WIRED |
-| F.04 | Retest button | POST /api/retest | Wired | POST /api/retest/<job>/<seq> | WIRED |
-| F.05 | Sort headers | Reorder table | Works | none | PASS |
-| F.06 | Density toggle | Change row density | Works | none | PASS |
-| F.07 | Bulk mark verified | Bulk verification | Hidden | none | HIDDEN |
-| F.08 | Bulk delete | Bulk delete | Hidden | none | HIDDEN |
-| F.09 | AI banner | Dismiss/approve proposal | Hidden | none | HIDDEN |
+| F.01 | Findings list | Load and render validated live report records; show empty, unavailable, malformed-response, and retry states | Implemented | GET /api/report?format=json | TESTS ADDED; BROWSER RUN PENDING |
+| F.02 | Finding card | Select a finding and inspect only recorded fields | Implemented | none | EXISTING BROWSER TEST |
+| F.03 | Validate selected finding | Submit validation and report the returned result | Implemented | POST /api/validate/<job>/<seq> | EXISTING BROWSER TEST |
+| F.04 | Retest selected / verified findings | Submit retest; report each failed item in a verified batch | Implemented | POST /api/retest/<job>/<seq> | TEST ADDED; BROWSER RUN PENDING |
+| F.05 | Severity, status, and adapter filters | Filter the live list; each filter can be cleared | Implemented | none | WIRED |
+| F.06 | Finding search | Search finding and recorded evidence fields | Implemented | none | EXISTING BROWSER TEST |
+| F.07 | Copy Evidence | Copy the selected finding's recorded evidence | Implemented | Clipboard API | WIRED |
+| F.08 | Scope status | Display current scope summary and enforcement state | Implemented | GET /api/scope | EXISTING BROWSER TEST |
+| F.09 | Mark Fixed / Issue Tracker export / approvals | Unsupported controls are hidden; no state is claimed | Hidden at runtime | none | HIDDEN |
+
+The former F.05 “Sort headers” and F.06 “Density toggle” rows described controls absent from this card-list design and are retired. Bulk verify/delete and the AI banner are not controls in the current source; they are not counted as hidden controls. Mark Fixed, Issue Tracker export, and approvals remain source-visible placeholder buttons with inert handlers; current page JavaScript hides them at runtime until real actions exist.
 
 ## Run page
 | R.01 | Catalog load | Fetch /api/tools | Works | GET /api/tools | PASS |
@@ -363,7 +365,7 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 
 This is a complete **static source-control registry**, not a declaration that every control is live or accepted. It covers anchors, buttons, inputs, selects, textareas, summaries explicit button/link roles, inline event handlers, focusable tabindex and editable elements, including initially hidden controls. IDs are template plus one-based line:column; minified shell markup can share a line. Controls dynamically created by JavaScript, computed CSS visibility, event delegation and backend permissions require runtime inspection.
 
-`source-hidden` includes an explicit hidden ancestor/class/style and can be responsive; `disabled` is declared disabled; `declared-nav` has a canonical href; `inline-handler` declares JavaScript; `script-reference` only means an ID/data-path occurs in an inline script, **not** that an event handler or backend works; `unresolved-static` means no binding was established by this conservative inspection. Unresolved controls are review items, not automatically dead controls. Every source row retains its binding evidence for follow-up.
+`source-hidden` includes an explicit hidden ancestor/class/style and can be responsive; `disabled` is declared disabled; `declared-nav` has a canonical href; `inline-handler` declares JavaScript; `script-reference` only means an ID/data-path or explicit `data-filter-action`/`data-filter-value` is referenced in an inline script, **not** that an event handler or backend works; `unresolved-static` means no binding was established by this conservative inspection. Unresolved controls are review items, not automatically dead controls. Every source row retains its binding evidence for follow-up.
 
 ## Acceptance still open
 
@@ -388,7 +390,7 @@ This is a complete **static source-control registry**, not a declaration that ev
 | ui_v2_dashboard.html | 35 | 2 | 0 | 0 | 0 | 21 | 12 |
 | ui_v2_diagnostics.html | 33 | 0 | 0 | 0 | 12 | 17 | 4 |
 | ui_v2_evidence.html | 35 | 0 | 0 | 0 | 0 | 14 | 21 |
-| ui_v2_findings.html | 25 | 0 | 0 | 1 | 4 | 7 | 13 |
+| ui_v2_findings.html | 26 | 1 | 0 | 1 | 4 | 20 | 0 |
 | ui_v2_history.html | 31 | 0 | 3 | 0 | 0 | 16 | 12 |
 | ui_v2_monitoring.html | 45 | 0 | 0 | 0 | 0 | 19 | 26 |
 | ui_v2_ptaas.html | 42 | 5 | 0 | 0 | 11 | 17 | 9 |
@@ -852,25 +854,26 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 4:5490 | a | verified_user Trust Layer & Findings | script-reference | # |
 | 4:5843 | a | analytics PTES Coverage & Reports | script-reference | # |
 | 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
-| 126:1 | button | ALL | unresolved-static | — |
-| 127:1 | button | CRIT (1) | unresolved-static | — |
-| 128:1 | button | HIGH (2) | unresolved-static | — |
-| 129:1 | button | MED (1) | unresolved-static | — |
-| 130:1 | button | LOW (0) | unresolved-static | — |
-| 135:1 | button | ALL | unresolved-static | — |
-| 136:1 | button | VERIFIED (6) | unresolved-static | — |
-| 137:1 | button | CANDIDATE (11) | unresolved-static | — |
-| 138:1 | button | REVIEW NEEDED | unresolved-static | — |
-| 143:1 | button | ALL | unresolved-static | — |
-| 144:1 | button | Nuclei | unresolved-static | — |
-| 145:1 | button | sqlmap | unresolved-static | — |
-| 146:1 | button | Nikto | unresolved-static | — |
+| 126:1 | button | ALL | script-reference | filter:severity:all |
+| 127:1 | button | CRIT (1) | script-reference | filter:severity:critical |
+| 128:1 | button | HIGH (2) | script-reference | filter:severity:high |
+| 129:1 | button | MED (1) | script-reference | filter:severity:medium |
+| 130:1 | button | LOW (0) | script-reference | filter:severity:low |
+| 135:1 | button | ALL | script-reference | filter:status:all |
+| 136:1 | button | VERIFIED (6) | script-reference | filter:status:verified |
+| 137:1 | button | CANDIDATE (11) | script-reference | filter:status:candidate |
+| 138:1 | button | REVIEW NEEDED | script-reference | filter:status:review_needed |
+| 143:1 | button | ALL | script-reference | filter:adapter:all |
+| 144:1 | button | Nuclei | script-reference | filter:adapter:nuclei |
+| 145:1 | button | sqlmap | script-reference | filter:adapter:sqlmap |
+| 146:1 | button | Nikto | script-reference | filter:adapter:nikto |
 | 151:1 | input | Filter findings by proof pattern, URL, or CVE | script-reference | whaxon-finding-filter |
-| 247:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
-| 309:1 | button | play_arrow Replay Test (Retest) | script-reference | replay-btn |
-| 313:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
-| 319:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
-| 323:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
+| 165:229 | button | Retry | source-hidden | whaxon-findings-retry |
+| 248:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
+| 310:1 | button | play_arrow Replay Test (Retest) | script-reference | replay-btn |
+| 314:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
+| 320:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
+| 324:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
 
 ### ui_v2_history.html
 
