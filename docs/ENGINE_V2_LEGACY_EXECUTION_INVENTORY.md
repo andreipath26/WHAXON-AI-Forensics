@@ -39,6 +39,7 @@ runner inventory.
 | `interfaces/cli/retest_cmd.py` | `main` | `Validator.revalidate` → `Validator.validate` | Requires a previously verified finding and rechecks target scope before calling the validator. The validator itself does not enforce scope. | Updates legacy finding verification state. Direct HTTP probes; no V2 task/attempt record. |
 | `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | `_validation_scope_error` checks target presence and current scope before the probe. The validator itself does not enforce scope. | Updates legacy verification state and proof through `JobStore`; not dispatched as a V2 workflow task. |
 | `interfaces/web/server.py` | `create_app.api_retest` | `Validator.revalidate` → `Validator.validate` | Requires `verification_status == "verified"`; `_validation_scope_error` checks target presence and current scope before the probe. | Updates legacy verification state through `JobStore`; not dispatched as a V2 workflow task. |
+| `interfaces/web/server.py` | `create_app.msf_run._do_run` | MSF adapter `run_module` | The MSF route validates module/target inputs and checks target scope before enqueueing its worker. This direct adapter path is not a `ToolRunner` dispatch. | Persists job output/findings through `JobStore`; no V2 workflow task, lease, attempt or cancellation record. Keep separate from catalog tools routed through `ToolRunner`. |
 
 `Validator.revalidate` calling `self.validate` is an internal service delegation,
 not a second external dispatch. The dedicated tests currently include
@@ -48,6 +49,16 @@ These prove selected service and route behavior; they do not establish
 cross-client V2 parity, durable workflow ownership, operator consent, or
 deployment acceptance. Keep the service paths classified as legacy until a
 separate capability mapping and migration with rollback evidence is accepted.
+
+## Adapter subprocess ownership
+
+`HashcatAdapter.run_module` and `ImpacketAdapter.run_module` contain direct
+subprocess hooks, but repository callsite search found no callers for either
+hook. The only direct `adapter.run_module(...)` invocation is in the MSF route,
+which resolves the MSF adapter. Do not treat the Hashcat/Impacket hooks as
+reachable execution paths until a caller is added and its authorization owner
+is reviewed. Current Impacket catalog and SMB/WMI session execution goes through
+`ToolRunner`, which applies target/scope checks before dispatch.
 
 ## Migration constraint
 
