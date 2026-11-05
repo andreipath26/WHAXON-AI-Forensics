@@ -628,3 +628,87 @@ def test_dashboard_null_status_payload_preserves_history_without_fake_engagement
     assert page.locator("#dashboard-history-count").inner_text() != "—"
     assert page.get_by_text("Default Credentials Detected").count() == 0
     assert page.get_by_text("Credential Status Unavailable").count() >= 1
+
+
+def test_dashboard_malformed_report_preserves_independent_live_panels(page, live_server):
+    """Bad nested report data must not halt history, scope or tool panels."""
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"jobs":[{"findings":null},{"findings":[null]}]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert "—" in page.locator(".rounded-lg.bg-surface-container-low.p-space-md").filter(
+        has_text="Verified Findings"
+    ).inner_text()
+    assert "STATUS UNAVAILABLE" in page.locator(
+        ".rounded-lg.bg-surface-container-low.p-space-md"
+    ).filter(has_text="Verified Findings").inner_text()
+    assert page.locator("#dashboard-history-count").inner_text() != "—"
+
+
+def test_dashboard_malformed_tools_response_is_unavailable_not_zero(page, live_server):
+    page.route(
+        "**/api/tools",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='[null]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert "STATUS UNAVAILABLE" in page.locator(
+        ".rounded-lg.bg-surface-container-low.p-space-md"
+    ).filter(has_text="Active Adapters").inner_text()
+
+
+def test_dashboard_malformed_history_rows_do_not_crash_independent_panels(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='[null]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('Live job history is unavailable')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-history-count").inner_text() == "—"
+    assert page.locator("#dashboard-engine-state").inner_text() == "ENGINE ONLINE"
+
+
+def test_dashboard_emergency_halt_reports_partial_failures_and_continues(page, live_server):
+    calls = []
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":"good"},{"id":"bad"}]',
+        ),
+    )
+    def cancel(route):
+        calls.append(route.request.url)
+        if route.request.url.endswith("/bad/cancel"):
+            route.fulfill(status=503, content_type="application/json", body='{"error":"unavailable"}')
+        else:
+            route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
+    page.route("**/api/jobs/*/cancel", cancel)
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 1 of 2')",
+        timeout=8000,
+    )
+    assert len(calls) == 2
+    assert "text-error" in page.locator("#dashboard-action-status").get_attribute("class")

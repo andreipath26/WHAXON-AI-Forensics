@@ -585,13 +585,20 @@
       fetch("/api/status").then(r => { if (!r.ok) throw new Error("Status HTTP " + r.status); return r.json(); }),
       fetch("/api/health/simple").then(r => { if (!r.ok) throw new Error("Health HTTP " + r.status); return r.json(); })
     ]);
-    const historyAvailable = historyResult.status === "fulfilled" && Array.isArray(historyResult.value);
+    const historyAvailable = historyResult.status === "fulfilled" && Array.isArray(historyResult.value) &&
+      historyResult.value.every(job => job && typeof job === "object" && !Array.isArray(job));
     const jobs = historyAvailable ? historyResult.value : [];
-    const activeJobsAvailable = activeJobsResult.status === "fulfilled" && Array.isArray(activeJobsResult.value);
+    const activeJobsAvailable = activeJobsResult.status === "fulfilled" && Array.isArray(activeJobsResult.value) &&
+      activeJobsResult.value.every(job => job && typeof job === "object" && !Array.isArray(job));
     const activeJobs = activeJobsAvailable ? activeJobsResult.value : [];
-    const reportAvailable = reportResult.status === "fulfilled" && reportResult.value && typeof reportResult.value === "object" && Array.isArray(reportResult.value.jobs);
+    const reportAvailable = reportResult.status === "fulfilled" && reportResult.value && typeof reportResult.value === "object" &&
+      Array.isArray(reportResult.value.jobs) && reportResult.value.jobs.every(item =>
+        item && typeof item === "object" && !Array.isArray(item) &&
+        (item.findings == null || (Array.isArray(item.findings) && item.findings.every(f => f && typeof f === "object" && !Array.isArray(f))))
+      );
     const report = reportAvailable ? reportResult.value : {};
-    const toolsAvailable = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value);
+    const toolsAvailable = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value) &&
+      toolsResult.value.every(tool => tool && typeof tool === "object" && !Array.isArray(tool));
     const tools = toolsAvailable ? toolsResult.value : [];
     const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
     const scopeAvailable = scopeResult.status === "fulfilled" && isObject(scopeResult.value);
@@ -756,7 +763,9 @@
         const response = await fetch("/api/history");
         if (!response.ok) throw new Error("History HTTP " + response.status);
         const records = await response.json();
-        if (!Array.isArray(records)) throw new Error("History API returned an invalid response.");
+        if (!Array.isArray(records) || !records.every(job => job && typeof job === "object" && !Array.isArray(job))) {
+          throw new Error("History API returned an invalid response.");
+        }
         const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), jobs: records }, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -776,22 +785,29 @@
         const response = await fetch("/api/jobs/active");
         if (!response.ok) throw new Error("Active jobs HTTP " + response.status);
         const active = await response.json();
-        if (!Array.isArray(active)) throw new Error("Active jobs API returned an invalid response.");
+        if (!Array.isArray(active) || !active.every(job => job && typeof job === "object" && !Array.isArray(job))) {
+          throw new Error("Active jobs API returned an invalid response.");
+        }
         if (!active.length) {
           showActionStatus("No running jobs were found. Nothing was cancelled.");
           return;
         }
         if (!window.confirm("Cancel " + active.length + " active WHAXON job(s)? This cannot be undone.")) return;
         const results = await Promise.all(active.map(async job => {
-          const id = job.id || job.job_id;
-          if (!id) return false;
-          const result = await fetch("/api/jobs/" + encodeURIComponent(id) + "/cancel", { method: "POST" });
-          if (!result.ok) return false;
-          const body = await result.json();
-          return body.ok === true;
+          try {
+            const id = job.id || job.job_id;
+            if (!id) return false;
+            const result = await fetch("/api/jobs/" + encodeURIComponent(id) + "/cancel", { method: "POST" });
+            if (!result.ok) return false;
+            const body = await result.json();
+            return body && body.ok === true;
+          } catch (_) {
+            return false;
+          }
         }));
         const cancelled = results.filter(Boolean).length;
-        showActionStatus("Cancellation requested for " + cancelled + " of " + active.length + " active job(s). Refreshing job state.", cancelled ? "success" : "error");
+        showActionStatus("Cancellation requested for " + cancelled + " of " + active.length + " active job(s). Refreshing job state.",
+          cancelled === active.length ? "success" : "error");
         await load();
       } catch (error) {
         showActionStatus("Emergency halt failed: " + error.message, "error");
