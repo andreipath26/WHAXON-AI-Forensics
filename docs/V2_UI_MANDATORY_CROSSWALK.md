@@ -70,7 +70,7 @@ A page becomes `DEPLOYMENT_READY` **only when D1–D6 each have exact-source evi
 
 Dashboard batch 1 hardens malformed-history export: a successful HTTP response with non-array payload must **fail visibly** rather than export a misleading empty archive; added browser regression. It does not alter visual design. **Dashboard remains NOT deployment-ready** until all D1–D6 complete.
 
-**Next after Dashboard:** UI-02 Scope, UI-03 Run, UI-04 Findings, then evidence/report workflows and the remaining pages; order follows critical dependencies and is adjustable without skipping gates.
+**Next after Dashboard and Scope & Targets:** UI-03 Run & Orchestration, then UI-04 Findings, then evidence/report workflows and the remaining pages; order follows critical dependencies and is adjustable without skipping gates. Scope PR #127 is merged, but UI-02 deployment acceptance remains OPEN.
 
 ### Run & Orchestration (UI-03) — candidate hardening, 2026-11-05
 
