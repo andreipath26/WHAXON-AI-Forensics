@@ -1424,7 +1424,7 @@ This register follows master-roadmap §38 G01–G10 and E0–E9 phase-freeze pol
 
 | Gate | Candidate evidence already available | Specific unpassed obligation | Current decision |
 |---|---|---|---|
-| G01 — capability/workflow | Existing Core, API/CLI, `ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md`, 793 static controls; partial direct-dispatch inventory in `ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md` (guarded by `test_engine_v2_legacy_callsite_inventory.py`) | Exhaustive live capability/transport/client inventory and controlled full solo chain | OPEN |
+| G01 — capability/workflow | Existing Core plus `ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md`: catalog/transport map, all 104 Flask API method/path/handler bindings, consequential route and deployment/readiness crosswalk, guarded direct-dispatch inventory; UI controls remain separately frozen | Complete capability/transport/client/test semantics and controlled full solo chain | OPEN |
 | G02 — authorization/execution | E1 regression suite and `test_engine_v2_e6_mutation_guards.py` candidate | Authorized target/pivot/redirect/secondary DNS and legacy direct-dispatch no-bypass lab; UI cannot grant permissions | OPEN |
 | G03 — independent verification | Existing validator and retest tests | End-to-end replay/verification and conservative inconclusive/failure outcomes with retained proof | OPEN |
 | G04 — evidence/coverage/report | E3 audit and evidence seals, E6 empty-evidence parity candidate | Reproducible complete report, redaction, missing/skipped coverage, independent trust anchor, audit fault recovery | OPEN |
