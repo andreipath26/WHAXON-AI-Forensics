@@ -128,6 +128,27 @@ enable execution.
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | None of their direct execution actions are V2 workflow dispatches | GUI/TUI call `Core.runner` directly | Legacy `JobStore`/event path; see `test_gui_entrypoint.py`, `test_tui_main.py`, and runner tests. |
 
+### G01 controlled solo-chain crosswalk
+
+The release chain is scope → recon → enumeration → supported initial access →
+independent verification → evidence/report → retest. Current source maps as
+follows; the gaps below prevent a G01 pass.
+
+| Stage | Current V2 path/evidence | G01 result |
+| --- | --- | --- |
+| Scope and bounded plan | Mission, typed plan/task, scope authorization, exact approval, limits and scheduler path in `Core`; see `test_workflow.py`, `test_providers.py`, and `test_engine_v2_e1_boundary.py`. | Implemented components; full cross-client and controlled-target acceptance is open under G02/G05. |
+| Recon and enumeration | Admitted local-process providers listed above; fixed catalog argv goes through `ToolRunner`. | Provider contracts exist, but this local environment has no installed V2 binaries and none is smoke/lab/E2E verified. |
+| Supported initial access | No initial-access provider is admitted to the V2 capability registry. `commix`, `impacket`, and MSF/session actions remain excluded or on legacy paths. | **Missing from V2.** The full release chain cannot currently exercise this stage through V2. |
+| Independent verification | `Validator` supports legacy CLI/API validation and retest paths; they are outside the V2 scheduler and task/attempt ownership. | **Not integrated into V2 chain.** G03 acceptance remains open. |
+| Evidence, report, retest | V2 exposes workflow evidence, audit and readiness; legacy validators and report/export paths still use job/finding state. | **No accepted end-to-end workflow report/retest proof.** G04/G05 acceptance remains open. |
+
+Existing tests establish component and client behavior; none is the required
+controlled full solo-chain run with retained, independently verified proof.
+This assessment does not authorize adding or exercising high-impact initial
+access against any target. The missing stage must be resolved through the
+reviewed capability, consent, evidence and rollback contracts before G01 can
+close.
+
 This matrix is not G01 closeout. It records source mappings and a local
 readiness snapshot; the required controlled full solo chain has not been
 executed. Catalog/admission/transport changes are guarded by
