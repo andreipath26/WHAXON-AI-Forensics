@@ -26,6 +26,30 @@ def _task(core: Core, *, task_id: str, capability: str, target: str,
     )
 
 
+def _ensure_failure_artifact(artifact: Path, failure: Exception) -> None:
+    """Retain a minimal hashed report when a stage fails before chain setup."""
+    if artifact.exists():
+        return
+    artifact.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "whaxon.g01-controlled-lab.v1",
+        "mission_id": MISSION_ID,
+        "status": "failed",
+        "failure": type(failure).__name__,
+        "completed_stages": [],
+        "required_chain": [
+            "scope", "recon", "enumeration", "initial_access",
+            "verification", "report", "retest",
+        ],
+    }
+    encoded = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    artifact.write_text(encoded, encoding="utf-8")
+    digest = hashlib.sha256(encoded.encode()).hexdigest()
+    artifact.with_suffix(artifact.suffix + ".sha256").write_text(
+        f"{digest}  {artifact.name}\n", encoding="ascii",
+    )
+
+
 async def _run_stage(core: Core, stage: str, tasks: tuple[WorkflowTask, ...]):
     plan_id = f"g01-{stage}"
     bindings = {}
@@ -285,7 +309,14 @@ def main() -> int:
     parser.add_argument("--artifact", type=Path,
                         default=Path("/artifacts/g01-mission-report.json"))
     options = parser.parse_args()
-    result = asyncio.run(run(options.data_dir, options.artifact))
+    try:
+        result = asyncio.run(run(options.data_dir, options.artifact))
+    except Exception as exc:
+        try:
+            _ensure_failure_artifact(options.artifact, exc)
+        except OSError:
+            pass
+        raise
     print(json.dumps({
         "mission_id": result["mission_id"], "status": result["status"],
         "artifact": str(options.artifact),

@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import runpy
 from pathlib import Path
 
@@ -71,3 +73,37 @@ def test_failed_initial_access_cleanup_stops_only_new_matching_lab_sessions():
     assert stopped == ["7"]
     assert msf.stopped == ["7"]
     assert "5" in msf.sessions_by_id
+
+
+def test_g01_bootstrap_failure_writes_a_verifiable_minimal_artifact(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    ensure_failure = runpy.run_path(str(root / "scripts/g01-lab-chain.py"))[
+        "_ensure_failure_artifact"
+    ]
+    artifact = tmp_path / "g01-mission-report.json"
+
+    ensure_failure(artifact, RuntimeError("fixture setup failed"))
+
+    report_bytes = artifact.read_bytes()
+    report = json.loads(report_bytes)
+    digest, filename = artifact.with_suffix(artifact.suffix + ".sha256").read_text(
+        encoding="ascii"
+    ).split()
+    assert report["status"] == "failed"
+    assert report["failure"] == "RuntimeError"
+    assert report["completed_stages"] == []
+    assert filename == artifact.name
+    assert digest == hashlib.sha256(report_bytes).hexdigest()
+
+
+def test_g01_bootstrap_failure_does_not_replace_an_existing_report(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    ensure_failure = runpy.run_path(str(root / "scripts/g01-lab-chain.py"))[
+        "_ensure_failure_artifact"
+    ]
+    artifact = tmp_path / "g01-mission-report.json"
+    artifact.write_text('{"status":"complete"}\n', encoding="utf-8")
+
+    ensure_failure(artifact, RuntimeError("later failure"))
+
+    assert json.loads(artifact.read_text(encoding="utf-8"))["status"] == "complete"
