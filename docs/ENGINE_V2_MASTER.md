@@ -1433,6 +1433,15 @@ This register follows master-roadmap §38 G01–G10 and E0–E9 phase-freeze pol
 | G09 — release identity | Existing beta version and package workflow | Approved release version/tag, reproducible artifact/checksums, release workflow and intended index publication | OPEN |
 | G10 — documentation/decision | This ledger and E6 contract matrix | Reconciled current crosswalk, operator deployment/security approval, accepted evidence links, final release decision | OPEN |
 
+
+## G01 acceptance status — 2026-11-05
+
+G01 is **IN PROGRESS and OPEN** on main baseline `b12470d6708ab658fd86195b9e8bc2f445e74bfe`. The G01 integration candidate is PR [#132](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/132). Its first batch reconciles direct ToolRunner calls, recon/validation/retest/MSF service paths, packaged catalog IDs/transports, V2 provider admission, semantic operation aliases, declared target types, and client ownership in `docs/ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md`. A regression guard pins catalog transports and the V2-admitted capability/target map. The stale `whatweb` provider-admission declaration was removed because no packaged catalog entry exists.
+
+A read-only local portfolio audit recorded 24 catalog entries, 26 discovered adapters, 12 V2-bound catalog tools, 12 unsupported catalog entries, four adapter-only integrations, and zero executable providers in that audit environment. None of the admitted providers was smoke-tested, lab-validated, or end-to-end-verified there. This is environment-specific evidence; it is not a target-host readiness claim.
+
+**G01 is not ready to freeze.** The required controlled full solo chain has not been executed. The current V2 provider set has no admitted initial-access capability, and independent verification/retest remain outside scheduler-owned V2 tasks. Keep G01 open until the full chain and all required evidence pass. Do not start the next gate or mark this gate frozen before that acceptance record exists.
+
 ## Engineering delivery tracks that can proceed while UI is blocked
 
 1. **C1/C3**: enforce Core/API/CLI durable status and cancellation parity, no browser-owned drainer, no implicit success.
