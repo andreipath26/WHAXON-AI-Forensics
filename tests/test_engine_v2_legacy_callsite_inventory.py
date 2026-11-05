@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -371,10 +372,10 @@ def test_api_route_census_matches_documented_g01_inventory():
     section = inventory[start:end]
     documented = {
         (method, path): handler
-        for method, path, handler in __import__("re").findall(
-            r"^\\| `(GET|POST|PUT|PATCH|DELETE)` \\| `([^\`]+)` \\| `([^\`]+)` \\|",
+        for method, path, handler in re.findall(
+            r"^\| `(GET|POST|PUT|PATCH|DELETE)` \| `([^`]+)` \| `([^`]+)` \|",
             section,
-            __import__("re").MULTILINE,
+            re.MULTILINE,
         )
     }
     assert documented == EXPECTED_API_ROUTE_HANDLERS
