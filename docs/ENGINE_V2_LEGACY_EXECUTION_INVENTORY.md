@@ -142,6 +142,13 @@ method, path and handler binding for these consequential routes. It complements
 the callsite inventory; it does not claim to guard every read-only API or any UI
 control.
 
+A static decorator census currently finds 104 `/api/*` method/path bindings and
+22 `/ui-v2/*` page routes in `interfaces/web/server.py` (five other routes are
+health/root/settings/favicon pages). The matrix below covers consequential
+execution, authorization-state, cancellation and provisioning routes. The
+remaining API read/status/export mappings are still part of the G01 exhaustive
+crosswalk; the UI page/control inventory is frozen and is not being edited here.
+
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
 | V2 capability and lifecycle | `GET /api/v2/capabilities`, `/providers`, `/providers/portfolio-audit`; `POST /api/v2/workflows`; `POST /api/v2/workflows/<plan_id>/run`; `POST /api/v2/workflow-runs/<request_id>/cancel` | Core capability registry, workflow contracts, approvals and durable request queue. A run submission is persisted work, not a success result. | Shared Core path; see `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, and `test_workflow.py`. |
@@ -169,6 +176,23 @@ does not prove smoke, lab, end-to-end or authorization acceptance.
 | `/api/health` | `core_ready` means SQLite responds and the data directory is writable; Metasploit is reported as optional degraded state. | Does not prove worker liveness, scanner readiness, workflow readiness, or assessment success. |
 | `whaxon workflow providers`, `/api/v2/providers` | `executable=true` means local manifest/catalog binding plus installed binary. `smoke_tested`, `lab_validated`, and `end_to_end_verified` remain separate fields and currently false. | “Executable” does not mean authorized, smoke-tested, lab-validated, end-to-end verified, or production-ready. |
 | `whaxon doctor` | `overall_status=READY` means required dependency checks are ready. | Does not establish service, worker, workflow or deployment acceptance. |
+
+Top-level CLI modes from `src/whaxon/cli.py` are `setup`, `doctor`, `init`,
+`up`, `down`, `serve`, `web`, `tui`, `gui`, `msf`, `bounty`, `scope`,
+`install`, `suggest`, `burp-import`, `evidence`, `report`, `jobs`, `ai`,
+`cve`, `vulndb`, `lookup`, `validate`, `retest`, `coverage`, `recon`,
+`findings`, `run`, `workflow`, and `state`. Only `workflow` enters Engine V2
+capability and plan services. Of the assessment commands, `run`, `ai`, `recon`,
+`validate`, and `retest` still use legacy execution/service ownership; `msf`
+is an inspection CLI, while module/session execution remains on web/runner
+legacy routes. Environment/bootstrap commands and read/report commands do not
+become V2 assessment dispatch merely because they share the `whaxon` binary.
+
+Installed terminal and desktop paths need a separate packaging check: `WhaxonApp`
+and `EmbeddedServer` derive their data directory from the checkout-relative
+package path rather than `WHAXON_DATA`; GUI starts `serve --daemon`. Their source
+checkout behavior therefore does not establish installed-wheel data-path or
+daemon support.
 
 The CLI split also distinguishes three V2 execution modes: `workflow plan run`
 uses the V2 scheduler/policy/provider path synchronously; `workflow plan
