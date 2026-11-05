@@ -143,6 +143,57 @@ class MetasploitableLabAccessProvider:
         if str(session_id) in await self._session_snapshot():
             raise RuntimeError("Metasploit session remained open after session.stop")
 
+    async def _cleanup_remote_resources(
+        self, remote_job_id: str, before_sessions: dict[str, dict], evidence_job_id: str,
+        *, known_session_ids=(),
+    ) -> list[str]:
+        """Stop a failed exploit handler and any new matching late sessions."""
+        errors = []
+        try:
+            client = self.msf.connect()
+            reply = await asyncio.to_thread(client.call, "job.stop", [str(remote_job_id)])
+            if not isinstance(reply, dict) or reply.get("result") != "success":
+                running = await asyncio.to_thread(client.call, "job.list", [])
+                if not isinstance(running, dict) or str(remote_job_id) in running:
+                    errors.append("job.stop was not confirmed")
+        except Exception as exc:
+            errors.append(f"job.stop failed: {type(exc).__name__}")
+
+        stopped = set()
+        candidates = {str(sid) for sid in known_session_ids}
+        try:
+            sessions = await self._session_snapshot()
+            for sid, info in sessions.items():
+                if sid in before_sessions:
+                    continue
+                via = str(info.get("via_exploit") or "").removeprefix("exploit/")
+                host = self._host(info.get("target_host") or info.get("tunnel_peer"))
+                if via == self.MODULE and host == self.TARGET:
+                    candidates.add(str(sid))
+        except Exception as exc:
+            errors.append(f"late-session snapshot failed: {type(exc).__name__}")
+
+        for session_id in candidates:
+            try:
+                await self._stop_session(session_id)
+                stopped.add(session_id)
+            except Exception as exc:
+                errors.append(f"session {session_id} cleanup failed: {type(exc).__name__}")
+
+        try:
+            summary = (
+                f"Metasploit failure cleanup job={remote_job_id} "
+                f"stopped_sessions={','.join(sorted(stopped)) or 'none'} "
+                f"errors={','.join(errors) or 'none'}"
+            )
+            self.store.append_line(
+                evidence_job_id, "stderr", summary,
+            )
+        except Exception:
+            # Caller records cleanup outcome on its already-started evidence job.
+            pass
+        return errors
+
     def _fail_evidence_job(self, job_id: str, message: str) -> None:
         try:
             self.store.append_line(job_id, "stderr", message[:500])
@@ -163,6 +214,7 @@ class MetasploitableLabAccessProvider:
         if not self.store.set_started(job_id, self.CAPABILITY, self.TARGET):
             raise RuntimeError("could not start lab access evidence job")
         self.store.mark_engine_v2_execution_job(job_id)
+        remote_job_id = None
         try:
             before_sessions = await self._session_snapshot()
             result = await asyncio.to_thread(
@@ -179,6 +231,10 @@ class MetasploitableLabAccessProvider:
                 job_id, "stdout", f"Metasploit remote job started: {remote_job_id}",
             )
         except Exception as exc:
+            if remote_job_id is not None:
+                await self._cleanup_remote_resources(
+                    remote_job_id, before_sessions, job_id,
+                )
             self._fail_evidence_job(job_id, f"Metasploit dispatch failed: {type(exc).__name__}")
             raise
 
@@ -200,15 +256,22 @@ class MetasploitableLabAccessProvider:
                     break
                 await asyncio.sleep(self.SESSION_POLL_INTERVAL_S)
         except Exception as exc:
+            await self._cleanup_remote_resources(
+                remote_job_id, before_sessions, job_id,
+            )
             self._fail_evidence_job(
                 job_id,
                 f"Metasploit session poll failed for remote job {remote_job_id}: {type(exc).__name__}",
             )
             raise
         if not session_id:
+            cleanup_errors = await self._cleanup_remote_resources(
+                remote_job_id, before_sessions, job_id,
+            )
             self._fail_evidence_job(
                 job_id,
-                f"Metasploit job {remote_job_id} opened no new matching target session",
+                f"Metasploit job {remote_job_id} opened no new matching target session; "
+                f"cleanup_errors={','.join(cleanup_errors) or 'none'}",
             )
             raise RuntimeError("fixed lab exploit started but no new matching target session opened")
 
@@ -241,13 +304,19 @@ class MetasploitableLabAccessProvider:
             self.store.append_finding(job_id, finding, 0)
             self.store.set_finished(job_id, 0, 0.0)
         except Exception as exc:
-            self._fail_evidence_job(job_id, f"evidence persistence failed: {type(exc).__name__}")
-            try:
-                await self._stop_session(session_id)
-            except Exception as cleanup_error:
+            cleanup_errors = await self._cleanup_remote_resources(
+                remote_job_id, before_sessions, job_id,
+                known_session_ids=(session_id,),
+            )
+            self._fail_evidence_job(
+                job_id,
+                f"evidence persistence failed: {type(exc).__name__}; "
+                f"cleanup_errors={','.join(cleanup_errors) or 'none'}",
+            )
+            if cleanup_errors:
                 raise RuntimeError(
-                    "could not persist access evidence or close newly opened Metasploit session"
-                ) from cleanup_error
+                    "could not persist access evidence or confirm Metasploit resource cleanup"
+                ) from exc
             raise
         return {
             "job_id": job_id, "session_id": session_id,

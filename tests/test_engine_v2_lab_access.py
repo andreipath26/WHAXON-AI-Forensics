@@ -12,11 +12,14 @@ from whaxon.core.workflow import WorkflowTask
 
 
 class _FixedMsf:
-    def __init__(self, host="127.0.0.1", *, preexisting=False):
+    def __init__(self, host="127.0.0.1", *, preexisting=False, fail_poll=False):
         self.calls = []
         self.config = type("Config", (), {"host": host})()
         self._sessions = {}
         self.stopped = []
+        self.stopped_jobs = []
+        self.snapshot_calls = 0
+        self.fail_poll = fail_poll
         if preexisting:
             self._sessions["7"] = self._matching_session()
 
@@ -34,12 +37,21 @@ class _FixedMsf:
         }
 
     def sessions(self, *, strict=False):
+        self.snapshot_calls += 1
+        if self.fail_poll and self.snapshot_calls == 2:
+            raise RuntimeError("injected session polling failure")
         return dict(self._sessions)
 
     def connect(self):
         return self
 
     def call(self, method, args):
+        if method == "job.stop":
+            job_id = str(args[0])
+            self.stopped_jobs.append(job_id)
+            return {"result": "success"}
+        if method == "job.list":
+            return {}
         assert method == "session.stop"
         session_id = str(args[0])
         self.stopped.append(session_id)
@@ -186,6 +198,7 @@ async def test_lab_access_does_not_reuse_a_preexisting_matching_session(
         await provider.dispatch(_task())
     row = store.history(limit=10)[0]
     assert row["status"] == "failed"
+    assert msf.stopped_jobs == ["msf-remote-23"]
     assert "msf-remote-23" in " ".join(
         line["text"] for line in store.get(row["id"])["lines"]
     )
@@ -204,3 +217,19 @@ async def test_lab_access_stops_new_session_if_evidence_persistence_fails(lab_pr
     assert msf.stopped == ["7"]
     row = store.history(limit=10)[0]
     assert row["status"] == "failed"
+    assert msf.stopped_jobs == ["msf-remote-23"]
+
+
+@pytest.mark.asyncio
+async def test_lab_access_stops_remote_job_when_session_polling_fails(lab_provider):
+    provider, store, msf = lab_provider
+    msf.fail_poll = True
+    with pytest.raises(RuntimeError, match="injected session polling failure"):
+        await provider.dispatch(_task())
+    assert msf.stopped_jobs == ["msf-remote-23"]
+    assert msf.stopped == ["7"]
+    row = store.history(limit=10)[0]
+    assert row["status"] == "failed"
+    assert "Metasploit failure cleanup" in " ".join(
+        line["text"] for line in store.get(row["id"])["lines"]
+    )

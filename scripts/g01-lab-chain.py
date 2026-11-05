@@ -58,8 +58,33 @@ async def _run_stage(core: Core, stage: str, tasks: tuple[WorkflowTask, ...]):
     return {"plan_id": plan_id, "result": result, "report": report}
 
 
+async def _cleanup_new_lab_sessions(core: Core, before_session_ids: set[str]) -> list[str]:
+    """Close matching lab shells opened by a failed initial-access stage."""
+    stopped = []
+    sessions = await asyncio.to_thread(core.msf.sessions, strict=True)
+    for session_id, info in sessions.items():
+        if str(session_id) in before_session_ids:
+            continue
+        module = str(info.get("via_exploit") or "").removeprefix("exploit/")
+        peer = str(info.get("target_host") or info.get("tunnel_peer") or "")
+        host = peer.rsplit(":", 1)[0].strip("[]") if peer.count(":") == 1 else peer.strip("[]")
+        if module != "multi/samba/usermap_script" or host != "172.28.0.10":
+            continue
+        reply = await asyncio.to_thread(
+            core.msf.connect().call, "session.stop", [str(session_id)],
+        )
+        if not isinstance(reply, dict) or reply.get("result") != "success":
+            raise RuntimeError(f"cleanup failed for newly opened Metasploit session {session_id}")
+        current = await asyncio.to_thread(core.msf.sessions, strict=True)
+        if str(session_id) in current:
+            raise RuntimeError(f"Metasploit session {session_id} remained open")
+        stopped.append(str(session_id))
+    return stopped
+
+
 async def run(data_dir: Path, artifact: Path) -> dict:
     data_dir.mkdir(parents=True, exist_ok=True)
+    artifact.parent.mkdir(parents=True, exist_ok=True)
     scope_path = data_dir / "scope.json"
     scope_path.write_text(json.dumps({
         "engagement": "repository-owned Engine V2 G01 lab",
@@ -125,17 +150,42 @@ async def run(data_dir: Path, artifact: Path) -> dict:
     if not source_job_id or source_finding is None:
         raise RuntimeError("the sealed SQLmap attempt did not produce a same-target SQLi finding")
 
-    access = await _run_stage(core, "initial_access", (
-        _task(core, task_id="fixed-samba-access",
-              capability="lab.initial_access.samba_usermap",
-              target="172.28.0.10", permissions=("network.exploit",),
-              impact="critical", timeout_s=90.0),
-    ))
-    stages.append(access)
-
-    access_attempt = core.workflow_evidence(access["plan_id"])["attempts"][0]
-    session_id = str(access_attempt["findings"][0]["data"]["session_id"])
-    artifact.parent.mkdir(parents=True, exist_ok=True)
+    before_access_sessions = await asyncio.to_thread(core.msf.sessions, strict=True)
+    before_access_session_ids = set(before_access_sessions)
+    try:
+        access = await _run_stage(core, "initial_access", (
+            _task(core, task_id="fixed-samba-access",
+                  capability="lab.initial_access.samba_usermap",
+                  target="172.28.0.10", permissions=("network.exploit",),
+                  impact="critical", timeout_s=90.0),
+        ))
+        stages.append(access)
+        access_attempt = core.workflow_evidence(access["plan_id"])["attempts"][0]
+        session_id = str(access_attempt["findings"][0]["data"]["session_id"])
+    except Exception as exc:
+        cleanup_exception = None
+        try:
+            stopped = await _cleanup_new_lab_sessions(core, before_access_session_ids)
+            cleanup = {"result": "success", "stopped_sessions": stopped}
+        except Exception as cleanup_exc:
+            cleanup_exception = cleanup_exc
+            cleanup = {"result": "failed", "reason": type(cleanup_exc).__name__}
+        failure = {
+            "schema_version": "whaxon.g01-controlled-lab.v1",
+            "mission_id": MISSION_ID,
+            "status": "failed",
+            "failure": type(exc).__name__,
+            "operator_session_cleanup": cleanup,
+        }
+        encoded = json.dumps(failure, indent=2, sort_keys=True) + "\n"
+        artifact.write_text(encoded, encoding="utf-8")
+        digest = hashlib.sha256(encoded.encode()).hexdigest()
+        artifact.with_suffix(artifact.suffix + ".sha256").write_text(
+            f"{digest}  {artifact.name}\n", encoding="ascii",
+        )
+        if cleanup["result"] != "success":
+            raise RuntimeError("initial-access failure left cleanup unconfirmed") from cleanup_exception
+        raise
     result = {
         "schema_version": "whaxon.g01-controlled-lab.v1",
         "mission_id": MISSION_ID,
