@@ -119,7 +119,12 @@ catalog rows, **zero executable providers**, and no smoke-tested, lab-validated,
 or end-to-end-verified providers; all 12 admitted binaries were absent from that
 environment. This is an environment-specific readiness observation, not a claim
 about a deployment host. The audit command is read-only and explicitly does not
-enable execution.
+enable execution. A same-session executable preflight also found no Docker CLI
+and none of the 12 admitted binaries (`arjun`, `dig`, `dnsrecon`, `ffuf`,
+`gobuster`, `nikto`, `nmap`, `nuclei`, `sqlmap`, `theharvester`, `whois`,
+`wpscan`) on this workspace host. No scanner, container or network operation
+was attempted. This host therefore cannot supply the required controlled-lab
+execution evidence; deployment-host readiness remains unverified.
 
 ### Client and service boundary summary
 
