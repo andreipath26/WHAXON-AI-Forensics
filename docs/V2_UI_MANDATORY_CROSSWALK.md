@@ -1545,3 +1545,7 @@ The design system enforces a sharp, engineered geometry (`roundedness: 1`):
 - **Scope Verification Banner:** Dual-state header lock indicating operational mandate, legal authorization timeframe, and IP range constraints.
 - **CVE / Finding Severity Pill:** Compact micro-indicator displaying CVSS base score alongside metric vectors (`AV:N/AC:L/PR:N`).
 - **Telemetry Pulse Indicator:** Constant 6px radar dot in teal/emerald indicating active agent heartbeat and live proxy socket health.
+
+### Scope & Targets — responsive and installed-wheel candidate evidence (2026-11-05)
+
+The 390px candidate screenshot exposed a broken mobile layout (fixed 256px sidebar left only a sliver for content). The Scope page now has a mobile-only collapsed sidebar, an accessible open/close navigation button, Escape focus restoration and independent responsive layout checks. The desktop visual reference assets were not altered, nor was the frozen Dashboard. A separate Scope CI lane captures 1440px/390px screens and runs axe-core against the rendered page. A fresh installed-wheel smoke boots `whaxon serve` on a loopback port and requests the Scope page plus bundled stylesheet, images and fonts. These are automated candidate checks; D1–D6 remain open pending signed visual, manual accessibility, independent security, user-target rollout/rollback and release approval.
