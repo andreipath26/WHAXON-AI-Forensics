@@ -23,9 +23,20 @@ request_lock = threading.Lock()
 
 def _sqlmap_boolean_oracle(value: str) -> bytes:
     """Model conjunctions used by SQLmap's bounded boolean smoke payloads."""
-    checks = re.findall(r"\band\s+(\d+)\s*=\s*(\d+)\b", value.lower())
-    if any(left != right for left, right in checks):
-        return b"No products found\n"
+    checks = re.findall(
+        r"(\d+)\s*(=|!=|>=|<=|>|<)\s*(\d+)", value.lower(),
+    )
+    for left_text, operator, right_text in checks:
+        left, right = int(left_text), int(right_text)
+        if not {
+            "=": left == right,
+            "!=": left != right,
+            ">=": left >= right,
+            "<=": left <= right,
+            ">": left > right,
+            "<": left < right,
+        }[operator]:
+            return b"No products found\n"
     return b"Product: fixture-item\n"
 
 
