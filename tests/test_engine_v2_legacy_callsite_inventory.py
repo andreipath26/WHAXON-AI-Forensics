@@ -2,10 +2,66 @@
 from __future__ import annotations
 
 import ast
+import json
 from collections import Counter
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1] / "src" / "whaxon"
+
+EXPECTED_CATALOG_TRANSPORTS = {
+    "nmap": "cli",
+    "nikto": "cli",
+    "gobuster": "cli",
+    "echo": "cli",
+    "sqlmap": "cli",
+    "whois": "cli",
+    "dig": "cli",
+    "nuclei": "cli",
+    "commix": "cli",
+    "ffuf": "cli",
+    "wpscan": "cli",
+    "impacket": "cli",
+    "theharvester": "cli",
+    "dnsrecon": "cli",
+    "msf_sysinfo": "msf_session",
+    "msf_getuid": "msf_session",
+    "msf_hashdump": "msf_session",
+    "ssh_cmd": "ssh",
+    "smb_shares": "smb",
+    "smb_ls": "smb",
+    "netexec": "cli",
+    "arjun": "cli",
+    "hydra": "cli",
+    "wmi_exec": "wmi",
+}
+EXPECTED_V2_TARGET_TYPES = {
+    "arjun": ("url",),
+    "dig": ("hostname",),
+    "dnsrecon": ("hostname",),
+    "ffuf": ("url",),
+    "gobuster": ("hostname", "ip"),
+    "nikto": ("hostname", "ip", "url"),
+    "nmap": ("hostname", "ip"),
+    "nuclei": ("url",),
+    "sqlmap": ("url",),
+    "theharvester": ("hostname",),
+    "whois": ("hostname", "ip"),
+    "wpscan": ("url",),
+}
+EXPECTED_V2_SEMANTIC_OPERATIONS = {
+    "arjun": "web.parameters.discover",
+    "dig": "dns.records.query",
+    "dnsrecon": "dns.records.enumerate",
+    "ffuf": "web.paths.fuzz",
+    "gobuster": "web.directories.enumerate",
+    "nikto": "web.server.audit",
+    "nmap": "network.services.discover",
+    "nuclei": "web.templates.assess",
+    "sqlmap": "web.sql_injection.assess",
+    "theharvester": "osint.domain.contacts.search",
+    "whois": "domain.registration.lookup",
+    "wpscan": "web.wordpress.audit",
+}
 
 # (source path, containing function path, method) -> number of syntactic calls.
 # Every item except core/providers.py is a legacy path. That provider is the
@@ -130,3 +186,18 @@ def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
         f"Unexpected: {actual - EXPECTED_SERVICE_CALLS}; "
         f"missing: {EXPECTED_SERVICE_CALLS - actual}"
     )
+
+
+def test_catalog_transports_and_v2_admission_are_explicit() -> None:
+    catalog = json.loads(
+        (SOURCE_ROOT / "data" / "tools.json").read_text(encoding="utf-8")
+    )
+    actual_transports = {
+        tool["id"]: tool.get("transport", "cli") for tool in catalog["tools"]
+    }
+    assert actual_transports == EXPECTED_CATALOG_TRANSPORTS
+
+    from whaxon.core.providers import _CATALOG_TARGETS, SEMANTIC_OPERATION_IDS
+
+    assert _CATALOG_TARGETS == EXPECTED_V2_TARGET_TYPES
+    assert SEMANTIC_OPERATION_IDS == EXPECTED_V2_SEMANTIC_OPERATIONS
