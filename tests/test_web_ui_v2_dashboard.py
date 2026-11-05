@@ -1061,3 +1061,23 @@ def test_dashboard_mobile_history_columns_are_scrollable_and_named(page, live_se
     region.evaluate("el => {el.scrollLeft = el.scrollWidth}")
     assert region.evaluate("el => el.scrollLeft") > 0
     assert page.locator("table").get_by_role("columnheader", name="Operational Actions").count() == 1
+
+
+def test_dashboard_uses_packaged_stylesheet_not_runtime_tailwind_cdn(page, live_server):
+    """A dashboard must not execute third-party utility CSS generation at runtime."""
+    page.route("**/cdn.tailwindcss.com", lambda route: route.abort("blockedbyclient"))
+    page.route("**/fonts.googleapis.com/**", lambda route: route.abort("blockedbyclient"))
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+    assert 'src="https://cdn.tailwindcss.com"' not in response.text()
+    assert 'href="/static/dashboard-v2.css"' in response.text()
+    css_response = page.request.get(f"{live_server}/static/dashboard-v2.css")
+    assert css_response.status == 200
+    assert ".bg-background" in css_response.text()
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert page.evaluate(
+        "() => getComputedStyle(document.body).backgroundColor"
+    ) == "rgb(15, 19, 28)"
