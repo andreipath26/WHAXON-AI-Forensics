@@ -102,3 +102,31 @@ def test_scope_closed_sidebar_is_inert_for_keyboard_and_assistive_technology(pag
     assert sidebar.evaluate("(node) => node.inert") is False
     page.keyboard.press("Escape")
     assert sidebar.evaluate("(node) => node.inert") is True
+
+
+def test_scope_registry_badge_preserves_material_icon_and_live_rule_count(page, live_server):
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=12000,
+    )
+    header = page.locator("h2").filter(has_text="In-Scope Target Registry")
+    badge = header.locator("xpath=following-sibling::span[1]")
+    assert "rules loaded" in badge.inner_text()
+    assert "Loading live rules" not in badge.inner_text()
+    assert header.locator("xpath=preceding-sibling::span[1]").inner_text() == "verified"
+
+
+def test_scope_mobile_table_is_keyboard_scrollable(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=12000,
+    )
+    region = page.get_by_role("region", name="Scope rule table, scroll horizontally for every rule field")
+    assert region.get_attribute("tabindex") == "0"
+    assert page.get_by_text("Scroll sideways to view every scope-rule column.").is_visible()
+    assert region.evaluate("(node) => node.scrollWidth > node.clientWidth")
+    region.evaluate("(node) => node.scrollLeft = node.scrollWidth")
+    assert region.evaluate("(node) => node.scrollLeft") > 0
