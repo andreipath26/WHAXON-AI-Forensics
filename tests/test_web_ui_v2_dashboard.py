@@ -712,3 +712,53 @@ def test_dashboard_emergency_halt_reports_partial_failures_and_continues(page, l
     )
     assert len(calls) == 2
     assert "text-error" in page.locator("#dashboard-action-status").get_attribute("class")
+
+
+def test_dashboard_missing_enforcement_flag_never_claims_scope_enforced(page, live_server):
+    """HTTP 200 is not permission to assert the scope enforcement switch."""
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"in_scope":["192.0.2.10"],"engagement":"Fixture"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    assert "SCOPE ENFORCEMENT ENABLED" not in page.locator("header").inner_text()
+
+
+def test_dashboard_filter_no_results_has_explicit_empty_state(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    field = page.get_by_role("textbox", name="Filter recent job history by ID, target, or tool")
+    field.fill("does-not-exist-in-history")
+    assert page.get_by_text("No recorded jobs match this filter.").is_visible()
+    assert page.locator('table tbody tr[data-dashboard-no-match]').count() == 1
+    field.fill("seed-job-1")
+    assert page.locator('table tbody tr[data-dashboard-no-match]').count() == 0
+    assert page.locator("table tbody tr:visible").count() == 1
+
+
+def test_dashboard_filter_preserves_unavailable_state_when_history_fails(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=503, content_type="application/json",
+            body='{"error":"temporarily unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('Live job history is unavailable')",
+        timeout=8000,
+    )
+    page.get_by_role("textbox", name="Filter recent job history by ID, target, or tool").fill("nmap")
+    assert page.get_by_text("Live job history is unavailable.", exact=False).is_visible()
+    assert page.get_by_text("No recorded jobs match this filter.").count() == 0

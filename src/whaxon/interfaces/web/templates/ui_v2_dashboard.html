@@ -603,6 +603,7 @@
     const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
     const scopeAvailable = scopeResult.status === "fulfilled" && isObject(scopeResult.value);
     const scope = scopeAvailable ? scopeResult.value : {};
+    const scopeEnforcementKnown = scopeAvailable && typeof scope.enabled === "boolean";
     const liveStatus = statusResult.status === "fulfilled" && isObject(statusResult.value) ? statusResult.value : {};
     const health = healthResult.status === "fulfilled" && isObject(healthResult.value) ? healthResult.value : {};
     const engineState = document.getElementById("dashboard-engine-state");
@@ -630,10 +631,10 @@
     document.querySelectorAll("header span, header div").forEach(n => {
       if (textOf(n) === "Target: No target selected") n.textContent = "Target: " + target;
       if (["(IN SCOPE)", "(CONFIGURED RULE)", "(NO TARGET RULE)", "(ENFORCEMENT DISABLED)", "(STATUS UNAVAILABLE)", "(CHECKING SCOPE)"].includes(textOf(n))) {
-        n.textContent = !scopeAvailable ? "(STATUS UNAVAILABLE)" : scope.enabled === false ? "(ENFORCEMENT DISABLED)" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "(RULE CONFIGURED)" : "(NO TARGET RULE)");
+        n.textContent = !scopeEnforcementKnown ? "(STATUS UNAVAILABLE)" : scope.enabled === false ? "(ENFORCEMENT DISABLED)" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "(RULE CONFIGURED)" : "(NO TARGET RULE)");
       }
       if (["STRICT BOUNDARY ENFORCED", "CHECK SCOPE BEFORE RUNNING", "SCOPE ENFORCEMENT ENABLED", "NO TARGET RULE CONFIGURED", "SCOPE STATUS UNAVAILABLE", "CHECKING SCOPE STATUS"].includes(textOf(n))) {
-        n.textContent = !scopeAvailable ? "SCOPE STATUS UNAVAILABLE" : scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "SCOPE ENFORCEMENT ENABLED" : "NO TARGET RULE CONFIGURED");
+        n.textContent = !scopeEnforcementKnown ? "SCOPE STATUS UNAVAILABLE" : scope.enabled === false ? "CHECK SCOPE BEFORE RUNNING" : (Array.isArray(scope.in_scope) && scope.in_scope.length ? "SCOPE ENFORCEMENT ENABLED" : "NO TARGET RULE CONFIGURED");
       }
     });
     const engagementButton = [...document.querySelectorAll("header button")].find(button =>
@@ -748,15 +749,36 @@
     const filterInput = [...document.querySelectorAll("input")].find(input => (input.placeholder || "").includes("Filter by ID"));
     if (filterInput) {
       filterInput.setAttribute("aria-label", "Filter recent job history by ID, target, or tool");
-      filterInput.addEventListener("input", () => {
-        const term = filterInput.value.trim().toLowerCase();
-        const body = document.querySelector('table[aria-label="Recent recorded WHAXON jobs"] tbody');
-        if (!body) return;
-        body.querySelectorAll("tr").forEach(row => {
-          const isEmptyMessage = row.textContent.includes("No job history has been recorded");
-          row.hidden = !isEmptyMessage && !row.textContent.toLowerCase().includes(term);
+      if (filterInput.dataset.dashboardFilterWired !== "true") {
+        filterInput.dataset.dashboardFilterWired = "true";
+        filterInput.addEventListener("input", () => {
+          const term = filterInput.value.trim().toLowerCase();
+          const body = document.querySelector('table[aria-label="Recent recorded WHAXON jobs"] tbody');
+          if (!body) return;
+          body.querySelector('tr[data-dashboard-no-match]')?.remove();
+          let matchCount = 0;
+          let hasStatusRow = false;
+          body.querySelectorAll("tr").forEach(row => {
+            if (row.querySelector("td[colspan]")) {
+              hasStatusRow = true;
+              row.hidden = false;
+              return;
+            }
+            const matches = !term || row.textContent.toLowerCase().includes(term);
+            row.hidden = !matches;
+            if (matches) matchCount++;
+          });
+          if (term && !hasStatusRow && !matchCount) {
+            const row = document.createElement("tr");
+            row.dataset.dashboardNoMatch = "true";
+            const cell = td(row, "No recorded jobs match this filter.",
+              "px-space-md py-space-lg text-center text-on-surface-variant font-code-sm");
+            cell.colSpan = 7;
+            body.appendChild(row);
+          }
         });
-      });
+      }
+      filterInput.dispatchEvent(new Event("input"));
     }
     async function exportHistory() {
       try {
