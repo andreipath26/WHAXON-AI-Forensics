@@ -32,6 +32,57 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
     assert page.locator('a[data-path="trust-layer-and-findings"]').get_attribute("href") == "/ui-v2/findings"
 
 
+def test_run_page_serves_assets_without_external_requests(page, live_server):
+    external_requests = []
+    page.on(
+        "request",
+        lambda request: external_requests.append(request.url)
+        if request.url.startswith("https://")
+        else None,
+    )
+    page.route("https://**/*", lambda route: route.abort())
+    response = page.goto(f"{live_server}/ui-v2/run")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    assert page.title() == "WHAXON — Run & Orchestration"
+    assert external_requests == []
+    for path in (
+        "run-v2.css",
+        "dashboard-fonts.css",
+        "dashboard-logo.jpg",
+        "dashboard-profile.jpg",
+    ):
+        asset = page.request.get(f"{live_server}/static/{path}")
+        assert asset.ok, (path, asset.status)
+        assert asset.body(), path
+
+
+def test_run_page_mobile_navigation_is_keyboard_operable(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2/run")
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
+    menu = page.get_by_role("button", name="Open Run navigation")
+    assert menu.is_visible()
+    sidebar = page.locator("#run-mobile-sidebar")
+    assert sidebar.get_attribute("aria-hidden") == "true"
+    assert sidebar.evaluate("node => node.inert") is True
+    menu.click()
+    assert menu.get_attribute("aria-expanded") == "true"
+    assert sidebar.get_attribute("aria-hidden") == "false"
+    assert sidebar.evaluate("node => node.inert") is False
+    page.keyboard.press("Escape")
+    assert menu.get_attribute("aria-expanded") == "false"
+    assert menu.evaluate("el => document.activeElement === el")
+    assert sidebar.evaluate("node => node.inert") is True
+
+
 def test_run_page_echo_job_streams_real_output(page, live_server):
     page.goto(f"{live_server}/ui-v2/run")
     page.wait_for_function(
