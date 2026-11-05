@@ -26,6 +26,29 @@ CLI passive recon and verified-finding retests call their dedicated recon and
 validator services rather than `ToolRunner`; they should only be mapped to V2
 capabilities after their permission and evidence contracts are reviewed.
 
+## Dedicated network-service entry points
+
+These paths can perform network work without calling `ToolRunner`. The
+callsite guard pins their current production entry points separately from the
+runner inventory.
+
+| Source | Caller | Service path | Scope/consent boundary | Persistence and V2 status |
+| --- | --- | --- | --- | --- |
+| `interfaces/cli/recon_cmd.py` | `main` | `core.recon.run` → `ReconRunner.run` → registered DNS/TLS/HTTP checks | CLI checks scope before execution; `ReconRunner.run` checks scope again. No plan-bound approval or V2 task authorization. | `JobStarted`/`JobFindings` enter the legacy event bus and its store subscribers. Direct service execution; no V2 workflow request, lease, attempt or cancellation record. |
+| `interfaces/cli/validate_cmd.py` | `main` | `Validator.validate` | CLI resolves the stored finding target, requires it, then checks active scope before calling the validator. The validator itself does not enforce scope. | Writes verification state to the legacy job store and records proof for verified outcomes. Direct HTTP probes; no V2 task/attempt record. |
+| `interfaces/cli/retest_cmd.py` | `main` | `Validator.revalidate` → `Validator.validate` | Requires a previously verified finding and rechecks target scope before calling the validator. The validator itself does not enforce scope. | Updates legacy finding verification state. Direct HTTP probes; no V2 task/attempt record. |
+| `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | `_validation_scope_error` checks target presence and current scope before the probe. The validator itself does not enforce scope. | Updates legacy verification state and proof through `JobStore`; not dispatched as a V2 workflow task. |
+| `interfaces/web/server.py` | `create_app.api_retest` | `Validator.revalidate` → `Validator.validate` | Requires `verification_status == "verified"`; `_validation_scope_error` checks target presence and current scope before the probe. | Updates legacy verification state through `JobStore`; not dispatched as a V2 workflow task. |
+
+`Validator.revalidate` calling `self.validate` is an internal service delegation,
+not a second external dispatch. The dedicated tests currently include
+`test_recon.py`, `test_validate_cmd.py`, `test_validator_retest.py`,
+`test_validator_security_regressions.py`, and `test_web_trust_layer.py`. UI tests exercise client requests but are not the route-level security evidence cited here.
+These prove selected service and route behavior; they do not establish
+cross-client V2 parity, durable workflow ownership, operator consent, or
+deployment acceptance. Keep the service paths classified as legacy until a
+separate capability mapping and migration with rollback evidence is accepted.
+
 ## Migration constraint
 
 Do not redirect `/api/run`, `/api/ai/run`, CLI tool/session execution, recon, or
