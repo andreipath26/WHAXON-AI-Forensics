@@ -93,7 +93,7 @@ def main() -> None:
             assert "admin" in gobuster.stdout, gobuster.stdout
 
             ffuf_output = root / "ffuf.json"
-            sqlmap_direct = run([
+            run([
                 "ffuf", "-w", str(wordlist), "-u", f"{base_url}/FUZZ",
                 "-mc", "200", "-of", "json", "-o", str(ffuf_output),
                 "-s", "-noninteractive", "-timeout", "3", "-maxtime", "20",
@@ -102,7 +102,7 @@ def main() -> None:
             assert any(item.get("input", {}).get("FUZZ") == "admin" for item in ffuf_results), ffuf_results
 
             sqlmap_output = root / "sqlmap-output"
-            run([
+            sqlmap_direct = run([
                 "sqlmap", "-u", f"{base_url}/search?id=1",
                 "--batch", "--flush-session", "--technique=B",
                 "--level=1", "--risk=1", "--threads=1",
@@ -216,11 +216,11 @@ http:
                 assert "whaxon-loopback-smoke" in output, output
 
             print(
-            "Loopback scanner smoke passed: Nmap TCP discovery, Gobuster directory "
-            "enumeration, ffuf content discovery, SQLmap boolean-injection detection "
-            "directly and through Engine V2"
-            + (", and Nuclei template matching." if shutil.which("nuclei") else ".")
-        )
+                "Loopback scanner smoke passed: Nmap TCP discovery, Gobuster directory "
+                "enumeration, ffuf content discovery, SQLmap boolean-injection detection "
+                "directly and through Engine V2"
+                + (", and Nuclei template matching." if shutil.which("nuclei") else ".")
+            )
     finally:
         server.shutdown()
         server.server_close()
