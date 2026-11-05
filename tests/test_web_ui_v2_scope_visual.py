@@ -56,3 +56,33 @@ def test_scope_automated_accessibility(page, live_server, width, height):
     (output / f"scope-axe-{width}.json").write_text(
         json.dumps(issues, indent=2), encoding="utf-8")
     assert not issues, issues
+
+
+def test_scope_mobile_nav_restores_viewport_and_keyboard_focus(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=12000,
+    )
+    assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
+    button = page.get_by_role("button", name="Open Scope navigation")
+    assert button.is_visible()
+    assert page.locator("body > aside").get_attribute("aria-hidden") == "true"
+    button.click()
+    assert page.locator("body > aside").get_attribute("aria-hidden") == "false"
+    assert button.get_attribute("aria-expanded") == "true"
+    page.keyboard.press("Escape")
+    assert button.get_attribute("aria-expanded") == "false"
+    assert button.evaluate("(el) => document.activeElement === el")
+
+
+def test_scope_mobile_primary_actions_are_accessible(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=12000,
+    )
+    assert page.locator("#openTargetModalBtn").is_visible()
+    assert page.locator("#openImportDrawerBtn").is_visible()
