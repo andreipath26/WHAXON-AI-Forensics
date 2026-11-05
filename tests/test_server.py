@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from io import BytesIO
 
 from whaxon.core import Core
 from whaxon.interfaces.web.server import (
@@ -88,6 +89,56 @@ def test_health_reachable(tmp_path, monkeypatch):
     data = r.get_json()
     assert "status" in data
     assert "checks" in data
+
+
+def test_burp_import_route_persists_imported_findings(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    xml = (
+        "<issues><issue><name>Test issue</name><severity>High</severity>"
+        "<confidence>Certain</confidence><host>example.test</host>"
+        "<path>/login</path><location>https://example.test/login</location>"
+        "</issue></issues>"
+    )
+
+    response = app.test_client().post(
+        "/api/import/burp",
+        data={"file": (BytesIO(xml.encode("utf-8")), "burp.xml")},
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 201
+    result = response.get_json()
+    assert result["target"] == "example.test"
+    assert result["count"] == 1
+    job = core.store.get(result["job_id"])
+    findings = core.store.get_findings(result["job_id"])
+    assert job is not None
+    assert findings[0]["source"] == "burp"
+    assert findings[0]["kind"] == "web_issue"
+    assert findings[0]["data"]["location"] == "https://example.test/login"
+
+
+def test_burp_import_route_rejects_missing_bad_extension_and_empty_xml(
+    tmp_path, monkeypatch,
+):
+    app, _ = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+
+    missing = client.post("/api/import/burp")
+    bad_extension = client.post(
+        "/api/import/burp",
+        data={"file": (BytesIO(b"<issues/ >"), "burp.txt")},
+        content_type="multipart/form-data",
+    )
+    empty_xml = client.post(
+        "/api/import/burp",
+        data={"file": (BytesIO(b"<issues/>"), "burp.xml")},
+        content_type="multipart/form-data",
+    )
+
+    assert missing.status_code == 400
+    assert bad_extension.status_code == 400
+    assert empty_xml.status_code == 400
 
 
 # ---------------------------------------------------------------- /api/tools
