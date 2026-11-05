@@ -852,7 +852,7 @@ jobs:
           sudo git clone --depth 1 https://gitlab.com/exploit-database/exploitdb.git /usr/share/exploitdb
           sudo ln -s /usr/share/exploitdb/searchsploit /usr/local/bin/searchsploit
           # The resource file points all CSVs and exploit paths at this checkout.
-          sed -E 's@path_array\\+=\\(.*\\)@path_array+=("/usr/share/exploitdb")@g' \
+          sed -E 's@path_array[+]=[(].*[)]@path_array+=("/usr/share/exploitdb")@g' \
             /usr/share/exploitdb/.searchsploit_rc > "$HOME/.searchsploit_rc"
           test -x /usr/share/exploitdb/searchsploit
           test -s /usr/share/exploitdb/files_exploits.csv
