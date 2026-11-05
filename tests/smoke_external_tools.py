@@ -5,9 +5,9 @@ All scanner targets bind to and resolve to 127.0.0.1.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -20,24 +20,13 @@ from urllib.parse import parse_qs, unquote, urlsplit
 requests: list[str] = []
 request_lock = threading.Lock()
 
-
-def _sqlmap_boolean_oracle(value: str) -> bytes:
-    """Model conjunctions used by SQLmap's bounded boolean smoke payloads."""
-    checks = re.findall(
-        r"(\d+)\s*(=|!=|>=|<=|>|<)\s*(\d+)", value.lower(),
-    )
-    for left_text, operator, right_text in checks:
-        left, right = int(left_text), int(right_text)
-        if not {
-            "=": left == right,
-            "!=": left != right,
-            ">=": left >= right,
-            "<=": left <= right,
-            ">": left > right,
-            "<": left < right,
-        }[operator]:
-            return b"No products found\n"
-    return b"Product: fixture-item\n"
+_ORACLE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "sqlmap_boolean_oracle.py"
+_ORACLE_SPEC = importlib.util.spec_from_file_location("sqlmap_boolean_oracle", _ORACLE_PATH)
+if _ORACLE_SPEC is None or _ORACLE_SPEC.loader is None:
+    raise RuntimeError("loopback SQLmap oracle is unavailable")
+_ORACLE_MODULE = importlib.util.module_from_spec(_ORACLE_SPEC)
+_ORACLE_SPEC.loader.exec_module(_ORACLE_MODULE)
+_sqlmap_boolean_oracle = _ORACLE_MODULE.sqlmap_boolean_oracle
 
 
 class FixtureHandler(BaseHTTPRequestHandler):

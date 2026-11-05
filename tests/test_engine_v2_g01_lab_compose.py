@@ -1,3 +1,5 @@
+import asyncio
+import runpy
 from pathlib import Path
 
 
@@ -7,6 +9,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     runner = (root / "Dockerfile.g01-lab-runner").read_text(encoding="utf-8")
     entrypoint = (root / "scripts/g01-lab-runner-entrypoint.sh").read_text(encoding="utf-8")
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    project = (root / "pyproject.toml").read_text(encoding="utf-8")
 
     for address in ("172.28.0.10", "172.28.0.11"):
         assert address in compose
@@ -24,6 +27,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "engine-v2-g01-controlled-lab:" in workflow
     assert "scripts/g01-lab-chain.py" in workflow
     assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
+    assert 'metasploit = ["pymetasploit3==1.0.6"]' in project
     assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
         "Validate isolated fixed-address lab topology"
     )
@@ -31,6 +35,39 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert 'SQLI_URL = "http://172.28.0.10:8080/search?id=1"' in (
         root / "scripts/g01-lab-chain.py"
     ).read_text(encoding="utf-8")
-    assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
-        "Validate isolated fixed-address lab topology"
-    )
+
+
+def test_failed_initial_access_cleanup_stops_only_new_matching_lab_sessions():
+    root = Path(__file__).resolve().parents[1]
+    cleanup = runpy.run_path(str(root / "scripts/g01-lab-chain.py"))[
+        "_cleanup_new_lab_sessions"
+    ]
+
+    class FakeMsf:
+        def __init__(self):
+            matching = {
+                "via_exploit": "exploit/multi/samba/usermap_script",
+                "target_host": "172.28.0.10:139",
+            }
+            self.sessions_by_id = {"5": matching.copy(), "7": matching.copy()}
+            self.stopped = []
+
+        def sessions(self, *, strict=False):
+            return dict(self.sessions_by_id)
+
+        def connect(self):
+            return self
+
+        def call(self, method, args):
+            assert method == "session.stop"
+            session_id = str(args[0])
+            self.stopped.append(session_id)
+            self.sessions_by_id.pop(session_id, None)
+            return {"result": "success"}
+
+    msf = FakeMsf()
+    core = type("CoreFixture", (), {"msf": msf})()
+    stopped = asyncio.run(cleanup(core, {"5"}))
+    assert stopped == ["7"]
+    assert msf.stopped == ["7"]
+    assert "5" in msf.sessions_by_id
