@@ -9,6 +9,7 @@ Source and tests on an exact commit establish implemented behavior. The [product
 - [Project README](../README.md): overview and installation entry point.
 - [Product trajectory and release gates](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md): P0–P8, current work order, §38 acceptance and previous-scope reconciliation.
 - [Engine V2 Master](ENGINE_V2_MASTER.md): consolidated architecture, implementation and phase acceptance; use this before the historical E-series source documents.
+- [Documentation ownership register](DOCUMENTATION_OWNERSHIP.md): full root/docs Markdown inventory, one designated master per subject, and consolidation rules.
 - [Project state](STATE.md): concise dated snapshot.
 - [Baseline and acceptance register](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md): current source, test and CI evidence, critical workflow map and remaining acceptance.
 - [Repository due diligence and dispositions](DOCUMENTATION_RECONCILIATION.md): exact removal candidates, dependency-bound cleanup, retirement gates and retained material. This is a disposition register, not another roadmap.
