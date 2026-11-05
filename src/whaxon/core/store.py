@@ -2124,6 +2124,31 @@ class JobStore:
         finally:
             c.close()
 
+    def has_valid_workflow_evidence_seal(self, job_id):
+        """Require source findings to belong to an intact successful V2 attempt."""
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            rows = c.execute(
+                "SELECT s.attempt_id, s.digest, t.target, t.capability_id, p.digest AS plan_digest "
+                "FROM workflow_evidence_seals s "
+                "JOIN task_attempts a ON a.id=s.attempt_id "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id "
+                "WHERE s.job_id=? AND a.status='succeeded'",
+                (job_id,),
+            ).fetchall()
+            return any(
+                _workflow_evidence_digest(
+                    c, attempt_id=row["attempt_id"], job_id=job_id,
+                    target=row["target"], capability_id=row["capability_id"],
+                    plan_digest=row["plan_digest"],
+                ) == row["digest"]
+                for row in rows
+            )
+        finally:
+            c.close()
+
     def get_workflow_resource_summary(self, plan_id):
         """Durable, evidence-based utilization; no invented CPU or provider costs."""
         c = self._conn()

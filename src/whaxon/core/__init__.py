@@ -116,12 +116,13 @@ class Core:
             self.catalog.load()
 
         # Engine v2 uses the same catalog, runner, adapter parser and event store
-        # as the existing interfaces. The provider bridge is intentionally
-        # limited to read-only scanners until dedicated approval models exist.
+        # as the existing interfaces. Bounded SQLi verification has a separate
+        # moderate-impact provider contract and remains plan-approval gated.
         from .capabilities import CapabilityRegistry
         from .providers import (
             BoundProviderRouter,
             CatalogAdapterProvider,
+            FindingVerificationProvider,
             SemanticOperationProvider,
         )
         self.capabilities = CapabilityRegistry(self.store)
@@ -132,9 +133,13 @@ class Core:
             registry=self.capabilities,
             suppress_legacy_followup=self.automator.suppress_legacy_followup,
         )
+        verification_provider = FindingVerificationProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
+            verification_provider,
         ))
 
     def _wire_store(self) -> None:
