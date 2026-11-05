@@ -380,13 +380,17 @@
     document.body.classList.remove("scope-nav-open");
     scopeBackdrop.hidden = true;
     scopeMenu.setAttribute("aria-expanded", "false");
-    if (scopeSidebar) scopeSidebar.setAttribute("aria-hidden", matchMedia("(max-width:767px)").matches ? "true" : "false");
+    if (scopeSidebar) {
+      const small = matchMedia("(max-width:767px)").matches;
+      scopeSidebar.setAttribute("aria-hidden", small ? "true" : "false");
+      scopeSidebar.inert = small;
+    }
   };
   const openScopeMenu = () => {
     document.body.classList.add("scope-nav-open");
     scopeBackdrop.hidden = false;
     scopeMenu.setAttribute("aria-expanded", "true");
-    scopeSidebar?.setAttribute("aria-hidden", "false");
+    if (scopeSidebar) { scopeSidebar.inert = false; scopeSidebar.setAttribute("aria-hidden", "false"); }
     scopeSidebar?.querySelector("a[href]")?.focus();
   };
   scopeMenu.addEventListener("click", () => document.body.classList.contains("scope-nav-open") ? closeScopeMenu() : openScopeMenu());
@@ -406,7 +410,10 @@
   });
   const syncScopeNav = () => {
     if (!matchMedia("(max-width:767px)").matches) closeScopeMenu();
-    else if (!document.body.classList.contains("scope-nav-open")) scopeSidebar?.setAttribute("aria-hidden","true");
+    else if (!document.body.classList.contains("scope-nav-open") && scopeSidebar) {
+      scopeSidebar.setAttribute("aria-hidden", "true");
+      scopeSidebar.inert = true;
+    }
   };
   window.addEventListener("resize", syncScopeNav);
   syncScopeNav();

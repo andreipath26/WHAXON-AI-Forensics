@@ -86,3 +86,19 @@ def test_scope_mobile_primary_actions_are_accessible(page, live_server):
     )
     assert page.locator("#openTargetModalBtn").is_visible()
     assert page.locator("#openImportDrawerBtn").is_visible()
+
+
+def test_scope_closed_sidebar_is_inert_for_keyboard_and_assistive_technology(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=12000,
+    )
+    sidebar = page.locator("#scope-mobile-sidebar")
+    assert sidebar.evaluate("(node) => node.inert") is True
+    menu = page.get_by_role("button", name="Open Scope navigation")
+    menu.click()
+    assert sidebar.evaluate("(node) => node.inert") is False
+    page.keyboard.press("Escape")
+    assert sidebar.evaluate("(node) => node.inert") is True
