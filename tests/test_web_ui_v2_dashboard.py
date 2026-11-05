@@ -511,3 +511,620 @@ def test_dashboard_engine_state_reports_health_failure(page, live_server):
         "() => document.querySelector('#dashboard-engine-state')?.textContent === 'ENGINE UNAVAILABLE'",
         timeout=8000,
     )
+
+
+def test_dashboard_export_rejects_malformed_history_without_false_success(page, live_server):
+    """HTTP 200 with invalid history must not fabricate an empty archive."""
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"error":"history temporarily unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile(r"Export Archive")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('History API returned an invalid response')",
+        timeout=5000,
+    )
+    assert "Exported 0 recorded job" not in page.locator("#dashboard-action-status").inner_text()
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+
+
+def test_dashboard_health_requires_actual_boolean_true(page, live_server):
+    """Malformed health data must never claim a connected engine."""
+    page.route(
+        "**/api/health/simple",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"ok":"true"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-engine-state')?.textContent === 'ENGINE UNAVAILABLE'",
+        timeout=8000,
+    )
+    assert page.get_by_text("ENGINE ONLINE", exact=True).count() == 0
+
+
+def test_dashboard_import_rejects_invalid_success_response_without_navigation(page, live_server):
+    """A malformed successful upload response must not claim findings exist."""
+    page.route(
+        "**/api/import/burp",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"count":"not-a-number"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    with page.expect_file_chooser() as picker:
+        page.get_by_role("button", name=re.compile(r"Upload Artifact")).click()
+    picker.value.set_files({
+        "name": "test-burp.xml", "mimeType": "application/xml",
+        "buffer": b'<?xml version="1.0"?><issues></issues>',
+    })
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Import API returned an invalid response')",
+        timeout=8000,
+    )
+    assert page.url.endswith("/ui-v2")
+    assert "Imported" not in page.locator("#dashboard-action-status").inner_text()
+
+
+def test_dashboard_invalid_history_timestamp_is_honest(page, live_server):
+    """Bad historical dates must not render 'Invalid Date' as real telemetry."""
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":"bad-clock","tool":"nmap","target":"192.0.2.10","status":"finished","created_at":"nonsense"}]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('bad-clock')",
+        timeout=8000,
+    )
+    row = page.locator("table tbody tr").filter(has_text="bad-clock")
+    assert "Not recorded" in row.inner_text()
+    assert "Invalid Date" not in row.inner_text()
+
+
+def test_dashboard_null_scope_payload_fails_closed_without_losing_history(page, live_server):
+    """A successful HTTP code with null scope cannot invent an authorization rule."""
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body="null",
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    assert "target: unavailable" in page.locator("header").inner_text().lower()
+    assert "scope enforcement enabled" not in page.locator("header").inner_text().lower()
+    assert page.locator("table tbody").get_by_text("seed-job-1", exact=False).count() >= 1
+
+
+def test_dashboard_null_status_payload_preserves_history_without_fake_engagement(page, live_server):
+    """Malformed status data must not abort all independent dashboard panels."""
+    page.route(
+        "**/api/status",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body="null",
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-history-count").inner_text() != "—"
+    assert page.get_by_text("Default Credentials Detected").count() == 0
+    assert page.get_by_text("Credential Status Unavailable").count() >= 1
+
+
+def test_dashboard_malformed_report_preserves_independent_live_panels(page, live_server):
+    """Bad nested report data must not halt history, scope or tool panels."""
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"jobs":[{"findings":null},{"findings":[null]}]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert "—" in page.locator(".rounded-lg.bg-surface-container-low.p-space-md").filter(
+        has_text="Verified Findings"
+    ).inner_text()
+    assert "STATUS UNAVAILABLE" in page.locator(
+        ".rounded-lg.bg-surface-container-low.p-space-md"
+    ).filter(has_text="Verified Findings").inner_text()
+    assert page.locator("#dashboard-history-count").inner_text() != "—"
+
+
+def test_dashboard_malformed_tools_response_is_unavailable_not_zero(page, live_server):
+    page.route(
+        "**/api/tools",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='[null]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert "STATUS UNAVAILABLE" in page.locator(
+        ".rounded-lg.bg-surface-container-low.p-space-md"
+    ).filter(has_text="Active Adapters").inner_text()
+
+
+def test_dashboard_malformed_history_rows_do_not_crash_independent_panels(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body='[null]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('Live job history is unavailable')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-history-count").inner_text() == "—"
+    assert page.locator("#dashboard-engine-state").inner_text() == "ENGINE ONLINE"
+
+
+def test_dashboard_emergency_halt_reports_partial_failures_and_continues(page, live_server):
+    calls = []
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":"good"},{"id":"bad"}]',
+        ),
+    )
+    def cancel(route):
+        calls.append(route.request.url)
+        if route.request.url.endswith("/bad/cancel"):
+            route.fulfill(status=503, content_type="application/json", body='{"error":"unavailable"}')
+        else:
+            route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
+    page.route("**/api/jobs/*/cancel", cancel)
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 1 of 2')",
+        timeout=8000,
+    )
+    assert len(calls) == 2
+    assert "text-error" in page.locator("#dashboard-action-status").get_attribute("class")
+
+
+def test_dashboard_missing_enforcement_flag_never_claims_scope_enforced(page, live_server):
+    """HTTP 200 is not permission to assert the scope enforcement switch."""
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"in_scope":["192.0.2.10"],"engagement":"Fixture"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    assert "SCOPE ENFORCEMENT ENABLED" not in page.locator("header").inner_text()
+
+
+def test_dashboard_filter_no_results_has_explicit_empty_state(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    field = page.get_by_role("textbox", name="Filter recent job history by ID, target, or tool")
+    field.fill("does-not-exist-in-history")
+    assert page.get_by_text("No recorded jobs match this filter.").is_visible()
+    assert page.locator('table tbody tr[data-dashboard-no-match]').count() == 1
+    field.fill("seed-job-1")
+    assert page.locator('table tbody tr[data-dashboard-no-match]').count() == 0
+    assert page.locator("table tbody tr:visible").count() == 1
+
+
+def test_dashboard_filter_preserves_unavailable_state_when_history_fails(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=503, content_type="application/json",
+            body='{"error":"temporarily unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('Live job history is unavailable')",
+        timeout=8000,
+    )
+    page.get_by_role("textbox", name="Filter recent job history by ID, target, or tool").fill("nmap")
+    assert page.get_by_text("Live job history is unavailable.", exact=False).is_visible()
+    assert page.get_by_text("No recorded jobs match this filter.").count() == 0
+
+
+def test_dashboard_malformed_scope_rules_do_not_claim_authorization(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"enabled":true,"in_scope":{"not":"a-list"},"engagement":"Fixture"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    assert "target: unavailable" in page.locator("header").inner_text().lower()
+    assert "SCOPE ENFORCEMENT ENABLED" not in page.locator("header").inner_text()
+
+
+def test_dashboard_adapter_count_requires_actual_boolean_readiness(page, live_server):
+    page.route(
+        "**/api/tools",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"available":"false","adapter_available":"yes","binary_available":"true"}]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    card = page.locator(".rounded-lg.bg-surface-container-low.p-space-md").filter(
+        has_text="Active Adapters"
+    )
+    assert "TOOLS AVAILABLE" in card.inner_text()
+    assert "0" in card.inner_text()
+
+
+def test_dashboard_invalid_engagement_type_is_not_rendered_as_object(page, live_server):
+    page.route(
+        "**/api/status",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"engagement":{"unexpected":"value"},"default_creds":false}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-session-engagement')?.textContent",
+        timeout=8000,
+    )
+    assert "[object Object]" not in page.locator("#dashboard-session-engagement").inner_text()
+    assert page.locator("#dashboard-session-engagement").inner_text() != "undefined"
+
+
+def test_dashboard_verified_metric_requires_independent_verification_field(page, live_server):
+    """Generic record status never promotes a candidate to a verified finding."""
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"jobs":[{"findings":[{"status":"verified","verification_status":"candidate"},'
+                 '{"status":"verified"},{"verification_status":"verified"}]}]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    card = page.locator(".rounded-lg.bg-surface-container-low.p-space-md").filter(
+        has_text="Verified Findings"
+    )
+    assert "1" in card.inner_text()
+    assert "0 FALSE POSITIVES" in card.inner_text()
+
+
+def test_dashboard_mobile_menu_traps_keyboard_focus_and_escape_restores_button(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    menu = page.get_by_role("button", name="Open navigation")
+    menu.click()
+    links = page.locator("aside a[href]:visible")
+    assert links.count() >= 5
+    first = links.first
+    last = links.last
+    first.focus()
+    page.keyboard.press("Shift+Tab")
+    assert last.evaluate("(node) => document.activeElement === node")
+    page.keyboard.press("Tab")
+    assert first.evaluate("(node) => document.activeElement === node")
+    page.keyboard.press("Escape")
+    assert menu.evaluate("(node) => document.activeElement === node")
+    assert page.locator("body > aside").get_attribute("aria-hidden") == "true"
+
+
+def test_dashboard_halt_never_calls_cancel_with_untrusted_object_identity(page, live_server):
+    """Malformed active-job IDs cannot turn into arbitrary cancellation paths."""
+    calls = []
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":{"bad":"value"}}]',
+        ),
+    )
+    page.route(
+        "**/api/jobs/*/cancel",
+        lambda route: (calls.append(route.request.url), route.fulfill(
+            status=200, content_type="application/json", body='{"ok":true}'
+        )),
+    )
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile("Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1')",
+        timeout=8000,
+    )
+    assert calls == []
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+
+
+def test_dashboard_error_message_is_announced_as_accessibility_alert(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=503, content_type="application/json",
+            body='{"error":"unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile("Export Archive")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('History export failed')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+
+
+def test_dashboard_api_connection_abort_is_unavailable_not_empty(page, live_server):
+    """An aborted transport must not show fabricated zero metrics."""
+    for route_path in ("/api/history", "/api/tools", "/api/jobs/active"):
+        page.route(
+            f"**{route_path}",
+            lambda route: route.abort("timedout"),
+        )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('Live job history is unavailable')",
+        timeout=8000,
+    )
+    cards = page.locator(".rounded-lg.bg-surface-container-low.p-space-md")
+    assert "STATUS UNAVAILABLE" in cards.filter(has_text="Active Scans").inner_text()
+    assert "STATUS UNAVAILABLE" in cards.filter(has_text="Active Adapters").inner_text()
+    assert page.locator("#dashboard-history-count").inner_text() == "—"
+
+
+def test_dashboard_export_is_single_flight_during_pending_request(page, live_server):
+    """Repeated Export clicks cannot cause simultaneous duplicate downloads."""
+    calls = []
+    def history(route):
+        calls.append(route)
+        # Keep export response pending until duplicate clicks have been attempted.
+        if len(calls) > 1:
+            route.fulfill(status=200, content_type="application/json", body="[]")
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.route("**/api/history", history)
+    button = page.get_by_role("button", name=re.compile("Export Archive"))
+    button.click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status') !== null",
+        timeout=8000,
+    )
+    button.click()
+    page.wait_for_timeout(150)
+    assert len(calls) == 1
+    calls[0].fulfill(status=200, content_type="application/json", body="[]")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Exported 0 recorded job')",
+        timeout=8000,
+    )
+
+
+def test_dashboard_renders_untrusted_history_and_scope_as_text(page, live_server):
+    """Records received from APIs must never be interpreted as executable HTML."""
+    marker = '<img src=x onerror="window.__dashboardInjected=1">'
+    import json
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps([{
+                "id": "markup-record", "target": marker, "tool": "nmap",
+                "status": "finished", "created_at": "2026-11-05T08:00:00Z",
+            }]),
+        ),
+    )
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"enabled": True, "in_scope": [marker], "engagement": "Fixture"}),
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('markup-record')",
+        timeout=8000,
+    )
+    assert marker in page.locator("table tbody").inner_text()
+    assert marker in page.locator("#dashboard-session-target").inner_text()
+    assert page.evaluate("() => window.__dashboardInjected === 1") is False
+    assert page.locator("table tbody img").count() == 0
+
+
+def test_dashboard_all_visible_links_resolve_to_canonical_ui_pages(page, live_server):
+    """Post-initialization navigation must expose no inert or unsafe anchors."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('aside a[data-path]')].every(a => a.getAttribute('href')?.startsWith('/ui-v2'))",
+        timeout=8000,
+    )
+    links = page.locator("a:visible").evaluate_all(
+        """elements => elements.map(node => ({
+          href: node.getAttribute('href'),
+          name: (node.getAttribute('aria-label') || node.innerText || '').trim()
+        }))"""
+    )
+    assert links
+    assert all(link["name"] for link in links)
+    assert all(link["href"] and link["href"].startswith("/ui-v2") for link in links)
+
+
+def test_dashboard_rejected_cancel_never_claims_halt_succeeded(page, live_server):
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":"restricted-job","status":"running"}]',
+        ),
+    )
+    page.route(
+        "**/api/jobs/restricted-job/cancel",
+        lambda route: route.fulfill(
+            status=403, content_type="application/json",
+            body='{"error":"not authorized"}',
+        ),
+    )
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile("Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+    assert "1 of 1" not in page.locator("#dashboard-action-status").inner_text()
+
+
+def test_dashboard_mobile_header_keeps_critical_actions_onscreen(page, live_server):
+    """Neither Terminal Log nor Emergency Halt may be clipped on a phone."""
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    for name in ("Terminal Log", "Emergency Halt Scan"):
+        button = page.get_by_role("button", name=name)
+        assert button.is_visible(), name
+        rect = button.bounding_box()
+        assert rect is not None
+        assert rect["x"] >= 0, (name, rect)
+        assert rect["x"] + rect["width"] <= 390, (name, rect)
+    assert page.get_by_role("button", name="Open navigation").is_visible()
+
+
+def test_dashboard_mobile_history_columns_are_scrollable_and_named(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('seed-job-1')",
+        timeout=8000,
+    )
+    region = page.get_by_role("region", name="Job history table, scroll horizontally for all columns")
+    assert region.is_visible()
+    assert region.get_attribute("tabindex") == "0"
+    assert page.get_by_text("Swipe or scroll sideways to view every job-history column.").is_visible()
+    dimensions = region.evaluate(
+        "el => ({scrollWidth:el.scrollWidth, clientWidth:el.clientWidth})"
+    )
+    assert dimensions["scrollWidth"] > dimensions["clientWidth"]
+    region.evaluate("el => {el.scrollLeft = el.scrollWidth}")
+    assert region.evaluate("el => el.scrollLeft") > 0
+    assert page.locator("table").get_by_role("columnheader", name="Operational Actions").count() == 1
+
+
+def test_dashboard_uses_packaged_stylesheet_not_runtime_tailwind_cdn(page, live_server):
+    """A dashboard must not execute third-party utility CSS generation at runtime."""
+    page.route("**/cdn.tailwindcss.com", lambda route: route.abort("blockedbyclient"))
+    page.route("**/fonts.googleapis.com/**", lambda route: route.abort("blockedbyclient"))
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+    assert 'src="https://cdn.tailwindcss.com"' not in response.text()
+    assert 'href="/static/dashboard-v2.css"' in response.text()
+    css_response = page.request.get(f"{live_server}/static/dashboard-v2.css")
+    assert css_response.status == 200
+    assert ".bg-background" in css_response.text()
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert page.evaluate(
+        "() => getComputedStyle(document.body).backgroundColor"
+    ) == "rgb(15, 19, 28)"
+
+
+def test_dashboard_document_has_descriptive_browser_and_screen_reader_title(page, live_server):
+    page.goto(f"{live_server}/ui-v2")
+    assert page.title() == "WHAXON — Security Operations Dashboard"
+
+
+def test_dashboard_has_no_external_browser_asset_dependencies(page, live_server):
+    """The security console must not send page-view telemetry to external CDNs."""
+    external_requests = []
+    def refuse_external(route):
+        external_requests.append(route.request.url)
+        route.abort("blockedbyclient")
+    page.route("https://**/*", refuse_external)
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('seed-job-1')",
+        timeout=8000,
+    )
+    page.evaluate("() => document.fonts.ready")
+    assert external_requests == []
+    assert "fonts.googleapis.com" not in response.text()
+    assert "lh3.googleusercontent.com" not in response.text()
+    assert "cdn.tailwindcss.com" not in response.text()
+    for path in (
+        "/static/dashboard-v2.css",
+        "/static/dashboard-fonts.css",
+        "/static/dashboard-logo.jpg",
+        "/static/dashboard-profile.jpg",
+    ):
+        assert page.request.get(f"{live_server}{path}").status == 200, path
+    assert page.evaluate(
+        "() => getComputedStyle(document.body).backgroundColor"
+    ) == "rgb(15, 19, 28)"
+    for alt in ("WHAXON Security Logo", "Profile"):
+        image = page.get_by_role("img", name=alt)
+        assert image.evaluate("(node) => node.naturalWidth > 0"), alt
+
+
+def test_dashboard_bundled_font_css_has_no_third_party_urls(page, live_server):
+    response = page.request.get(f"{live_server}/static/dashboard-fonts.css")
+    assert response.status == 200
+    css = response.text()
+    assert "@font-face" in css
+    assert "/static/dashboard-fonts/" in css
+    assert "https://" not in css
