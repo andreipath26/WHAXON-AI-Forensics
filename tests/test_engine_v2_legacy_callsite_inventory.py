@@ -212,6 +212,32 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('POST', '/api/validate/<job_id>/<int:seq>'): 'api_validate',
 }
 
+EXPECTED_UI_ROUTE_HANDLERS = {
+    "/ui-v2": "ui_v2_home",
+    "/ui-v2/dashboard": "ui_v2_home",
+    "/ui-v2/run": "ui_v2_run",
+    "/ui-v2/findings": "ui_v2_findings",
+    "/ui-v2/scope": "ui_v2_scope",
+    "/ui-v2/report": "ui_v2_report",
+    "/ui-v2/reports": "ui_v2_reports",
+    "/ui-v2/history": "ui_v2_history",
+    "/ui-v2/diagnostics": "ui_v2_diagnostics",
+    "/ui-v2/evidence": "ui_v2_evidence",
+    "/ui-v2/ai": "ui_v2_ai",
+    "/ui-v2/retest": "ui_v2_retest",
+    "/ui-v2/chains": "ui_v2_chains",
+    "/ui-v2/adapters": "ui_v2_adapters",
+    "/ui-v2/settings": "ui_v2_settings",
+    "/ui-v2/audit": "ui_v2_audit",
+    "/ui-v2/monitoring": "ui_v2_monitoring",
+    "/ui-v2/bas": "ui_v2_bas",
+    "/ui-v2/bug-bounty": "ui_v2_bug_bounty",
+    "/ui-v2/compliance": "ui_v2_compliance",
+    "/ui-v2/ptaas": "ui_v2_ptaas",
+    "/ui-v2/threat-intel": "ui_v2_threat_intel",
+    "/ui-v2/approvals": "ui_v2_approvals",
+}
+
 SERVICE_CALL_NAMES = {item[2] for item in EXPECTED_SERVICE_CALLS}
 
 
@@ -343,6 +369,56 @@ def test_api_route_methods_and_handlers_are_explicit() -> None:
         f"missing: {EXPECTED_API_ROUTE_HANDLERS.keys() - actual.keys()}; "
         f"changed: {[key for key in actual.keys() & EXPECTED_API_ROUTE_HANDLERS.keys() if actual[key] != EXPECTED_API_ROUTE_HANDLERS[key]]}"
     )
+
+
+def test_ui_route_crosswalk_is_explicit_and_matches_g01_documentation() -> None:
+    server = SOURCE_ROOT / "interfaces" / "web" / "server.py"
+    tree = ast.parse(server.read_text(encoding="utf-8"), filename=str(server))
+    actual = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call) or not decorator.args:
+                continue
+            func = decorator.func
+            if (
+                not isinstance(func, ast.Attribute)
+                or not isinstance(func.value, ast.Name)
+                or func.value.id != "app"
+            ):
+                continue
+            if func.attr == "get":
+                route, methods = ast.literal_eval(decorator.args[0]), ["GET"]
+            elif func.attr == "route":
+                route = ast.literal_eval(decorator.args[0])
+                methods = next(
+                    (ast.literal_eval(item.value) for item in decorator.keywords
+                     if item.arg == "methods"),
+                    ["GET"],
+                )
+            else:
+                continue
+            if route.startswith("/ui-v2") and "GET" in methods:
+                actual[route] = node.name
+    assert actual == EXPECTED_UI_ROUTE_HANDLERS
+
+    inventory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    start = inventory.index("The UI route aliases below are recorded")
+    end = inventory.index("#### Exact Flask API method/path/handler census", start)
+    documented = {
+        route: handler
+        for route, handler in re.findall(
+            r"^\| `GET` \| `([^`]+)` \| `([^`]+)` \|",
+            inventory[start:end],
+            re.MULTILINE,
+        )
+    }
+    assert documented == EXPECTED_UI_ROUTE_HANDLERS
 
 
 def test_catalog_transports_and_v2_admission_are_explicit() -> None:
