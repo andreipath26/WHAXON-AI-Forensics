@@ -1,6 +1,7 @@
 """Browser coverage for the canonical findings UI (UI v2)."""
 from __future__ import annotations
 
+import json
 import re
 
 
@@ -219,3 +220,135 @@ def test_findings_list_uses_only_records_from_live_report(page, live_server):
         timeout=5000,
     )
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
+
+
+def test_findings_reject_malformed_report_and_retry(page, live_server):
+    calls = 0
+
+    def malformed_once(route):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"jobs":"not-an-array"}',
+            )
+        else:
+            route.continue_()
+
+    page.route("**/api/report**", malformed_once)
+    page.goto(f"{live_server}/ui-v2/findings")
+    state = page.locator("#whaxon-findings-state")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-state')?.dataset.state === 'error'",
+        timeout=5000,
+    )
+    assert "invalid report response" in state.inner_text().lower()
+    assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 0
+    page.get_by_role("button", name="Retry").click()
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
+        timeout=5000,
+    )
+    assert calls == 2
+
+
+def test_findings_empty_report_is_distinct_from_unavailable(page, live_server):
+    page.route(
+        "**/api/report**",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"jobs":[]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-count')?.textContent === 'Live findings: 0'",
+        timeout=5000,
+    )
+    assert page.locator("#whaxon-findings-state").is_hidden()
+    assert page.locator("#whaxon-findings-list #whaxon-findings-empty").inner_text() == (
+        "No findings are recorded in the live report."
+    )
+    assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 0
+
+
+def test_findings_403_and_network_error_are_unavailable_and_retryable(page, live_server):
+    calls = 0
+
+    def unavailable_then_network(route):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            route.fulfill(
+                status=403,
+                content_type="application/json",
+                body='{"error":"forbidden"}',
+            )
+        else:
+            route.abort()
+
+    page.route("**/api/report**", unavailable_then_network)
+    page.goto(f"{live_server}/ui-v2/findings")
+    state = page.locator("#whaxon-findings-state")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-state')?.dataset.state === 'unavailable'",
+        timeout=5000,
+    )
+    assert "access denied" in state.inner_text().lower()
+    assert page.get_by_role("button", name="Retry").is_visible()
+    page.get_by_role("button", name="Retry").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-state')?.dataset.state === 'unavailable' && document.querySelector('#whaxon-findings-retry')?.hidden === false",
+        timeout=5000,
+    )
+    assert calls == 2
+
+
+def test_verified_batch_retest_reports_each_failed_finding(page, live_server):
+    payload = {
+        "jobs": [{
+            "job": {"id": "verified-job", "target": "127.0.0.1", "tool": "nuclei"},
+            "findings": [{
+                "seq": 0,
+                "title": "Recorded verified finding",
+                "severity": "high",
+                "source": "nuclei",
+                "verification_status": "verified",
+                "data": {},
+                "raw_line": "recorded test finding",
+            }],
+        }],
+    }
+    calls = []
+    page.add_init_script("window.__whaxonAlerts=[];window.confirm=()=>true;window.alert=message=>window.__whaxonAlerts.push(String(message));")
+
+    page.route(
+        "**/api/report**",
+        lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(payload)),
+    )
+
+    def reject_retest(route):
+        calls.append(route.request.url)
+        route.fulfill(
+            status=403,
+            content_type="application/json",
+            body='{"error":"target blocked by scope"}',
+        )
+
+    page.route("**/api/retest/**", reject_retest)
+
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 1",
+        timeout=5000,
+    )
+    page.get_by_role("button", name="Retest Verified Scope").click()
+    page.wait_for_function("() => window.__whaxonAlerts.length > 0", timeout=5000)
+    assert calls and len(calls) == 1
+    messages = page.evaluate("() => window.__whaxonAlerts")
+    assert messages
+    assert "1 failed" in messages[-1]
+    assert "Recorded verified finding (HTTP 403): target blocked by scope" in messages[-1]
