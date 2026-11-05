@@ -16,6 +16,7 @@ def test_core_pages_navigate_without_leaving_ui_v2(page, live_server):
 
     page.locator('a[data-path="run-and-orchestration"]').click()
     assert page.url.endswith("/ui-v2/run")
+    page.locator("#run-target-input").wait_for(state="visible", timeout=5000)
     assert page.locator("#run-target-input").is_visible()
 
     page.locator('a[data-path="trust-layer-and-findings"]').click()
