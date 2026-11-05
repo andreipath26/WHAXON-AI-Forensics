@@ -116,8 +116,8 @@ class Core:
             self.catalog.load()
 
         # Engine v2 uses the same catalog, runner, adapter parser and event store
-        # as the existing interfaces. Bounded SQLi verification has a separate
-        # moderate-impact provider contract and remains plan-approval gated.
+        # as the existing interfaces. Bounded SQLi/reflected-XSS verification
+        # has a separate moderate-impact provider contract and remains approval gated.
         from .capabilities import CapabilityRegistry
         from .providers import (
             BoundProviderRouter,
@@ -285,6 +285,58 @@ class Core:
     def workflow_evidence(self, plan_id: str, *, limit: int = 100):
         """Return real, cross-checked workflow-to-tool evidence for reporting."""
         return self.store.get_workflow_evidence(plan_id, limit=limit)
+
+    def workflow_report(self, plan_id: str, *, limit: int = 100):
+        """Build a read-only report exclusively from one plan's persisted evidence.
+
+        Partial, failed, missing, or unsealed attempts remain visible but can
+        never receive a complete/success status.
+        """
+        evidence = self.workflow_evidence(plan_id, limit=limit)
+        readiness = self.workflow_readiness(plan_id)
+        progress = self.workflow_progress(plan_id)
+        attempts = evidence["attempts"]
+        truncated = len(attempts) < progress["attempts"]
+        complete = bool(
+            readiness["ready_to_report_success"]
+            and evidence["all_evidence_recorded"]
+            and evidence["all_evidence_integrity_verified"]
+            and attempts
+            and not truncated
+        )
+        findings = [
+            {**finding, "task_key": attempt["task_key"],
+             "target": attempt["target"], "job_id": attempt["job_id"]}
+            for attempt in attempts
+            if attempt["evidence_status"] == "recorded"
+            and attempt["integrity_status"] == "verified"
+            for finding in attempt["findings"]
+        ]
+        return {
+            "schema_version": "whaxon.workflow-report.v1",
+            "plan_id": evidence["plan_id"],
+            "mission_id": evidence["mission_id"],
+            "plan_digest": evidence["plan_digest"],
+            "status": "complete" if complete else "partial",
+            "readiness": readiness,
+            "truncated": truncated,
+            "evidence": evidence,
+            "summary": {
+                "task_attempts": len(attempts),
+                "recorded_attempts": sum(
+                    attempt["evidence_status"] == "recorded" for attempt in attempts
+                ),
+                "verified_seals": sum(
+                    attempt["integrity_status"] == "verified" for attempt in attempts
+                ),
+                "findings": len(findings),
+            },
+            "findings": findings,
+            "limitations": [
+                "This report contains only evidence linked to the named workflow plan.",
+                "A partial report is not a successful completion or a release acceptance record.",
+            ],
+        }
 
     def workflow_resource_summary(self, plan_id: str):
         return self.store.get_workflow_resource_summary(plan_id)

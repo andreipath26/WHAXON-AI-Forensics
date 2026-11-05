@@ -1450,7 +1450,10 @@ Candidate based on `c4356c712c200834ecd4694befa15a31c28c25a9` adds exact
 catalog/admission/transport and semantic-operation crosswalk guards, all 22
 UI page handlers and 23 route aliases, and a loopback-only SQLi smoke. The
 current working candidate also adds scheduler-owned SQLi and reflected-XSS
-verification and conservative retest tasks for sealed, same-target V2 findings. The HTTP
+verification and conservative retest tasks for sealed, same-target V2 findings,
+plus read-only `whaxon workflow plan report --id PLAN` output over only that
+plan's persisted evidence. The report labels failed, partial, or unsealed
+evidence as partial and cannot claim full-chain acceptance. The HTTP
 requests recheck scope immediately before dispatch, reject redirects and
 path changes, and accept IP literals only to prevent DNS rebinding. Results
 are written to separate V2 evidence jobs. This remains a narrow SQLi/reflected-XSS
@@ -1458,11 +1461,15 @@ subset: timing and observation validation are not integrated, each operation
 is a separate plan, and no initial-access capability or controlled full-chain
 proof exists.
 
-Local focused results: **255** G01 tests pass across capability serialization,
-provider/workflow, API/CLI, callsite inventory, and Burp import. Ruff, Python
-compilation, and `git diff --check` pass. The API now serializes nested
+Local focused results: **336** G01 tests pass across capability serialization,
+providers/workflows, plan reporting, API/CLI, callsite inventory, Burp import,
+SQLmap parsing, and SQLi/reflected-XSS verification. Ruff, Python compilation,
+and `git diff --check` pass. The API now serializes nested
 capability-schema arrays as JSON arrays while retaining immutable manifests.
-Scanner-backed smoke and exact-head CI are not yet available on this candidate. G01 remains
+The previous exact-head candidate failed its SQLmap loopback smoke because the
+fixture evaluated only the first boolean conjunction. The local fixture now
+evaluates every conjunction, has direct regression tests, and the report path
+has focused component coverage; these changes await exact-head CI. G01 remains
 **OPEN** and unfrozen; the full controlled chain is still unproven.
 
 ## Engineering delivery tracks that can proceed while UI is blocked

@@ -21,6 +21,14 @@ requests: list[str] = []
 request_lock = threading.Lock()
 
 
+def _sqlmap_boolean_oracle(value: str) -> bytes:
+    """Model conjunctions used by SQLmap's bounded boolean smoke payloads."""
+    checks = re.findall(r"\band\s+(\d+)\s*=\s*(\d+)\b", value.lower())
+    if any(left != right for left, right in checks):
+        return b"No products found\n"
+    return b"Product: fixture-item\n"
+
+
 class FixtureHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         with request_lock:
@@ -35,12 +43,7 @@ class FixtureHandler(BaseHTTPRequestHandler):
             # exposes data. Boolean conditions only change a fixed response.
             query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
             value = unquote(query.get("id", [""])[0]).lower()
-            false_match = re.search(r"\band\s+(\d+)\s*=\s*(\d+)\b", value)
-            body = (
-                b"No products found\n"
-                if false_match and false_match.group(1) != false_match.group(2)
-                else b"Product: fixture-item\n"
-            )
+            body = _sqlmap_boolean_oracle(value)
             status = 200
         else:
             body = b"not found\n"

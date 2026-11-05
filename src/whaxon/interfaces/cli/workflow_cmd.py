@@ -143,6 +143,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     evidence.add_argument("--id", required=True)
     evidence.add_argument("--limit", type=int, default=100)
+    report = plan_commands.add_parser(
+        "report", help="render only persisted evidence linked to a workflow plan",
+    )
+    report.add_argument("--id", required=True)
+    report.add_argument("--limit", type=int, default=100)
     resources = plan_commands.add_parser(
         "resources", help="show measured workflow utilization and unavailable metrics",
     )
@@ -360,6 +365,10 @@ def main(args: list[str] | None = None) -> int:
                 indent=2, sort_keys=True,
             ))
             return 0
+        if options.command == "plan" and options.plan_command == "report":
+            report = core.workflow_report(options.id, limit=options.limit)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0 if report["status"] == "complete" else 1
         if options.command == "plan" and options.plan_command == "resources":
             print(json.dumps(
                 core.workflow_resource_summary(options.id), indent=2, sort_keys=True,
