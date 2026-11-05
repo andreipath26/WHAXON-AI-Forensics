@@ -558,6 +558,7 @@
   let currentJob = null;
   let source = null;
   let currentStatus = "idle";
+  let startInProgress = false;
   let startedAt = null;
   let timerId = null;
   const notice = document.createElement("div");
@@ -629,8 +630,14 @@
     const tool_id = toolSelect?.value;
     if (!target) { say("Enter a target that you are authorized to assess.", false); targetInput?.focus(); return; }
     if (!tool_id) { say("Choose an installed tool with an available adapter.", false); return; }
+    if (startInProgress) return;
     if (currentJob && ["running","queued"].includes(currentStatus)) {
       say("A job is already active. Cancel it or wait for it to finish.", false); return;
+    }
+    startInProgress = true;
+    if (activeRunButton) {
+      activeRunButton.disabled = true;
+      activeRunButton.setAttribute("aria-busy", "true");
     }
     try {
       say("Checking the target against the active WHAXON scope…");
@@ -653,6 +660,12 @@
     } catch (error) {
       line(error.message, "whaxon.web", "error");
       say("Could not start job: " + error.message, false);
+    } finally {
+      startInProgress = false;
+      if (activeRunButton) {
+        activeRunButton.disabled = false;
+        activeRunButton.removeAttribute("aria-busy");
+      }
     }
   }
   function connectStream(jobId) {
