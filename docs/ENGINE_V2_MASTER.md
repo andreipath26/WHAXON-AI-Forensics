@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 60261)
-Total output lines: 2131
+Warning: truncated output (original token count: 60310)
+Total output lines: 2134
 
 # WHAXON — ENGINE V2 MASTER DOCUMENT
 
@@ -131,7 +131,7 @@ Define typed, schema-versioned contracts (no untyped dictionaries at service bou
 |---|---|
 | Mission | Objective, owner, engagement/programme reference, mode, lifecycle, expiry, isolation boundary |
 | AuthorizationContext | Domain/type, policy ID/version, scope, limits, activation/expiry |
-| Plan | Mi…52261 tokens truncated…in a historical mapping of compound roadmap requirements, not current completeness.  
+| Plan | Mi…52310 tokens truncated…in a historical mapping of compound roadmap requirements, not current completeness.  
 **Detailed ledger:** [ENGINE_V2_ROADMAP_REQUIREMENTS.csv](ENGINE_V2_ROADMAP_REQUIREMENTS.csv).
 
 ## Coverage and limitations
