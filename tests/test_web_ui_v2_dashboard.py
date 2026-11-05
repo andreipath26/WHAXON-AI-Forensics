@@ -511,3 +511,23 @@ def test_dashboard_engine_state_reports_health_failure(page, live_server):
         "() => document.querySelector('#dashboard-engine-state')?.textContent === 'ENGINE UNAVAILABLE'",
         timeout=8000,
     )
+
+
+def test_dashboard_export_rejects_malformed_history_without_false_success(page, live_server):
+    """HTTP 200 with invalid history must not fabricate an empty archive."""
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"error":"history temporarily unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile(r"Export Archive")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('History API returned an invalid response')",
+        timeout=5000,
+    )
+    assert "Exported 0 recorded job" not in page.locator("#dashboard-action-status").inner_text()
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "status"
