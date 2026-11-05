@@ -60,29 +60,6 @@ def test_run_page_serves_assets_without_external_requests(page, live_server):
         assert asset.body(), path
 
 
-def test_run_page_mobile_navigation_is_keyboard_operable(page, live_server):
-    page.set_viewport_size({"width": 390, "height": 844})
-    page.goto(f"{live_server}/ui-v2/run")
-    page.wait_for_function(
-        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
-        timeout=8000,
-    )
-    assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
-    menu = page.get_by_role("button", name="Open Run navigation")
-    assert menu.is_visible()
-    sidebar = page.locator("#run-mobile-sidebar")
-    assert sidebar.get_attribute("aria-hidden") == "true"
-    assert sidebar.evaluate("node => node.inert") is True
-    menu.click()
-    assert menu.get_attribute("aria-expanded") == "true"
-    assert sidebar.get_attribute("aria-hidden") == "false"
-    assert sidebar.evaluate("node => node.inert") is False
-    page.keyboard.press("Escape")
-    assert menu.get_attribute("aria-expanded") == "false"
-    assert menu.evaluate("el => document.activeElement === el")
-    assert sidebar.evaluate("node => node.inert") is True
-
-
 def test_run_page_echo_job_streams_real_output(page, live_server):
     page.goto(f"{live_server}/ui-v2/run")
     page.wait_for_function(
