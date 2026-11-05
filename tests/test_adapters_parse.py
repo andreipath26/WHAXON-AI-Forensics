@@ -129,6 +129,18 @@ def test_sqlmap_retracts_summary_rejected_as_false_positive():
     assert not [finding for finding in findings if finding.kind == "sqli"]
 
 
+def test_sqlmap_later_positive_summary_supersedes_earlier_retraction():
+    lines = _stdout([
+        "[INFO] GET parameter 'id' appears to be injectable",
+        "[WARNING] GET parameter 'id' does not seem to be injectable",
+        "[INFO] GET parameter 'id' appears to be 'AND boolean-based blind' injectable",
+    ])
+    findings = SqlmapAdapter().parse(lines)
+    sqli = [finding for finding in findings if finding.kind == "sqli"]
+    assert len(sqli) == 1
+    assert sqli[0].data["type"] == "injectable"
+
+
 def test_sqlmap_parses_current_database_info():
     lines = _stdout(["current database: 'dvwa'"])
     findings = SqlmapAdapter().parse(lines)

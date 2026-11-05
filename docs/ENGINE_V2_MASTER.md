@@ -1461,7 +1461,7 @@ subset: timing and observation validation are not integrated, each operation
 is a separate plan, and no initial-access capability or controlled full-chain
 proof exists.
 
-Local focused results: **336** G01 tests pass across capability serialization,
+Local focused results: **337** G01 tests pass across capability serialization,
 providers/workflows, plan reporting, API/CLI, callsite inventory, Burp import,
 SQLmap parsing, and SQLi/reflected-XSS verification. Ruff, Python compilation,
 and `git diff --check` pass. The API now serializes nested

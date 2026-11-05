@@ -95,10 +95,13 @@ class SqlmapAdapter(Adapter):
             injectable = _INJECTABLE_RE.search(text)
             if injectable:
                 name = injectable.group("name")
-                confirmed_parameters.setdefault(name, text.rstrip())
+                confirmed_parameters[name] = text.rstrip()
+                rejected_parameters.discard(name)
             rejected = _NOT_INJECTABLE_RE.search(text)
             if rejected:
-                rejected_parameters.add(rejected.group("name"))
+                name = rejected.group("name")
+                rejected_parameters.add(name)
+                confirmed_parameters.pop(name, None)
             if stream != "stdout":
                 continue
             line = text.rstrip()
