@@ -1458,7 +1458,7 @@ XSS, timing, and observation validation are not integrated, each operation is
 a separate plan, and no initial-access capability or controlled full-chain
 proof exists.
 
-Local focused results: **177** verification/provider/workflow tests pass;
+Local focused results: **178** verification/provider/workflow tests pass;
 Ruff, Python compilation, and `git diff --check` pass. Scanner-backed smoke
 and exact-head CI are not yet available on this candidate. G01 remains
 **OPEN** and unfrozen; the full controlled chain is still unproven.

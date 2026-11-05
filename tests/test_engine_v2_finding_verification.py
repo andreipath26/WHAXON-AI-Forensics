@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import threading
 import time
@@ -70,7 +71,7 @@ def _bound_plan(core, *, plan_id, capability_id, target, inputs):
     return task
 
 
-async def _seed_sealed_source(core, *, plan_id, target):
+async def _seed_sealed_source(core, *, plan_id, target, request_context=None):
     """Persist a test-only SQLmap result through the real scheduler seal path."""
     from whaxon.core.workflow import WorkflowPlan
 
@@ -80,7 +81,7 @@ async def _seed_sealed_source(core, *, plan_id, target):
         permissions=("network.scan",), impact="moderate",
     )
     core.save_workflow_plan(plan_id, WorkflowPlan(mission_id=plan_id, tasks=(task,)))
-    source_job = "a" * 12
+    source_job = hashlib.sha256(plan_id.encode("utf-8")).hexdigest()[:12]
 
     async def fake_scan(_task):
         core.store.create(source_job)
@@ -89,7 +90,9 @@ async def _seed_sealed_source(core, *, plan_id, target):
         core.store.append_finding(source_job, Finding(
             kind="sqli", severity="critical", source="sqlmap",
             data={"parameter": "id"}, raw_line="Parameter: id (GET)",
-            request_context={"method": "GET", "url": target, "parameter": "id"},
+            request_context=(request_context if request_context is not None else {
+                "method": "GET", "url": target, "parameter": "id",
+            }),
         ), 0)
         core.store.set_finished(source_job, 0, 0.01)
         return {
@@ -227,6 +230,69 @@ def test_v2_verification_rejects_hostname_targets_before_dispatch(tmp_path):
             raise AssertionError("hostname verification target must be rejected")
 
     asyncio.run(exercise())
+
+
+def test_v2_verification_authorizes_contextless_and_rejects_changed_path(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.vulnerable = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="contextless-source-plan", target=target,
+                request_context={},
+            )
+            _bound_plan(
+                core, plan_id="contextless-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            verified = await core.run_workflow_plan(
+                "contextless-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert verified["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("contextless-verification-plan")
+            assert evidence["all_evidence_integrity_verified"] is True
+            assert evidence["attempts"][0]["findings"][0]["verification_status"] == "verified"
+            assert _SQLiFixture.requests == 6
+
+            other_path_source = await _seed_sealed_source(
+                core, plan_id="changed-path-source-plan", target=target,
+                request_context={
+                    "method": "GET", "url": target.replace("/search", "/other"),
+                    "parameter": "id",
+                },
+            )
+            _bound_plan(
+                core, plan_id="changed-path-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": other_path_source, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(
+                "changed-path-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            changed = core.workflow_evidence("changed-path-verification-plan")
+            assert changed["all_evidence_integrity_verified"] is True
+            finding = changed["attempts"][0]["findings"][0]
+            assert finding["verification_status"] == "candidate"
+            assert "scope authorization denied" in finding["verification_reason"]
+            assert _SQLiFixture.requests == 6
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_v2_validation_rechecks_scope_before_each_probe(tmp_path):
