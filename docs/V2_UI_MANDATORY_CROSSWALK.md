@@ -86,3 +86,9 @@ The Dashboard is the **first** page in this UI-wide crosswalk, not a separate cr
 | D6 Deployment | OPEN | Exact candidate browser/desktop tests, packaged fonts/icons/CSS or explicitly approved connected-only asset policy and failover, target-environment rollout/rollback evidence |
 
 **Decision:** Dashboard **NOT DEPLOYMENT-READY** until D1–D6 evidence and operator sign-off exist; E6 remains FROZEN. Do not equate a green CI run, static 35-control inventory, or this checkpoint with approval.
+
+### Dashboard action safety update — 2026-11-05
+
+- Emergency halt requests are single-flight within the dashboard session, to prevent duplicate submissions from repeated clicks. A malformed job identity is not sent to the cancellation endpoint; a partial cancel result remains an incomplete cancellation request, not proof of stopped effects.
+- Error outcomes use an assertive accessibility alert role. Non-error informational updates use a status region. Added browser negative tests for invalid job IDs and alert signaling.
+- Source changes are bounded to the production Dashboard template and browser tests; no design source was modified. **D1–D6 remain OPEN until evidence and sign-off are recorded**. Prior green CI is not exact-head acceptance.

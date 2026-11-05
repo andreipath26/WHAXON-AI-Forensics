@@ -530,7 +530,7 @@ def test_dashboard_export_rejects_malformed_history_without_false_success(page, 
         timeout=5000,
     )
     assert "Exported 0 recorded job" not in page.locator("#dashboard-action-status").inner_text()
-    assert page.locator("#dashboard-action-status").get_attribute("role") == "status"
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
 
 
 def test_dashboard_health_requires_actual_boolean_true(page, live_server):
