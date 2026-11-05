@@ -137,17 +137,18 @@ execution evidence; deployment-host readiness remains unverified.
 
 ### Consequential HTTP route ownership
 
-`test_consequential_api_route_methods_and_handlers_are_explicit` pins the
-method, path and handler binding for these consequential routes. It complements
-the callsite inventory; it does not claim to guard every read-only API or any UI
-control.
+`test_api_route_methods_and_handlers_are_explicit` pins the method, path and
+handler binding for all Flask `/api/*` routes, including read/status/export
+routes. The matrix below summarizes consequential ownership and authorization
+boundaries; it does not claim to guard UI controls.
 
 A static decorator census currently finds 104 `/api/*` method/path bindings and
 22 `/ui-v2/*` page routes in `interfaces/web/server.py` (five other routes are
 health/root/settings/favicon pages). The matrix below covers consequential
-execution, authorization-state, cancellation and provisioning routes. The
-remaining API read/status/export mappings are still part of the G01 exhaustive
-crosswalk; the UI page/control inventory is frozen and is not being edited here.
+execution, authorization-state, cancellation and provisioning routes. Read,
+status and export routes are pinned for drift, but their complete source,
+persistence, access-control and test-semantic crosswalk remains open under G01.
+The UI page/control inventory is frozen and is not being edited here.
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
@@ -193,6 +194,12 @@ and `EmbeddedServer` derive their data directory from the checkout-relative
 package path rather than `WHAXON_DATA`; GUI starts `serve --daemon`. Their source
 checkout behavior therefore does not establish installed-wheel data-path or
 daemon support.
+
+All `whaxon workflow` verbs call shared `Core` capability, policy, store,
+scheduler or queue methods; only `plan run` and the durable request worker
+dispatch providers. The remaining verbs are read or control-plane operations.
+CLI `plan approval grant --actor` accepts a caller-supplied actor label, so that
+label is not authenticated-principal evidence.
 
 The CLI split also distinguishes three V2 execution modes: `workflow plan run`
 uses the V2 scheduler/policy/provider path synchronously; `workflow plan
