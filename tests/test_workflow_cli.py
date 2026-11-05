@@ -26,6 +26,25 @@ class _FakeCore:
     def workflow_plan_details(self, plan_id):
         return {"plan": {"mission_id": "m"}, "tasks": [{"id": "scan"}]}
 
+    def capability_inventory(self):
+        return [{"capability_id": "tool.nmap", "executable": False}]
+
+    def capability_portfolio_audit(self):
+        return {"summary": {"bound": 0}, "execution_enabled_by_audit": False}
+
+    def propose_workflow_followups(self, source_plan_id, *, max_tasks=16):
+        plan = {"mission_id": "m", "tasks": [{"id": "followup"}]}
+        return type("Proposal", (), {
+            "plan_id": "proposal-1",
+            "plan": plan,
+            "to_dict": lambda self: {
+                "source_plan_id": source_plan_id,
+                "max_tasks": max_tasks,
+                "plan_id": self.plan_id,
+                "plan": self.plan,
+            },
+        })()
+
     def configure_mission_cost_limit(self, mission_id, *, max_cost_microusd):
         self.cost_cap = (mission_id, max_cost_microusd)
 
@@ -142,6 +161,42 @@ def test_workflow_cli_creates_mission(monkeypatch, capsys):
         "mission", "create", "--id", "mission-1", "--objective", "audit lab",
     ]) == 0
     assert json.loads(capsys.readouterr().out)["created"] is True
+
+
+def test_workflow_cli_capability_views_are_read_only_core_calls(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["capabilities"]) == 0
+    assert json.loads(capsys.readouterr().out) == []
+    assert workflow_cmd.main(["providers"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["executable"] is False
+    assert workflow_cmd.main(["portfolio-audit"]) == 0
+    assert json.loads(capsys.readouterr().out)["execution_enabled_by_audit"] is False
+
+
+def test_workflow_cli_show_and_followups_do_not_execute_a_plan(
+    monkeypatch, capsys,
+):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main(["plan", "show", "--id", "plan-1"]) == 0
+    assert json.loads(capsys.readouterr().out)["tasks"][0]["id"] == "scan"
+
+    core = _FakeCore(data_dir=None)
+    monkeypatch.setattr(workflow_cmd, "Core", lambda data_dir: core)
+    assert workflow_cmd.main([
+        "plan", "followups", "--source-id", "source-1",
+    ]) == 0
+    proposal = json.loads(capsys.readouterr().out)
+    assert proposal["created"] is False
+    assert core.saved is None
+    assert getattr(core, "initialized_with_drain", None) is None
+
+    assert workflow_cmd.main([
+        "plan", "followups", "--source-id", "source-1", "--save",
+    ]) == 0
+    saved_proposal = json.loads(capsys.readouterr().out)
+    assert saved_proposal["created"] is True
+    assert core.saved[0] == "proposal-1"
+    assert getattr(core, "initialized_with_drain", None) is None
 
 
 def test_workflow_cli_validates_and_persists_plan_file(tmp_path, monkeypatch, capsys):
