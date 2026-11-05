@@ -18,3 +18,7 @@ def test_boolean_oracle_rejects_false_later_conjunct():
 
 def test_boolean_oracle_leaves_non_boolean_lookup_stable():
     assert _ORACLE("1") == b"Product: fixture-item\n"
+
+
+def test_boolean_oracle_handles_whitespace_around_comparisons():
+    assert _ORACLE("1 AND 123 = 123 AND 456 = 457") == b"No products found\n"
