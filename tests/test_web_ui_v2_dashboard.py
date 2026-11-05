@@ -531,3 +531,64 @@ def test_dashboard_export_rejects_malformed_history_without_false_success(page, 
     )
     assert "Exported 0 recorded job" not in page.locator("#dashboard-action-status").inner_text()
     assert page.locator("#dashboard-action-status").get_attribute("role") == "status"
+
+
+def test_dashboard_health_requires_actual_boolean_true(page, live_server):
+    """Malformed health data must never claim a connected engine."""
+    page.route(
+        "**/api/health/simple",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"ok":"true"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-engine-state')?.textContent === 'ENGINE UNAVAILABLE'",
+        timeout=8000,
+    )
+    assert page.get_by_text("ENGINE ONLINE", exact=True).count() == 0
+
+
+def test_dashboard_import_rejects_invalid_success_response_without_navigation(page, live_server):
+    """A malformed successful upload response must not claim findings exist."""
+    page.route(
+        "**/api/import/burp",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"count":"not-a-number"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    with page.expect_file_chooser() as picker:
+        page.get_by_role("button", name=re.compile(r"Upload Artifact")).click()
+    picker.value.set_files({
+        "name": "test-burp.xml", "mimeType": "application/xml",
+        "buffer": b'<?xml version="1.0"?><issues></issues>',
+    })
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Import API returned an invalid response')",
+        timeout=8000,
+    )
+    assert page.url.endswith("/ui-v2")
+    assert "Imported" not in page.locator("#dashboard-action-status").inner_text()
+
+
+def test_dashboard_invalid_history_timestamp_is_honest(page, live_server):
+    """Bad historical dates must not render 'Invalid Date' as real telemetry."""
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":"bad-clock","tool":"nmap","target":"192.0.2.10","status":"finished","created_at":"nonsense"}]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('bad-clock')",
+        timeout=8000,
+    )
+    row = page.locator("table tbody tr").filter(has_text="bad-clock")
+    assert "Not recorded" in row.inner_text()
+    assert "Invalid Date" not in row.inner_text()

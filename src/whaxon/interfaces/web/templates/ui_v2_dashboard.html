@@ -562,7 +562,11 @@
     const sub = card.querySelector(".font-label-sm:not(.uppercase)");
     if (sub && suffix) sub.textContent = suffix;
   };
-  const fmt = value => value ? new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value).toLocaleString() : "Not recorded";
+  const fmt = value => {
+    if (value == null || value === "") return "Not recorded";
+    const date = new Date(typeof value === "number" && value < 1e12 ? value * 1000 : value);
+    return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleString();
+  };
   const statusLabel = value => String(value || "unknown").replace(/_/g, " ").toUpperCase();
   const td = (row, value, classes) => {
     const cell = document.createElement("td");
@@ -656,7 +660,7 @@
     const headerLabels = [...document.querySelectorAll("header span")];
     const headerValue = label => headerLabels.find(node => textOf(node).replace(/:$/, "") === label)?.parentElement?.querySelectorAll("span")[1];
     const engineValue = headerValue("Engine");
-    if (engineValue) engineValue.textContent = health.ok ? "Connected" : "Unavailable";
+    if (engineValue) engineValue.textContent = health.ok === true ? "Connected" : "Unavailable";
     const portValue = headerValue("Port");
     if (portValue) portValue.textContent = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
     const hostValue = headerValue("Host");
@@ -803,7 +807,10 @@
       try {
         const response = await fetch("/api/import/burp", { method: "POST", body: form });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || ("Import HTTP " + response.status));
+        if (!response.ok) throw new Error(result?.error || ("Import HTTP " + response.status));
+        if (!result || !Number.isSafeInteger(result.count) || result.count < 1) {
+          throw new Error("Import API returned an invalid response.");
+        }
         showActionStatus("Imported " + result.count + " finding(s) from " + file.name + ". Opening Findings.", "success");
         window.location.href = "/ui-v2/findings";
       } catch (error) {
