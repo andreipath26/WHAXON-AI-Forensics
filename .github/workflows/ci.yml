@@ -831,3 +831,61 @@ jobs:
           if counts["failures"] or counts["errors"]:
               raise SystemExit(1)
           PY
+
+  searchsploit-integration:
+    name: SearchSploit real Exploit-DB integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install WHAXON test dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install ".[dev]"
+      - name: Install genuine offline Exploit-DB and SearchSploit
+        run: |
+          set -euo pipefail
+          # Official upstream, not mocked responses or an untrusted package mirror.
+          sudo git clone --depth 1 https://gitlab.com/exploit-database/exploitdb.git /usr/share/exploitdb
+          sudo ln -s /usr/share/exploitdb/searchsploit /usr/local/bin/searchsploit
+          # The resource file points all CSVs and exploit paths at this checkout.
+          sed -E 's@path_array\\+=\\(.*\\)@path_array+=("/usr/share/exploitdb")@g' \
+            /usr/share/exploitdb/.searchsploit_rc > "$HOME/.searchsploit_rc"
+          test -x /usr/share/exploitdb/searchsploit
+          test -s /usr/share/exploitdb/files_exploits.csv
+          command -v searchsploit
+          searchsploit --json "vsftpd 2.3.4" > searchsploit-probe.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("searchsploit-probe.json").read_text())
+          assert any(
+              row.get("EDB-ID") == "49757"
+              for row in data.get("RESULTS_EXPLOIT", [])
+          ), "Official Exploit-DB snapshot missing expected EDB-ID 49757"
+          PY
+      - name: Run all real SearchSploit integration tests
+        run: |
+          set -euo pipefail
+          python -m pytest -q -ra --junitxml=searchsploit-results.xml tests/test_lookup_cmd.py
+      - name: Reject unexecuted or skipped tests
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          f = Path("searchsploit-results.xml")
+          if not f.is_file():
+              raise SystemExit("SearchSploit tests did not execute")
+          root = ET.parse(f).getroot()
+          suite = root if root.tag == "testsuite" else root.find("testsuite")
+          if suite is None:
+              raise SystemExit("SearchSploit JUnit suite missing")
+          counts = {n: int(suite.get(n, "0")) for n in ("tests", "failures", "errors", "skipped")}
+          print(counts)
+          if counts["tests"] < 13 or any(counts[k] for k in ("failures", "errors", "skipped")):
+              raise SystemExit("SearchSploit integration must execute all tests without skips or failures")
+          PY
