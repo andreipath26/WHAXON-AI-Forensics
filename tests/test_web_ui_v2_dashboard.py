@@ -1086,3 +1086,45 @@ def test_dashboard_uses_packaged_stylesheet_not_runtime_tailwind_cdn(page, live_
 def test_dashboard_document_has_descriptive_browser_and_screen_reader_title(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     assert page.title() == "WHAXON — Security Operations Dashboard"
+
+
+def test_dashboard_has_no_external_browser_asset_dependencies(page, live_server):
+    """The security console must not send page-view telemetry to external CDNs."""
+    external_requests = []
+    def refuse_external(route):
+        external_requests.append(route.request.url)
+        route.abort("blockedbyclient")
+    page.route("https://**/*", refuse_external)
+    response = page.goto(f"{live_server}/ui-v2")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('seed-job-1')",
+        timeout=8000,
+    )
+    page.evaluate("() => document.fonts.ready")
+    assert external_requests == []
+    assert "fonts.googleapis.com" not in response.text()
+    assert "lh3.googleusercontent.com" not in response.text()
+    assert "cdn.tailwindcss.com" not in response.text()
+    for path in (
+        "/static/dashboard-v2.css",
+        "/static/dashboard-fonts.css",
+        "/static/dashboard-logo.jpg",
+        "/static/dashboard-profile.jpg",
+    ):
+        assert page.request.get(f"{live_server}{path}").status == 200, path
+    assert page.evaluate(
+        "() => getComputedStyle(document.body).backgroundColor"
+    ) == "rgb(15, 19, 28)"
+    for alt in ("WHAXON Security Logo", "Profile"):
+        image = page.get_by_role("img", name=alt)
+        assert image.evaluate("(node) => node.naturalWidth > 0"), alt
+
+
+def test_dashboard_bundled_font_css_has_no_third_party_urls(page, live_server):
+    response = page.request.get(f"{live_server}/static/dashboard-fonts.css")
+    assert response.status == 200
+    css = response.text()
+    assert "@font-face" in css
+    assert "/static/dashboard-fonts/" in css
+    assert "https://" not in css
