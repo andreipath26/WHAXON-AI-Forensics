@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -14,7 +15,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 requests: list[str] = []
 request_lock = threading.Lock()
@@ -25,8 +26,21 @@ class FixtureHandler(BaseHTTPRequestHandler):
         with request_lock:
             requests.append(self.path)
         path = urlsplit(self.path).path
-        if path in {"/admin", "/robots.txt", "/search"}:
+        if path in {"/admin", "/robots.txt"}:
             body = b"fixture response\n"
+            status = 200
+        elif path == "/search":
+            # A deterministic, harmless boolean oracle for SQLmap. It models
+            # a read-only product lookup and never connects to a database or
+            # exposes data. Boolean conditions only change a fixed response.
+            query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+            value = unquote(query.get("id", [""])[0]).lower()
+            false_match = re.search(r"\band\s+(\d+)\s*=\s*(\d+)\b", value)
+            body = (
+                b"No products found\n"
+                if false_match and false_match.group(1) != false_match.group(2)
+                else b"Product: fixture-item\n"
+            )
             status = 200
         else:
             body = b"not found\n"
@@ -79,7 +93,7 @@ def main() -> None:
             assert "admin" in gobuster.stdout, gobuster.stdout
 
             ffuf_output = root / "ffuf.json"
-            run([
+            sqlmap_direct = run([
                 "ffuf", "-w", str(wordlist), "-u", f"{base_url}/FUZZ",
                 "-mc", "200", "-of", "json", "-o", str(ffuf_output),
                 "-s", "-noninteractive", "-timeout", "3", "-maxtime", "20",
@@ -98,6 +112,11 @@ def main() -> None:
             with request_lock:
                 sqlmap_requests = [path for path in requests if path.startswith("/search?")]
             assert sqlmap_requests, "SQLmap did not send an HTTP request to the loopback fixture"
+            assert "injectable" in (
+                sqlmap_direct.stdout + "\n" + sqlmap_direct.stderr
+            ).lower(), (
+                "SQLmap contacted the fixture but did not identify its boolean oracle"
+            )
 
             # Exercise the installed scanner through the actual Engine V2 plan,
             # policy, provider, scheduler and evidence-seal path. The target is
@@ -157,6 +176,11 @@ def main() -> None:
             assert any(path.startswith("/search?") for path in v2_requests), (
                 "Engine V2 SQLmap provider did not contact its approved loopback target"
             )
+            assert any(
+                finding["kind"] == "sqli"
+                for attempt in v2_evidence["attempts"]
+                for finding in attempt["findings"]
+            ), "Engine V2 SQLmap evidence did not retain the detected SQL injection finding"
 
             nuclei = shutil.which("nuclei")
             if os.environ.get("WHAXON_REQUIRE_NUCLEI") == "1" and not nuclei:
@@ -191,10 +215,10 @@ http:
                 output = nuclei_output.read_text(encoding="utf-8")
                 assert "whaxon-loopback-smoke" in output, output
 
-        print(
+            print(
             "Loopback scanner smoke passed: Nmap TCP discovery, Gobuster directory "
-            "enumeration, ffuf content discovery, SQLmap direct and Engine V2 "
-            "workflow HTTP parameter testing"
+            "enumeration, ffuf content discovery, SQLmap boolean-injection detection "
+            "directly and through Engine V2"
             + (", and Nuclei template matching." if shutil.which("nuclei") else ".")
         )
     finally:
