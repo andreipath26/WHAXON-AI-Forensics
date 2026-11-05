@@ -12,6 +12,8 @@
 
 ---
 
+**Business-impact implementation source:** [technical severity/cost design](business-impact.md), implemented alongside `src/whaxon/core/business_impact.py` and severity/reporting code. Cost bands are not verified losses for any particular client.
+
 ## Part 1 — findings.md
 
 # Findings

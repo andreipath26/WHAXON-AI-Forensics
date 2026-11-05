@@ -111,6 +111,8 @@ For the latest tested commit and outstanding release criteria, use [GitHub Actio
 | [Engine V2 architecture](docs/ENGINE_V2_MASTER.md) | Execution contracts and engineering work |
 | [Product roadmap](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) | Priorities, milestones and release gates |
 
+Dedicated technical designs: [bug bounty programme policy and workflow](docs/bounty-addon.md), [business-impact severity and costs](docs/business-impact.md), and the original supplied [Obsidian Kinetic design source](web%20ui%20files%20and%20rendering/obsidian_kinetic/DESIGN.md).
+
 ## Contributing, security and licensing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes and [SECURITY.md](SECURITY.md) to report a security issue. This project is for **systems you own or are explicitly authorized to assess**; neither a tool configuration nor an AI suggestion replaces permission and rules of engagement.

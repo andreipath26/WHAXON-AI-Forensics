@@ -15,11 +15,16 @@ The Engine V2 requirement and checkpoint ledgers are live CSV navigation indexes
 | App architecture, AI and API | [APPLICATION_ARCHITECTURE_MASTER.md](APPLICATION_ARCHITECTURE_MASTER.md) |
 | Installation, deployment, operator instructions | [OPERATIONS_MASTER.md](OPERATIONS_MASTER.md) |
 | Findings, reporting, evidence, retention | [EVIDENCE_AND_REPORTING_MASTER.md](EVIDENCE_AND_REPORTING_MASTER.md) |
-| Commercial planning, CBC, funding, bounty, editions | [CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md](CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md) |
+| Commercial planning, CBC, funding, editions | [CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md](CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md) |
+| Bug bounty authorization, programmes and differential workflows | [bounty-addon.md](bounty-addon.md) |
+| Business-impact severity methodology | [business-impact.md](business-impact.md) |
 | Engineering governance, previous retirement records | [PROJECT_GOVERNANCE_MASTER.md](PROJECT_GOVERNANCE_MASTER.md) |
 | Release history | [CHANGELOG.md](CHANGELOG.md) |
 
 ## Permanently distinct files
+
+The bug bounty module and business-impact calculator are independent technical specifications, not chapters of the CBC commercial playbook. The original `web ui files and rendering/obsidian_kinetic/DESIGN.md` remains at its canonical design-source path and must not be deleted or silently replaced by a consolidated copy.
+
 
 The root `README.md`, `AGENTS.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CLA.md`, `LICENSE*`, `TRADEMARK.md`, `THIRD_PARTY_NOTICES.md` and third-party license inventory have distinct operational or legal roles; do not absorb/delete these. Retain asset readmes and data-provenance files adjacent to assets, plus CSV evidence registers and historical Git commits.
 

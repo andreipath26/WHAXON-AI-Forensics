@@ -1312,7 +1312,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 
 ---
 
-## Part 5 — web ui files and rendering/obsidian_kinetic/DESIGN.md (source record)
+## Part 5 — web ui files and rendering/obsidian_kinetic/DESIGN.md (historical embedded copy; original restored at supplied path)
 
 ---
 name: Obsidian Kinetic

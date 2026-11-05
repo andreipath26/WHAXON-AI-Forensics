@@ -1,6 +1,6 @@
 # Supplied WHAXON UI design sources
 
-Named screen folders remain the visual source assets; the former `obsidian_kinetic/DESIGN.md` has been consolidated into `docs/V2_UI_MANDATORY_CROSSWALK.md`. Preserve their design and distinct versioned/hardened alternatives until canonical mapping and visual acceptance are complete.
+Named screen folders remain the visual source assets; the original `obsidian_kinetic/DESIGN.md` has been restored at its supplied path; a historical copy also exists in `docs/V2_UI_MANDATORY_CROSSWALK.md`. Preserve their design and distinct versioned/hardened alternatives until canonical mapping and visual acceptance are complete.
 
 Production templates are in `src/whaxon/interfaces/web/templates/ui_v2_*.html`. Current behavior is established by source/tests; UI acceptance is tracked in [the new UI audit](../docs/V2_UI_MANDATORY_CROSSWALK.md).
 

@@ -1,3 +1,12 @@
+# Changelog
+
+## 2026-11-05 — Documentation ownership and restored original sources (unreleased)
+
+- Restored `docs/bounty-addon.md` as the technical owner of bounty programme policy, differential analysis and workflow design; corrected missing-policy wording to fail closed for bounty operations, without changing standalone WHAXON host-scope rules.
+- Restored `docs/business-impact.md` and placed it under evidence/reporting technical ownership, separate from CBC event and investor strategy.
+- Restored the **byte-identical** supplied `web ui files and rendering/obsidian_kinetic/DESIGN.md` from Git history; preserves the frozen design assets and original configuration.
+- Moved technical chapters out of the CBC commercial playbook and repaired canonical document ownership/index references. Historical changelog entries below retain their original dates and citations.
+
 ## 2026-11-05 — Source-versus-documentation reconciliation (unreleased)
 
 - Corrected the active roadmap/V1 descriptions of the previously fixed one-shot `Core.initialize(drain=False)` CLI isolation, desktop `/ui-v2` default, and merged E5 bounded engineering service. Retained prior historical snapshots explicitly as dated evidence rather than live defects.
@@ -317,7 +326,7 @@ Verified with curl against the live server: all five wired endpoints return real
 - README rewritten to lead with the R107 product claim (Trust Layer).
 - pyproject.toml description updated for PyPI/Piwheels.
 
-# Changelog
+## Historical changelog (retained original section)
 ## 2026-10-18 (session 68 - hydra adapter registered)
 
 - **hydra adapter wired end-to-end.** adapter existed and was unit-tested, but nothing imported it, so register() never ran, get_adapter("hydra") returned None, and every run parsed nothing: [no findings] against output hydra itself printed as successful. added to _autoload() tuple; __init__.py import removed. catalog entry added. initial-access ladder step: run hydra, then propose post-access. 3 ladder tests.

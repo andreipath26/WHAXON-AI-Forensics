@@ -170,7 +170,7 @@ Close all §38 gates. Capture current reports, inspect HTML/PDF/Markdown/JSON be
 
 ### P6 — Programme policy, bounty and bounded campaigns
 
-Retain the detailed [bounty design](docs/CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md) and original §§26, 45–46 as requirement sources, subordinate to this order:
+Retain the detailed [bounty design](docs/bounty-addon.md) and original §§26, 45–46 as requirement sources, subordinate to this order:
 
 1. Source-backed programme ingestion and policy versioning, uncertainty, review/activation, dual programme+host gates, staleness/change suspension and audit. Import or URL availability never authorizes testing.
 2. Controlled-lab plan/execution with separate customer/bounty policy/state, exact permission envelope, expiry, rate/concurrency/request/cost limits and emergency stop.
