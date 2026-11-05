@@ -357,3 +357,25 @@ def test_catalog_transports_and_v2_admission_are_explicit() -> None:
 
     assert _CATALOG_TARGETS == EXPECTED_V2_TARGET_TYPES
     assert SEMANTIC_OPERATION_IDS == EXPECTED_V2_SEMANTIC_OPERATIONS
+
+def test_api_route_census_matches_documented_g01_inventory():
+    """Keep the exact route/handler source census synchronized with G01 docs."""
+    inventory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    marker = "#### Exact Flask API method/path/handler census"
+    start = inventory.index(marker)
+    end = inventory.index("| Route group | Paths and owner", start)
+    section = inventory[start:end]
+    documented = {
+        (method, path): handler
+        for method, path, handler in __import__("re").findall(
+            r"^\\| `(GET|POST|PUT|PATCH|DELETE)` \\| `([^\`]+)` \\| `([^\`]+)` \\|",
+            section,
+            __import__("re").MULTILINE,
+        )
+    }
+    assert documented == EXPECTED_API_ROUTE_HANDLERS
+
