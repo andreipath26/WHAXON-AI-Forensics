@@ -194,6 +194,13 @@ def _parser() -> argparse.ArgumentParser:
     limits.add_argument("--max-total-attempts", type=int, required=True)
     limits.add_argument("--max-concurrency", type=int, required=True)
 
+    submit = plan_commands.add_parser(
+        "submit-run", help="persist a bounded V2 run intent for the durable worker",
+    )
+    submit.add_argument("--id", required=True)
+    submit.add_argument("--max-tasks", type=int, default=100)
+    submit.add_argument("--max-attempts", type=int, default=2)
+    submit.add_argument("--max-concurrency", type=int, default=4)
     service = plan_commands.add_parser(
         "serve-requests", help="continuously process durable V2 run requests",
     )
@@ -210,6 +217,14 @@ def _parser() -> argparse.ArgumentParser:
         "run-request", help="inspect persisted V2 execution request status",
     )
     request_status.add_argument("--id", required=True)
+    snapshot = plan_commands.add_parser(
+        "run-snapshot", help="inspect persisted request and workflow progress",
+    )
+    snapshot.add_argument("--id", required=True)
+    cancel_request = plan_commands.add_parser(
+        "cancel-request", help="persist cancellation for a durable run request",
+    )
+    cancel_request.add_argument("--id", required=True)
     run = plan_commands.add_parser("run", help="execute a plan through scoped Core providers")
     run.add_argument("--id", required=True)
     run.add_argument("--max-tasks", type=int, default=100)
@@ -440,11 +455,40 @@ def main(args: list[str] | None = None) -> int:
                 "max_concurrency": options.max_concurrency,
             }, sort_keys=True))
             return 0
+        if options.command == "plan" and options.plan_command == "submit-run":
+            queued = core.enqueue_workflow_run(
+                options.id, max_tasks=options.max_tasks,
+                max_attempts=options.max_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            print(json.dumps({
+                "plan_id": queued["plan_id"],
+                "run_request_id": queued["id"],
+                "request_status": queued["status"],
+                "execution_completed": False,
+                "automatic_uncertain_replay": False,
+            }, sort_keys=True))
+            return 0
         if options.command == "plan" and options.plan_command == "queue-summary":
             print(json.dumps(core.workflow_run_queue_summary(), indent=2, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "run-request":
             state = core.workflow_run_request(options.id)
+            if state is None:
+                print("unknown workflow run request", file=sys.stderr)
+                return 1
+            print(json.dumps(state, indent=2, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "cancel-request":
+            try:
+                state = core.cancel_workflow_run_request(options.id)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            print(json.dumps(state, indent=2, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "run-snapshot":
+            state = core.workflow_run_snapshot(options.id)
             if state is None:
                 print("unknown workflow run request", file=sys.stderr)
                 return 1

@@ -361,3 +361,55 @@ def test_workflow_cli_exposes_only_persisted_evidence(monkeypatch, capsys):
     assert data["limit_seen"] == 5
     assert data["all_evidence_recorded"] is False
     assert data["attempts"] == []
+
+
+def test_e5_cli_run_snapshot_is_shared_core_contract(monkeypatch, capsys):
+    class SnapshotCore(_FakeCore):
+        def workflow_run_snapshot(self, request_id):
+            if request_id == "missing":
+                return None
+            return {
+                "schema_version": "whaxon.workflow-run-snapshot.v1",
+                "request": {"id": request_id, "status": "uncertain"},
+                "progress": {"plan_id": "p", "complete": False},
+                "worker_liveness_verified": False,
+                "automatic_uncertain_replay": False,
+            }
+
+    monkeypatch.setattr(workflow_cmd, "Core", SnapshotCore)
+    assert workflow_cmd.main([
+        "plan", "run-snapshot", "--id", "durable-request",
+    ]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["request"]["id"] == "durable-request"
+    assert data["request"]["status"] == "uncertain"
+    assert data["worker_liveness_verified"] is False
+    assert data["automatic_uncertain_replay"] is False
+    assert workflow_cmd.main([
+        "plan", "run-snapshot", "--id", "missing",
+    ]) == 1
+    assert "unknown workflow run request" in capsys.readouterr().err
+
+
+def test_e5_cli_cancel_request_uses_core_barrier(monkeypatch, capsys):
+    class CancelCore(_FakeCore):
+        def cancel_workflow_run_request(self, request_id):
+            if request_id == "missing":
+                raise ValueError("unknown workflow run request")
+            return {
+                "run_request_id": request_id,
+                "cancellation_requested": True,
+                "external_effects_stopped": False,
+            }
+
+    monkeypatch.setattr(workflow_cmd, "Core", CancelCore)
+    assert workflow_cmd.main([
+        "plan", "cancel-request", "--id", "run-123",
+    ]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["run_request_id"] == "run-123"
+    assert data["external_effects_stopped"] is False
+    assert workflow_cmd.main([
+        "plan", "cancel-request", "--id", "missing",
+    ]) == 1
+    assert "unknown workflow run request" in capsys.readouterr().err

@@ -25,6 +25,11 @@ from whaxon.core.events import (
 )
 
 
+def _v2_worker_externally_supervised() -> bool:
+    """Do not drain durable V2 work from web when a service worker is active."""
+    return os.environ.get("WHAXON_V2_EXTERNAL_WORKER", "").strip() == "1"
+
+
 def _check_execution_scope(scope, target):
     """Use the scope manager's DNS-safe execution gate when available."""
     checker = getattr(scope, "check_for_execution", None)
@@ -512,7 +517,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/health/simple")
     def health_simple():
-        return {"ok": True, "tools": len(core.catalog.list())}
+        """Do not advertise a healthy service when durable state is unavailable.
+
+        The lightweight endpoint shares the full probe's authoritative
+        database/data-dir readiness decision. Optional tools are not gates.
+        """
+        full_response, status = health_probe()
+        return jsonify({
+            "ok": status == 200,
+            "tools": len(core.catalog.list()),
+            "core_ready": full_response.get_json()["core_ready"],
+        }), status
 
     # Engine V2 read-only API. All operations use the same Core contracts
     # consumed by the CLI; inherited application auth/rate gates apply.
@@ -586,13 +601,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify({"error": str(exc)}), (
                 404 if "unknown workflow plan" in str(exc) else 409
             )
-        # The accepted intent lives in SQLite even if this process stops.
-        try:
-            runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
-        except Exception:
-            # The accepted request is already in durable storage. Worker
-            # failure must not turn that accepted submission into a false 500.
-            pass
+        # The request persists even if web exits. Only the supervised worker
+        # drains it in paired E5 deployments, never another web process.
+        if not _v2_worker_externally_supervised():
+            try:
+                runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+            except Exception:
+                # An accepted durable request must not become a false 500.
+                pass
         return jsonify({
             "plan_id": plan_id,
             "run_request_id": queued["id"],
@@ -601,6 +617,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             "execution_completed": False,
             "durable_progress_url": f"/api/v2/workflows/{plan_id}/progress",
             "run_request_url": f"/api/v2/workflow-runs/{queued['id']}",
+            "run_snapshot_url": f"/api/v2/workflow-runs/{queued['id']}/snapshot",
         }), 202
 
     @app.get("/api/v2/workflow-runs/summary")
@@ -610,6 +627,22 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.get("/api/v2/workflow-runs/<request_id>")
     def workflow_v2_run_request_status(request_id):
         row = core.workflow_run_request(request_id)
+        return (jsonify(row), 200) if row else (
+            jsonify({"error": "unknown workflow run request"}), 404
+        )
+
+    @app.post("/api/v2/workflow-runs/<request_id>/cancel")
+    def workflow_v2_cancel_run_request(request_id):
+        """Cancel by durable request identity through the plan stop barrier."""
+        try:
+            return jsonify(core.cancel_workflow_run_request(request_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflow-runs/<request_id>/snapshot")
+    def workflow_v2_run_snapshot(request_id):
+        """Reconnect to one durable request and its persisted task progress."""
+        row = core.workflow_run_snapshot(request_id)
         return (jsonify(row), 200) if row else (
             jsonify({"error": "unknown workflow run request"}), 404
         )
@@ -2643,7 +2676,8 @@ def create_app_factory(host: str | None = None, port: int | None = None):
     runner = AsyncRunner(core)
     app = create_app(core, registry, runner)
     # Recover queued (not running/uncertain) requests after service restart.
-    runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+    if not _v2_worker_externally_supervised():
+        runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
     return app
 
 
@@ -2688,7 +2722,8 @@ def main(args: list[str] | None = None) -> None:
     runner = AsyncRunner(core)
 
     app = create_app(core, registry, runner)
-    runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
+    if not _v2_worker_externally_supervised():
+        runner.submit(lambda: asyncio.run(core.drain_workflow_run_requests()))
     auth_user = os.environ.get("WHAXON_AUTH_USER", "")
     auth_on = "enabled" if auth_user else "DISABLED"
     print()

@@ -342,6 +342,42 @@ class Core:
     def workflow_run_request(self, request_id: str):
         return self.workflow_requests.get(request_id)
 
+    def cancel_workflow_run_request(self, request_id: str):
+        """Request cancellation through the existing durable plan stop barrier.
+
+        A running external effect is not asserted to have stopped. Unknown
+        requests never cancel an unrelated plan.
+        """
+        row = self.workflow_run_request(request_id)
+        if row is None:
+            raise ValueError("unknown workflow run request")
+        cancelled = self.cancel_workflow_plan(row["plan_id"])
+        return {
+            "run_request_id": request_id,
+            "plan_id": row["plan_id"],
+            "cancellation_requested": True,
+            "tasks_cancelled": cancelled,
+            "external_effects_stopped": False,
+            "request": self.workflow_run_request(request_id),
+        }
+
+    def workflow_run_snapshot(self, request_id: str):
+        """Reconnect-safe persisted run and task progress, without lease secrets.
+
+        The request and task views are individually persisted snapshots, not
+        a claim that external effects completed or that a worker is alive.
+        """
+        row = self.workflow_run_request(request_id)
+        if row is None:
+            return None
+        return {
+            "schema_version": "whaxon.workflow-run-snapshot.v1",
+            "request": row,
+            "progress": self.workflow_progress(row["plan_id"]),
+            "worker_liveness_verified": False,
+            "automatic_uncertain_replay": False,
+        }
+
     async def drain_workflow_run_requests(self, *, max_runs: int = 20,
                                           initialized: bool = False,
                                           stop_event=None) -> int:
@@ -359,7 +395,13 @@ class Core:
             raise TypeError("stop_event must expose is_set()")
         if not initialized:
             await self.initialize(drain=False)
-        self.workflow_requests.reconcile_stale()
+        # Reconcile the full bounded backlog before claiming fresh work.
+        # Each pass holds a short transaction (at most 128 lost leases).
+        # A single pass would leave older lost leases indefinitely if the
+        # service exits after draining all newly queued work.
+        while self.workflow_requests.reconcile_stale():
+            if stop_event is not None and stop_event.is_set():
+                return 0
         owner = "workflow-run-worker-" + uuid.uuid4().hex
         processed = 0
         for _ in range(max_runs):
@@ -368,7 +410,20 @@ class Core:
             # external effect is allowed to finish or become uncertain.
             if stop_event is not None and stop_event.is_set():
                 break
-            request = self.workflow_requests.claim(owner)
+            # Claim quarantines at most 64 poisoned heads per transaction.
+            # One-shot CLI drains must not mistake that bounded yield for
+            # an empty queue and strand valid work behind corrupted heads.
+            # Cap retries to prevent a continuously poisoned producer from
+            # monopolizing the worker forever.
+            request = None
+            for _claim_pass in range(16):
+                if stop_event is not None and stop_event.is_set():
+                    break
+                request = self.workflow_requests.claim(owner)
+                if request is not None:
+                    break
+                if self.workflow_requests.queued_count() == 0:
+                    break
             if request is None:
                 break
             token = request["lease_token"]
@@ -432,13 +487,15 @@ class Core:
                 max_runs=max_runs_per_batch, initialized=True,
                 stop_event=stop_event,
             )
-            # Check shutdown at least every 250 ms even if configured
-            # polling is long. Do not terminate in-flight task executions.
-            remaining = float(poll_interval_s)
-            while remaining > 0 and not stop_event.is_set():
-                delay = min(remaining, 0.25)
-                await asyncio.sleep(delay)
-                remaining -= delay
+            # Poll deadlines use a monotonic clock: repeated fractional
+            # subtraction can drift under scheduler pauses and postpone new
+            # durable requests. A stop signal remains responsive.
+            deadline = asyncio.get_running_loop().time() + float(poll_interval_s)
+            while not stop_event.is_set():
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    break
+                await asyncio.sleep(min(remaining, 0.25))
         return total
 
     def propose_workflow_followups(self, source_plan_id: str, *, max_tasks: int = 16):

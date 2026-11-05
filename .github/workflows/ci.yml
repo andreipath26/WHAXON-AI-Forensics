@@ -16,6 +16,319 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  engine-v2-e5-systemd-deployment:
+    name: Engine V2 E5 real systemd host smoke (Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install wheel on isolated host and provision service account
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          python -m pip install build
+          python -m build --wheel
+          sudo useradd --system --home /opt/whaxon --shell /usr/sbin/nologin whaxon
+          sudo mkdir -p /opt/whaxon /var/lib/whaxon/data
+          sudo chown -R whaxon:whaxon /opt/whaxon /var/lib/whaxon
+          sudo python3 -m venv /opt/whaxon/.venv
+          sudo /opt/whaxon/.venv/bin/pip install "$(echo dist/*.whl)[web]"
+          printf '%s\n' 'WHAXON_AUTH_USER=ci-operator' \
+            'WHAXON_AUTH_PASS=ci-unique-secret-not-for-production-use' | sudo tee /etc/whaxon.env >/dev/null
+          sudo chmod 0600 /etc/whaxon.env
+          sudo install -m 0644 whaxon.service whaxon-workflow-worker.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+      - name: Start both services and prove shared state survives supervised restart
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          sudo systemctl start whaxon-workflow-worker.service whaxon.service
+          python - <<'PY'
+          import base64
+          import json
+          import time
+          import urllib.request
+
+          credentials = base64.b64encode(
+              b"ci-operator:ci-unique-secret-not-for-production-use"
+          ).decode()
+          deadline = time.monotonic() + 90
+          while time.monotonic() < deadline:
+              try:
+                  req = urllib.request.Request(
+                      "http://127.0.0.1:5001/api/health",
+                      headers={"Authorization": f"Basic {credentials}"},
+                  )
+                  with urllib.request.urlopen(req, timeout=4) as response:
+                      state = json.load(response)
+                  if state["core_ready"] is True:
+                      break
+              except (OSError, KeyError, ValueError):
+                  pass
+              time.sleep(2)
+          else:
+              raise SystemExit("systemd web Core readiness did not become true")
+          assert state["worker_liveness_verified"] is False if "worker_liveness_verified" in state else True
+          PY
+          sudo systemctl is-active --quiet whaxon.service
+          sudo systemctl is-active --quiet whaxon-workflow-worker.service
+          sudo -u whaxon env WHAXON_DATA=/var/lib/whaxon/data \
+            /opt/whaxon/.venv/bin/whaxon workflow mission create \
+              --id systemd-e5-durable --objective "inert systemd persistence" > e5-systemd-created.json
+          sudo systemctl restart whaxon-workflow-worker.service whaxon.service
+          sudo systemctl is-active --quiet whaxon.service
+          sudo systemctl is-active --quiet whaxon-workflow-worker.service
+          sudo -u whaxon env WHAXON_DATA=/var/lib/whaxon/data \
+            /opt/whaxon/.venv/bin/whaxon workflow mission list > e5-systemd-restored.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path("e5-systemd-restored.json").read_text())
+          assert any(row["id"] == "systemd-e5-durable" for row in data), data
+          PY
+      - name: Stop paired services, snapshot complete state and verify isolated restore
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo systemctl stop whaxon.service whaxon-workflow-worker.service
+          sudo -u whaxon /opt/whaxon/.venv/bin/python - <<'PY'
+          from pathlib import Path
+          from whaxon.core import Core
+          from whaxon.core.state_snapshot import (
+              create_offline_snapshot, restore_offline_snapshot, verify_offline_snapshot,
+          )
+          source = Path("/var/lib/whaxon/data")
+          snapshot = Path("/var/lib/whaxon/e5-ci-backup")
+          destination = Path("/var/lib/whaxon/e5-ci-restored")
+          report = create_offline_snapshot(source, snapshot)
+          assert report["files_verified"]
+          anchor = report["manifest_sha256"]
+          assert verify_offline_snapshot(
+              snapshot, expected_manifest_sha256=anchor,
+          )["external_anchor_verified"]
+          restore_offline_snapshot(
+              snapshot, destination, expected_manifest_sha256=anchor,
+          )
+          restored = Core(destination)
+          assert any(
+              row["id"] == "systemd-e5-durable"
+              for row in restored.missions()
+          )
+          print("Systemd host offline restore verified; independent anchor not deployed")
+          PY
+      - name: Collect diagnostics on failure
+        if: failure()
+        run: |
+          sudo systemctl --no-pager status whaxon.service whaxon-workflow-worker.service || true
+          sudo journalctl --no-pager -u whaxon.service -u whaxon-workflow-worker.service -n 70 || true
+      - name: Stop services and remove CI secrets
+        if: always()
+        run: |
+          sudo systemctl stop whaxon.service whaxon-workflow-worker.service || true
+          sudo rm -f /etc/whaxon.env
+
+  engine-v2-e5-docker-deployment:
+    name: Engine V2 E5 paired Docker web-worker smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      WHAXON_AUTH_USER: ci-operator
+      WHAXON_AUTH_PASS: ci-only-example-long-unique-secret-not-for-deployment
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate isolated E5 Compose configuration
+        run: docker compose -f docker-compose.e5.yml config --quiet
+      - name: Build and start both supervised E5 services
+        timeout-minutes: 22
+        run: docker compose -f docker-compose.e5.yml up -d --build
+      - name: Verify web readiness, worker CLI and shared persistent state
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+
+          credentials = f"{os.environ['WHAXON_AUTH_USER']}:{os.environ['WHAXON_AUTH_PASS']}"
+          value = base64.b64encode(credentials.encode()).decode()
+          url = "http://127.0.0.1:5001/api/health"
+          deadline = time.monotonic() + 90
+          while time.monotonic() < deadline:
+              try:
+                  request = urllib.request.Request(url, headers={"Authorization": f"Basic {value}"})
+                  with urllib.request.urlopen(request, timeout=3) as response:
+                      data = json.load(response)
+                  if data.get("core_ready") is True:
+                      break
+              except (OSError, ValueError, urllib.error.HTTPError):
+                  pass
+              time.sleep(2)
+          else:
+              raise SystemExit("paired E5 web service did not become Core-ready")
+          print("Web Core-ready (not a worker-liveness guarantee)")
+          PY
+          docker compose -f docker-compose.e5.yml exec -T workflow-worker \
+            whaxon workflow plan queue-summary > e5-queue-before.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          state = json.loads(Path("e5-queue-before.json").read_text())
+          assert state["worker_liveness_verified"] is False
+          assert state["automatic_uncertain_replay"] is False
+          PY
+          # Create one inert mission through the worker CLI. Its metadata
+          # must be visible from the independent web container after restart,
+          # proving both services use the same durable state volume.
+          docker compose -f docker-compose.e5.yml exec -T workflow-worker \
+            whaxon workflow mission create --id e5-ci-shared-state --objective "inert persistence check" > e5-mission-created.json
+          docker compose -f docker-compose.e5.yml exec -T web \
+            whaxon workflow mission list > e5-missions-before.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          created = json.loads(Path("e5-mission-created.json").read_text())
+          missions = json.loads(Path("e5-missions-before.json").read_text())
+          assert created["mission_id"] == "e5-ci-shared-state"
+          assert any(row["id"] == "e5-ci-shared-state" for row in missions)
+          PY
+          # Prove the independent worker really processes a persisted V2
+          # request end-to-end. An unregistered fixture capability is blocked
+          # without launching a scanner or touching an external target.
+          # With the supervised worker stopped, HTTP 202 must persist only.
+          # No gunicorn process may create its own V2 drainer in this mode.
+          docker compose -f docker-compose.e5.yml stop workflow-worker
+          docker compose -f docker-compose.e5.yml exec -T web python - <<'PY'
+          from pathlib import Path
+          from whaxon.core import Core
+          from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+          core = Core(Path("/data"))
+          core.create_mission("e5-ci-no-external-effects", "safe durable worker smoke")
+          core.save_workflow_plan(
+              "e5-ci-no-external-effects-plan",
+              WorkflowPlan(
+                  "e5-ci-no-external-effects",
+                  (WorkflowTask("unsupported", "unsupported.fixture", "192.0.2.10"),),
+              ),
+          )
+          PY
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import time
+          import urllib.request
+          credentials = f"{os.environ['WHAXON_AUTH_USER']}:{os.environ['WHAXON_AUTH_PASS']}"
+          auth = base64.b64encode(credentials.encode()).decode()
+          url = "http://127.0.0.1:5001/api/v2/workflows/e5-ci-no-external-effects-plan/run"
+          req = urllib.request.Request(
+              url, data=b"{}", method="POST",
+              headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
+          )
+          with urllib.request.urlopen(req, timeout=10) as response:
+              assert response.status == 202
+              accepted = json.load(response)
+          assert accepted["execution_completed"] is False
+          assert accepted["request_status"] == "queued"
+          assert accepted["run_request_id"]
+          # Prove no process-local web drainer picks up the request.
+          time.sleep(1)
+          req = urllib.request.Request(
+              "http://127.0.0.1:5001" + accepted["run_request_url"],
+              headers={"Authorization": f"Basic {auth}"},
+          )
+          with urllib.request.urlopen(req, timeout=10) as response:
+              state = json.load(response)
+          assert state["id"] == accepted["run_request_id"]
+          assert state["status"] == "queued", state
+          assert "lease_token" not in state
+          print("HTTP 202 persisted a request with worker stopped; no web fallback")
+          PY
+          docker compose -f docker-compose.e5.yml start workflow-worker
+          docker compose -f docker-compose.e5.yml exec -T web python - <<'PY'
+          import time
+          from pathlib import Path
+          from whaxon.core import Core
+          core = Core(Path("/data"))
+          deadline = time.monotonic() + 60
+          while time.monotonic() < deadline:
+              progress = core.workflow_progress("e5-ci-no-external-effects-plan")
+              if progress["counts"].get("blocked", 0) == 1:
+                  break
+              time.sleep(0.5)
+          else:
+              raise SystemExit("durable E5 worker did not process inert blocked task")
+          assert progress["counts"].get("succeeded", 0) == 0
+          print("Independent E5 worker processed a safe blocked task")
+          PY
+          docker compose -f docker-compose.e5.yml restart workflow-worker
+          docker compose -f docker-compose.e5.yml exec -T web \
+            whaxon workflow mission list > e5-missions-after.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          missions = json.loads(Path("e5-missions-after.json").read_text())
+          assert any(row["id"] == "e5-ci-shared-state" for row in missions)
+          PY
+          docker compose -f docker-compose.e5.yml exec -T workflow-worker \
+            whaxon workflow plan queue-summary > e5-queue-after.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          before = json.loads(Path("e5-queue-before.json").read_text())
+          after = json.loads(Path("e5-queue-after.json").read_text())
+          assert before["schema_version"] == after["schema_version"]
+          assert after["worker_liveness_verified"] is False
+          assert after["automatic_uncertain_replay"] is False
+          PY
+      - name: Offline E5 state backup, verified restore and mission recovery
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          # Quiesce both services. A new one-shot container reads the existing
+          # state volume but never runs the V2 worker loop or any scanner.
+          docker compose -f docker-compose.e5.yml stop web workflow-worker
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            python -m whaxon.core.state_snapshot backup /data /e5-backups/snapshot \
+            > e5-snapshot-result.json
+          manifest_sha="$(python -c 'import json; print(json.load(open("e5-snapshot-result.json"))["manifest_sha256"])')"
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            python -m whaxon.core.state_snapshot verify /e5-backups/snapshot \
+            --expected-manifest-sha256 "$manifest_sha" > e5-verify-result.json
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            python -m whaxon.core.state_snapshot restore \
+            /e5-backups/snapshot /e5-backups/restored \
+            --expected-manifest-sha256 "$manifest_sha" > e5-restore-result.json
+          docker compose -f docker-compose.e5.yml run --rm --no-deps -T \
+            -v e5-backups:/e5-backups workflow-worker \
+            whaxon workflow --data-dir /e5-backups/restored mission list \
+            > e5-restored-missions.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          verified = json.loads(Path("e5-verify-result.json").read_text())
+          restored = json.loads(Path("e5-restore-result.json").read_text())
+          missions = json.loads(Path("e5-restored-missions.json").read_text())
+          assert verified["files_verified"] and restored["files_verified"]
+          assert verified["external_anchor_verified"] is True
+          assert restored["external_anchor_verified"] is True
+          assert any(m["id"] == "e5-ci-shared-state" for m in missions)
+          PY
+      - name: Capture service diagnostics on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.e5.yml ps || true
+          docker compose -f docker-compose.e5.yml logs --tail=80 || true
+      - name: Tear down without deleting evidence volume
+        if: always()
+        run: docker compose -f docker-compose.e5.yml down || true
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20

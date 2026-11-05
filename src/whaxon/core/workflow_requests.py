@@ -150,6 +150,16 @@ class WorkflowRunQueue:
         finally:
             conn.close()
 
+    def queued_count(self) -> int:
+        """Count remaining queued intents without claiming or executing them."""
+        conn = self.store._conn()
+        try:
+            return int(conn.execute(
+                "SELECT COUNT(*) FROM workflow_run_requests WHERE status='queued'",
+            ).fetchone()[0])
+        finally:
+            conn.close()
+
     def claim(self, owner: str) -> dict | None:
         if not isinstance(owner, str) or not owner.strip():
             raise ValueError("worker owner required")
@@ -345,6 +355,9 @@ class WorkflowRunQueue:
         now = time.time()
         conn = self.store._conn()
         try:
+            # Pin all queue counters to one SQLite read snapshot so clients
+            # cannot observe mutually inconsistent counts during a claim.
+            conn.execute("BEGIN")
             rows = conn.execute(
                 "SELECT status, COUNT(*) AS count "
                 "FROM workflow_run_requests GROUP BY status",
@@ -366,7 +379,7 @@ class WorkflowRunQueue:
                 "(heartbeat_at IS NULL OR heartbeat_at<?)",
                 (now - stale_after_s,),
             ).fetchone()["total"]
-            return {
+            result = {
                 "schema_version": "whaxon.workflow-run-queue-summary.v1",
                 "snapshot_at": now,
                 "counts": counts,
@@ -381,6 +394,12 @@ class WorkflowRunQueue:
                 "worker_liveness_verified": False,
                 "automatic_uncertain_replay": False,
             }
+            conn.execute("COMMIT")
+            return result
+        except Exception:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
         finally:
             conn.close()
 
@@ -397,9 +416,11 @@ class WorkflowRunQueue:
                 stale = conn.execute(
                     "SELECT id,plan_id FROM workflow_run_requests "
                     "WHERE status='running' AND "
-                    "(heartbeat_at IS NULL OR heartbeat_at<?)",
+                    "(heartbeat_at IS NULL OR heartbeat_at<?) "
+                    "ORDER BY COALESCE(heartbeat_at, started_at, submitted_at), id "
+                    "LIMIT 128",
                     (now - older_than_s,),
-                ).fetchmany(128)
+                ).fetchall()
                 for row in stale:
                     conn.execute(
                         "UPDATE workflow_run_requests SET status='uncertain',"

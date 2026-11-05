@@ -49,6 +49,70 @@ whaxon.service is included in the repo root. Install:
 
 Adjust User, WorkingDirectory, and paths to your layout.
 
+## Engine V2 durable worker alongside the web service (systemd)
+
+Engine V2 run requests are stored in SQLite and require a **separate supervised
+worker**. Running only `whaxon.service` exposes the web interface but does
+not guarantee that queued V2 work is being processed. Installing a service
+unit is configuration, not proof that a process is healthy.
+
+Use the two repository-provided units from the **same installed WHAXON
+release**: `whaxon.service` and `whaxon-workflow-worker.service`. Both
+specify `User=whaxon`, `WorkingDirectory=/opt/whaxon`,
+`WHAXON_DATA=/var/lib/whaxon/data`, and `StateDirectory=whaxon`.
+Provision the virtual environment and the protected `/etc/whaxon.env`
+before enabling services. Never use default/demo network credentials;
+restrict the environment file to administrators, and ensure the service
+identity can access only its intended persistent state. Review and adjust
+paths for the host instead of blindly copying a unit from another installation.
+
+On a supported systemd host, after reviewing units and provisioning the
+service user, application, environment and state:
+
+```sh
+sudo install -m 0644 whaxon.service whaxon-workflow-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now whaxon.service whaxon-workflow-worker.service
+sudo systemctl status whaxon.service whaxon-workflow-worker.service
+sudo journalctl -u whaxon-workflow-worker.service --no-pager -n 100
+```
+
+The web and worker services use a shared store, **not separate SQLite
+databases**. Do not start an additional ad-hoc drain worker against the same
+installation without first evaluating worker ownership and resource limits.
+The worker runs `whaxon workflow plan serve-requests` in the foreground;
+SIGTERM stops admission of additional claims. An external effect already in
+flight may remain uncertain, not automatically cancelled or replayed.
+
+For a local operational check, inspect the web's Core readiness at
+`http://127.0.0.1:5001/api/health` using the configured authentication
+when required. Core readiness does **not** prove worker liveness. Check the
+worker's systemd status/journal and, as the service account with the
+production data path, inspect `whaxon workflow plan queue-summary`.
+Verify a permitted, explicitly approved synthetic/controlled workflow
+through submission, persisted run-request inspection, restart, reconnect
+and cancellation without unauthorized external activity.
+
+### Backup, recovery and release evidence
+
+Protect the **entire** operator state: the consistent SQLite database
+transactional snapshot, protected configuration and scope/approvals,
+evidence/artifacts and installed-provider inventory. The automated
+`test_engine_v2_e5_backup_restore.py` covers a SQLite-only snapshot, not
+this full recovery. Never claim success from copying a live database file
+without a consistent backup. Before a restore, stop **both** services,
+retain the old state for investigation, restore files with service ownership
+and restrictive permissions, then bring the services back under supervision.
+Treat recovered in-flight/expired work as **uncertain** pending manual
+reconciliation; never silently requeue potentially effectful operations.
+
+Deployment acceptance requires a dated record of host OS, exact commit and
+package version, chosen systemd paths, credentials/proxy/TLS safeguards,
+start/stop/restart behavior, worker claims, approved test target, request
+IDs, queue/audit evidence, complete backup/restore, failure injection,
+known limitations, and reviewer sign-off. Until a real supported-host
+rehearsal succeeds, E5 deployment readiness remains **NOT VERIFIED**.
+
 ## Docker
 
 Hardened container:
@@ -82,3 +146,102 @@ nginx example:
         proxy_buffering off;
       }
     }
+
+### Opt-in Engine V2 Docker deployment
+
+The root `docker-compose.yml` defines an intentionally separate target lab;
+**do not** use it as a WHAXON production deployment. The new
+`docker-compose.e5.yml` runs two non-root services from the same built image:
+`web` and the persistent `workflow-worker`. They share the named
+`e5-state` volume at `/data`, while only the web service publishes
+`127.0.0.1:5001`. Both containers use read-only root filesystems, a
+restricted tmpfs and dropped Linux capabilities.
+
+Provide strong non-default `WHAXON_AUTH_USER` and `WHAXON_AUTH_PASS`
+values via a private operator environment (or a protected Compose env file)
+without committing credentials. Inspect the fully resolved configuration
+before starting; do not post its output because it can contain secrets.
+
+```sh
+docker compose -f docker-compose.e5.yml config --quiet
+docker compose -f docker-compose.e5.yml up -d --build
+docker compose -f docker-compose.e5.yml ps
+docker compose -f docker-compose.e5.yml logs --tail 100 workflow-worker
+```
+
+A started container does not certify worker liveness or external-effect
+recovery. Verify the shared queue and one explicitly approved controlled
+workflow before accepting the deployment. Persist and back up the named
+volume together with independently protected operational configuration and
+evidence. This Compose configuration is an **engineering candidate**;
+real Docker service, restart, recovery, secrets and backup/restore acceptance
+are still outstanding.
+
+### Offline E5 operator-state snapshot and restoration
+
+Stop **both** web and workflow-worker services before taking an offline backup;
+the utility cannot determine whether another process is modifying the state.
+The standalone tool includes the complete operator-state file tree (such as
+scope, configuration and evidence), makes a consistent SQLite backup,
+rejects symbolic links/nonregular files and generates per-file SHA-256 checks.
+It does not back up secrets or host configuration outside `WHAXON_DATA`.
+
+```sh
+python -m whaxon.core.state_snapshot backup /var/lib/whaxon/data /secure/whaxon-e5-snapshot
+python -m whaxon.core.state_snapshot verify /secure/whaxon-e5-snapshot --expected-manifest-sha256 "<independently-retained-64-character-sha256>"
+python -m whaxon.core.state_snapshot restore /secure/whaxon-e5-snapshot /secure/whaxon-restored --expected-manifest-sha256 "<independently-retained-64-character-sha256>"
+```
+
+The destination must **not exist**. Restore into a separate location, inspect
+its integrity and ownership, and only then coordinate a deliberate cutover
+while both services remain stopped. The snapshot's internal checksums detect
+accidental changes but are **not independently trusted**: retain its manifest
+hash or copy in protected external storage with operator-controlled identity.
+Use restrictive permissions and encrypted off-host retention for sensitive
+evidence. This is an offline engineering recovery mechanism; real supervised
+host restoration and sign-off remain mandatory E5 deployment gates.
+
+The backup command outputs `manifest_sha256`; retain that value outside
+WHAXON storage using an operator-protected witness before allowing a later
+restore. Verification without `--expected-manifest-sha256` detects file drift
+against the internal manifest but **does not** protect against an attacker who
+changes the manifest itself. The external expected digest provides comparison
+only; its authenticity depends on how the operator retained it.
+
+### E5 dedicated-worker mode
+
+The systemd web unit and opt-in paired Docker web container set
+`WHAXON_V2_EXTERNAL_WORKER=1`. In this mode the web API durably enqueues V2
+run requests but **does not create an additional process-local queue drainer**.
+Only the separately supervised `workflow-worker` executes V2 queue work.
+When it is down, accepted requests remain queued, never falsely completed.
+Existing web-only users without this flag retain the prior wakeup behavior.
+This flag does not disable unrelated legacy tool/AI execution endpoints;
+those remain a separate authorization and migration obligation.
+
+### E5 containerized offline recovery test
+
+The E5 GitHub Actions deployment smoke now stops both Compose services,
+uses an isolated one-shot `workflow-worker` image to snapshot the existing
+state volume to a **separate** `e5-backups` volume, verifies an independently
+recorded manifest digest, restores into a new directory and checks that the
+persisted test mission remains readable. The auxiliary `/e5-backups` mount
+point is writable by the container's non-root user; it is not mounted by
+normal running web and worker services. CI demonstrates an isolated
+container recovery path only. An operator must still verify off-host backup
+retention, service credentials, host-specific failure injection, ownership,
+real environment recovery and external audit anchoring before production
+acceptance.
+
+### Durable E5 run submission from headless CLI
+
+Use `whaxon workflow --data-dir /var/lib/whaxon/data plan submit-run
+--id <existing-plan-id>` to persist a bounded request for the supervised
+worker without launching a second execution loop. Optional `--max-tasks`,
+`--max-attempts` and `--max-concurrency` have the same values and validation
+as the V2 run API. Repeating the same plan and limits returns the same active
+request ID; differing limits fail closed. Inspect with `plan run-request` or
+`plan run-snapshot` using the returned ID. `plan run` remains the existing
+legacy direct execution command for backward compatibility and is **not**
+considered proof of a single execution authority; avoid it during paired
+supervised deployment until caller migration and phase review are complete.

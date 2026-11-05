@@ -152,10 +152,18 @@ time.sleep(60)
     )
     try:
         deadline = time.monotonic() + 15
-        while not marker.exists() and proc.poll() is None and time.monotonic() < deadline:
+        observed = ""
+        # The child creates the marker before write_text finishes writing;
+        # existence alone can race with an empty/partial file on CI.
+        while proc.poll() is None and time.monotonic() < deadline:
+            if marker.is_file():
+                observed = marker.read_text(encoding="utf-8")
+                if observed == request["id"]:
+                    break
             time.sleep(0.05)
-        assert marker.exists(), "child worker did not claim the request"
-        assert marker.read_text(encoding="utf-8") == request["id"]
+        assert observed == request["id"], (
+            f"child did not publish the full claimed request ID: {observed!r}"
+        )
         assert primary.workflow_run_request(request["id"])["status"] == "running"
     finally:
         if proc.poll() is None:
@@ -234,3 +242,96 @@ def test_drain_rejects_invalid_stop_object(tmp_path):
         pool.submit(lambda: asyncio.run(
             core.drain_workflow_run_requests(stop_event=object()),
         )).result(timeout=10)
+
+
+def test_e5_worker_poll_uses_monotonic_deadline(tmp_path, monkeypatch):
+    """Scheduler delays must not accumulate into longer polling intervals."""
+    core = _core(tmp_path)
+    stop = threading.Event()
+    observed = []
+    original = core.drain_workflow_run_requests
+
+    async def observe(**kwargs):
+        observed.append(asyncio.get_running_loop().time())
+        if len(observed) == 3:
+            stop.set()
+        return await original(**kwargs)
+
+    monkeypatch.setattr(core, "drain_workflow_run_requests", observe)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        count = pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(
+                stop, poll_interval_s=0.05, max_runs_per_batch=1,
+            ),
+        )).result(timeout=5)
+    assert count == 0
+    assert len(observed) == 3
+    assert observed[1] >= observed[0]
+    assert observed[2] >= observed[1]
+
+
+def test_e5_headless_cli_exposes_shared_run_snapshot_contract():
+    options = _parser().parse_args([
+        "plan", "run-snapshot", "--id", "persisted-request",
+    ])
+    assert options.plan_command == "run-snapshot"
+    assert options.id == "persisted-request"
+
+
+def test_e5_drain_reconciles_all_stale_leases_before_new_claims(tmp_path, monkeypatch):
+    core = _core(tmp_path)
+    calls = []
+    original = core.workflow_requests.reconcile_stale
+
+    def reconcile(*args, **kwargs):
+        calls.append("reconcile")
+        # Simulate more than one bounded 128-row reconciliation pass.
+        return 128 if len(calls) == 1 else 5 if len(calls) == 2 else original(
+            *args, **kwargs,
+        )
+
+    monkeypatch.setattr(core.workflow_requests, "reconcile_stale", reconcile)
+    queued = core.enqueue_workflow_run("p")
+    stop = threading.Event()
+    stop.set()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(lambda: asyncio.run(core.drain_workflow_run_requests(
+            max_runs=1, initialized=True, stop_event=stop,
+        ))).result(timeout=10) == 0
+    assert calls == ["reconcile"]
+    assert core.workflow_run_request(queued["id"])["status"] == "queued"
+
+    stop.clear()
+    original_claim = core.workflow_requests.claim
+    def claim(owner):
+        calls.append("claim")
+        return original_claim(owner)
+    monkeypatch.setattr(core.workflow_requests, "claim", claim)
+    async def incomplete(*args, **kwargs):
+        return {"complete": False}
+    monkeypatch.setattr(core, "run_workflow_plan", incomplete)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(lambda: asyncio.run(core.drain_workflow_run_requests(
+            max_runs=1, initialized=True, stop_event=stop,
+        ))).result(timeout=10) == 1
+    assert calls[-3:] == ["reconcile", "reconcile", "claim"]
+    assert core.workflow_run_request(queued["id"])["status"] == "incomplete"
+
+
+def test_e5_one_shot_claim_retry_is_bounded_under_poisoned_producer(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    attempts = []
+    monkeypatch.setattr(
+        core.workflow_requests, "claim",
+        lambda owner: attempts.append(owner) or None,
+    )
+    monkeypatch.setattr(
+        core.workflow_requests, "queued_count", lambda: 1,
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        assert pool.submit(lambda: asyncio.run(core.drain_workflow_run_requests(
+            max_runs=1, initialized=True,
+        ))).result(timeout=10) == 0
+    assert len(attempts) == 16

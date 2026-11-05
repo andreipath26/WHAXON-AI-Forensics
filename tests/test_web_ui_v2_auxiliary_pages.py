@@ -502,11 +502,11 @@ def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server):
         timeout=8000,
     )
     before = calls["pending"]
-    page.get_by_role("button", name="Refresh queue").click()
-    page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('0 pending item(s)')",
-        timeout=8000,
-    )
+    # The displayed count is already zero; observing it does not prove the
+    # refresh has reached the API. Wait for the real request and response.
+    with page.expect_response("**/api/ai/pending", timeout=8000) as refreshed:
+        page.get_by_role("button", name="Refresh queue").click()
+    assert refreshed.value.status == 200
     assert calls["pending"] > before
 
     page.get_by_role("button", name="Emergency Halt Scan").click()
