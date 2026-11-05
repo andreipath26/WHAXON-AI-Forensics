@@ -9,6 +9,7 @@ on:
       - "tests/test_web_ui_v2_scope_interactions.py"
       - "tests/test_web_ui_v2_scope_visual.py"
       - ".github/workflows/scope-acceptance.yml"
+      - "scripts/smoke_scope_installed.py"
   workflow_dispatch:
 permissions:
   contents: read
@@ -69,3 +70,5 @@ jobs:
               assert required.issubset(names), required - names
           print('Scope template, compiled CSS, fonts CSS present in wheel and sdist')
           PY
+      - name: Fresh installed wheel serves Scope and all local resources
+        run: python scripts/smoke_scope_installed.py
