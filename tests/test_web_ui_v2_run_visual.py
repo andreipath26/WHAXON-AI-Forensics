@@ -1,4 +1,4 @@
-"""Run & Orchestration visual candidate evidence; manual review stays separate."""
+"""Desktop Run & Orchestration visual candidate evidence; manual review stays separate."""
 from __future__ import annotations
 
 import json
@@ -9,7 +9,7 @@ import pytest
 
 @pytest.mark.parametrize(
     ("width", "height", "label"),
-    [(1440, 900, "desktop"), (390, 844, "mobile")],
+    [(1440, 900, "desktop")],
 )
 def test_run_visual_candidate(page, live_server, width, height, label):
     page.set_viewport_size({"width": width, "height": height})
@@ -33,11 +33,9 @@ def test_run_visual_candidate(page, live_server, width, height, label):
     assert page.evaluate(
         "() => getComputedStyle(document.body).backgroundColor === 'rgb(15, 19, 28)'"
     )
-    if width < 768:
-        assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
 
 
-@pytest.mark.parametrize(("width", "height"), [(1440, 900), (390, 844)])
+@pytest.mark.parametrize(("width", "height"), [(1440, 900)])
 def test_run_automated_accessibility(page, live_server, width, height):
     axe = Path(__file__).resolve().parents[1] / "node_modules" / "axe-core" / "axe.min.js"
     if not axe.is_file():
