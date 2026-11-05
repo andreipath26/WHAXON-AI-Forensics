@@ -487,7 +487,7 @@ Until implementation and acceptance tests are completed, all capabilities descri
 **Reviewed:** 2026-11-02
 **Repository / inspected branch:** `andreipath26/WHAXON-AI-Forensics` / `main`
 **Source baseline:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`
-**Authority:** [Product trajectory](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md), especially P0–P5 and §38. This is a dated summary; [the baseline register](docs/V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) holds detailed evidence.
+**Authority:** [Product trajectory](#part-i--authoritative-product-roadmap), especially P0–P5 and §38. This is a dated summary; [the baseline register](docs/V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) holds detailed evidence.
 
 ## Release and verification
 
