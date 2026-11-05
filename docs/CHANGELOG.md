@@ -1,3 +1,19 @@
+# Changelog
+
+## 2026-11-05 — Documentation ownership and restored original sources (unreleased)
+
+- Restored `docs/bounty-addon.md` as the technical owner of bounty programme policy, differential analysis and workflow design; corrected missing-policy wording to fail closed for bounty operations, without changing standalone WHAXON host-scope rules.
+- Restored `docs/business-impact.md` and placed it under evidence/reporting technical ownership, separate from CBC event and investor strategy.
+- Restored the **byte-identical** supplied `web ui files and rendering/obsidian_kinetic/DESIGN.md` from Git history; preserves the frozen design assets and original configuration.
+- Moved technical chapters out of the CBC commercial playbook and repaired canonical document ownership/index references. Historical changelog entries below retain their original dates and citations.
+
+## 2026-11-05 — Source-versus-documentation reconciliation (unreleased)
+
+- Corrected the active roadmap/V1 descriptions of the previously fixed one-shot `Core.initialize(drain=False)` CLI isolation, desktop `/ui-v2` default, and merged E5 bounded engineering service. Retained prior historical snapshots explicitly as dated evidence rather than live defects.
+- Reconciled current service/deployment descriptions with staged systemd/Docker and offline-state restore checks; real-target, externally anchored evidence, full legacy-client migration and V1 release gates remain open.
+- Verified the 75-row Engine V2 requirements CSV (4 historically bounded ACCEPTED, 71 NOT_ACCEPTED), 10 E0–E9 engineering gate entries and separate open G01–G10 release gates. Do not turn implementation or green tests into new acceptance without exact requirement-level evidence.
+- Last completed green main-branch baseline at audit: [`fc056d0`, 13/13 CI jobs](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849); later commits require their own CI. No v1.0 release or production deployment approval is claimed.
+
 ## 2026-11-02 — One-shot isolation, catalog consolidation and desktop default
 
 - Prevent coverage, validation, retest and reconnaissance commands from draining unrelated pending jobs during startup; add real-store normal/refusal regressions.
@@ -16,7 +32,7 @@
 - Removed hard-coded demo credentials from the screenshot capture instructions.
 - Recorded the latest known CI failure and the queued CI run for this documentation commit. No v1.0 release or acceptance gate is claimed.
 
-> **Documentation status correction (2026-11-02):** Earlier entries titled “Full documentation consistency pass” and “Operator documentation reconciliation” described limited subsets of the repository. They did **not** represent a complete review of all documentation. The repository-wide inventory and status classification are recorded in [DOCUMENTATION_RECONCILIATION.md](DOCUMENTATION_RECONCILIATION.md). Do not treat the earlier wording as evidence that every Markdown file had been reconciled.
+> **Documentation status correction (2026-11-02):** Earlier entries titled “Full documentation consistency pass” and “Operator documentation reconciliation” described limited subsets of the repository. They did **not** represent a complete review of all documentation. The repository-wide inventory and status classification are recorded in [DOCUMENTATION_RECONCILIATION.md](PROJECT_GOVERNANCE_MASTER.md). Do not treat the earlier wording as evidence that every Markdown file had been reconciled.
 
 ## 2026-11-02 — Full documentation consistency pass
 
@@ -310,7 +326,7 @@ Verified with curl against the live server: all five wired endpoints return real
 - README rewritten to lead with the R107 product claim (Trust Layer).
 - pyproject.toml description updated for PyPI/Piwheels.
 
-# Changelog
+## Historical changelog (retained original section)
 ## 2026-10-18 (session 68 - hydra adapter registered)
 
 - **hydra adapter wired end-to-end.** adapter existed and was unit-tested, but nothing imported it, so register() never ran, get_adapter("hydra") returned None, and every run parsed nothing: [no findings] against output hydra itself printed as successful. added to _autoload() tuple; __init__.py import removed. catalog entry added. initial-access ladder step: run hydra, then propose post-access. 3 ladder tests.

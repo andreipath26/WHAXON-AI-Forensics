@@ -1,78 +1,35 @@
-# WHAXON documentation
+# WHAXON documentation — canonical index
 
-Source and tests on an exact commit establish implemented behavior. The [product trajectory](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) is the single active priority and release-gate file. A design, screenshot, old DONE label or passing historical CI run is not current product acceptance.
+> **Current verified evidence (2026-11-05):** [main CI at `fc056d0`](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849) passed all 13 jobs, including Python 3.11–3.13, SearchSploit, systemd, Docker and platform setup. Subsequent commits must pass **their own** exact-head checks. E5 bounded engineering work is merged, while complete client migration, D1–D6, independent real-target/evidence acceptance and V1 G01–G10 release gates remain OPEN.
 
-## Start here
+**Consolidated 2026-11-05.** One authoritative master per subject. Superseded documentation has been absorbed into the linked masters and removed from the live tree. Git history preserves its original revisions. Do not create competing architecture, roadmap, audit, acceptance, or status documents. For current feature claims, consult code and exact-HEAD CI rather than historical narratives embedded within masters.
 
-- [Project README](../README.md): overview and installation entry point.
-- [Product trajectory and release gates](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md): P0–P8, current work order, §38 acceptance and previous-scope reconciliation.
-- [Project state](STATE.md): concise dated snapshot.
-- [Baseline and acceptance register](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md): current source, test and CI evidence, critical workflow map and remaining acceptance.
-- [Repository due diligence and dispositions](DOCUMENTATION_RECONCILIATION.md): exact removal candidates, dependency-bound cleanup, retirement gates and retained material. This is a disposition register, not another roadmap.
-- [Changelog](CHANGELOG.md): engineering/release history, not the active task queue.
+| Area | Single authoritative document | Scope |
+|---|---|---|
+| Product work order and release gates | [Product roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) | P0–P8, product priorities, competitor gap analysis, dated product-state capture |
+| Engine V2 | [Engine V2 master](ENGINE_V2_MASTER.md) | Architecture, migration, provider contracts, E0–E9, evidence and acceptance |
+| V1 release | [V1 acceptance master](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) | Solo release criteria, bounded acceptance and reconciliations |
+| UI V2 | [UI V2 master](V2_UI_MANDATORY_CROSSWALK.md) | 22-page crosswalk, interaction, accessibility/design inventories and audits |
+| Bug bounty module | [Bounty technical design](bounty-addon.md) | Programme policy, scope enforcement, differential analysis and proposed bounty workflows |
+| Business impact | [Impact technical design](business-impact.md) | Severity calculation, finding enrichment, cost-range methodology and report presentation |
+| Application architecture | [Application architecture master](APPLICATION_ARCHITECTURE_MASTER.md) | AI, agents, scope, tools, providers, adapters, autonomous/session execution, API |
+| Installation and operations | [Operations master](OPERATIONS_MASTER.md) | First-run, dependency setup, deployment, diagnostics, demo and screenshots |
+| Findings, evidence and reports | [Evidence/reporting master](EVIDENCE_AND_REPORTING_MASTER.md) | Findings, evidence, reporting design, retention requirements |
+| Business, partnerships and licensing guidance | [CBC playbook](CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md) | CBC, funding/investor strategy, commercial editions and licensing overview |
+| Engineering process, retention and repository cleanup | [Project governance master](PROJECT_GOVERNANCE_MASTER.md) | Engineering rules, prior cleanup decisions and AI use audit |
+| Document routing | [Documentation ownership](DOCUMENTATION_OWNERSHIP.md) | Single-master policy and current inventory |
+| Engineering history | [Changelog](CHANGELOG.md) | Chronological changes (historical, not a second roadmap) |
 
-## Maintained operator and developer guides
+## Separate binding or functional files
 
-| Topic | Guide |
-|---|---|
-| First run | [Getting started](getting-started.md), [dependency readiness](dependency-readiness.md), [troubleshooting](troubleshooting.md) |
-| Execution | [Scope](scope.md), [tools](tools.md), [adapters](adapters.md), [plugins](plugins.md), [AI](ai.md) |
-| Results | [Findings](findings.md), [reports and evidence](reports-and-evidence.md), [data retention](DATA_RETENTION.md) |
-| Interfaces | [Interfaces](interfaces.md), [selected HTTP API](api.md), [deployment](deployment.md) |
-| Development | [Architecture](architecture.md), [contributing](../CONTRIBUTING.md), [security policy](../SECURITY.md) |
+- [Repository README](../README.md), [contributor guide](../CONTRIBUTING.md), [security policy](../SECURITY.md), [agent instructions](../AGENTS.md).
+- [AGPL community license](../LICENSE), [commercial](../LICENSE-COMMERCIAL.md) and [enterprise](../LICENSE-ENTERPRISE.md) instruments, [CLA](../CLA.md), [trademark](../TRADEMARK.md), [third-party notices](../THIRD_PARTY_NOTICES.md) and [license inventory](../THIRD_PARTY_LICENSES/README.md).
+- [Documentation assets inventory](assets/README.md), [supplied UI design sources](../web%20ui%20files%20and%20rendering/README.md) and [payload attribution](../src/whaxon/data/payloads/ATTRIBUTION.md).
+- Structured acceptance CSVs, checked-in tests, actual deployment configurations, screenshots and generated evidence remain as data/evidence rather than new narrative masters.
 
-Guides can describe supported subsets. Check current source and the capability register before assuming every tool, transport, platform or API workflow is implemented and accepted.
+## Integrity rules
 
-- [UI source-control inventory](UI_CONTROL_INVENTORY.md): all 22 templates, source binding evidence and unresolved runtime/visual/accessibility checks.
-
-## Detailed architecture and acceptance records
-
-These documents serve distinct purposes and remain subordinate to the trajectory's work order:
-
-- [New UI interaction/acceptance audit](NEW_UI_INTERACTION_AUDIT.md): page-route/test mapping and remaining supplied-design acceptance.
-- [Engine v2 architecture/crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md): detailed target contracts, migration and dated implementation records.
-- [First-run implementation/acceptance record](first-run-installation-redesign.md): setup design and remaining deployment checks; current use belongs in the dependency-readiness guide.
-- [Engineering execution model](ENGINEERING_EXECUTION_MODEL.md): dependency-driven work ownership, integration and verification.
-
-## Approved deferred designs
-
-Presence here is not a claim that a subsystem ships:
-
-- [Tool intelligence and controlled onboarding](TOOL_INTELLIGENCE_AND_ONBOARDING.md).
-- [Metasploit / Armitage integration](METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md).
-- [Bug-bounty add-on](bounty-addon.md).
-- [Competitor capability and remediation addendum](../WHAXON%20Competitor%20Capability%20and%20Remediation%20Roadmap%20Addendum.md).
-
-The trajectory places these at their dependency gates. Inspect source before implementing; preserve reusable existing contracts and do not create parallel schedulers, registries or execution authorities.
-
-## Historical records and references
-
-These files retain rationale or earlier evidence. They are not current implementation instructions:
-
-- [Agent architecture](agent-architecture.md), [autonomous loop](autonomous-loop.md), [session execution](session-execution.md).
-- [Report redesign](report-redesign.md), [report visual design](report-visual-design.md), [business impact](business-impact.md).
-- [Engine v2 E0 baseline](ENGINE_V2_BASELINE_INVENTORY.md), [legacy UI audit](WEB_UI_INTERACTION_AUDIT.md).
-- [Screenshot capture guide](screenshots.md), [demo script](demo.md): instructions/proposals, not completed demonstrations.
-- [Partnership/investor research](CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md): dated research, with external facts requiring revalidation before use.
-- `data/proof-dvwa/`: dated generated sample reports; not current regression or release evidence.
-
-The previously referenced `whaxon-experiment-2026-10-25/` folder and `docs/WHAXON_EXPERIMENT_AUDIT_2026-10-25.md` are absent from the inspected `6fa1fa5` working tree. Do not follow their former local links or describe them as currently checked-in artifacts. Their historical branch/reference disposition is recorded in the due-diligence register.
-
-The complete previous roadmap remains available through the trajectory's pinned Git-history link. There is no second active roadmap or copied archive added to this tree.
-
-## Supplied UI assets and imported captures
-
-[Supplied UI source](../web%20ui%20files%20and%20rendering/README.md) and its [design reference](../web%20ui%20files%20and%20rendering/obsidian_kinetic/DESIGN.md) govern visual fidelity. Production templates live in `src/whaxon/interfaces/web/templates/ui_v2_*.html`. Named source variants are not interchangeable until mapped.
-
-Verified loose duplicates, imported page captures, the copied roadmap, unissued release-note disclaimer and static source/history exports have been removed. Named design originals remain unchanged. See the [disposition register](DOCUMENTATION_RECONCILIATION.md) for executed cleanup and remaining migration gates.
-
-Vendored [payload attribution](../src/whaxon/data/payloads/ATTRIBUTION.md) is a runtime/provenance resource. Payload presence does not establish validator support for every listed technique.
-
-## Licensing and notices
-
-- [Editions](editions.md), [licensing overview](licensing.md), [commercial licensing](commercial-licensing.md).
-- [Community license](../LICENSE), [commercial notice](../LICENSE-COMMERCIAL.md), [enterprise status](../LICENSE-ENTERPRISE.md).
-- [Third-party notices](../THIRD_PARTY_NOTICES.md), [third-party license inventory](../THIRD_PARTY_LICENSES/README.md).
-- [Trademark policy](../TRADEMARK.md), [contributor agreement](../CLA.md).
-
-KILN, Aletheia Framework, SYBIL and other portfolio projects are separate repositories/products, not WHAXON runtime dependencies or release workstreams.
+1. The root product roadmap decides priorities and release gates. The subject masters provide detailed explanation but cannot overrule it.
+2. Draft UI V2 and Engine V2 acceptance does not mean production-ready; do not relax deployment gates because documents were consolidated.
+3. Update the subject master in place. Add standalone files only for legally independent documents, functional source assets, or reproducible machine-readable evidence.
+4. The old standalone narrative documents have been removed. Locate past revisions in Git history when needed, not through dead links.

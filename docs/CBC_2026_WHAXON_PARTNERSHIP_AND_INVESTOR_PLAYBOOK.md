@@ -1,3 +1,11 @@
+# WHAXON — CBC PARTNERSHIPS, FUNDING AND COMMERCIAL LICENSING PLAYBOOK
+
+> **Engineering claim cross-check — 2026-11-05.** WHAXON package metadata remains `0.11.16` Beta. E5 has merged, bounded engineering acceptance with staged worker/recovery evidence; production certification, all real-target/third-party security conditions, autonomous breadth, and full client migration are **not complete**. [Exact `fc056d0` CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849) passed 13/13 jobs. Commercial event attendance, funding eligibility, meeting and revenue claims are outside repository-verifiable engineering evidence and must not be presented as verified by this audit.
+
+**Canonical business-development and commercial product reference, consolidated 2026-11-05.** The CBC partnership and investor playbook is the governing commercial narrative. Technical bug bounty and business-impact specifications are maintained separately; editions and licensing notes below are subordinate commercial guidance. Binding legal license instruments remain separate, unchanged and authoritative on their own terms (root LICENSE files, CLA, trademark and third-party notices). Claims about grant eligibility or revenue require fresh verification.
+
+## Part I — Partnership and investor playbook
+
 # CBC 2026 — WHAXON Partnership, Customer and Funding Playbook
 
 **Event:** Cybersecurity Business Convention (CBC), 25–26 November 2026, MEETT, Toulouse  
@@ -1230,4 +1238,86 @@ These are routes to investigate, not a guarantee of eligibility or funding. Conf
 ### The outcome to optimize
 
 A successful CBC is not necessarily an investment cheque. It is a concrete path from a working product to a credible first deployment: a named technical evaluator, an authorized use case, agreed success criteria, a partner contribution and a scheduled decision point.
+
+
+
+---
+
+## Technical documentation kept outside this commercial playbook
+
+The [bug bounty module's authorization and differential-analysis design](bounty-addon.md) is a separate technical document. [Business-impact severity and incident-cost methodology](business-impact.md) belongs to findings/reporting engineering, not CBC event, funding or investor strategy. Neither technical document is superseded by this commercial playbook.
+
+---
+
+## Part 2 — commercial-licensing.md (supporting source)
+
+# Commercial licensing
+
+## Current community license
+
+The WHAXON source code in this repository is licensed under **GNU Affero General Public License v3 or later (AGPL-3.0-or-later)**. The repository-root [LICENSE](../LICENSE) is the governing community license.
+
+## Separate commercial agreement
+
+A separate commercial license may be discussed for organizations or use cases that cannot comply with the AGPL. Contact the rights holder at [andreipath@gmail.com](mailto:andreipath@gmail.com) to discuss the intended use.
+
+This guide and [LICENSE-COMMERCIAL.md](../LICENSE-COMMERCIAL.md) are notices only. Neither grants additional rights. No commercial license exists unless and until the rights holder and licensee sign a separate written agreement. That agreement must define its scope, permitted use, redistribution rights, fees, support, warranties and other applicable terms.
+
+## Enterprise status
+
+There is currently no separately published enterprise edition, proprietary `enterprise/` module tree, enterprise service-level commitment or standard enterprise agreement in this repository. [LICENSE-ENTERPRISE.md](../LICENSE-ENTERPRISE.md) records that status. Do not represent roadmap items or the presence of an enterprise licensing notice as delivered enterprise functionality.
+
+## Third-party dependencies
+
+Optional extras and external tools may have their own license terms. Review [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) and [THIRD_PARTY_LICENSES/dependencies.csv](../THIRD_PARTY_LICENSES/dependencies.csv) before bundling or redistributing them. This documentation is not legal advice; obtain independent legal advice for a specific deployment or distribution.
+
+## What to discuss before signing
+
+At minimum, define the licensed entities and users, deployment model, permitted use, source/derivative-work obligations, redistribution and hosting rights, third-party components, support and maintenance expectations, fees and term, termination, data handling, warranties and liability. Do not rely on informal email or this repository notice as a substitute for the executed agreement.
+
+
+---
+
+## Part 3 — editions.md (supporting source)
+
+# WHAXON editions and licensing status
+
+## Community edition
+
+The code in this repository is distributed under the GNU Affero General Public License v3 or later (AGPL-3.0-or-later); see the repository-root `LICENSE`.
+
+## Commercial licensing
+
+A separate commercial license may be discussed with the maintainer for use cases that cannot comply with the AGPL. Contact details are in `LICENSE-COMMERCIAL.md`. That short notice is not a substitute for a signed license agreement and does not itself grant additional rights. Terms, scope, support, and pricing must be agreed in writing.
+
+## Enterprise edition
+
+No separate enterprise edition or proprietary `enterprise/` module tree is currently included in this repository. Do not assume enterprise features, service levels, or license terms exist unless they are separately published and agreed in writing.
+
+## Dependency licensing
+
+Optional extras have their own third-party licenses. Review `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES/dependencies.csv` before redistributing an installation, especially for the GUI and Metasploit extras.
+
+
+---
+
+## Part 4 — licensing.md (supporting source)
+
+# Licensing overview
+
+## Community code
+
+The code in this repository is distributed under the GNU Affero General Public License v3 or later (AGPL-3.0-or-later). See the root `LICENSE`.
+
+## Commercial licensing
+
+A separate commercial license may be discussed for use cases that cannot comply with the AGPL. See `LICENSE-COMMERCIAL.md` and contact the maintainer. A contact notice is not itself a license grant; additional rights exist only under a separately signed written agreement.
+
+## Enterprise status
+
+No separate enterprise modules or published enterprise agreement are currently included in this repository. See `LICENSE-ENTERPRISE.md` for the current status.
+
+## Dependencies
+
+Third-party runtime dependencies retain their own licenses. Review `THIRD_PARTY_NOTICES.md` and `THIRD_PARTY_LICENSES/dependencies.csv` before redistributing the software or bundling optional GUI/Metasploit extras. These inventory files are not legal advice; verify the exact distributions used in a release.
 

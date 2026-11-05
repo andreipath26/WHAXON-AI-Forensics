@@ -79,9 +79,19 @@ def test_approvals_workspace_loads_real_queue_and_disables_demo_decisions(page, 
         " || document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Live data unavailable')",
         timeout=10000,
     )
-    for button in page.locator("main button:visible").all():
-        if not button.evaluate("(el) => el.closest('#whaxon-live-approvals') !== null"):
-            assert button.is_disabled(), f"Unwired approval control remains enabled: {button.inner_text()}"
+    # Check a single DOM snapshot: refreshing the live queue may insert a
+    # functional Submit answer button between separate nth-locator operations.
+    unwired = page.locator("main button").evaluate_all("""buttons => buttons
+      .filter(button => !button.closest('#whaxon-live-approvals'))
+      .filter(button => {
+        const style = getComputedStyle(button);
+        return button.getClientRects().length > 0 && style.visibility !== 'hidden'
+          && style.display !== 'none' && !button.closest('[hidden]');
+      })
+      .filter(button => !button.disabled)
+      .map(button => button.textContent.trim())
+    """)
+    assert not unwired, f"Unwired approval controls remain enabled: {unwired}"
 
 
 def test_approvals_workspace_submits_operator_answer_to_waiting_run(page, live_server):

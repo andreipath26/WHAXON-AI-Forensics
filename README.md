@@ -1,5 +1,7 @@
 # WHAXON
 
+> **Verified source status (2026-11-05):** Version `0.11.16`, Python `>=3.11`. E5 [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) merged with bounded engineering acceptance, **not** production approval. Scope [PR #127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) remains draft/unmerged. Full Engine V2 migration and V1 release gates remain open.
+
 **A scope-controlled security assessment workspace: orchestrate tools, validate findings, preserve evidence, and retest fixes.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/andreipath26/WHAXON-AI-Forensics/ci.yml?branch=main)](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml)
@@ -33,7 +35,7 @@ The central principle is that **a tool's output is evidence to evaluate—not au
 | User interfaces | Command-line operation, a browser workspace at `/ui-v2`, and optional terminal/desktop interfaces |
 | Engine V2 foundation | Versioned workflow and capability contracts, persistent missions and execution intents, bounded scheduling, approvals, events and provider routing |
 
-These are **implemented capabilities, not claims of universal scanner support or completed end-to-end certification**. Some integrations require external binaries; parser coverage, supported validation contexts and output fidelity depend on the tool and workflow. The [tool documentation](docs/tools.md) and [adapter documentation](docs/adapters.md) explain the integration boundaries.
+These are **implemented capabilities, not claims of universal scanner support or completed end-to-end certification**. Some integrations require external binaries; parser coverage, supported validation contexts and output fidelity depend on the tool and workflow. The [tool documentation](docs/APPLICATION_ARCHITECTURE_MASTER.md) and [adapter documentation](docs/APPLICATION_ARCHITECTURE_MASTER.md) explain the integration boundaries.
 
 ### How Engine V2 fits
 
@@ -41,7 +43,7 @@ Engine V2 is the ongoing work to make the execution system **one durable, capabi
 
 Its foundations include versioned plans and task contracts, deterministic provider selection, durable queue ownership, leases, bounded concurrency, policy-bound approvals, cancellation barriers and reconciliation states. Newer implementation slices also provide semantic operation aliases, provider inventories and reviewable evidence-derived follow-up plans.
 
-The hard remaining work is proving these mechanisms together under real service restarts, external-tool failures, transport changes and multi-client workflows. **An accepted queued request must not vanish, and an uncertain external effect must not be blindly replayed.** See the [Engine V2 architecture](docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) for the detailed contracts and outstanding gates.
+The hard remaining work is proving these mechanisms together under real service restarts, external-tool failures, transport changes and multi-client workflows. **An accepted queued request must not vanish, and an uncertain external effect must not be blindly replayed.** See the [Engine V2 architecture](docs/ENGINE_V2_MASTER.md) for the detailed contracts and outstanding gates.
 
 ## Get started
 
@@ -59,7 +61,7 @@ whaxon setup --profile core
 whaxon doctor --json
 ```
 
-The setup command above **previews** the core dependency plan; it does not silently install all proposed tools. Review the plan and required approvals before making changes. Windows PowerShell users can activate the environment with `.venv\Scripts\Activate.ps1`. See [Getting started](docs/getting-started.md) and [dependency readiness](docs/dependency-readiness.md) for platform-specific instructions.
+The setup command above **previews** the core dependency plan; it does not silently install all proposed tools. Review the plan and required approvals before making changes. Windows PowerShell users can activate the environment with `.venv\Scripts\Activate.ps1`. See [Getting started](docs/OPERATIONS_MASTER.md) and [dependency readiness](docs/OPERATIONS_MASTER.md) for platform-specific instructions.
 
 ### Launch the browser workspace
 
@@ -80,9 +82,9 @@ whaxon run --help
 whaxon report --help
 ```
 
-Inspect your configuration, set the targets covered by written authorization, and review what a command will do. **Default scope rules are not proof that a network belongs to you.** Start with [scope and policy](docs/scope.md).
+Inspect your configuration, set the targets covered by written authorization, and review what a command will do. **Default scope rules are not proof that a network belongs to you.** Start with [scope and policy](docs/APPLICATION_ARCHITECTURE_MASTER.md).
 
-For service operation and remote-access considerations, read the [deployment guide](docs/deployment.md). Do not expose an assessment service to an untrusted network without suitable authentication and transport protection.
+For service operation and remote-access considerations, read the [deployment guide](docs/OPERATIONS_MASTER.md). Do not expose an assessment service to an untrusted network without suitable authentication and transport protection.
 
 ## Current maturity and boundaries
 
@@ -91,26 +93,28 @@ WHAXON is an **actively developed beta**, not a finished autonomous penetration-
 - **Verification is deliberately limited.** Supported checks produce specific outcomes; unsupported, ambiguous or unreproducible findings must not be presented as independently verified. Stateful POST replay and arbitrary authenticated request replay are not generally supported.
 - **Scope controls do not replace network isolation.** External tools may perform additional network operations; application-level checks are not a firewall or a connection-time DNS pin.
 - **Evidence integrity is not the same as an external trust anchor.** Local digests and consistency checks can detect some changes, but do not themselves prove independent, tamper-proof custody.
-- **Durability is being hardened.** Queue persistence, lease fencing, budget and cancellation controls exist, while full external-effect crash recovery, daemon/container operation and backup/restore acceptance remain open.
+- **Durability is boundedly engineered, not production-certified.** Queue persistence, lease fencing, mission controls, cancellation and conservative recovery have implemented tests; Ubuntu systemd and paired Docker worker/restart/offline-restore *staging* passed E5 engineering smokes. External-effect crash/real-target, operator security, independent audit anchors and complete production disaster-recovery acceptance remain open.
 - **Interface and installation acceptance is incomplete.** The supplied UI, supported external tools, cross-platform installation, accessibility and end-to-end deployment still need exact-environment verification.
 - **Larger expansions remain gated.** Broad autonomous bounty campaigns, multi-target orchestration, advanced session/Metasploit breadth and enterprise integrations are not part of the accepted solo-v1.0 baseline.
 
-For the latest tested commit and outstanding release criteria, use [GitHub Actions](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml), the [project state](docs/STATE.md) and the [v1.0 acceptance register](docs/V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md). CI passing does not mean every external tool or security claim is validated.
+For the latest tested commit and outstanding release criteria, use [GitHub Actions](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml), the [project state](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and the [v1.0 acceptance register](docs/V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md). CI passing does not mean every external tool or security claim is validated.
 
 ## Documentation
 
 | Start here | Details |
 |---|---|
-| [Getting started](docs/getting-started.md) | Installation and first use |
-| [Scope](docs/scope.md) | Assessment boundaries and authorization |
-| [Tools](docs/tools.md) and [adapters](docs/adapters.md) | Tool integration and supported paths |
-| [Findings](docs/findings.md) and [reports](docs/reports-and-evidence.md) | Interpretation, evidence and exports |
-| [Interfaces](docs/interfaces.md) and [API](docs/api.md) | CLI, browser and service surfaces |
-| [Engine V2 architecture](docs/ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) | Execution contracts and engineering work |
+| [Getting started](docs/OPERATIONS_MASTER.md) | Installation and first use |
+| [Scope](docs/APPLICATION_ARCHITECTURE_MASTER.md) | Assessment boundaries and authorization |
+| [Tools](docs/APPLICATION_ARCHITECTURE_MASTER.md) and [adapters](docs/APPLICATION_ARCHITECTURE_MASTER.md) | Tool integration and supported paths |
+| [Findings](docs/EVIDENCE_AND_REPORTING_MASTER.md) and [reports](docs/EVIDENCE_AND_REPORTING_MASTER.md) | Interpretation, evidence and exports |
+| [Interfaces](docs/APPLICATION_ARCHITECTURE_MASTER.md) and [API](docs/APPLICATION_ARCHITECTURE_MASTER.md) | CLI, browser and service surfaces |
+| [Engine V2 architecture](docs/ENGINE_V2_MASTER.md) | Execution contracts and engineering work |
 | [Product roadmap](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) | Priorities, milestones and release gates |
+
+Dedicated technical designs: [bug bounty programme policy and workflow](docs/bounty-addon.md), [business-impact severity and costs](docs/business-impact.md), and the original supplied [Obsidian Kinetic design source](web%20ui%20files%20and%20rendering/obsidian_kinetic/DESIGN.md).
 
 ## Contributing, security and licensing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) before proposing changes and [SECURITY.md](SECURITY.md) to report a security issue. This project is for **systems you own or are explicitly authorized to assess**; neither a tool configuration nor an AI suggestion replaces permission and rules of engagement.
 
-WHAXON is licensed under [AGPL-3.0-or-later](LICENSE). See [commercial licensing](docs/commercial-licensing.md), [third-party notices](THIRD_PARTY_NOTICES.md) and the [trademark policy](TRADEMARK.md).
+WHAXON is licensed under [AGPL-3.0-or-later](LICENSE). See [commercial licensing](docs/CBC_2026_WHAXON_PARTNERSHIP_AND_INVESTOR_PLAYBOOK.md), [third-party notices](THIRD_PARTY_NOTICES.md) and the [trademark policy](TRADEMARK.md).
