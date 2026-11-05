@@ -23,3 +23,9 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "engine-v2-g01-controlled-lab:" in workflow
     assert "scripts/g01-lab-chain.py" in workflow
     assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
+    assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
+        "Validate isolated fixed-address lab topology"
+    )
+    assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
+        "Validate isolated fixed-address lab topology"
+    )
