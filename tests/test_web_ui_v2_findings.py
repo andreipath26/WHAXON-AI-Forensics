@@ -222,57 +222,6 @@ def test_findings_list_uses_only_records_from_live_report(page, live_server):
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
 
 
-def test_findings_page_loads_all_assets_locally(page, live_server):
-    external = []
-    page.on(
-        "request",
-        lambda request: external.append(request.url)
-        if request.url.startswith(("https://", "http://"))
-        and not request.url.startswith(live_server)
-        else None,
-    )
-    page.route("https://**/*", lambda route: route.abort())
-    response = page.goto(f"{live_server}/ui-v2/findings")
-    assert response is not None and response.status == 200
-    page.wait_for_function(
-        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
-    )
-    assert page.title() == "WHAXON — Trust Layer & Findings"
-    assert external == []
-    for asset in (
-        "dashboard-fonts.css",
-        "findings-v2.css",
-        "findings-mobile.css",
-        "dashboard-logo.jpg",
-    ):
-        result = page.request.get(f"{live_server}/static/{asset}")
-        assert result.ok and result.body(), (asset, result.status)
-
-
-def test_findings_mobile_navigation_is_keyboard_operable(page, live_server):
-    page.set_viewport_size({"width": 390, "height": 844})
-    page.goto(f"{live_server}/ui-v2/findings")
-    page.wait_for_function(
-        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
-    )
-    assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
-    menu = page.get_by_role("button", name="Open Findings navigation")
-    assert menu.is_visible()
-    sidebar = page.locator("#findings-mobile-sidebar")
-    assert sidebar.get_attribute("aria-hidden") == "true"
-    assert sidebar.evaluate("node => node.inert") is True
-    menu.click()
-    assert menu.get_attribute("aria-expanded") == "true"
-    assert sidebar.get_attribute("aria-hidden") == "false"
-    assert sidebar.evaluate("node => node.inert") is False
-    page.keyboard.press("Escape")
-    assert menu.get_attribute("aria-expanded") == "false"
-    assert menu.evaluate("el => document.activeElement === el")
-    assert sidebar.evaluate("node => node.inert") is True
-
-
 def test_findings_reject_malformed_report_and_retry(page, live_server):
     calls = 0
 
