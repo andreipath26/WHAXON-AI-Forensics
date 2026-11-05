@@ -1,5 +1,7 @@
 # WHAXON — PRODUCT ROADMAP MASTER
 
+> **Source reconciliation (2026-11-05; inspected main `55a2e8b`):** E5 [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) **merged November 5** with exact PR-head 12/12 CI. This establishes bounded E5 engineering acceptance, NOT production sign-off. Legacy dispatch migration, E6, independent evidence anchoring, real authorized targets and V1 G01–G10 release gates remain OPEN. [Scope PR #127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) is draft/unmerged. Older assertions that E5 merge is pending are superseded.
+
 **Canonical product scope, priorities, delivery sequence and release gates. Consolidated 2026-11-05.**
 
 The original product roadmap below is the governing source. The competitor-capability analysis is subordinate strategic input, not a parallel work order. The dated state snapshot is retained solely as historical evidence; exact-head code, tests and acceptance determine current state.

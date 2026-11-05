@@ -1,5 +1,7 @@
 # WHAXON — FINDINGS, REPORTS, EVIDENCE AND RETENTION MASTER
 
+> **Current source audit (2026-11-05):** `core/findings.py` defines Finding and supported parsers; `core/report.py` contains Markdown, JSON, HTML and PDF render paths; CLI and Flask expose reports, per-job findings and evidence endpoints. These source surfaces do not establish all-scanner validation or independently witnessed evidence. Historical report redesign and visual plans below are not proof of deployed capabilities.
+
 **Canonical findings/reporting/evidence lifecycle reference, consolidated 2026-11-05.** Preserve raw evidence, provenance, verification state and deterministic authorization. Design proposals are not released features. Data retention requirements and evidence integrity remain binding where applicable, independent of the consolidation.
 
 - Part 1: findings.md

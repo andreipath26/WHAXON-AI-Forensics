@@ -1,5 +1,7 @@
 # WHAXON — INSTALLATION, DEPLOYMENT AND OPERATIONS MASTER
 
+> **Verified setup/deployment (2026-11-05):** Python `>=3.11`, optional `[web]`, `[tui]`, `[gui]`, `[metasploit]`, `[dev]` dependencies. `whaxon setup --profile core` previews, not installs. Curated automatic external-tool installation is bounded to supported Debian/Ubuntu/Kali `apt` and macOS Homebrew mappings/architectures; Windows package managers are diagnostics/manual. `whaxon serve` uses Waitress; the systemd web service uses Gunicorn and separate `workflow plan serve-requests` worker; paired Docker E5 config is staged. Wheel installation alone does not start or production-authorize these services.
+
 **Authoritative operator guide, consolidated 2026-11-05.** Contains first-run, dependencies, deployment, troubleshooting, demos, screenshots and installation design. Verify configuration and commands against current CLI/service code and installed package; historical aspirations are not current shipped functionality. Use current acceptance and release gates before production deployment.
 
 ## Guide navigation

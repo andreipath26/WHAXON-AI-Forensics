@@ -1,5 +1,7 @@
 # WHAXON — REPOSITORY GOVERNANCE, EXECUTION RULES AND RETIREMENT MASTER
 
+> **Current governance (2026-11-05):** Historical file-count and branch-retirement statements below refer to their original snapshots, not current main. The November 5 consolidation removed 56 superseded Markdown narratives and moved their contents into subject masters. `AGENTS.md` retains Dashboard freeze and E6 restrictions; legal and security files remain independent.
+
 **Consolidated 2026-11-05.** Records engineering execution ownership, documented AI-use audit limitations and prior repository due diligence. Legal licenses, SECURITY.md, CONTRIBUTING.md, CLA.md, AGENTS.md and third-party notices remain separate binding documents. The [documentation index](README.md) and [documentation ownership policy](DOCUMENTATION_OWNERSHIP.md) determine which subject master to edit. Historical retention/deletion candidates in the register are *not* automatically approved changes; review runtime consumers and present HEAD.
 
 ## Part I — Repository due diligence and retirement audit (historical)

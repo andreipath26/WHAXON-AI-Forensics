@@ -1,5 +1,7 @@
 # WHAXON — ENGINE V2 MASTER DOCUMENT
 
+> **Current code audit (2026-11-05; source `55a2e8b`):** E5 PR #124 **merged** with bounded engineering acceptance and 12/12 exact-PR-head CI. `Core` initializes `JobStore`, `WorkflowRunQueue`, `CapabilityRegistry` and `BoundProviderRouter`; workflow requests implement durable claim, heartbeat, cancellation and reconciliation; CLI and Flask have V2 workflow endpoints. Legacy `/api/run` and `/api/ai/run` still exist, so full legacy-to-V2 migration, production deployment, E6 and release gates are NOT accepted. Historical pre-merge claims below are superseded.
+
 **Consolidation date:** 2026-11-05. **Baseline:** main at `9157afd250bddb15dd56837d49b3c29492ad5aca`.
 
 > **Authority and interpretation:** This is the single consolidated Engine V2 architecture, implementation, acceptance and evidence reference. The root [master product roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) remains authoritative for product priorities, release requirements and scheduling. Current source plus exact-head test/CI evidence determine implemented behavior; the historical records below are not independent current-status claims. A phase freeze is not production approval. Never infer production deployment readiness from a dated green run, merge, or design.

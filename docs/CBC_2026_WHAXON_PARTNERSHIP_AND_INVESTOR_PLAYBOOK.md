@@ -1,5 +1,7 @@
 # WHAXON — COMMERCIAL, FUNDING, PARTNERSHIP AND PRODUCT EDITIONS MASTER
 
+> **Technical-claims audit (2026-11-05):** WHAXON source is `0.11.16` Beta; V1.0 and production certification are not accepted. Core execution, findings, reports, and bounded V2 services exist, but universal autonomous assessment, external audit attestation, and complete client migration are not proven. E5 PR #124 is engineering acceptance only. Event, financial, funding and partner claims are outside this code-only audit and require separate validation.
+
 **Canonical business-development and commercial product reference, consolidated 2026-11-05.** The CBC partnership and investor playbook is the governing commercial narrative. Business impact, bounty programme, editions and licensing notes below are subordinate research or product guidance. Binding legal license instruments remain separate, unchanged and authoritative on their own terms (root LICENSE files, CLA, trademark and third-party notices). Claims about grant eligibility or revenue require fresh verification.
 
 ## Part I — Partnership and investor playbook

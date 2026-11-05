@@ -1,5 +1,7 @@
 # WHAXON — APPLICATION ARCHITECTURE, AGENTS, TOOLS AND API MASTER
 
+> **Current implementation (2026-11-05):** `src/whaxon/cli.py` dispatches `setup`, `doctor`, `init`, `up`, `down`, `serve`, `web`, `tui`, `gui`, `msf`, `scope`, `install`, `suggest`, `burp-import`, `evidence`, `report`, `run`, `workflow`, `findings`, `lookup`, `cve`, `vulndb`, `validate`, `retest`, `coverage`, `bounty`, `state`, `jobs` and `ai`; default is TUI. `Core` provides SQLite-backed storage, scoped runner, events and V2 services. The Flask server still exposes both V2 workflow APIs and legacy direct/AI execution: not every client is migrated.
+
 **Canonical shared application and developer reference, consolidated 2026-11-05.** This master covers the application outside the separately governed Engine V2 and UI V2 contracts. Operational and implementation assertions in original snapshots must be checked against current code/tests. Security authorization remains deterministic; AI proposals never grant execution permission. The root roadmap controls priorities.
 
 ## Navigation

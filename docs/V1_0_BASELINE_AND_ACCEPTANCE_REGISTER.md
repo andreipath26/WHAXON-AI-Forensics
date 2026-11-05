@@ -1,5 +1,7 @@
 # WHAXON — V1 RELEASE AND ACCEPTANCE MASTER
 
+> **Codebase reconciliation (2026-11-05):** `pyproject.toml` declares **0.11.16 Beta**, Python `>=3.11`; V1.0 production acceptance remains OPEN. The 4/75 accepted figure is a dated 2026-11-03 checkpoint, **not a new current-HEAD audit of all 75 requirements**. E5 PR #124 merged with bounded engineering acceptance; this does not close the 10 release gates.
+
 **Consolidated 2026-11-05.** This is the single V1 baseline, 75-requirement and release acceptance narrative. The product roadmap remains authoritative for priorities. Older checkpoint assertions have their original dates and SHAs, and must not be treated as live deployment approval. CSV ledgers and CI remain machine-checkable underlying evidence.
 
 ## Part I — V1 baseline and release acceptance register

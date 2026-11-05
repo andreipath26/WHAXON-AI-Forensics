@@ -1,5 +1,7 @@
 # WHAXON
 
+> **Verified source status (2026-11-05):** Version `0.11.16`, Python `>=3.11`. E5 [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) merged with bounded engineering acceptance, **not** production approval. Scope [PR #127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) remains draft/unmerged. Full Engine V2 migration and V1 release gates remain open.
+
 **A scope-controlled security assessment workspace: orchestrate tools, validate findings, preserve evidence, and retest fixes.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/andreipath26/WHAXON-AI-Forensics/ci.yml?branch=main)](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml)

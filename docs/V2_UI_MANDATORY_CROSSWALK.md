@@ -1,5 +1,7 @@
 # WHAXON — UI V2 DESIGN, INTERACTION AND ACCEPTANCE MASTER
 
+> **Current UI status (2026-11-05; source `55a2e8b`):** 22 `ui_v2_*.html` page templates exist, but routes/tests are not D1–D6 deployment sign-off. Dashboard remains frozen under `AGENTS.md` and `.github/workflows/dashboard-frozen.yml`. [Scope PR #127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) remains draft and unmerged; its candidate changes are not on main. E6 remains frozen. Old `NEW_UI_INTERACTION_AUDIT.md`, `UI_CONTROL_INVENTORY.md` and DESIGN.md were consolidated into this document and removed.
+
 **Canonical UI design and acceptance reference, consolidated 2026-11-05.** Source, tests, screenshots and exact-head CI are required to establish implemented behavior. The design crosswalk determines planned UI scope; historical audits and templates are evidence, not production-ready declarations. Keep D1–D6 deployment gates open until demonstrated and approved. Do not infer that Dashboard approval implies Scope or Engine E6 approval.
 
 ## Part I — Canonical UI V2 contract and page crosswalk
@@ -7,7 +9,7 @@
 # Mandatory WHAXON V2 UI crosswalk — all 22 pages
 
 **Scope:** All V2 UI designs, production pages, shared navigation, client APIs, desktop entry points, tests and reviews. This is the **single canonical UI-wide crosswalk**, not a Dashboard-only plan.
-**Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md` P4/P5 and §38 G01–G10 (especially G06); `docs/ENGINEERING_EXECUTION_MODEL.md`; `docs/NEW_UI_INTERACTION_AUDIT.md`; `docs/UI_CONTROL_INVENTORY.md`; `docs/ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md`; `web ui files and rendering/obsidian_kinetic/DESIGN.md`.
+**Authority:** root roadmap P4/P5 and §38 G01–G10, the [project governance master](PROJECT_GOVERNANCE_MASTER.md), [Engine V2 master](ENGINE_V2_MASTER.md), and the UI audit, inventory, and supplied-design text consolidated later in this master.
 **Freeze rule:** E6 engine integration remains frozen until the operator explicitly declares the new UI **deployment-ready**. Independent UI preparation/hardening does **not** authorize E6 restart or production deployment. Do not edit supplied design references or redesign canonical page variants.
 
 ## REQUIRED BEFORE EACH UI TASK (human or agent)
