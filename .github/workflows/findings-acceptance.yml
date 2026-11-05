@@ -5,7 +5,6 @@ on:
     paths:
       - "src/whaxon/interfaces/web/templates/ui_v2_findings.html"
       - "src/whaxon/interfaces/web/static/findings-v2.css"
-      - "src/whaxon/interfaces/web/static/findings-mobile.css"
       - "src/whaxon/interfaces/web/static/dashboard-fonts.css"
       - "src/whaxon/interfaces/web/static/dashboard-assets-manifest.json"
       - "src/whaxon/interfaces/web/static/dashboard-fonts/**"
@@ -40,7 +39,7 @@ jobs:
         run: |
           node scripts/build_findings_css.cjs
           git diff --exit-code -- src/whaxon/interfaces/web/static/findings-v2.css
-      - name: Run Findings contracts, mobile, offline and accessibility regressions
+      - name: Run Findings contracts, offline and accessibility regressions
         run: python -m pytest -q -ra tests/test_web_ui_v2_findings.py tests/test_web_ui_v2_control_inventory.py tests/test_web_ui_v2_findings_visual.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
@@ -69,7 +68,6 @@ jobs:
           required = {
               'whaxon/interfaces/web/templates/ui_v2_findings.html',
               'whaxon/interfaces/web/static/findings-v2.css',
-              'whaxon/interfaces/web/static/findings-mobile.css',
               'whaxon/interfaces/web/static/dashboard-fonts.css',
               'whaxon/interfaces/web/static/dashboard-logo.jpg',
           }
