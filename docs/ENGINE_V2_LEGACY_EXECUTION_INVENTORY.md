@@ -145,10 +145,123 @@ boundaries; it does not claim to guard UI controls.
 A static decorator census currently finds 104 `/api/*` method/path bindings and
 22 `/ui-v2/*` page routes in `interfaces/web/server.py` (five other routes are
 health/root/settings/favicon pages). The matrix below covers consequential
-execution, authorization-state, cancellation and provisioning routes. Read,
-status and export routes are pinned for drift, but their complete source,
-persistence, access-control and test-semantic crosswalk remains open under G01.
+execution, authorization-state, cancellation and provisioning routes. This census makes every method/path/handler binding reviewable. It does not replace the handler-family semantics, persistence, access-control or test evidence mapped below; those remain bounded and are not inferred from route registration.
 The UI page/control inventory is frozen and is not being edited here.
+
+#### Exact Flask API method/path/handler census
+
+The following index lists every one of the **104** `/api/*` decorator bindings
+from the AST guard. It is a binding census, not a security approval: GET routes
+are reads/status/exports; POST and DELETE routes may mutate state or dispatch
+work, as classified in the family tables below. Handler source and the cited
+test family remain authoritative for side effects and access-control limits.
+
+| Method | Exact path | Handler | Owning state/service |
+| --- | --- | --- | --- |
+| `GET` | `/api/ai/pending` | `ai_pending_list` | Legacy AI run state/executor |
+| `POST` | `/api/ai/run` | `ai_run` | Legacy AI run state/executor |
+| `GET` | `/api/ai/runs` | `ai_runs_list` | Legacy AI run state/executor |
+| `GET` | `/api/ai/runs/<run_id>` | `ai_run_get` | Legacy AI run state/executor |
+| `POST` | `/api/ai/runs/<run_id>/answer` | `ai_run_answer` | Legacy AI run state/executor |
+| `GET` | `/api/ai/runs/<run_id>/stream` | `ai_run_stream` | Legacy AI run state/executor |
+| `POST` | `/api/approvals/<job_id>/<int:seq>/resolve` | `api_approval_resolve` | Legacy finding review state |
+| `POST` | `/api/bounty/import` | `import_bounty_program` | Bounty import/review draft |
+| `GET` | `/api/coverage/<job_id>` | `api_coverage` | Legacy coverage records |
+| `GET` | `/api/dependencies` | `api_dependencies_get` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/audit` | `api_dependencies_audit_get` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/drift` | `api_dependencies_drift_get` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/history` | `api_dependencies_history_get` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/install` | `api_dependencies_install` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/install-batch` | `api_dependencies_install_batch` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/install/<operation_id>` | `api_dependencies_install_status` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/install/<operation_id>/cancel` | `api_dependencies_install_cancel` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/plan` | `api_dependencies_plan` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/snapshots` | `api_dependencies_snapshot_post` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/verify` | `api_dependencies_verify_post` | Local dependency/readiness or installer service |
+| `GET` | `/api/health` | `health_probe` | Runtime diagnostics |
+| `GET` | `/api/health/simple` | `health_simple` | Runtime diagnostics |
+| `GET` | `/api/history` | `list_history` | Legacy job history |
+| `POST` | `/api/import/burp` | `import_burp` | Legacy imported finding/evidence store |
+| `GET` | `/api/jobs/<job_id>` | `get_job` | Legacy JobStore, evidence and job registry |
+| `POST` | `/api/jobs/<job_id>/cancel` | `cancel_job` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/evidence` | `list_evidence` | Legacy JobStore, evidence and job registry |
+| `POST` | `/api/jobs/<job_id>/evidence` | `add_evidence` | Legacy JobStore, evidence and job registry |
+| `DELETE` | `/api/jobs/<job_id>/evidence/<int:seq>` | `delete_evidence` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/evidence/<int:seq>/download` | `download_evidence` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/findings` | `get_job_findings` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/findings.csv` | `download_findings_csv` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/findings.json` | `download_findings_json` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/output.txt` | `download_output_txt` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/report` | `get_report` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/stream` | `stream_job` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/active` | `list_active_jobs` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/loot` | `api_loot` | Legacy report, finding or loot view |
+| `GET` | `/api/msf/modules/<module_type>` | `msf_list_modules` | Legacy Metasploit RPC/session service |
+| `POST` | `/api/msf/run` | `msf_run` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/sessions` | `msf_sessions` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/sessions/<session_id>` | `msf_session_info` | Legacy Metasploit RPC/session service |
+| `POST` | `/api/msf/sessions/<session_id>/exec` | `msf_session_exec` | Legacy Metasploit RPC/session service |
+| `DELETE` | `/api/msf/sessions/<session_id>/portfwd` | `pf_del` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/sessions/<session_id>/portfwd` | `pf_list` | Legacy Metasploit RPC/session service |
+| `POST` | `/api/msf/sessions/<session_id>/portfwd` | `pf_add` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/status` | `msf_status` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/pivot/candidates` | `api_pivot_candidates` | Legacy pivot/session graph |
+| `GET` | `/api/pivot/graph` | `api_pivot_graph` | Legacy pivot/session graph |
+| `GET` | `/api/pivot/sessions/<session_id>/chain` | `api_pivot_chain` | Legacy pivot/session graph |
+| `GET` | `/api/report` | `api_report` | Legacy report, finding or loot view |
+| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Legacy Validator and JobStore |
+| `POST` | `/api/run` | `run_tool` | Legacy ToolRunner and JobStore |
+| `GET` | `/api/scope` | `get_scope` | Scope policy service/configuration |
+| `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
+| `POST` | `/api/scope/check` | `check_scope` | Scope policy service/configuration |
+| `POST` | `/api/scope/override` | `log_override` | Scope policy service/configuration |
+| `GET` | `/api/settings` | `api_settings_get` | Application settings store |
+| `POST` | `/api/settings` | `api_settings_post` | Application settings store |
+| `GET` | `/api/status` | `api_status` | Runtime diagnostics |
+| `GET` | `/api/tools` | `list_tools` | Packaged catalog advertisement |
+| `GET` | `/api/tree` | `get_tree` | Legacy report, finding or loot view |
+| `GET` | `/api/ui-v2/findings` | `api_ui_v2_findings` | Legacy web service; consult handler and tests |
+| `GET` | `/api/v2/capabilities` | `workflow_v2_capabilities` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/budget` | `workflow_v2_mission_budget` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/budget` | `workflow_v2_mission_budget` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/cost` | `workflow_v2_mission_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/cost` | `workflow_v2_mission_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/deadline` | `workflow_v2_mission_deadline` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/plans` | `workflow_v2_mission_plans` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/providers` | `workflow_v2_providers` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/providers/portfolio-audit` | `workflow_v2_portfolio_audit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflow-runs/<request_id>` | `workflow_v2_run_request_status` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflow-runs/<request_id>/cancel` | `workflow_v2_cancel_run_request` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflow-runs/<request_id>/snapshot` | `workflow_v2_run_snapshot` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflow-runs/summary` | `workflow_v2_run_queue_summary` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows` | `workflow_v2_save_plan` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>` | `workflow_v2_plan_details` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke` | `workflow_v2_revoke_approval` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/deadline` | `workflow_v2_set_deadline` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/event-ack` | `workflow_v2_event_ack` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/event-inbox` | `workflow_v2_event_inbox` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/events` | `workflow_v2_events` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/evidence` | `workflow_v2_evidence` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_limits` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_set_limits` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/progress` | `workflow_v2_progress` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/rate-limit` | `workflow_v2_set_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/readiness` | `workflow_v2_readiness` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/reconcile` | `workflow_v2_reconcile` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/reconciliation` | `workflow_v2_reconciliation` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Legacy Validator and JobStore |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
