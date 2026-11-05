@@ -1026,3 +1026,38 @@ def test_dashboard_rejected_cancel_never_claims_halt_succeeded(page, live_server
     )
     assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
     assert "1 of 1" not in page.locator("#dashboard-action-status").inner_text()
+
+
+def test_dashboard_mobile_header_keeps_critical_actions_onscreen(page, live_server):
+    """Neither Terminal Log nor Emergency Halt may be clipped on a phone."""
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    for name in ("Terminal Log", "Emergency Halt Scan"):
+        button = page.get_by_role("button", name=name)
+        assert button.is_visible(), name
+        rect = button.bounding_box()
+        assert rect is not None
+        assert rect["x"] >= 0, (name, rect)
+        assert rect["x"] + rect["width"] <= 390, (name, rect)
+    assert page.get_by_role("button", name="Open navigation").is_visible()
+
+
+def test_dashboard_mobile_history_columns_are_scrollable_and_named(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.innerText.includes('seed-job-1')",
+        timeout=8000,
+    )
+    region = page.get_by_role("region", name="Job history table, scroll horizontally for all columns")
+    assert region.is_visible()
+    assert region.get_attribute("tabindex") == "0"
+    assert page.get_by_text("Swipe or scroll sideways to view every job-history column.").is_visible()
+    dimensions = region.evaluate(
+        "el => ({scrollWidth:el.scrollWidth, clientWidth:el.clientWidth})"
+    )
+    assert dimensions["scrollWidth"] > dimensions["clientWidth"]
+    region.evaluate("el => {el.scrollLeft = el.scrollWidth}")
+    assert region.evaluate("el => el.scrollLeft") > 0
+    assert page.locator("table").get_by_role("columnheader", name="Operational Actions").count() == 1
