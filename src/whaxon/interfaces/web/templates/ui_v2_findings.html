@@ -123,27 +123,27 @@
 <!-- Severity Filter Group -->
 <div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-xs py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline px-space-xs">SEV:</span>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm bg-surface-container text-on-surface hover:text-primary" type="button">ALL</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-error hover:bg-surface-container" type="button">CRIT (1)</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-tertiary hover:bg-surface-container" type="button">HIGH (2)</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-secondary hover:bg-surface-container" type="button">MED (1)</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-outline-variant hover:bg-surface-container" type="button">LOW (0)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm bg-surface-container text-on-surface hover:text-primary" data-filter-action="severity" data-filter-value="all" type="button">ALL</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-error hover:bg-surface-container" data-filter-action="severity" data-filter-value="critical" type="button">CRIT (1)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-tertiary hover:bg-surface-container" data-filter-action="severity" data-filter-value="high" type="button">HIGH (2)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-secondary hover:bg-surface-container" data-filter-action="severity" data-filter-value="medium" type="button">MED (1)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-outline-variant hover:bg-surface-container" data-filter-action="severity" data-filter-value="low" type="button">LOW (0)</button>
 </div>
 <!-- Trust State Filter Group -->
 <div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-xs py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline px-space-xs">STATE:</span>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">ALL</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-primary hover:bg-surface-container" type="button">VERIFIED (6)</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-tertiary hover:bg-surface-container" type="button">CANDIDATE (11)</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">REVIEW NEEDED</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" data-filter-action="status" data-filter-value="all" type="button">ALL</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-primary hover:bg-surface-container" data-filter-action="status" data-filter-value="verified" type="button">VERIFIED (6)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-tertiary hover:bg-surface-container" data-filter-action="status" data-filter-value="candidate" type="button">CANDIDATE (11)</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" data-filter-action="status" data-filter-value="review_needed" type="button">REVIEW NEEDED</button>
 </div>
 <!-- Tool Origin Filter Group -->
 <div class="flex items-center gap-space-xs bg-surface-container-lowest px-space-xs py-1 rounded">
 <span class="font-label-sm text-label-sm text-outline px-space-xs">ADAPTER:</span>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">ALL</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">Nuclei</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">sqlmap</button>
-<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" type="button">Nikto</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" data-filter-action="adapter" data-filter-value="all" type="button">ALL</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" data-filter-action="adapter" data-filter-value="nuclei" type="button">Nuclei</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" data-filter-action="adapter" data-filter-value="sqlmap" type="button">sqlmap</button>
+<button class="px-space-sm py-0.5 rounded font-label-sm text-label-sm text-on-surface-variant hover:bg-surface-container" data-filter-action="adapter" data-filter-value="nikto" type="button">Nikto</button>
 </div>
 </div>
 <div class="flex items-center gap-space-sm">
@@ -162,6 +162,7 @@
 <span id="whaxon-findings-heading" class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Attack Surface Findings (loading live count…)</span>
 <span class="font-label-sm text-label-sm text-primary">Live report records</span>
 </div>
+<div id="whaxon-findings-state" class="bg-surface-container-low p-space-md rounded-lg font-code-sm text-on-surface-variant" role="status" aria-live="polite"><span id="whaxon-findings-state-message">Loading live findings…</span> <button id="whaxon-findings-retry" class="ml-space-sm text-secondary underline" type="button" hidden>Retry</button></div>
 <!-- Empty template: populated exclusively from the live report API. -->
 <div class="cursor-pointer bg-surface-container-low p-space-md rounded-lg shadow-sm transition-all relative overflow-hidden" id="finding-card-template" hidden>
 <div class="absolute left-0 top-0 bottom-0 w-1 bg-outline"></div>
@@ -363,15 +364,16 @@
 <script>
 (function(){
 "use strict";
-const findingsCount=document.getElementById("whaxon-findings-count");const list=document.getElementById("whaxon-findings-list"),detail=document.getElementById("whaxon-detail"),filter=document.getElementById("whaxon-finding-filter"),proof=document.getElementById("curl-proof-payload");
-let findings=[],selected=null,filters={severity:"",status:"",adapter:""};
+const findingsCount=document.getElementById("whaxon-findings-count");const list=document.getElementById("whaxon-findings-list"),detail=document.getElementById("whaxon-detail"),filter=document.getElementById("whaxon-finding-filter"),proof=document.getElementById("curl-proof-payload"),findingsState=document.getElementById("whaxon-findings-state"),findingsStateMessage=document.getElementById("whaxon-findings-state-message"),findingsRetry=document.getElementById("whaxon-findings-retry");
+let findings=[],selected=null,hasLoadedReport=false,filters={severity:"",status:"",adapter:""};
 const template=document.getElementById("finding-card-template");
 list.querySelectorAll('[id^="finding-card-"]').forEach(n=>{if(n.id!=="finding-card-template")n.remove();});
 detail.style.visibility="hidden";
 const label=v=>String(v||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()),safe=v=>v==null||v===""?"Not recorded":String(v);
 const sevColor={critical:"error",high:"tertiary",medium:"secondary",low:"primary",info:"outline"};
 const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!==undefined)n.textContent=text;return n;};
-function flatten(data){const out=[];(data.jobs||[]).forEach(e=>{const job=e.job||{};(e.findings||[]).forEach((f,i)=>out.push({raw:f,job,jobId:job.id||"",seq:f.seq==null?i:f.seq,title:f.title||f.data?.title||f.data?.name||f.data?.message||f.raw_line||f.kind||"Untitled finding",target:f.target||job.target||"",source:f.source||job.tool||"",severity:String(f.severity||"info").toLowerCase(),status:String(f.verification_status||f.status||"candidate").toLowerCase()}));});return out;}
+function validReport(data){return !!data&&typeof data==="object"&&!Array.isArray(data)&&Array.isArray(data.jobs)&&data.jobs.every(entry=>!!entry&&typeof entry==="object"&&!Array.isArray(entry)&&!!entry.job&&typeof entry.job==="object"&&!Array.isArray(entry.job)&&Array.isArray(entry.findings)&&entry.findings.every(f=>!!f&&typeof f==="object"&&!Array.isArray(f)));}
+function flatten(data){const out=[];data.jobs.forEach(e=>{const job=e.job;(e.findings).forEach((f,i)=>out.push({raw:f,job,jobId:job.id||"",seq:f.seq==null?i:f.seq,title:f.title||f.data?.title||f.data?.name||f.data?.message||f.raw_line||f.kind||"Untitled finding",target:f.target||job.target||"",source:f.source||job.tool||"",severity:String(f.severity||"info").toLowerCase(),status:String(f.verification_status||f.status||"candidate").toLowerCase()}));});return out;}
 function matches(f){
   const q=(filter.value||"").trim().toLowerCase();
   const raw=f.raw||{};
@@ -391,6 +393,8 @@ function renderList(){
   if(!shown.length){
     const empty=el("div","bg-surface-container-low p-space-md rounded-lg font-code-sm text-on-surface-variant",findings.length?"No findings match these filters.":"No findings are recorded in the live report.");
     empty.id="whaxon-findings-empty";
+    empty.setAttribute("role","status");
+    empty.setAttribute("aria-live","polite");
     list.insertBefore(empty,document.getElementById("ptes-phase-footer"));
   }
   shown.forEach(f=>{const card=template.cloneNode(true);updateCard(card,f,findings.indexOf(f));list.insertBefore(card,document.getElementById("ptes-phase-footer"));});
@@ -406,10 +410,9 @@ function wireFilters(){
   const groups=[...document.querySelectorAll("div.bg-surface-container-lowest.px-space-xs.py-1.rounded")];
   const updateGroup=(g,kind)=>{
     const key=kind==="sev"?"severity":kind==="state"?"status":"adapter";
-    g.querySelectorAll("button").forEach(button=>{
-      const token=button.textContent.trim().toLowerCase().split(/\s+/)[0].replace(/\s*\(.*/, "");
-      const normalized=kind==="sev"?(token==="crit"?"critical":token==="med"?"medium":token):kind==="state"&&token==="review"?"review_needed":token;
-      const active=filters[key]?normalized===filters[key]:token==="all";
+    g.querySelectorAll("button[data-filter-action]").forEach(button=>{
+      const normalized=button.dataset.filterValue;
+      const active=filters[key]?normalized===filters[key]:normalized==="all";
       button.classList.remove("ring-1","ring-primary/50");
       button.setAttribute("aria-pressed",active?"true":"false");
       if(active)button.classList.add("ring-1","ring-primary/50");
@@ -420,14 +423,9 @@ function wireFilters(){
     const kind=(labelNode?.textContent||"").trim().replace(":","").toLowerCase();
     if(!["sev","state","adapter"].includes(kind))return;
     updateGroup(g,kind);
-    g.querySelectorAll("button").forEach(b=>{
-      const original=b.textContent.trim(),match=original.match(/^([A-Z]+)/i);
+    g.querySelectorAll("button[data-filter-action]").forEach(b=>{
       b.addEventListener("click",()=>{
-        const token=(match?match[1]:original).toLowerCase();
-        let key="",next="";
-        if(kind==="sev"){key="severity";next=token==="all"?"":token==="crit"?"critical":token==="med"?"medium":token==="high"?"high":token==="low"?"low":"";}
-        else if(kind==="state"){key="status";next=token==="all"?"":token==="verified"?"verified":token==="candidate"?"candidate":token==="review"?"review_needed":"";}
-        else if(kind==="adapter"){key="adapter";next=token==="all"?"":token;}
+        const action=b.dataset.filterAction,key=action==="severity"?"severity":action==="status"?"status":action==="adapter"?"adapter":"",next=b.dataset.filterValue==="all"?"":b.dataset.filterValue;
         if(!key)return;
         filters[key]=next&&filters[key]===next?"":next;
         updateGroup(g,kind);
@@ -437,11 +435,13 @@ function wireFilters(){
   });
 }
 async function act(kind,button){if(!selected)return;button.disabled=true;try{const r=await fetch("/api/"+kind+"/"+encodeURIComponent(selected.jobId)+"/"+encodeURIComponent(selected.seq),{method:"POST"}),d=await r.json();if(!r.ok)throw new Error(d.error||("HTTP "+r.status));alert(kind+" result: "+safe(d.status)+(d.reason?" — "+d.reason:""));await load(false);}catch(e){alert(kind+" failed: "+e.message);}finally{button.disabled=false;}}
-async function runRetestAll(){const queue=findings.filter(f=>f.status==="verified"&&f.jobId&&f.seq!=null);if(!queue.length){alert("No verified findings are available to retest.");return;}if(!confirm("Retest "+queue.length+" verified findings against their recorded targets?"))return;let ok=0,failed=0;for(const f of queue){try{const r=await fetch("/api/retest/"+encodeURIComponent(f.jobId)+"/"+encodeURIComponent(f.seq),{method:"POST"});if(r.ok)ok++;else failed++;}catch(_){failed++;}}alert("Retest batch finished: "+ok+" succeeded, "+failed+" failed.");await load(false);}
-async function load(reset){try{const r=await fetch("/api/report?format=json");if(!r.ok)throw new Error("HTTP "+r.status);const d=await r.json();findings=flatten(d);setKpis();if(reset!==false)selected=null;renderList();}catch(e){list.insertBefore(el("div","bg-error-container/20 border border-error/40 p-space-md rounded-lg font-code-sm text-error","Could not load live findings: "+e.message),document.getElementById("ptes-phase-footer"));}}
+function setFindingsState(kind,message,retry){findingsState.hidden=false;findingsState.dataset.state=kind;findingsStateMessage.textContent=message;findingsRetry.hidden=!retry;list.setAttribute("aria-busy",kind==="loading"?"true":"false");}
+async function runRetestAll(){const queue=findings.filter(f=>f.status==="verified"&&f.jobId&&f.seq!=null);if(!queue.length){alert("No verified findings are available to retest.");return;}if(!confirm("Retest "+queue.length+" verified findings against their recorded targets?"))return;let ok=0;const failures=[];for(const f of queue){try{const r=await fetch("/api/retest/"+encodeURIComponent(f.jobId)+"/"+encodeURIComponent(f.seq),{method:"POST"});if(r.ok){ok++;continue;}let detail="";try{const body=await r.json();detail=body.error||body.reason||"";}catch(_){}failures.push(safe(f.title)+" (HTTP "+r.status+")"+(detail?": "+detail:""));}catch(error){failures.push(safe(f.title)+" (network error)"+(error?.message?": "+error.message:""));}}const summary="Retest batch finished: "+ok+" succeeded, "+failures.length+" failed."+(failures.length?"\nFailed findings:\n• "+failures.join("\n• "):"");alert(summary);await load(false);}
+async function load(reset){setFindingsState("loading",hasLoadedReport?"Refreshing live findings…":"Loading live findings…",false);try{const r=await fetch("/api/report?format=json",{headers:{"Accept":"application/json"}});if(!r.ok){const error=new Error(r.status===401||r.status===403?"Findings are unavailable: access denied (HTTP "+r.status+").":"Findings could not be loaded (HTTP "+r.status+").");error.state=r.status===401||r.status===403?"unavailable":"error";throw error;}let d;try{d=await r.json();}catch(_){const error=new Error("The findings service returned an invalid JSON response.");error.state="error";throw error;}if(!validReport(d)){const error=new Error("The findings service returned an invalid report response.");error.state="error";throw error;}findings=flatten(d);hasLoadedReport=true;setKpis();if(reset!==false)selected=null;renderList();findingsState.hidden=true;list.setAttribute("aria-busy","false");}catch(error){const reason=error?.message||"Unknown error";const stale=hasLoadedReport;const state=error?.state||"unavailable";setFindingsState(state,stale?"Could not refresh live findings; previously loaded results remain visible. "+reason:reason,true);}}
 window.selectFinding=selectFinding;window.runRetestAll=runRetestAll;
 document.getElementById("copy-btn")?.addEventListener("click",async e=>{e.preventDefault();try{await navigator.clipboard.writeText(proof.textContent||"");}catch(_){alert("Clipboard access was denied by the browser.");}});
 document.getElementById("replay-btn")?.addEventListener("click",e=>{e.preventDefault();if(selected)act(selected.status==="verified"?"retest":"validate",e.currentTarget);});
+findingsRetry?.addEventListener("click",()=>load(false));
 ["fixed-btn"].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display="none";});
 document.querySelectorAll('button[onclick="exportProofAction()"],button[onclick="sendToApprovalsAction()"]').forEach(b=>b.style.display="none");
 
