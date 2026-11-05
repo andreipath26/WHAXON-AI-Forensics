@@ -593,10 +593,11 @@
     const report = reportAvailable ? reportResult.value : {};
     const toolsAvailable = toolsResult.status === "fulfilled" && Array.isArray(toolsResult.value);
     const tools = toolsAvailable ? toolsResult.value : [];
-    const scopeAvailable = scopeResult.status === "fulfilled";
+    const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
+    const scopeAvailable = scopeResult.status === "fulfilled" && isObject(scopeResult.value);
     const scope = scopeAvailable ? scopeResult.value : {};
-    const liveStatus = statusResult.status === "fulfilled" ? statusResult.value : {};
-    const health = healthResult.status === "fulfilled" ? healthResult.value : {};
+    const liveStatus = statusResult.status === "fulfilled" && isObject(statusResult.value) ? statusResult.value : {};
+    const health = healthResult.status === "fulfilled" && isObject(healthResult.value) ? healthResult.value : {};
     const engineState = document.getElementById("dashboard-engine-state");
     if (engineState) engineState.textContent = health.ok === true ? "ENGINE ONLINE" : "ENGINE UNAVAILABLE";
     const findings = (report.jobs || []).flatMap(item => item.findings || []);

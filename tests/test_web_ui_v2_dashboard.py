@@ -592,3 +592,39 @@ def test_dashboard_invalid_history_timestamp_is_honest(page, live_server):
     row = page.locator("table tbody tr").filter(has_text="bad-clock")
     assert "Not recorded" in row.inner_text()
     assert "Invalid Date" not in row.inner_text()
+
+
+def test_dashboard_null_scope_payload_fails_closed_without_losing_history(page, live_server):
+    """A successful HTTP code with null scope cannot invent an authorization rule."""
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body="null",
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    assert "target: unavailable" in page.locator("header").inner_text().lower()
+    assert "scope enforcement enabled" not in page.locator("header").inner_text().lower()
+    assert page.locator("table tbody").get_by_text("seed-job-1", exact=False).count() >= 1
+
+
+def test_dashboard_null_status_payload_preserves_history_without_fake_engagement(page, live_server):
+    """Malformed status data must not abort all independent dashboard panels."""
+    page.route(
+        "**/api/status",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body="null",
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-history-count").inner_text() != "—"
+    assert page.get_by_text("Default Credentials Detected").count() == 0
+    assert page.get_by_text("Credential Status Unavailable").count() >= 1
