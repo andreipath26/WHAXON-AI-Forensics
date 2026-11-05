@@ -189,6 +189,22 @@ bindings. The API remains mixed during migration: route presence does not imply
 that the route delegates to V2, and legacy exports must not be presented as
 V2-owned evidence.
 
+### Remaining API mutations
+
+| Mutation group | Paths and persisted state | Authority/truth limitation | Evidence |
+| --- | --- | --- | --- |
+| V2 mission and plan controls | Mission create, budget/cost/rate/deadline writes; plan approval grant/revoke, cancellation, reconciliation, event acknowledgement, attempt cost and plan limit/deadline/rate writes all delegate to Core workflow services and durable stores. | Approval `actor` and attempt-cost `source` are accepted from the request body; route tests establish binding and validation, not an authenticated principal or provider-origin proof. Reconciliation fences stale attempts as uncertain; it does not prove external work stopped or recovered. | `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, `test_workflow.py` |
+| Legacy AI answer | `POST /api/ai/runs/<run_id>/answer` writes the operator response to legacy AI-run state and may resume the legacy executor. | Not a V2 plan/task approval. The route ignores a client-supplied user identity and records its local actor behavior. | `test_server_ai.py::test_ai_run_answer_records_operator_response` |
+| Legacy evidence mutation | `POST`/`DELETE /api/jobs/<job_id>/evidence[/<seq>]` writes/removes files and JobStore evidence rows. | Legacy job evidence, not V2 attempt-sealed evidence. | `test_server.py`, `test_server_ai.py` evidence note/delete cases |
+| Bounty program import | `POST /api/bounty/import` fetches or parses source and returns a disabled review-required draft. | Ingestion only; draft is not persisted as authorization and does not activate testing. | `test_web_bounty_ingest.py`, `test_bounty_ingest.py` |
+| Burp report import | `POST /api/import/burp` parses uploaded XML, creates a legacy job and persists imported findings. | User-supplied evidence import; no target dispatch and no V2 attempt/evidence seal. | `test_server.py::test_burp_import_route_persists_imported_findings`, plus invalid-upload cases |
+| Dependency checks and local config | `POST /api/dependencies/verify`, `/snapshots`, `/plan` run bounded local checks, save a local snapshot, or create a remediation preview; `POST /api/settings` persists application settings. | Not target assessment or V2 capability execution. Settings are configuration state, not target authorization. | `test_dependencies.py`, `test_dependency_installer.py`, `test_server.py` settings/dependency cases |
+
+The V2 and legacy mutations above have different actor, persistence and
+evidence contracts. The route map is source/test traceability; unresolved trust
+and authorization acceptance remains open under the relevant later gates and
+must not be inferred from route registration alone.
+
 ### Deployment entry points and readiness semantics
 
 | Entry point or report | Current source behavior | G01 limit |
@@ -224,6 +240,16 @@ scheduler or queue methods; only `plan run` and the durable request worker
 dispatch providers. The remaining verbs are read or control-plane operations.
 CLI `plan approval grant --actor` accepts a caller-supplied actor label, so that
 label is not authenticated-principal evidence.
+
+| Workflow command group | Ownership and effect | Existing CLI/domain evidence |
+| --- | --- | --- |
+| `capabilities`, `providers`, `portfolio-audit` | Read-only registry, live provider and catalog/adapter portfolio views. | `test_workflow_cli.py`, `test_providers.py` |
+| `mission create/list/plans`, `cost`, `cost-limit`, `rate`, `rate-limit`, `deadline`, `limits`, `budget` | Shared Core mission state and policy limits; no target dispatch. | `test_workflow_cli.py`, mission enforcement cases in `test_workflow.py` |
+| `plan save`, `followups`, `show` | Validate/persist a plan, propose followups, or inspect state; no provider dispatch. `followups --save` only persists a new unapproved plan. | Plan validation in `test_workflow_cli.py`; `test_engine_v2_followups.py`; core plan tests in `test_workflow.py`. Direct CLI test coverage for `followups` and `show` is incomplete. |
+| `plan approval list/grant/revoke`, `record-cost`, `cancel`, `reconcile`, `rate-limit`, `deadline`, `limits` | Consent, accounting and lifecycle control-plane mutations. Approval actor identity supplied as CLI text is not authenticated identity. | Approval, cancel, recovery and limit tests in `test_workflow_cli.py` and `test_workflow.py`. |
+| `plan readiness`, `evidence`, `resources`, `audit`, `audit-snapshot`, `audit-verify`, `attempts`, `progress`, `events`, `event-inbox`, `event-ack`, `reconciliation-report` | Persisted diagnostics and evidence views; `event-ack` advances a consumer cursor but does not dispatch. | `test_workflow_cli.py`, `test_engine_v2_e3_audit_cli.py`, `test_workflow.py`. |
+| `plan submit-run`, `serve-requests`, `drain-requests`, `queue-summary`, `run-request`, `run-snapshot`, `cancel-request` | Durable request queue and supervised worker lifecycle; submit returns queued state and does not assert completion. | `test_workflow_run_requests.py`, `test_workflow_continuous_worker.py`, `test_workflow_cli.py`. |
+| `plan run` | Synchronous V2 Core workflow execution through policy, provider binding, scheduler and task attempts; does not create a durable run-request record/worker lease. | `test_workflow_cli.py::test_workflow_cli_runs_headless_without_draining_legacy_jobs`, `test_providers.py`, `test_workflow.py`. |
 
 The CLI split also distinguishes three V2 execution modes: `workflow plan run`
 uses the V2 scheduler/policy/provider path synchronously; `workflow plan
