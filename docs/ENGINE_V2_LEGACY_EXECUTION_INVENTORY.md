@@ -21,10 +21,11 @@ identity, task leases, plan-bound approval, cancellation, reconnect, and recover
 This inventory is evidence of caller coverage, not a claim that those controls
 are absent from every legacy path or that a migration is safe.
 
-Additional execution actions need their own semantic inventory. In particular,
-CLI passive recon and verified-finding retests call their dedicated recon and
-validator services rather than `ToolRunner`; they should only be mapped to V2
-capabilities after their permission and evidence contracts are reviewed.
+Additional execution actions need their own semantic inventory. CLI passive
+recon and the existing CLI/API validate/retest callers still use dedicated
+legacy services rather than `ToolRunner`. A separate V2 provider now covers
+only sealed-finding SQLi verification/retest under a plan-bound contract; this
+does not migrate those legacy callers or cover the other validator kinds.
 
 ## Dedicated network-service entry points
 

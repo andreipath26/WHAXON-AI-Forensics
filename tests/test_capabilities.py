@@ -81,6 +81,21 @@ def test_capability_manifest_nested_schema_is_immutable():
     assert manifest.input_schema["properties"]["ports"]["enum"] == (80, 443)
 
 
+def test_manifest_to_dict_thaws_nested_schema_arrays_for_json_clients():
+    manifest = _manifest(
+        "provider.a",
+        input_schema={
+            "type": "object",
+            "properties": {"ids": {"type": "array", "items": {"type": "string"}}},
+            "required": ["ids"],
+        },
+    )
+
+    serialized = manifest.to_dict()
+    assert serialized["input_schema"]["required"] == ["ids"]
+    assert isinstance(serialized["input_schema"]["required"], list)
+
+
 def test_capability_registry_persists_and_reloads_manifests(tmp_path):
     from whaxon.core.store import JobStore
 

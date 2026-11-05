@@ -65,8 +65,9 @@ EXPECTED_V2_SEMANTIC_OPERATIONS = {
 }
 
 # (source path, containing function path, method) -> number of syntactic calls.
-# Every item except core/providers.py is a legacy path. That provider is the
-# canonical scheduler-authorized Engine V2 dispatch and stays separately pinned.
+# Core/providers.py contains both the catalog bridge's ToolRunner dispatch and
+# the separately bounded scheduler-owned validator calls. Keep each service
+# entry explicit; neither is a legacy CLI/web caller.
 EXPECTED_RUNNER_CALLS = Counter(
     {
         ("ai/executor.py", "_validate_and_run", "run_tool"): 1,
@@ -100,6 +101,8 @@ EXPECTED_SERVICE_CALLS = Counter(
         ("core/runner.py", "_run_msf_session", "client.session_exec"): 1,
         ("adapters/msf.py", "run_module", "self._client.execute"): 2,
         ("core/validator.py", "revalidate", "self.validate"): 1,
+        ("core/providers.py", "dispatch", "validator.validate"): 1,
+        ("core/providers.py", "dispatch", "validator.revalidate"): 1,
     }
 )
 
