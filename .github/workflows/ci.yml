@@ -331,7 +331,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -348,7 +348,9 @@ jobs:
       # PDF and CLI ergonomics tests expect these dependencies on every matrix version.
       # Bound network waits and retry transient Ubuntu mirror failures.
       - name: Install system deps (pandoc, weasyprint)
-        timeout-minutes: 7
+        # Ubuntu mirrors sometimes stall while downloading pandoc (~29 MB).
+        # Keep the full report/PDF tests enabled; allow the mirror enough time.
+        timeout-minutes: 17
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
