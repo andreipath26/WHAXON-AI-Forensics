@@ -762,3 +762,57 @@ def test_dashboard_filter_preserves_unavailable_state_when_history_fails(page, l
     page.get_by_role("textbox", name="Filter recent job history by ID, target, or tool").fill("nmap")
     assert page.get_by_text("Live job history is unavailable.", exact=False).is_visible()
     assert page.get_by_text("No recorded jobs match this filter.").count() == 0
+
+
+def test_dashboard_malformed_scope_rules_do_not_claim_authorization(page, live_server):
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"enabled":true,"in_scope":{"not":"a-list"},"engagement":"Fixture"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('header')?.innerText.includes('SCOPE STATUS UNAVAILABLE')",
+        timeout=8000,
+    )
+    assert "target: unavailable" in page.locator("header").inner_text().lower()
+    assert "SCOPE ENFORCEMENT ENABLED" not in page.locator("header").inner_text()
+
+
+def test_dashboard_adapter_count_requires_actual_boolean_readiness(page, live_server):
+    page.route(
+        "**/api/tools",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"available":"false","adapter_available":"yes","binary_available":"true"}]',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    card = page.locator(".rounded-lg.bg-surface-container-low.p-space-md").filter(
+        has_text="Active Adapters"
+    )
+    assert "TOOLS AVAILABLE" in card.inner_text()
+    assert "0" in card.inner_text()
+
+
+def test_dashboard_invalid_engagement_type_is_not_rendered_as_object(page, live_server):
+    page.route(
+        "**/api/status",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"engagement":{"unexpected":"value"},"default_creds":false}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-session-engagement')?.textContent",
+        timeout=8000,
+    )
+    assert "[object Object]" not in page.locator("#dashboard-session-engagement").inner_text()
+    assert page.locator("#dashboard-session-engagement").inner_text() != "undefined"

@@ -603,7 +603,9 @@
     const isObject = value => value !== null && typeof value === "object" && !Array.isArray(value);
     const scopeAvailable = scopeResult.status === "fulfilled" && isObject(scopeResult.value);
     const scope = scopeAvailable ? scopeResult.value : {};
-    const scopeEnforcementKnown = scopeAvailable && typeof scope.enabled === "boolean";
+    const scopeRulesKnown = scopeAvailable && Array.isArray(scope.in_scope) &&
+      scope.in_scope.every(rule => typeof rule === "string");
+    const scopeEnforcementKnown = scopeRulesKnown && typeof scope.enabled === "boolean";
     const liveStatus = statusResult.status === "fulfilled" && isObject(statusResult.value) ? statusResult.value : {};
     const health = healthResult.status === "fulfilled" && isObject(healthResult.value) ? healthResult.value : {};
     const engineState = document.getElementById("dashboard-engine-state");
@@ -611,15 +613,16 @@
     const findings = (report.jobs || []).flatMap(item => item.findings || []);
     const verified = findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length;
     const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
-    const availableTools = tools.filter(t => t.available && t.adapter_available && t.binary_available).length;
+    const availableTools = tools.filter(t => t.available === true && t.adapter_available === true && t.binary_available === true).length;
     setCardValue("Active Scans", activeJobsAvailable ? activeJobs.length : "—", activeJobsAvailable ? (activeJobs.length ? "RUNNING" : "NO ACTIVE JOBS") : "STATUS UNAVAILABLE");
     setCardValue("Verified Findings", reportAvailable ? verified : "—", reportAvailable ? (falsePositives + " FALSE POSITIVES") : "STATUS UNAVAILABLE");
     setCardValue("Active Adapters", toolsAvailable ? availableTools : "—", toolsAvailable ? "TOOLS AVAILABLE" : "STATUS UNAVAILABLE");
     setCardValue("PTES Coverage", "—", "NOT RECORDED");
-    const target = scopeAvailable ? (scope.in_scope?.[0] || "No target configured") : "unavailable";
-    const engagementName = liveStatus.engagement && liveStatus.engagement !== "default"
+    const target = scopeRulesKnown ? (scope.in_scope[0] || "No target configured") : "unavailable";
+    const engagementName = typeof liveStatus.engagement === "string" && liveStatus.engagement && liveStatus.engagement !== "default"
       ? liveStatus.engagement
-      : (scope.engagement && scope.engagement !== "default" ? scope.engagement : "No active engagement");
+      : (typeof scope.engagement === "string" && scope.engagement && scope.engagement !== "default"
+        ? scope.engagement : "No active engagement");
     const sessionEngagement = document.getElementById("dashboard-session-engagement");
     const sessionTarget = document.getElementById("dashboard-session-target");
     if (sessionEngagement) sessionEngagement.textContent = engagementName;
@@ -705,7 +708,8 @@
           td(row, job.target || "Target not recorded");
           td(row, job.tool || "Tool not recorded");
           td(row, fmt(job.created_at || job.started_at));
-          const count = Number.isFinite(job.findings_count) ? job.findings_count : (Array.isArray(job.findings) ? job.findings.length : "—");
+          const count = Number.isSafeInteger(job.findings_count) && job.findings_count >= 0
+            ? job.findings_count : (Array.isArray(job.findings) ? job.findings.length : "—");
           td(row, count);
           td(row, statusLabel(job.status));
           const actions = td(row, "");
