@@ -95,6 +95,9 @@ EXPECTED_SERVICE_CALLS = Counter(
         ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
         ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.msf_run._do_run", "adapter.run_module"): 1,
+        ("interfaces/web/server.py", "create_app.msf_session_exec", "client.session_exec"): 1,
+        ("core/runner.py", "_run_msf_session", "client.session_exec"): 1,
+        ("adapters/msf.py", "run_module", "self._client.execute"): 2,
         ("core/validator.py", "revalidate", "self.validate"): 1,
     }
 )
