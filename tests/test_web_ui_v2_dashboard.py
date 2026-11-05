@@ -838,3 +838,22 @@ def test_dashboard_verified_metric_requires_independent_verification_field(page,
     )
     assert "1" in card.inner_text()
     assert "0 FALSE POSITIVES" in card.inner_text()
+
+
+def test_dashboard_mobile_menu_traps_keyboard_focus_and_escape_restores_button(page, live_server):
+    page.set_viewport_size({"width": 390, "height": 844})
+    page.goto(f"{live_server}/ui-v2")
+    menu = page.get_by_role("button", name="Open navigation")
+    menu.click()
+    links = page.locator("aside a[href]:visible")
+    assert links.count() >= 5
+    first = links.first
+    last = links.last
+    first.focus()
+    page.keyboard.press("Shift+Tab")
+    assert last.evaluate("(node) => document.activeElement === node")
+    page.keyboard.press("Tab")
+    assert first.evaluate("(node) => document.activeElement === node")
+    page.keyboard.press("Escape")
+    assert menu.evaluate("(node) => document.activeElement === node")
+    assert page.locator("body > aside").get_attribute("aria-hidden") == "true"
