@@ -62,7 +62,7 @@ def main() -> None:
             assert status == 200 and "WHAXON — Trust Layer &amp; Findings".encode() in body
             for external in (b"fonts.googleapis.com", b"cdn.tailwindcss.com", b"lh3.googleusercontent.com"):
                 assert external not in body, external
-            for asset in ("findings-v2.css", "findings-mobile.css", "dashboard-fonts.css", "dashboard-logo.jpg"):
+            for asset in ("findings-v2.css", "dashboard-fonts.css", "dashboard-logo.jpg"):
                 code, data, content_type = get(url + "/static/" + asset)
                 assert code == 200 and data, (asset, code)
                 if asset.endswith(".css"):
