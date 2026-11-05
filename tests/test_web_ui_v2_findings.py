@@ -222,6 +222,34 @@ def test_findings_list_uses_only_records_from_live_report(page, live_server):
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
 
 
+def test_findings_page_loads_all_assets_locally(page, live_server):
+    external = []
+    page.on(
+        "request",
+        lambda request: external.append(request.url)
+        if request.url.startswith(("https://", "http://"))
+        and not request.url.startswith(live_server)
+        else None,
+    )
+    page.route("https://**/*", lambda route: route.abort())
+    response = page.goto(f"{live_server}/ui-v2/findings")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
+        timeout=8000,
+    )
+    assert page.title() == "WHAXON — Trust Layer & Findings"
+    assert external == []
+    for asset in (
+        "dashboard-fonts.css",
+        "findings-v2.css",
+        "dashboard-logo.jpg",
+    ):
+        result = page.request.get(f"{live_server}/static/{asset}")
+        assert result.ok and result.body(), (asset, result.status)
+
+
+
 def test_findings_reject_malformed_report_and_retry(page, live_server):
     calls = 0
 
