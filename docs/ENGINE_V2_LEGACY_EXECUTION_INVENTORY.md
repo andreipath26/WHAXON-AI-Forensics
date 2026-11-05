@@ -60,6 +60,80 @@ reachable execution paths until a caller is added and its authorization owner
 is reviewed. Current Impacket catalog and SMB/WMI session execution goes through
 `ToolRunner`, which applies target/scope checks before dispatch.
 
+## Packaged catalog and Engine V2 admission
+
+The packaged catalog contains 24 tool IDs across five declared transports:
+17 `cli`, three `msf_session`, two `smb`, one `ssh`, and one `wmi`. The V2
+catalog bridge admits 12 of the CLI entries. For each admitted entry it creates
+both a `tool.<id>` compatibility capability and one stable semantic operation
+alias. These aliases share the same local-process provider, fixed catalog argv,
+`network.scan` permission, moderate impact, network-traffic/service-log side
+effects, scope and approval checks, and ToolRunner dispatch. Dynamic task
+arguments are unsupported; a successful tool exit is not independent
+verification.
+
+| Catalog IDs | V2 status | Transport and reason |
+| --- | --- | --- |
+| `arjun`, `dig`, `dnsrecon`, `ffuf`, `gobuster`, `nikto`, `nmap`, `nuclei`, `sqlmap`, `theharvester`, `whois`, `wpscan` | Admitted | `cli` → `local_process`, provider-bound; target-type allowlist applies. |
+| `commix`, `echo`, `hydra`, `impacket`, `netexec` | Not admitted | `cli`; no Engine V2 provider admission. Some have legacy adapters. |
+| `msf_getuid`, `msf_hashdump`, `msf_sysinfo` | Unsupported in V2 | `msf_session`; requires a separately accepted session provider. |
+| `smb_ls`, `smb_shares` | Unsupported in V2 | `smb`; requires a separately accepted session provider. |
+| `ssh_cmd` | Unsupported in V2 | `ssh`; no registered adapter in the inspected runtime. |
+| `wmi_exec` | Unsupported in V2 | `wmi`; requires a separately accepted session provider. |
+
+Exact V2 operation aliases and declared target types:
+
+| Tool | Compatibility capability | Semantic capability | Target types |
+| --- | --- | --- | --- |
+| `arjun` | `tool.arjun` | `web.parameters.discover` | URL |
+| `dig` | `tool.dig` | `dns.records.query` | Hostname |
+| `dnsrecon` | `tool.dnsrecon` | `dns.records.enumerate` | Hostname |
+| `ffuf` | `tool.ffuf` | `web.paths.fuzz` | URL |
+| `gobuster` | `tool.gobuster` | `web.directories.enumerate` | Hostname, IP |
+| `nikto` | `tool.nikto` | `web.server.audit` | Hostname, IP, URL |
+| `nmap` | `tool.nmap` | `network.services.discover` | Hostname, IP |
+| `nuclei` | `tool.nuclei` | `web.templates.assess` | URL |
+| `sqlmap` | `tool.sqlmap` | `web.sql_injection.assess` | URL |
+| `theharvester` | `tool.theharvester` | `osint.domain.contacts.search` | Hostname |
+| `whois` | `tool.whois` | `domain.registration.lookup` | Hostname, IP |
+| `wpscan` | `tool.wpscan` | `web.wordpress.audit` | URL |
+
+The built-in adapter registry also reports four adapter-only IDs—`burp`,
+`hashcat`, `msf`, and `whatweb`—without packaged catalog entries. The prior
+V2 allowlist declared `whatweb` even though no catalog item could bind it. The
+allowlist and semantic alias map now exclude that stale declaration; the
+catalog/transport guard will fail if the shipped catalog or admitted set drifts
+without explicit G01 review. `echo` and `ssh_cmd` are catalog entries without a
+registered adapter. Portfolio classification for non-admitted tools does not
+replace this separate adapter-presence fact.
+
+### Read-only live snapshot
+
+On the local audit environment, `whaxon workflow portfolio-audit` reported 24
+catalog entries and 26 discovered adapters: 12 bound, five not admitted, seven
+unsupported transports, and four adapter-only. The provider inventory showed
+24 registered rows (12 compatibility + 12 semantic aliases), 12 unsupported
+catalog rows, **zero executable providers**, and no smoke-tested, lab-validated,
+or end-to-end-verified providers; all 12 admitted binaries were absent from that
+environment. This is an environment-specific readiness observation, not a claim
+about a deployment host. The audit command is read-only and explicitly does not
+enable execution.
+
+### Client and service boundary summary
+
+| Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
+| --- | --- | --- | --- |
+| CLI workflow | `whaxon workflow` → shared `Core` workflow/approval/provider services | `whaxon run`, `ai`, `recon`, `validate`, `retest`, and MSF still have direct legacy execution paths | V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| HTTP API | `/api/v2/capabilities`, `/providers`, `/workflows`, `/workflow-runs` and related lifecycle routes call shared Core services | `/api/run`, `/api/ai/run`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths | V2 route evidence: `test_server_workflow_v2.py`; legacy paths retain legacy job/AI state and are not all V2 request/task-owned. |
+| Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
+| Native desktop and terminal | None of their direct execution actions are V2 workflow dispatches | GUI/TUI call `Core.runner` directly | Legacy `JobStore`/event path; see `test_gui_entrypoint.py`, `test_tui_main.py`, and runner tests. |
+
+This matrix is not G01 closeout. It records source mappings and a local
+readiness snapshot; the required controlled full solo chain has not been
+executed. Catalog/admission/transport changes are guarded by
+`test_catalog_transports_and_v2_admission_are_explicit` in addition to the
+runner and service callsite guards.
+
 ## Migration constraint
 
 Do not redirect `/api/run`, `/api/ai/run`, CLI tool/session execution, recon, or
