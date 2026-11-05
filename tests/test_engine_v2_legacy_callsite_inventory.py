@@ -29,6 +29,30 @@ EXPECTED_RUNNER_CALLS = Counter(
     }
 )
 
+# These services can perform network work without entering ToolRunner. Keep
+# their public execution entry points visible separately from runner calls.
+EXPECTED_SERVICE_CALLS = Counter(
+    {
+        ("interfaces/cli/recon_cmd.py", "main", "core.recon.run"): 1,
+        ("interfaces/cli/validate_cmd.py", "main", "validator.validate"): 1,
+        ("interfaces/cli/retest_cmd.py", "main", "validator.revalidate"): 1,
+        ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
+        ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
+        ("core/validator.py", "revalidate", "self.validate"): 1,
+    }
+)
+
+SERVICE_CALL_NAMES = {item[2] for item in EXPECTED_SERVICE_CALLS}
+
+
+def _dotted_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        prefix = _dotted_name(node.value)
+        return f"{prefix}.{node.attr}" if prefix else None
+    return None
+
 
 class _RunnerCallVisitor(ast.NodeVisitor):
     def __init__(self, path: str) -> None:
@@ -57,6 +81,19 @@ class _RunnerCallVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+class _ServiceCallVisitor(_RunnerCallVisitor):
+    def __init__(self, path: str) -> None:
+        super().__init__(path)
+        self.service_calls: Counter[tuple[str, str, str]] = Counter()
+
+    def visit_Call(self, node: ast.Call) -> None:
+        call_name = _dotted_name(node.func)
+        if call_name in SERVICE_CALL_NAMES:
+            scope = ".".join(self.functions)
+            self.service_calls[(self.path, scope, call_name)] += 1
+        self.generic_visit(node)
+
+
 def _runner_call_inventory() -> Counter[tuple[str, str, str]]:
     calls: Counter[tuple[str, str, str]] = Counter()
     for source in sorted(SOURCE_ROOT.rglob("*.py")):
@@ -74,4 +111,21 @@ def test_legacy_and_v2_runner_dispatch_callsites_are_explicit() -> None:
         "each addition as legacy or scheduler-authorized V2, then update this map. "
         f"Unexpected: {actual - EXPECTED_RUNNER_CALLS}; "
         f"missing: {EXPECTED_RUNNER_CALLS - actual}"
+    )
+
+
+def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
+    actual: Counter[tuple[str, str, str]] = Counter()
+    for source in sorted(SOURCE_ROOT.rglob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        visitor = _ServiceCallVisitor(source.relative_to(SOURCE_ROOT).as_posix())
+        visitor.visit(tree)
+        actual.update(visitor.service_calls)
+
+    assert actual == EXPECTED_SERVICE_CALLS, (
+        "Recon/validation/retest service callsites changed. Review the Engine V2 "
+        "service inventory, classification, and authorization boundary before "
+        "updating this map. "
+        f"Unexpected: {actual - EXPECTED_SERVICE_CALLS}; "
+        f"missing: {EXPECTED_SERVICE_CALLS - actual}"
     )
