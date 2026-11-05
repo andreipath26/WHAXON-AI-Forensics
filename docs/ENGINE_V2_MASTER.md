@@ -1442,20 +1442,20 @@ G01 is **IN PROGRESS and OPEN** on main baseline `b12470d6708ab658fd86195b9e8bc2
 
 A read-only local portfolio audit recorded 24 catalog entries, 26 discovered adapters, 12 V2-bound catalog tools, 12 unsupported catalog entries, four adapter-only integrations, and zero executable providers in that audit environment. None of the admitted providers was smoke-tested, lab-validated, or end-to-end-verified there. This is environment-specific evidence; it is not a target-host readiness claim.
 
-**G01 is not ready to freeze.** The required controlled full solo chain has not been executed, and the current V2 provider set has no admitted initial-access capability. A bounded SQLi verification/retest subset is now scheduler-owned, but other validation paths remain uncovered and the new provider has not been lab-validated. Keep G01 open until the full chain and all required evidence pass. Do not start the next gate or mark this gate frozen before that acceptance record exists.
+**G01 is not ready to freeze.** The required controlled full solo chain has not been executed, and the current V2 provider set has no admitted initial-access capability. Bounded SQLi and reflected-XSS verification/retest operations are scheduler-owned, but timing/observation paths remain uncovered and neither verifier has been independently lab-validated. Keep G01 open until the full chain and all required evidence pass. Do not start the next gate or mark this gate frozen before that acceptance record exists.
 
 ### G01 candidate update — 2026-11-05
 
 Candidate based on `c4356c712c200834ecd4694befa15a31c28c25a9` adds exact
 catalog/admission/transport and semantic-operation crosswalk guards, all 22
 UI page handlers and 23 route aliases, and a loopback-only SQLi smoke. The
-current working candidate also adds scheduler-owned SQLi verification and
-conservative retest tasks for sealed, same-target V2 findings. The HTTP
+current working candidate also adds scheduler-owned SQLi and reflected-XSS
+verification and conservative retest tasks for sealed, same-target V2 findings. The HTTP
 requests recheck scope immediately before dispatch, reject redirects and
 path changes, and accept IP literals only to prevent DNS rebinding. Results
-are written to separate V2 evidence jobs. This remains a narrow SQLi subset:
-XSS, timing, and observation validation are not integrated, each operation is
-a separate plan, and no initial-access capability or controlled full-chain
+are written to separate V2 evidence jobs. This remains a narrow SQLi/reflected-XSS
+subset: timing and observation validation are not integrated, each operation
+is a separate plan, and no initial-access capability or controlled full-chain
 proof exists.
 
 Local focused results: **255** G01 tests pass across capability serialization,

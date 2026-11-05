@@ -110,18 +110,20 @@ Exact V2 operation aliases and declared target types:
 | `whois` | `tool.whois` | `domain.registration.lookup` | Hostname, IP |
 | `wpscan` | `tool.wpscan` | `web.wordpress.audit` | URL |
 
-The separately bound HTTP verifier adds two V2-only operations outside the
+The separately bound HTTP verifier adds four V2-only operations outside the
 local-process catalog table:
 
 | Capability | Provider | Target and permission | Supported contract | Readiness |
 | --- | --- | --- | --- | --- |
-| `tool.verify_sqli` | `whaxon.verifier.http` (`v2-sqli-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | A successful same-target Engine V2 SQLi finding with an intact workflow evidence seal; separate exact-plan approval; fixed quote probe; scope reload before each request; redirects and changed paths blocked; result stored as a separate sealed job. | Registered; smoke, lab and end-to-end flags remain false. |
-| `tool.retest_sqli` | `whaxon.verifier.http` (`v2-sqli-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | Requires a prior V2 `verified` result from `tool.verify_sqli`; reports `still_vulnerable` or `inconclusive`, never `fixed` when proof is absent; separate exact-plan approval and sealed result job. | Registered; smoke, lab and end-to-end flags remain false. |
+| `tool.verify_sqli` | `whaxon.verifier.http` (`v2-sqli-xss-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | A successful same-target Engine V2 SQLi finding with an intact workflow evidence seal; separate exact-plan approval; fixed quote probe; scope reload before each request; redirects and changed paths blocked; result stored as a separate sealed job. | Registered; smoke, lab and end-to-end flags remain false. |
+| `tool.retest_sqli` | `whaxon.verifier.http` (`v2-sqli-xss-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | Requires a prior V2 `verified` result from `tool.verify_sqli`; reports `still_vulnerable` or `inconclusive`, never `fixed` when proof is absent; separate exact-plan approval and sealed result job. | Registered; smoke, lab and end-to-end flags remain false. |
+| `tool.verify_xss` | `whaxon.verifier.http` (`v2-sqli-xss-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | A successful same-target Engine V2 reflected-XSS finding with an intact workflow evidence seal; separate exact-plan approval; unique non-destructive SVG console probe; scope reload before each request; redirects and changed paths blocked; result stored as a separate sealed job. | Registered; smoke, lab and end-to-end flags remain false. |
+| `tool.retest_xss` | `whaxon.verifier.http` (`v2-sqli-xss-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | Requires a prior V2 `verified` result from `tool.verify_xss`; reports `still_vulnerable` or `inconclusive`, never `fixed` when proof is absent; separate exact-plan approval and sealed result job. | Registered; smoke, lab and end-to-end flags remain false. |
 
 These operations require separate plans because their source job and finding
-sequence must already exist when each task is authorized. They support SQLi
-only; XSS, timing and observation validators are not registered in this
-provider. IP literals avoid DNS rebinding in the current urllib transport;
+sequence must already exist when each task is authorized. The provider supports
+SQLi and reflected-XSS validation only; timing and observation validators are
+not registered. IP literals avoid DNS rebinding in the current urllib transport;
 hostname verification remains unsupported until the transport pins the
 validated destination address.
 
@@ -439,7 +441,7 @@ follows; the gaps below prevent a G01 pass.
 | Scope and bounded plan | Mission, typed plan/task, scope authorization, exact approval, limits and scheduler path in `Core`; see `test_workflow.py`, `test_providers.py`, and `test_engine_v2_e1_boundary.py`. | Implemented components; full cross-client and controlled-target acceptance is open under G02/G05. |
 | Recon and enumeration | Admitted local-process providers listed above; fixed catalog argv goes through `ToolRunner`. | Provider contracts exist, but this local environment has no installed V2 binaries and none is smoke/lab/E2E verified. |
 | Supported initial access | No provider is admitted with an initial-access capability. The admitted `sqlmap` provider is only declared as `web.sql_injection.assess`; its catalog-default invocation may detect/assess SQL injection but is not registered as an access-gaining capability or independent verification. `commix`, `impacket`, and MSF/session actions remain excluded or on legacy paths. | **Missing from V2.** Do not count SQLi assessment as initial access; the full release chain cannot currently exercise that stage through V2. |
-| Independent verification | `tool.verify_sqli` and `tool.retest_sqli` now run bounded SQLi-only probes as approved V2 scheduler tasks, require a successful same-target V2 finding with a valid evidence seal, and write separate sealed result jobs. Every HTTP request rechecks scope and exact URL path; only IP-literal targets are accepted to avoid DNS rebinding. | **Partial.** Other validation kinds and timing/observation paths are not covered; the two operations require separate plans and have not been lab-validated. G03 remains open. |
+| Independent verification | `tool.verify_sqli`/`tool.retest_sqli` and `tool.verify_xss`/`tool.retest_xss` run bounded SQLi or reflected-XSS probes as approved V2 scheduler tasks, require a successful same-target V2 finding of the matching kind with a valid evidence seal, and write separate sealed result jobs. Every HTTP request rechecks scope and exact URL path; only IP-literal targets are accepted to avoid DNS rebinding. | **Partial.** Timing/observation paths are not covered; each operation requires a separate plan and neither verifier family has been independently lab-validated. G03 remains open. |
 | Evidence, report, retest | V2 exposes workflow evidence, audit and readiness; legacy validators and report/export paths still use job/finding state. | **No accepted end-to-end workflow report/retest proof.** G04/G05 acceptance remains open. |
 
 Existing tests establish component and client behavior; none is the required

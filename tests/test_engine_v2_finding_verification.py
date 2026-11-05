@@ -1,4 +1,4 @@
-"""Scheduler ownership and sealed evidence for bounded V2 SQLi verification."""
+"""Scheduler ownership and sealed evidence for bounded V2 finding verification."""
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +19,7 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 class _SQLiFixture(BaseHTTPRequestHandler):
     requests = 0
     vulnerable = True
+    reflect_xss = True
     scope_path = None
     revoke_after = None
 
@@ -35,9 +36,12 @@ class _SQLiFixture(BaseHTTPRequestHandler):
                 "out_of_scope": [],
                 "notes": "revoked during controlled test",
             }), encoding="utf-8")
-        value = parse_qs(urlsplit(self.path).query).get("id", [""])[0]
+        query = parse_qs(urlsplit(self.path).query)
+        value = query.get("id", [""])[0]
+        xss_value = query.get("q", [""])[0]
         body = (
-            b"You have an error in your SQL syntax"
+            xss_value.encode() if type(self).reflect_xss and "whaxon_xss_" in xss_value
+            else b"You have an error in your SQL syntax"
             if "'" in value and type(self).vulnerable else b"Product found"
         )
         self.send_response(200)
@@ -72,13 +76,14 @@ def _bound_plan(core, *, plan_id, capability_id, target, inputs):
     return task
 
 
-async def _seed_sealed_source(core, *, plan_id, target, request_context=None):
+async def _seed_sealed_source(core, *, plan_id, target, request_context=None, kind="sqli"):
     """Persist a test-only SQLmap result through the real scheduler seal path."""
     from whaxon.core.workflow import WorkflowPlan
 
     core.create_mission(plan_id, "Seed a sealed in-process scanner fixture")
+    tool_id = "nuclei" if kind == "xss" else "sqlmap"
     task = WorkflowTask(
-        id="scan", capability_id="tool.sqlmap", target=target,
+        id="scan", capability_id=f"tool.{tool_id}", target=target,
         permissions=("network.scan",), impact="moderate",
     )
     core.save_workflow_plan(plan_id, WorkflowPlan(mission_id=plan_id, tasks=(task,)))
@@ -86,18 +91,18 @@ async def _seed_sealed_source(core, *, plan_id, target, request_context=None):
 
     async def fake_scan(_task):
         core.store.create(source_job)
-        core.store.set_started(source_job, "sqlmap", target)
+        core.store.set_started(source_job, tool_id, target)
         core.store.mark_engine_v2_execution_job(source_job)
         core.store.append_finding(source_job, Finding(
-            kind="sqli", severity="critical", source="sqlmap",
-            data={"parameter": "id"}, raw_line="Parameter: id (GET)",
+            kind=kind, severity="high", source=tool_id,
+            data={"parameter": "q" if kind == "xss" else "id"}, raw_line="controlled fixture finding",
             request_context=(request_context if request_context is not None else {
                 "method": "GET", "url": target, "parameter": "id",
             }),
         ), 0)
         core.store.set_finished(source_job, 0, 0.01)
         return {
-            "job_id": source_job, "tool_id": "sqlmap", "target": target,
+            "job_id": source_job, "tool_id": tool_id, "target": target,
             "exit_code": 0,
         }
 
@@ -182,6 +187,61 @@ def test_v2_verify_and_retest_are_scheduler_owned_and_sealed(tmp_path):
         asyncio.run(exercise())
     finally:
         server.shutdown()
+        server.server_close()
+
+
+def test_v2_reflected_xss_verify_and_retest_are_scheduler_owned(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.reflect_xss = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="xss-source-plan", target=target, kind="xss",
+                request_context={"method": "GET", "url": target, "parameter": "q"},
+            )
+            _bound_plan(
+                core, plan_id="xss-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY_XSS,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            verified = await core.run_workflow_plan(
+                "xss-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert verified["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("xss-verification-plan")
+            assert evidence["all_evidence_integrity_verified"] is True, evidence
+            attempt = evidence["attempts"][0]
+            assert attempt["findings"][0]["verification_status"] == "verified"
+            verified_job = attempt["job_id"]
+
+            _SQLiFixture.reflect_xss = False
+            _bound_plan(
+                core, plan_id="xss-retest-plan",
+                capability_id=FindingVerificationProvider.RETEST_XSS,
+                target=target,
+                inputs={"source_job_id": verified_job, "finding_seq": 0},
+            )
+            retested = await core.run_workflow_plan(
+                "xss-retest-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert retested["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            retest_evidence = core.workflow_evidence("xss-retest-plan")
+            assert retest_evidence["all_evidence_integrity_verified"] is True
+            assert retest_evidence["attempts"][0]["findings"][0]["verification_status"] == "inconclusive"
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
         server.server_close()
         thread.join(timeout=5)
 
@@ -274,6 +334,8 @@ def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
         assert {row["capability_id"] for row in rows} == {
             FindingVerificationProvider.VERIFY,
             FindingVerificationProvider.RETEST,
+            FindingVerificationProvider.VERIFY_XSS,
+            FindingVerificationProvider.RETEST_XSS,
         }
         assert all(
             row["provider_version"] == FindingVerificationProvider.PROVIDER_VERSION
@@ -295,6 +357,8 @@ def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
         assert all(capability in section for capability in (
             FindingVerificationProvider.VERIFY,
             FindingVerificationProvider.RETEST,
+            FindingVerificationProvider.VERIFY_XSS,
+            FindingVerificationProvider.RETEST_XSS,
         ))
 
     asyncio.run(exercise())

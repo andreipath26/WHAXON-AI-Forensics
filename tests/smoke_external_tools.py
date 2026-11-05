@@ -117,6 +117,13 @@ def main() -> None:
             ).lower(), (
                 "SQLmap contacted the fixture but did not identify its boolean oracle"
             )
+            assert "parameter: id (get)" in sqlmap_direct.stdout.lower() and (
+                "false positive or unexploitable" not in sqlmap_direct.stdout.lower()
+            ), (
+                "SQLmap did not retain a confirmed finding after final confirmation; "
+                f"stdout={sqlmap_direct.stdout[-5000:]!r}; "
+                f"stderr={sqlmap_direct.stderr[-2000:]!r}"
+            )
 
             # Exercise the installed scanner through the actual Engine V2 plan,
             # policy, provider, scheduler and evidence-seal path. The target is
@@ -127,12 +134,28 @@ def main() -> None:
             from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
             async def run_v2_sqlmap() -> tuple[dict, dict, list[dict]]:
-                core = Core(root / "v2-data")
+                v2_data = root / "v2-data"
+                v2_data.mkdir(parents=True, exist_ok=True)
+                packaged_catalog = Path(__file__).resolve().parents[1] / "src" / "whaxon" / "data" / "tools.json"
+                catalog = json.loads(packaged_catalog.read_text(encoding="utf-8"))
+                sqlmap_tool = next(tool for tool in catalog["tools"] if tool["id"] == "sqlmap")
+                # Keep this smoke deterministic and bounded: exercise the
+                # supported boolean technique against the fixture's boolean
+                # oracle, with a private SQLmap session/output directory.
+                sqlmap_tool["args"] = (
+                    f"-u {{target}} --batch --level=1 --risk=1 --technique=B "
+                    f"--threads=1 --timeout=2 --retries=0 --disable-coloring "
+                    f"--flush-session --output-dir={root / 'sqlmap-v2-output'}"
+                )
+                (v2_data / "tools.json").write_text(
+                    json.dumps(catalog), encoding="utf-8",
+                )
+                core = Core(v2_data)
                 await core.initialize(drain=False)
                 task = WorkflowTask(
                     id="sqlmap-loopback",
                     capability_id="tool.sqlmap",
-                    target=f"{base_url}/search?id=2",
+                    target=f"{base_url}/search?id=1",
                     permissions=("network.scan",),
                     impact="moderate",
                     timeout_s=180,

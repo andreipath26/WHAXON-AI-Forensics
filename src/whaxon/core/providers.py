@@ -570,18 +570,26 @@ class SemanticOperationProvider:
 
 
 class FindingVerificationProvider:
-    """Run bounded SQLi verification/retest as scheduler-owned V2 tasks.
+    """Run bounded SQLi/XSS verification as scheduler-owned V2 tasks.
 
-    Only a stored V2 SQL injection finding can enter the verifier. Probes use
-    the existing non-destructive quote check; each outbound request rechecks
-    the current scope and exact URL origin. Results are written to a separate
-    V2 evidence job so a sealed scanner finding is never mutated in place.
+    Only a stored V2 finding of the exact supported kind can enter its matching
+    verifier. Probes reuse the existing bounded validators; each outbound
+    request rechecks current scope and the exact URL path. Results are written
+    to a separate V2 evidence job so sealed scanner findings remain immutable.
     """
 
     VERIFY = "tool.verify_sqli"
     RETEST = "tool.retest_sqli"
+    VERIFY_XSS = "tool.verify_xss"
+    RETEST_XSS = "tool.retest_xss"
     PROVIDER_ID = "whaxon.verifier.http"
-    PROVIDER_VERSION = "v2-sqli-verifier.1"
+    PROVIDER_VERSION = "v2-sqli-xss-verifier.1"
+    _KINDS = {
+        VERIFY: frozenset({"sqli", "sql_injection"}),
+        RETEST: frozenset({"sqli", "sql_injection"}),
+        VERIFY_XSS: frozenset({"xss"}),
+        RETEST_XSS: frozenset({"xss"}),
+    }
 
     def __init__(self, *, store, registry, scope):
         self.store = store
@@ -600,6 +608,8 @@ class FindingVerificationProvider:
         for capability_id, operation in (
             (self.VERIFY, "independent SQL injection verification"),
             (self.RETEST, "conservative SQL injection remediation retest"),
+            (self.VERIFY_XSS, "independent reflected XSS verification"),
+            (self.RETEST_XSS, "conservative reflected XSS remediation retest"),
         ):
             manifest = CapabilityManifest(
                 capability_id=capability_id,
@@ -618,8 +628,8 @@ class FindingVerificationProvider:
                     "required": ["job_id", "tool_id", "target", "exit_code", "status", "reason"],
                 },
                 limitations=(
-                    f"Supports {operation} for stored SQL injection findings only.",
-                    "Uses a single quote probe with three baseline and three injected samples.",
+                    f"Supports {operation} for sealed stored findings of its exact vulnerability kind only.",
+                    "Uses bounded non-destructive probes with three baseline and three injected samples.",
                     "Accepts IP-literal targets only; hostname targets require a future pinned-address transport.",
                     "No payload supplied by the caller; redirects are blocked.",
                     "Retest may return still_vulnerable or inconclusive; it never infers fixed from missing proof.",
@@ -700,10 +710,14 @@ class FindingVerificationProvider:
         ):
             raise ValueError("verification source must be a successful, same-target V2 job")
         selected = next((item for item in source_findings if item.get("seq") == source_seq), None)
-        if selected is None or selected.get("kind") not in {"sqli", "sql_injection"}:
-            raise ValueError("verification source is not a stored SQL injection finding")
-        if task.capability_id == self.RETEST and (
-            source_job.get("tool") != self.VERIFY.removeprefix("tool.")
+        if selected is None or selected.get("kind") not in self._KINDS[task.capability_id]:
+            raise ValueError("verification source kind does not match the selected verifier")
+        verify_capability = {
+            self.RETEST: self.VERIFY,
+            self.RETEST_XSS: self.VERIFY_XSS,
+        }.get(task.capability_id)
+        if verify_capability and (
+            source_job.get("tool") != verify_capability.removeprefix("tool.")
             or selected.get("verification_status") != "verified"
             or selected.get("verified_by") != "engine-v2"
         ):
@@ -762,7 +776,7 @@ class FindingVerificationProvider:
             authorize_request=authorize_probe,
         )
         started = time.monotonic()
-        if task.capability_id == self.VERIFY:
+        if task.capability_id in {self.VERIFY, self.VERIFY_XSS}:
             status, reason = validator.validate(finding, target_url=task.target)
         else:
             status, reason = validator.revalidate(finding, target_url=task.target)
