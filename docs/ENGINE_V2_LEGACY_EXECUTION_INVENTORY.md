@@ -135,6 +135,50 @@ execution evidence; deployment-host readiness remains unverified.
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | None of their direct execution actions are V2 workflow dispatches | GUI/TUI call `Core.runner` directly | Legacy `JobStore`/event path; see `test_gui_entrypoint.py`, `test_tui_main.py`, and runner tests. |
 
+### Consequential HTTP route ownership
+
+`test_consequential_api_route_methods_and_handlers_are_explicit` pins the
+method, path and handler binding for these consequential routes. It complements
+the callsite inventory; it does not claim to guard every read-only API or any UI
+control.
+
+| Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
+| --- | --- | --- | --- |
+| V2 capability and lifecycle | `GET /api/v2/capabilities`, `/providers`, `/providers/portfolio-audit`; `POST /api/v2/workflows`; `POST /api/v2/workflows/<plan_id>/run`; `POST /api/v2/workflow-runs/<request_id>/cancel` | Core capability registry, workflow contracts, approvals and durable request queue. A run submission is persisted work, not a success result. | Shared Core path; see `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, and `test_workflow.py`. |
+| Legacy tool and AI dispatch | `POST /api/run` → `_run_job_blocking`; `POST /api/ai/run` → legacy AI executor/bridge | Scope and input checks apply at the route, with legacy job or AI-run state. They do not create V2 plan-bound task attempts. | Legacy path; see `test_server.py`, `test_server_ai.py`, runner and AI bridge tests. |
+| Legacy Metasploit | `POST /api/msf/run`; `POST /api/msf/sessions/<session_id>/exec` | Module path validates inputs and scope before worker dispatch. Session command checks live session scope before RPC. | Legacy job/session paths; no V2 task/attempt lifecycle. |
+| Metasploit pivot forwarding | `GET`, `POST`, and `DELETE /api/msf/sessions/<session_id>/portfwd` | Every operation checks the session host against current scope. Creation separately checks the destination and writes a pivot edge; removal calls the legacy forward manager. | Network/pivot side effects remain outside V2 task ownership. See `test_server_portfwd.py` and scope-denial cases in `test_server.py`. |
+| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest recheck current target scope; retest requires existing verified status. The resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
+| Scope policy | `GET`, `POST /api/scope`; `POST /api/scope/check`; `POST /api/scope/override` | Scope POST persists rules and requires explicit confirmation to disable enforcement. Scope check evaluates a target. Override only writes a legacy audit-style record; it does not authorize dispatch. | Scope configuration feeds shared Core checks, but the legacy override record is not a V2 approval. See `test_web_scope.py`, `test_scope_failclosed.py`, and `test_server.py`. |
+| Legacy job cancellation | `POST /api/jobs/<job_id>/cancel` | Calls `_cancel_job_blocking` for a legacy job process/event state. | Separate from durable V2 run-request and plan cancellation endpoints. Route-level lifecycle parity remains open under G05. |
+| Dependency provisioning | `POST /api/dependencies/install`, `/install-batch`; `POST /api/dependencies/install/<operation_id>/cancel` | Runs only from a current approved install plan and uses separate OS/package-manager authority; this is system provisioning, not target assessment. | Outside workflow task dispatch. See `test_dependencies.py`, `test_dependency_installer.py`, and dependency server tests. |
+
+The legacy `/api/tools` catalog and `/api/v2/capabilities` registry are different
+advertisements: catalog presence is not V2 admission, and provider installation
+does not prove smoke, lab, end-to-end or authorization acceptance.
+
+### Deployment entry points and readiness semantics
+
+| Entry point or report | Current source behavior | G01 limit |
+| --- | --- | --- |
+| `whaxon web` | `server.main` starts Flask's development server. | Development path; not the production serving mode. |
+| `whaxon serve` | `interfaces/web/serve.py` starts Waitress in foreground; `--daemon` uses `os.fork` double-fork. | Daemon mode is Unix-specific in source; do not infer native Windows support from OS documentation. |
+| systemd | `whaxon.service` uses Gunicorn with `create_app_factory()`; paired worker unit runs durable request polling. | Unit contract and CI are not a successful supported-host install or live worker verification. |
+| `docker-compose.e5.yml` | Repository-source web and dedicated worker share `/data`; web binds to loopback. | Distinct from root `docker-compose.yml`, which is the vulnerable lab target. Docker assets are excluded from sdist; this is a checkout/source deployment path. |
+| Wheel/package | `pyproject.toml` exposes `whaxon`, `whaxon-tui`, and `whaxon-gui` and packages systemd units. | Installed TUI/GUI data directory behavior has not been reconciled with `WHAXON_DATA`; GUI startup also launches `whaxon serve --daemon`. Installed-wheel GUI/TUI acceptance remains unverified. |
+| `/api/health` | `core_ready` means SQLite responds and the data directory is writable; Metasploit is reported as optional degraded state. | Does not prove worker liveness, scanner readiness, workflow readiness, or assessment success. |
+| `whaxon workflow providers`, `/api/v2/providers` | `executable=true` means local manifest/catalog binding plus installed binary. `smoke_tested`, `lab_validated`, and `end_to_end_verified` remain separate fields and currently false. | “Executable” does not mean authorized, smoke-tested, lab-validated, end-to-end verified, or production-ready. |
+| `whaxon doctor` | `overall_status=READY` means required dependency checks are ready. | Does not establish service, worker, workflow or deployment acceptance. |
+
+The CLI split also distinguishes three V2 execution modes: `workflow plan run`
+uses the V2 scheduler/policy/provider path synchronously; `workflow plan
+submit-run` plus `serve-requests` uses the durable request queue and supervised
+worker; legacy `whaxon run`, `ai`, `recon`, `validate`, and `retest` remain
+outside V2 task/request ownership. `workflow plan run` is not a legacy runner
+dispatch, although it bypasses the durable run-request queue. The top-level
+help omission for `recon` was corrected and is guarded by
+`test_engine_v2_cli_surface.py`.
+
 ### G01 controlled solo-chain crosswalk
 
 The release chain is scope → recon → enumeration → supported initial access →
