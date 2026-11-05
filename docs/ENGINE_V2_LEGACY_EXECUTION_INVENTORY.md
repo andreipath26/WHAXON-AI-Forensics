@@ -43,6 +43,15 @@ runner inventory.
 | `interfaces/web/server.py` | `create_app.msf_session_exec` | `MSFClient.session_exec` | `_msf_session_scope_error` resolves the session host and checks current scope before sending the supplied session command. | Returns output directly; no V2 task/attempt record or durable workflow evidence link. |
 | `core/runner.py` | `run_in_session` → `_run_msf_session` | `MSFClient.session_exec` | Runner requires a persisted open session, authorizes its stored host, re-reads the live RPC session and authorizes its host, rejects host identity drift, and enforces a required session type when available before dispatch. | Emits legacy job events and stores capped output; this session-scoped execution path is not scheduler-owned V2 workflow dispatch. |
 
+The legacy CLI/API validator paths remain separate from the bounded V2 provider.
+For SQLi, the current replay uses three baseline and three injected samples
+and verifies only when a specific SQL parser error appears consistently after
+the quote probe. Missing proof, network failure and timing-only signals remain
+`candidate`; legacy retest reports those as `inconclusive`. The SQLi path has
+no `refuted` result, so it cannot currently establish `fixed`. Existing
+validator tests use synthetic HTTP fixtures; they do not replace a seeded-lab
+validation run for the scheduler-owned provider.
+
 `Validator.revalidate` calling `self.validate` is an internal service delegation,
 not a second external dispatch. The dedicated tests currently include
 `test_recon.py`, `test_validate_cmd.py`, `test_validator_retest.py`,
@@ -100,6 +109,21 @@ Exact V2 operation aliases and declared target types:
 | `whois` | `tool.whois` | `domain.registration.lookup` | Hostname, IP |
 | `wpscan` | `tool.wpscan` | `web.wordpress.audit` | URL |
 
+The separately bound HTTP verifier adds two V2-only operations outside the
+local-process catalog table:
+
+| Capability | Provider | Target and permission | Supported contract | Readiness |
+| --- | --- | --- | --- | --- |
+| `tool.verify_sqli` | `whaxon.verifier.http` (`v2-sqli-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | A successful same-target Engine V2 SQLi finding with an intact workflow evidence seal; separate exact-plan approval; fixed quote probe; scope reload before each request; redirects and changed paths blocked; result stored as a separate sealed job. | Registered; smoke, lab and end-to-end flags remain false. |
+| `tool.retest_sqli` | `whaxon.verifier.http` (`v2-sqli-verifier.1`) | IP-literal HTTP(S) URL; `network.verify`; moderate impact | Requires a prior V2 `verified` result from `tool.verify_sqli`; reports `still_vulnerable` or `inconclusive`, never `fixed` when proof is absent; separate exact-plan approval and sealed result job. | Registered; smoke, lab and end-to-end flags remain false. |
+
+These operations require separate plans because their source job and finding
+sequence must already exist when each task is authorized. They support SQLi
+only; XSS, timing and observation validators are not registered in this
+provider. IP literals avoid DNS rebinding in the current urllib transport;
+hostname verification remains unsupported until the transport pins the
+validated destination address.
+
 The built-in adapter registry also reports four adapter-only IDs—`burp`,
 `hashcat`, `msf`, and `whatweb`—without packaged catalog entries. The prior
 V2 allowlist declared `whatweb` even though no catalog item could bind it. The
@@ -111,15 +135,16 @@ replace this separate adapter-presence fact.
 
 ### Read-only live snapshot
 
-On the local audit environment, `whaxon workflow portfolio-audit` reported 24
-catalog entries and 26 discovered adapters: 12 bound, five not admitted, seven
-unsupported transports, and four adapter-only. The provider inventory showed
-24 registered rows (12 compatibility + 12 semantic aliases), 12 unsupported
-catalog rows, **zero executable providers**, and no smoke-tested, lab-validated,
-or end-to-end-verified providers; all 12 admitted binaries were absent from that
-environment. This is an environment-specific readiness observation, not a claim
-about a deployment host. The audit command is read-only and explicitly does not
-enable execution. A same-session executable preflight also found no Docker CLI
+The earlier local portfolio audit reported 24 catalog entries and 26 discovered
+adapters: 12 bound, five not admitted, seven unsupported transports, and four
+adapter-only. That snapshot preceded the two verifier operations. The current
+Core inventory includes 12 compatibility capabilities, 12 semantic aliases,
+and the two registered verifier operations; the verifier's smoke, lab and
+end-to-end flags remain false. The earlier snapshot found **zero executable
+providers**, with all 12 admitted binaries absent from that environment. These
+are environment-specific readiness observations, not claims about a deployment
+host. The audit command is read-only and explicitly does not enable execution.
+A same-session executable preflight also found no Docker CLI
 and none of the 12 admitted binaries (`arjun`, `dig`, `dnsrecon`, `ffuf`,
 `gobuster`, `nikto`, `nmap`, `nuclei`, `sqlmap`, `theharvester`, `whois`,
 `wpscan`) on this workspace host. No scanner, container or network operation
@@ -354,7 +379,7 @@ must not be inferred from route registration alone.
 | `whaxon web` | `server.main` starts Flask's development server. | Development path; not the production serving mode. |
 | `whaxon serve` | `interfaces/web/serve.py` starts Waitress in foreground; `--daemon` uses `os.fork` double-fork. | Daemon mode is Unix-specific in source; do not infer native Windows support from OS documentation. |
 | systemd | `whaxon.service` uses Gunicorn with `create_app_factory()`; paired worker unit runs durable request polling. | Unit contract and CI are not a successful supported-host install or live worker verification. |
-| `docker-compose.e5.yml` | Repository-source web and dedicated worker share `/data`; web binds to loopback. | Distinct from root `docker-compose.yml`, which is the vulnerable lab target. Docker assets are excluded from sdist; this is a checkout/source deployment path. |
+| `docker-compose.e5.yml` | Repository-source web and dedicated worker share `/data`; host-published port `5001` is bound to `127.0.0.1` (the app listens on `0.0.0.0` inside the container). | Distinct from root `docker-compose.yml`, which is the vulnerable lab target. Docker assets are excluded from sdist; this is a checkout/source deployment path. |
 | Wheel/package | `pyproject.toml` exposes `whaxon`, `whaxon-tui`, and `whaxon-gui` and packages systemd units. | Installed TUI/GUI data directory behavior has not been reconciled with `WHAXON_DATA`; GUI startup also launches `whaxon serve --daemon`. Installed-wheel GUI/TUI acceptance remains unverified. |
 | `/api/health` | `core_ready` means SQLite responds and the data directory is writable; Metasploit is reported as optional degraded state. | Does not prove worker liveness, scanner readiness, workflow readiness, or assessment success. |
 | `whaxon workflow providers`, `/api/v2/providers` | `executable=true` means local manifest/catalog binding plus installed binary. `smoke_tested`, `lab_validated`, and `end_to_end_verified` remain separate fields and currently false. | “Executable” does not mean authorized, smoke-tested, lab-validated, end-to-end verified, or production-ready. |
