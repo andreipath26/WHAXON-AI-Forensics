@@ -380,3 +380,16 @@ def test_api_route_census_matches_documented_g01_inventory():
     }
     assert documented == EXPECTED_API_ROUTE_HANDLERS
 
+
+def test_catalog_and_v2_operation_crosswalk_are_documented():
+    inventory_path = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    )
+    inventory = inventory_path.read_text(encoding="utf-8")
+    for tool_id in EXPECTED_CATALOG_TRANSPORTS:
+        assert f"`{tool_id}`" in inventory, f"catalog tool missing from G01 inventory: {tool_id}"
+    for _tool_id, operation_id in EXPECTED_V2_SEMANTIC_OPERATIONS.items():
+        assert f"`{operation_id}`" in inventory, f"V2 semantic operation missing from G01 inventory: {operation_id}"
+

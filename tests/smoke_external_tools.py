@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -98,6 +99,65 @@ def main() -> None:
                 sqlmap_requests = [path for path in requests if path.startswith("/search?")]
             assert sqlmap_requests, "SQLmap did not send an HTTP request to the loopback fixture"
 
+            # Exercise the installed scanner through the actual Engine V2 plan,
+            # policy, provider, scheduler and evidence-seal path. The target is
+            # the same ephemeral loopback fixture; approval is exact-plan-bound.
+            import asyncio
+
+            from whaxon.core import Core
+            from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+            async def run_v2_sqlmap() -> tuple[dict, dict]:
+                core = Core(root / "v2-data")
+                await core.initialize(drain=False)
+                task = WorkflowTask(
+                    id="sqlmap-loopback",
+                    capability_id="tool.sqlmap",
+                    target=f"{base_url}/search?id=2",
+                    permissions=("network.scan",),
+                    impact="moderate",
+                    timeout_s=180,
+                )
+                manifest = core.providers.manifest_for(task.capability_id)
+                plan = WorkflowPlan(
+                    mission_id="loopback-smoke",
+                    tasks=(task,),
+                    metadata={
+                        "provider_bindings": {
+                            task.id: {
+                                "provider_id": manifest.provider_id,
+                                "manifest_fingerprint": manifest.fingerprint,
+                            },
+                        },
+                    },
+                )
+                core.create_mission(
+                    "loopback-smoke", "Exercise Engine V2 against loopback only",
+                )
+                core.save_workflow_plan("loopback-smoke-plan", plan)
+                core.store.grant_workflow_approval(
+                    "loopback-smoke-plan", task.id, "ci-loopback-approval",
+                    "ci-operator", expires_at=time.time() + 300,
+                )
+                result = await core.run_workflow_plan(
+                    "loopback-smoke-plan", max_tasks=1, max_concurrency=1,
+                )
+                evidence = core.workflow_evidence("loopback-smoke-plan")
+                return result, evidence
+
+            with request_lock:
+                before_v2 = len(requests)
+            v2_result, v2_evidence = asyncio.run(run_v2_sqlmap())
+            assert v2_result["complete"] is True, v2_result
+            assert v2_result["tasks"] == [{"id": "sqlmap-loopback", "status": "succeeded"}], v2_result
+            assert v2_evidence["all_evidence_recorded"] is True, v2_evidence
+            assert v2_evidence["all_evidence_integrity_verified"] is True, v2_evidence
+            with request_lock:
+                v2_requests = requests[before_v2:]
+            assert any(path.startswith("/search?") for path in v2_requests), (
+                "Engine V2 SQLmap provider did not contact its approved loopback target"
+            )
+
             nuclei = shutil.which("nuclei")
             if os.environ.get("WHAXON_REQUIRE_NUCLEI") == "1" and not nuclei:
                 raise AssertionError("Homebrew acceptance requires the installed Nuclei executable")
@@ -133,7 +193,8 @@ http:
 
         print(
             "Loopback scanner smoke passed: Nmap TCP discovery, Gobuster directory "
-            "enumeration, ffuf content discovery, SQLmap HTTP parameter testing"
+            "enumeration, ffuf content discovery, SQLmap direct and Engine V2 "
+            "workflow HTTP parameter testing"
             + (", and Nuclei template matching." if shutil.which("nuclei") else ".")
         )
     finally:
