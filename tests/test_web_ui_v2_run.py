@@ -32,6 +32,34 @@ def test_run_page_loads_live_tool_catalog(page, live_server):
     assert page.locator('a[data-path="trust-layer-and-findings"]').get_attribute("href") == "/ui-v2/findings"
 
 
+def test_run_page_serves_assets_without_external_requests(page, live_server):
+    external_requests = []
+    page.on(
+        "request",
+        lambda request: external_requests.append(request.url)
+        if request.url.startswith("https://")
+        else None,
+    )
+    page.route("https://**/*", lambda route: route.abort())
+    response = page.goto(f"{live_server}/ui-v2/run")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    assert page.title() == "WHAXON — Run & Orchestration"
+    assert external_requests == []
+    for path in (
+        "run-v2.css",
+        "dashboard-fonts.css",
+        "dashboard-logo.jpg",
+        "dashboard-profile.jpg",
+    ):
+        asset = page.request.get(f"{live_server}/static/{path}")
+        assert asset.ok, (path, asset.status)
+        assert asset.body(), path
+
+
 def test_run_page_echo_job_streams_real_output(page, live_server):
     page.goto(f"{live_server}/ui-v2/run")
     page.wait_for_function(
@@ -91,6 +119,50 @@ def test_run_page_passive_button_starts_guarded_job(page, live_server):
     )
     assert page.locator("#run-job-id").text_content().strip() != "No job started"
     assert "finished" in page.locator("#terminal-stdout").text_content().lower()
+
+
+def test_run_page_start_is_single_flight(page, live_server):
+    page.goto(f"{live_server}/ui-v2/run")
+    page.wait_for_function(
+        "() => [...document.querySelector('#run-tool-select').options].some(o => o.value === 'echo')",
+        timeout=8000,
+    )
+    scope_checks = []
+    run_requests = []
+
+    def allow_scope(route):
+        scope_checks.append(route.request.url)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"allowed":true,"reason":"in-scope test target"}',
+        )
+
+    def accept_run(route):
+        run_requests.append(route.request.url)
+        route.fulfill(
+            status=202,
+            content_type="application/json",
+            body='{"job_id":"ui-single-flight-test"}',
+        )
+
+    page.route("**/api/scope/check", allow_scope)
+    page.route("**/api/run", accept_run)
+    page.locator("#run-tool-select").select_option("echo")
+    page.locator("#run-target-input").fill("127.0.0.1")
+    page.evaluate(
+        """() => {
+          const button = document.querySelector('#run-active-btn');
+          button.click();
+          button.click();
+        }"""
+    )
+    page.wait_for_function(
+        "() => document.querySelector('#run-job-id')?.textContent === 'ui-single-flight-test'",
+        timeout=8000,
+    )
+    assert len(scope_checks) == 1
+    assert len(run_requests) == 1
 
 
 def test_run_page_cancel_button_cancels_active_job(page, live_server):

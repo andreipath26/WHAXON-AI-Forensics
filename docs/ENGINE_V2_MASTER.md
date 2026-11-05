@@ -1,6 +1,6 @@
 # WHAXON — ENGINE V2 MASTER DOCUMENT
 
-> **Current code audit (2026-11-05; source `55a2e8b`):** E5 PR #124 **merged** with bounded engineering acceptance and 12/12 exact-PR-head CI. `Core` initializes `JobStore`, `WorkflowRunQueue`, `CapabilityRegistry` and `BoundProviderRouter`; workflow requests implement durable claim, heartbeat, cancellation and reconciliation; CLI and Flask have V2 workflow endpoints. Legacy `/api/run` and `/api/ai/run` still exist, so full legacy-to-V2 migration, production deployment, E6 and release gates are NOT accepted. Historical pre-merge claims below are superseded.
+> **Current code audit (2026-11-05; main `9bd4dfe`):** E5 PR #124 **merged** with bounded engineering acceptance and 12/12 exact-PR-head CI. `Core` initializes `JobStore`, `WorkflowRunQueue`, `CapabilityRegistry` and `BoundProviderRouter`; workflow requests implement durable claim, heartbeat, cancellation and reconciliation; CLI and Flask have V2 workflow endpoints. UI PRs #126 and #127 are merged, but deployment gates remain open; Scope-focused acceptance succeeded on final pre-merge head `bf89063`. Full CI run [42063514323](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514323) failed when the Python 3.13 lane's Ubuntu mirror download exceeded the 17-minute pandoc-install timeout; its tests did not run, while Python 3.11/3.12 and the other reported jobs passed. This branch increases the bounded timeout without skipping report/PDF tests. Legacy `/api/run` and `/api/ai/run` still exist, so full legacy-to-V2 migration, production deployment, E6 and release gates are NOT accepted. Engine V2 E6 remains frozen until the operator explicitly declares the new UI deployment-ready. Historical pre-merge claims below are superseded.
 
 **Consolidation date:** 2026-11-05. **Baseline:** main at `9157afd250bddb15dd56837d49b3c29492ad5aca`.
 
@@ -1422,7 +1422,7 @@ This register follows master-roadmap §38 G01–G10 and E0–E9 phase-freeze pol
 
 | Gate | Candidate evidence already available | Specific unpassed obligation | Current decision |
 |---|---|---|---|
-| G01 — capability/workflow | Existing Core, API/CLI, `ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md`, 793 static controls | Exhaustive live capability/transport/client inventory and controlled full solo chain | OPEN |
+| G01 — capability/workflow | Existing Core, API/CLI, `ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md`, 793 static controls; partial direct-dispatch inventory in `ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md` (guarded by `test_engine_v2_legacy_callsite_inventory.py`) | Exhaustive live capability/transport/client inventory and controlled full solo chain | OPEN |
 | G02 — authorization/execution | E1 regression suite and `test_engine_v2_e6_mutation_guards.py` candidate | Authorized target/pivot/redirect/secondary DNS and legacy direct-dispatch no-bypass lab; UI cannot grant permissions | OPEN |
 | G03 — independent verification | Existing validator and retest tests | End-to-end replay/verification and conservative inconclusive/failure outcomes with retained proof | OPEN |
 | G04 — evidence/coverage/report | E3 audit and evidence seals, E6 empty-evidence parity candidate | Reproducible complete report, redaction, missing/skipped coverage, independent trust anchor, audit fault recovery | OPEN |

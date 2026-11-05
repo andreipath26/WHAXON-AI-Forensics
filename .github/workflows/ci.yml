@@ -331,7 +331,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -349,8 +349,9 @@ jobs:
       # Bound network waits and retry transient Ubuntu mirror failures.
       - name: Install system deps (pandoc, weasyprint)
         # Ubuntu mirrors sometimes stall while downloading pandoc (~29 MB).
-        # Keep the full report/PDF tests enabled; allow the mirror enough time.
-        timeout-minutes: 17
+        # Keep the full report/PDF tests enabled and leave time for the matrix
+        # tests after a slow mirror eventually completes the download.
+        timeout-minutes: 35
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |

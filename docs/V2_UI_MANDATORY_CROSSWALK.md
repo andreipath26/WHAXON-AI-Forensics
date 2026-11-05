@@ -1,6 +1,6 @@
 # WHAXON — UI V2 DESIGN, INTERACTION AND ACCEPTANCE MASTER
 
-> **Verified current UI / CI reconciliation — 2026-11-05.** `main` inspection at `55618da`: 22 production `ui_v2_*.html` templates, source-bound Flask UI routes, Playwright page tests and `src/whaxon/interfaces/gui/embed.py` already defaulting to `/ui-v2`. Scope/Targets [PR #127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) remains **open draft and unmerged**. Dashboard freeze remains a contributor/change restriction. The [full 13/13 main CI at `fc056d0`](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849) is engineering evidence only; D1–D6 and E6 deployment approval stay OPEN.
+> **Verified current UI / CI reconciliation — 2026-11-05.** `main` is at `9bd4dfe` after Scope & Targets PR [#127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) merged. The merge does not authorize production deployment or lift the Engine V2 E6 freeze. On the final pre-merge head `bf89063`, the focused Scope acceptance run [42063514871](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514871) and Dashboard visual run [42063514383](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514383) succeeded. Full CI run [42063514323](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514323) failed when the Python 3.13 lane's Ubuntu mirror download exceeded the 17-minute pandoc-install timeout; its tests did not run, while Python 3.11/3.12 and the other reported jobs passed. This branch increases the bounded timeout without skipping report/PDF tests. The 22 production pages remain subject to D1–D6 evidence and sign-off; all deployment gates stay OPEN.
 
 **Canonical UI design and acceptance reference, consolidated 2026-11-05.** Source, tests, screenshots and exact-head CI are required to establish implemented behavior. The design crosswalk determines planned UI scope; historical audits and templates are evidence, not production-ready declarations. Keep D1–D6 deployment gates open until demonstrated and approved. Do not infer that Dashboard approval implies Scope or Engine E6 approval.
 
@@ -70,7 +70,13 @@ A page becomes `DEPLOYMENT_READY` **only when D1–D6 each have exact-source evi
 
 Dashboard batch 1 hardens malformed-history export: a successful HTTP response with non-array payload must **fail visibly** rather than export a misleading empty archive; added browser regression. It does not alter visual design. **Dashboard remains NOT deployment-ready** until all D1–D6 complete.
 
-**Next after Dashboard:** UI-02 Scope, UI-03 Run, UI-04 Findings, then evidence/report workflows and the remaining pages; order follows critical dependencies and is adjustable without skipping gates.
+**Next after Dashboard and Scope & Targets:** UI-03 Run & Orchestration, then UI-04 Findings, then evidence/report workflows and the remaining pages; order follows critical dependencies and is adjustable without skipping gates. Scope PR #127 is merged, but UI-02 deployment acceptance remains OPEN.
+
+### Run & Orchestration (UI-03) — candidate hardening, 2026-11-05
+
+**Reference and scope:** `web ui files and rendering/run_tool_orchestration/screen.png`, route `/ui-v2/run`, template `src/whaxon/interfaces/web/templates/ui_v2_run.html`, and browser module `tests/test_web_ui_v2_run.py`. The supplied design source remains unchanged. The guarded Run action performs an asynchronous scope check before posting to `/api/run`; two rapid clicks could previously pass the active-job check before either response set the current job, causing duplicate dispatches. The candidate adds a single-flight guard, disables the action while the authorization and dispatch request is pending, and adds a regression that asserts one scope check and one run request for two immediate clicks.
+
+**Evidence and limits:** Local `ruff check tests/test_web_ui_v2_run.py` and `tests/test_v2_ui_mandatory_crosswalk.py` passed. The browser regression could not run locally because the Playwright Chromium download was truncated in this environment. Exact-head CI is required. This is one safety improvement; it does not establish complete control mapping, backend V2 parity or any D1–D6 acceptance. UI-03 remains **OPEN** pending the complete per-page evidence and approver sign-offs.
 
 **Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1–D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
 
