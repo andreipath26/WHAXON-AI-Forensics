@@ -154,7 +154,7 @@ Evidence is persisted in SQLite (evidence table) and referenced from reports.
 
 # Report redesign
 
-**Status (2026-11-02): HISTORICAL IMPLEMENTATION DESIGN.** The PR sequence records the report-redesign rationale and plan at the time. It is not an active PR plan and its problem statements are not assertions about the current report. For current behavior, use [Reports and Evidence](./EVIDENCE_AND_REPORTING_MASTER.md), current report source/tests and the master roadmap's release gates.
+**Status (2026-11-02): HISTORICAL IMPLEMENTATION DESIGN.** The PR sequence records the report-redesign rationale and plan at the time. It is not an active PR plan and its problem statements are not assertions about the current report. For current behavior, use [Reports and Evidence](#part-3--report-redesignmd), current report source/tests and the master roadmap's release gates.
 **Owner:** andreipath
 **Depends on:** docs/reports-and-evidence.md
 **Non-goals:** does not change the finding model, does not add new adapters.
@@ -315,7 +315,7 @@ PR 1 → PR 2 → PR 3 → PR 4. Each is a separate branch and PR. None starts u
 
 # Report visual design — PR 4
 
-**Status (2026-11-02): HISTORICAL DESIGN RECORD.** This file preserves the original visual specification and PR planning notes. It is not a live design task or proof that every visual requirement is currently implemented. Compare the current report renderer and tests with [Reports and Evidence](./EVIDENCE_AND_REPORTING_MASTER.md); acceptance remains subject to the master roadmap's release gates.
+**Status (2026-11-02): HISTORICAL DESIGN RECORD.** This file preserves the original visual specification and PR planning notes. It is not a live design task or proof that every visual requirement is currently implemented. Compare the current report renderer and tests with [Reports and Evidence](#part-4--report-visual-designmd); acceptance remains subject to the master roadmap's release gates.
 **Owner:** andreipath.
 **Depends on:** docs/report-redesign.md §4, docs/reports-and-evidence.md.
 **Non-goals:** this doc does not design the in-app report preview, the reports store, or the past-reports menu. Those are follow-on units (named at the end) and get their own design docs. It does not change the report data model.

@@ -1685,7 +1685,7 @@ An operator can audit the current portfolio or assess a new candidate and receiv
 
 An adapter parses tool output into structured `Finding` objects. The runner executes the tool; the adapter must not launch a second process.
 
-**Adding an adapter inside WHAXON:** use this guide. **Shipping an adapter as a separate Python package:** use [Plugins](./APPLICATION_ARCHITECTURE_MASTER.md).
+**Adding an adapter inside WHAXON:** use this guide. **Shipping an adapter as a separate Python package:** use [Plugins](#part-9--pluginsmd).
 
 ## Adapter contract
 
@@ -1731,7 +1731,7 @@ Built-in adapters are imported by `src/whaxon/adapters/registry.py` and self-reg
 3. Ensure its tool ID exists in the effective catalog.
 4. Add parser and runner integration tests.
 
-Third-party packages use the `whaxon.adapters` Python entry-point group; see [Plugins](./APPLICATION_ARCHITECTURE_MASTER.md). The runtime registry is available through `whaxon.adapters.list_adapters()`.
+Third-party packages use the `whaxon.adapters` Python entry-point group; see [Plugins](#part-9--pluginsmd). The runtime registry is available through `whaxon.adapters.list_adapters()`.
 
 ## Using context
 
@@ -1839,7 +1839,7 @@ A WHAXON plugin is a pip-installable package that registers an adapter through t
 
 This doc is for the case: **you use a tool, WHAXON doesn't parse it,
 you want to fix that.** If you want to add an adapter to WHAXON itself
-(inside the repo), read [`adapters.md`](./APPLICATION_ARCHITECTURE_MASTER.md) instead. That's a
+(inside the repo), read [`adapters.md`](#part-9--pluginsmd) instead. That's a
 shorter path, but it means maintaining a fork.
 
 ## 1. The contract
@@ -2240,7 +2240,7 @@ Use `GET /api/tools` to inspect tool IDs and current availability. A missing opt
 4. Update dependency diagnostics and installation policy separately where appropriate.
 5. Verify the effective catalog through the API and run the relevant tests.
 
-For output parsing, see [Writing an Adapter](./APPLICATION_ARCHITECTURE_MASTER.md). For third-party adapter packages, see [Plugins](./APPLICATION_ARCHITECTURE_MASTER.md).
+For output parsing, see [Writing an Adapter](#part-7--adaptersmd). For third-party adapter packages, see [Plugins](#part-9--pluginsmd).
 
 
 ---
@@ -2396,7 +2396,7 @@ The new UI has 22 page routes/templates and page-specific browser tests. Impleme
 
 ## Authentication and deployment
 
-Loopback requests use a local-peer authentication shortcut after Host and cross-origin protections. Non-loopback requests require explicit non-default Basic authentication credentials. The local default credentials are not suitable for remote exposure. Review [HTTP API](./APPLICATION_ARCHITECTURE_MASTER.md) and [Deployment](OPERATIONS_MASTER.md) before changing the bind address or placing the service behind a proxy.
+Loopback requests use a local-peer authentication shortcut after Host and cross-origin protections. Non-loopback requests require explicit non-default Basic authentication credentials. The local default credentials are not suitable for remote exposure. Review [HTTP API](#part-13--apimd) and [Deployment](OPERATIONS_MASTER.md) before changing the bind address or placing the service behind a proxy.
 
 ## Current UI routes
 
@@ -2404,8 +2404,8 @@ The current route map, templates and browser-test references are maintained in [
 
 ## Related references
 
-- [HTTP API](./APPLICATION_ARCHITECTURE_MASTER.md)
-- [Scope and authorization](./APPLICATION_ARCHITECTURE_MASTER.md)
+- [HTTP API](#part-13--apimd)
+- [Scope and authorization](#part-11--scopemd)
 - [Dependency readiness](OPERATIONS_MASTER.md)
 - [Deployment](OPERATIONS_MASTER.md)
 - [Master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md)
@@ -2464,7 +2464,7 @@ The local default identity is `whaxon` / `whaxon`. It is for loopback developmen
 - `POST /api/scope` — update scope configuration (subject to server-side validation).
 - `POST /api/scope/override` — request a logged, one-time scope override; availability and authorization are controlled by the server.
 
-A scope check is an application-level preflight decision, not proof that every subsequent network connection remains inside scope. See [Scope](./APPLICATION_ARCHITECTURE_MASTER.md).
+A scope check is an application-level preflight decision, not proof that every subsequent network connection remains inside scope. See [Scope](#part-11--scopemd).
 
 ## Dependency readiness
 

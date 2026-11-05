@@ -16,7 +16,7 @@
 - Removed hard-coded demo credentials from the screenshot capture instructions.
 - Recorded the latest known CI failure and the queued CI run for this documentation commit. No v1.0 release or acceptance gate is claimed.
 
-> **Documentation status correction (2026-11-02):** Earlier entries titled “Full documentation consistency pass” and “Operator documentation reconciliation” described limited subsets of the repository. They did **not** represent a complete review of all documentation. The repository-wide inventory and status classification are recorded in [DOCUMENTATION_RECONCILIATION.md](DOCUMENTATION_RECONCILIATION.md). Do not treat the earlier wording as evidence that every Markdown file had been reconciled.
+> **Documentation status correction (2026-11-02):** Earlier entries titled “Full documentation consistency pass” and “Operator documentation reconciliation” described limited subsets of the repository. They did **not** represent a complete review of all documentation. The repository-wide inventory and status classification are recorded in [DOCUMENTATION_RECONCILIATION.md](PROJECT_GOVERNANCE_MASTER.md). Do not treat the earlier wording as evidence that every Markdown file had been reconciled.
 
 ## 2026-11-02 — Full documentation consistency pass
 

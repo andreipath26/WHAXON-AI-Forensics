@@ -141,7 +141,7 @@ At candidate `106c64f18e9762f4635043accee1338f513dd2f3`, [full CI run 4201089955
 
 # New Default Web UI — Interaction and Acceptance Audit
 
-> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](./V2_UI_MANDATORY_CROSSWALK.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
+> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](#part-4--docsui_control_inventorymd-source-record) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
 
 
 **Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, P4 and §38 G06; the previous section references are reconciled in its §50.
@@ -251,7 +251,7 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 
 ## Part 3 — docs/WEB_UI_INTERACTION_AUDIT.md (source record)
 
-> **Historical audit — superseded (2026-11-02).** This file records an earlier UI generation and must not be used to assess the current Obsidian Kinetic UI. Its page inventory, PASS/WIRED/MOCKUP labels, endpoint wiring and test counts are historical. Use [NEW_UI_INTERACTION_AUDIT.md](./V2_UI_MANDATORY_CROSSWALK.md) for the current 22-route implementation/acceptance record and master roadmap §38 for release acceptance. This historical file is retained for traceability only.
+> **Historical audit — superseded (2026-11-02).** This file records an earlier UI generation and must not be used to assess the current Obsidian Kinetic UI. Its page inventory, PASS/WIRED/MOCKUP labels, endpoint wiring and test counts are historical. Use [New UI interaction audit](#part-2--docsnew_ui_interaction_auditmd-source-record) for the current 22-route implementation/acceptance record and master roadmap §38 for release acceptance. This historical file is retained for traceability only.
 
 # WHAXON Web UI Interaction Audit
 

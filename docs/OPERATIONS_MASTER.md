@@ -24,7 +24,7 @@ This guide describes the current `main` checkout of **andreipath26/WHAXON-AI-For
 
 - Python 3.11 or newer (Python 3.13 is included in CI).
 - Linux, macOS or Windows; external tool installation support varies by OS.
-- External security tools are separate dependencies. See [Tools](APPLICATION_ARCHITECTURE_MASTER.md) and [Dependency readiness](./OPERATIONS_MASTER.md).
+- External security tools are separate dependencies. See [Tools](APPLICATION_ARCHITECTURE_MASTER.md) and [Dependency readiness](#part-2--dependency-readinessmd).
 
 ## Install from source
 
@@ -88,15 +88,15 @@ whaxon web
 
 Open [http://127.0.0.1:5001/](http://127.0.0.1:5001/). The root route redirects to the current Obsidian Kinetic interface at `/ui-v2`; `/ui` is retained as the legacy interface.
 
-Loopback requests use the local-peer authentication shortcut, subject to Host and cross-origin protections. Remote requests require explicit non-default authentication credentials. Never expose the default local configuration to an untrusted network. See [Deployment](./OPERATIONS_MASTER.md).
+Loopback requests use the local-peer authentication shortcut, subject to Host and cross-origin protections. Remote requests require explicit non-default authentication credentials. Never expose the default local configuration to an untrusted network. See [Deployment](#part-3--deploymentmd).
 
 ## Useful data locations
 
 Paths are relative to the configured `WHAXON_DATA` directory (default: `data/`):
 
 - `whaxon.db` — SQLite job, finding, evidence and workflow state.
-- Tool catalog and packaged resources — see [Tools](APPLICATION_ARCHITECTURE_MASTER.md) and [Dependency readiness](./OPERATIONS_MASTER.md).
-- Scope and other runtime configuration — see [Scope](APPLICATION_ARCHITECTURE_MASTER.md) and [Deployment](./OPERATIONS_MASTER.md).
+- Tool catalog and packaged resources — see [Tools](APPLICATION_ARCHITECTURE_MASTER.md) and [Dependency readiness](#part-2--dependency-readinessmd).
+- Scope and other runtime configuration — see [Scope](APPLICATION_ARCHITECTURE_MASTER.md) and [Deployment](#part-3--deploymentmd).
 
 Report output locations depend on the selected command and options; consult `whaxon report --help`.
 
@@ -105,9 +105,9 @@ Report output locations depend on the selected command and options; consult `wha
 - [Scope and authorization](APPLICATION_ARCHITECTURE_MASTER.md)
 - [Tool catalog](APPLICATION_ARCHITECTURE_MASTER.md)
 - [Interfaces](APPLICATION_ARCHITECTURE_MASTER.md)
-- [Dependency readiness](./OPERATIONS_MASTER.md)
-- [Deployment](./OPERATIONS_MASTER.md)
-- [Troubleshooting](./OPERATIONS_MASTER.md)
+- [Dependency readiness](#part-2--dependency-readinessmd)
+- [Deployment](#part-3--deploymentmd)
+- [Troubleshooting](#part-4--troubleshootingmd)
 
 
 ---
@@ -624,7 +624,7 @@ Generate a fresh profile plan with `whaxon setup --profile core`, or a single-de
 
 ### An installation failed or was interrupted
 
-Rerun `whaxon doctor` and inspect the operation/audit record. A failed pip operation may have partially changed the virtual environment; WHAXON does not promise rollback. If the environment is inconsistent, recreate the virtual environment and reinstall the required approved extras. See [Dependency readiness](./OPERATIONS_MASTER.md).
+Rerun `whaxon doctor` and inspect the operation/audit record. A failed pip operation may have partially changed the virtual environment; WHAXON does not promise rollback. If the environment is inconsistent, recreate the virtual environment and reinstall the required approved extras. See [Dependency readiness](#part-2--dependency-readinessmd).
 
 ## Tool execution and scope
 
@@ -664,7 +664,7 @@ Start the foreground server with `whaxon web` and use the address printed at sta
 
 ### Authentication fails
 
-Loopback requests use the local-peer shortcut after Host and cross-origin checks. Remote requests require explicit non-default Basic-auth credentials. Review `WHAXON_AUTH_USER`, `WHAXON_AUTH_PASS` or `WHAXON_AUTH_PASS_HASH`, restart the service after changing environment variables, and clear cached browser Basic-auth credentials if necessary. Never expose the loopback demo defaults remotely. See [Deployment](./OPERATIONS_MASTER.md).
+Loopback requests use the local-peer shortcut after Host and cross-origin checks. Remote requests require explicit non-default Basic-auth credentials. Review `WHAXON_AUTH_USER`, `WHAXON_AUTH_PASS` or `WHAXON_AUTH_PASS_HASH`, restart the service after changing environment variables, and clear cached browser Basic-auth credentials if necessary. Never expose the loopback demo defaults remotely. See [Deployment](#part-3--deploymentmd).
 
 ### A remote deployment rejects startup
 
@@ -704,7 +704,7 @@ Open an issue in the active repository: https://github.com/andreipath26/WHAXON-A
 
 # Dependency readiness and guided installation
 
-**Status reviewed 2026-11-02:** implementation exists on `main`; this is an implementation/acceptance record, not the primary operator guide. Use [dependency-readiness.md](./OPERATIONS_MASTER.md) for the maintained installation instructions. The acceptance requirements below remain open unless the master roadmap records closure with evidence. CI run #41313223574 is a specific passing run from 2026-11-01, not a guarantee that every later commit or current HEAD passed. Deployment gates below remain open unless the master roadmap records closure with evidence.
+**Status reviewed 2026-11-02:** implementation exists on `main`; this is an implementation/acceptance record, not the primary operator guide. Use [dependency-readiness.md](#part-2--dependency-readinessmd) for the maintained installation instructions. The acceptance requirements below remain open unless the master roadmap records closure with evidence. CI run #41313223574 is a specific passing run from 2026-11-01, not a guarantee that every later commit or current HEAD passed. Deployment gates below remain open unless the master roadmap records closure with evidence.
 
 ## Scope and status
 
