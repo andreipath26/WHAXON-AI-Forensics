@@ -476,3 +476,33 @@ def test_scope_copy_cli_quotes_wildcard_target_for_shell(page, live_server):
     page.locator("#copyCliBtn").click()
     page.wait_for_function("() => Boolean(window.__copiedScopeCommand)")
     assert page.evaluate('() => window.__copiedScopeCommand') == 'whaxon scope --check "*.example.com"'
+
+
+def test_scope_malformed_200_response_disables_actions(page, live_server):
+    page.route("**/api/scope", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='{"enabled":"true","in_scope":[],"out_of_scope":[]}'
+    ))
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('invalid configuration')",
+        timeout=8000)
+    assert page.locator("#openTargetModalBtn").is_disabled()
+    assert page.locator("#scope-ui-notice").get_attribute("role") == "alert"
+
+
+def test_scope_preflight_rejects_malformed_allowed_flag(page, live_server):
+    page.route("**/api/scope/check", lambda route: route.fulfill(
+        status=200, content_type="application/json",
+        body='{"allowed":"true","reason":"invalid"}'
+    ))
+    page.goto(f"{live_server}/ui-v2/scope")
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000)
+    page.locator("#scopeCheckTarget").fill("example.com")
+    page.locator("#runScopeCheckBtn").click()
+    page.wait_for_function(
+        "() => document.querySelector('#scopeCheckResult')?.textContent.includes('invalid verdict')",
+        timeout=8000)
+    assert "CHECK ERROR" in page.locator("#scopePreflightStatus").inner_text()
