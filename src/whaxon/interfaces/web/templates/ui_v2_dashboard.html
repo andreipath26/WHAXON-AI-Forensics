@@ -611,8 +611,8 @@
     const engineState = document.getElementById("dashboard-engine-state");
     if (engineState) engineState.textContent = health.ok === true ? "ENGINE ONLINE" : "ENGINE UNAVAILABLE";
     const findings = (report.jobs || []).flatMap(item => item.findings || []);
-    const verified = findings.filter(f => String(f.verification_status || f.status || "").toLowerCase() === "verified").length;
-    const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || f.status || "").toLowerCase())).length;
+    const verified = findings.filter(f => String(f.verification_status || "").toLowerCase() === "verified").length;
+    const falsePositives = findings.filter(f => ["refuted","false_positive"].includes(String(f.verification_status || "").toLowerCase())).length;
     const availableTools = tools.filter(t => t.available === true && t.adapter_available === true && t.binary_available === true).length;
     setCardValue("Active Scans", activeJobsAvailable ? activeJobs.length : "—", activeJobsAvailable ? (activeJobs.length ? "RUNNING" : "NO ACTIVE JOBS") : "STATUS UNAVAILABLE");
     setCardValue("Verified Findings", reportAvailable ? verified : "—", reportAvailable ? (falsePositives + " FALSE POSITIVES") : "STATUS UNAVAILABLE");

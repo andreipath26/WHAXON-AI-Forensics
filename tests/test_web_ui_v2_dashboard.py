@@ -816,3 +816,25 @@ def test_dashboard_invalid_engagement_type_is_not_rendered_as_object(page, live_
     )
     assert "[object Object]" not in page.locator("#dashboard-session-engagement").inner_text()
     assert page.locator("#dashboard-session-engagement").inner_text() != "undefined"
+
+
+def test_dashboard_verified_metric_requires_independent_verification_field(page, live_server):
+    """Generic record status never promotes a candidate to a verified finding."""
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"jobs":[{"findings":[{"status":"verified","verification_status":"candidate"},'
+                 '{"status":"verified"},{"verification_status":"verified"}]}]}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('seed-job-1')",
+        timeout=8000,
+    )
+    card = page.locator(".rounded-lg.bg-surface-container-low.p-space-md").filter(
+        has_text="Verified Findings"
+    )
+    assert "1" in card.inner_text()
+    assert "0 FALSE POSITIVES" in card.inner_text()

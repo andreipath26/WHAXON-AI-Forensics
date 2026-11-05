@@ -65,3 +65,24 @@ Dashboard batch 1 hardens malformed-history export: a successful HTTP response w
 **Next after Dashboard:** UI-02 Scope, UI-03 Run, UI-04 Findings, then evidence/report workflows and the remaining pages; order follows critical dependencies and is adjustable without skipping gates.
 
 **Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1–D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
+
+## Dashboard implementation checkpoint — 2026-11-05 (D1–D6)
+
+The Dashboard is the **first** page in this UI-wide crosswalk, not a separate crosswalk. Work is in [UI PR #126](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/126). Implemented safety hardening now includes:
+
+- Fail-closed malformed HTTP-success payloads for history export and import; null/invalid JSON shapes for history/jobs/report/tools/scope/status; boolean-only health, adapter and scope enforcement assertions.
+- No candidate-to-verified promotion from a generic finding `status`; use only explicit `verification_status`.
+- Invalid historical timestamps and negative findings counts remain unrecorded rather than being presented as real data.
+- Partial cancel failures report requested counts conservatively; history filtering has a visible no-match state and retains backend-unavailable messages.
+- No supplied design files modified; all changes in the production Dashboard template and existing browser test module.
+
+| Gate | Latest assessment | Evidence still required to close |
+|---|---|---|
+| D1 Design | OPEN | Approver-approved comparison to `web ui files and rendering/dashboard_engagement_hub_zero_state/screen.png` at representative desktop/mobile viewports |
+| D2 Controls | PARTIAL | Runtime inventory of every visible control with final expected action, loading/empty/error and authorization behavior, including generated elements |
+| D3 Runtime truth | CANDIDATE | New negative-case Playwright assertions, exact-head CI success, cross-client integration and monitored supported staging |
+| D4 Security | PARTIAL | Independent server-side authorization/CSRF review, malicious content escaping, permission-denied/timeout/cancel proofs |
+| D5 Accessibility | PARTIAL | Keyboard/focus, high zoom, non-color cues, contrast and assistive-technology manual sign-off |
+| D6 Deployment | OPEN | Exact candidate browser/desktop tests, packaged fonts/icons/CSS or explicitly approved connected-only asset policy and failover, target-environment rollout/rollback evidence |
+
+**Decision:** Dashboard **NOT DEPLOYMENT-READY** until D1–D6 evidence and operator sign-off exist; E6 remains FROZEN. Do not equate a green CI run, static 35-control inventory, or this checkpoint with approval.
