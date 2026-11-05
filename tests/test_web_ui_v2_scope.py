@@ -506,3 +506,22 @@ def test_scope_preflight_rejects_malformed_allowed_flag(page, live_server):
         "() => document.querySelector('#scopeCheckResult')?.textContent.includes('invalid verdict')",
         timeout=8000)
     assert "CHECK ERROR" in page.locator("#scopePreflightStatus").inner_text()
+
+
+def test_scope_has_local_assets_and_no_external_tracking(page, live_server):
+    outgoing = []
+    def block(route):
+        outgoing.append(route.request.url)
+        route.abort("blockedbyclient")
+    page.route("https://**/*", block)
+    response = page.goto(f"{live_server}/ui-v2/scope")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
+        timeout=8000)
+    assert outgoing == []
+    for path in ("/static/scope-v2.css", "/static/dashboard-fonts.css",
+                 "/static/dashboard-logo.jpg", "/static/dashboard-profile.jpg"):
+        assert page.request.get(f"{live_server}{path}").status == 200, path
+    assert page.evaluate(
+        "() => getComputedStyle(document.body).backgroundColor") == "rgb(15, 19, 28)"
