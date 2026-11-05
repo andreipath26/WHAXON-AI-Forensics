@@ -104,7 +104,7 @@ def main() -> None:
         from .interfaces.tui.app import main as tui_main
         tui_main(args)
     elif mode in ("--help", "-h"):
-        print("Usage: whaxon [setup|doctor|init|up|down|serve|web|tui|gui|msf|scope|install|suggest|burp-import|evidence|report|run|workflow|findings|lookup|cve|vulndb|validate|retest|coverage|bounty|state|jobs|ai]")
+        print("Usage: whaxon [setup|doctor|init|up|down|serve|web|tui|gui|msf|scope|install|suggest|burp-import|evidence|report|run|workflow|findings|lookup|cve|vulndb|validate|retest|coverage|recon|bounty|state|jobs|ai]")
     else:
         print(f"Unknown mode: {mode}. Use 'tui', 'gui', 'web', or 'serve'.")
         sys.exit(2)
