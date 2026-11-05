@@ -756,6 +756,7 @@
     }
     const showActionStatus = (message, kind = "info") => {
       actionStatus.hidden = false;
+      actionStatus.setAttribute("role", kind === "error" ? "alert" : "status");
       actionStatus.textContent = message;
       actionStatus.classList.toggle("text-error", kind === "error");
       actionStatus.classList.toggle("text-primary", kind === "success");
@@ -825,7 +826,10 @@
         showActionStatus("History export failed: " + error.message, "error");
       }
     }
+    let haltInFlight = false;
     async function haltActiveJobs() {
+      if (haltInFlight) return;
+      haltInFlight = true;
       try {
         const response = await fetch("/api/jobs/active");
         if (!response.ok) throw new Error("Active jobs HTTP " + response.status);
@@ -841,7 +845,7 @@
         const results = await Promise.all(active.map(async job => {
           try {
             const id = job.id || job.job_id;
-            if (!id) return false;
+            if (typeof id !== "string" || !id.trim()) return false;
             const result = await fetch("/api/jobs/" + encodeURIComponent(id) + "/cancel", { method: "POST" });
             if (!result.ok) return false;
             const body = await result.json();
@@ -856,6 +860,8 @@
         await load();
       } catch (error) {
         showActionStatus("Emergency halt failed: " + error.message, "error");
+      } finally {
+        haltInFlight = false;
       }
     }
     async function uploadBurpFile(file) {

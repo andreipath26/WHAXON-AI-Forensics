@@ -857,3 +857,49 @@ def test_dashboard_mobile_menu_traps_keyboard_focus_and_escape_restores_button(p
     page.keyboard.press("Escape")
     assert menu.evaluate("(node) => document.activeElement === node")
     assert page.locator("body > aside").get_attribute("aria-hidden") == "true"
+
+
+def test_dashboard_halt_never_calls_cancel_with_untrusted_object_identity(page, live_server):
+    """Malformed active-job IDs cannot turn into arbitrary cancellation paths."""
+    calls = []
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":{"bad":"value"}}]',
+        ),
+    )
+    page.route(
+        "**/api/jobs/*/cancel",
+        lambda route: (calls.append(route.request.url), route.fulfill(
+            status=200, content_type="application/json", body='{"ok":true}'
+        )),
+    )
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile("Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1')",
+        timeout=8000,
+    )
+    assert calls == []
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+
+
+def test_dashboard_error_message_is_announced_as_accessibility_alert(page, live_server):
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=503, content_type="application/json",
+            body='{"error":"unavailable"}',
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile("Export Archive")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('History export failed')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
