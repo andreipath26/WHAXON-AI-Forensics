@@ -220,7 +220,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/status` | `api_status` | Runtime diagnostics |
 | `GET` | `/api/tools` | `list_tools` | Packaged catalog advertisement |
 | `GET` | `/api/tree` | `get_tree` | Legacy report, finding or loot view |
-| `GET` | `/api/ui-v2/findings` | `api_ui_v2_findings` | Legacy web service; consult handler and tests |
+| `GET` | `/api/ui-v2/findings` | `api_ui_v2_findings` | Legacy finding/evidence API adapter |
 | `GET` | `/api/v2/capabilities` | `workflow_v2_capabilities` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
