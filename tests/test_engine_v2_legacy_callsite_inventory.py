@@ -388,8 +388,72 @@ def test_catalog_and_v2_operation_crosswalk_are_documented():
         / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
     )
     inventory = inventory_path.read_text(encoding="utf-8")
-    for tool_id in EXPECTED_CATALOG_TRANSPORTS:
-        assert f"`{tool_id}`" in inventory, f"catalog tool missing from G01 inventory: {tool_id}"
-    for _tool_id, operation_id in EXPECTED_V2_SEMANTIC_OPERATIONS.items():
-        assert f"`{operation_id}`" in inventory, f"V2 semantic operation missing from G01 inventory: {operation_id}"
+    catalog_start = inventory.index("| Catalog IDs | V2 status | Transport and reason |")
+    catalog_end = inventory.index(
+        "Exact V2 operation aliases and declared target types:", catalog_start,
+    )
+    documented_catalog = {}
+    for line in inventory[catalog_start:catalog_end].splitlines():
+        if not line.startswith("| `"):
+            continue
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        for tool_id in re.findall(r"`([^`]+)`", cells[0]):
+            documented_catalog[tool_id] = (cells[1], cells[2])
+
+    admitted = set(EXPECTED_V2_TARGET_TYPES)
+    not_admitted = {"commix", "echo", "hydra", "impacket", "netexec"}
+    unsupported = set(EXPECTED_CATALOG_TRANSPORTS) - admitted - not_admitted
+    expected_catalog = {
+        tool_id: (
+            "Admitted",
+            "`cli` → `local_process`, provider-bound; target-type allowlist applies.",
+        )
+        for tool_id in admitted
+    }
+    expected_catalog.update({
+        tool_id: (
+            "Not admitted",
+            "`cli`; no Engine V2 provider admission. Some have legacy adapters.",
+        )
+        for tool_id in not_admitted
+    })
+    transport_reasons = {
+        "msf_session": "`msf_session`; requires a separately accepted session provider.",
+        "smb": "`smb`; requires a separately accepted session provider.",
+        "ssh": "`ssh`; no registered adapter in the inspected runtime.",
+        "wmi": "`wmi`; requires a separately accepted session provider.",
+    }
+    expected_catalog.update({
+        tool_id: (
+            "Unsupported in V2",
+            transport_reasons[EXPECTED_CATALOG_TRANSPORTS[tool_id]],
+        )
+        for tool_id in unsupported
+    })
+    assert documented_catalog == expected_catalog
+
+    operation_start = inventory.index(
+        "| Tool | Compatibility capability | Semantic capability | Target types |",
+    )
+    operation_end = inventory.index("The built-in adapter registry", operation_start)
+    documented_operations = {}
+    for line in inventory[operation_start:operation_end].splitlines():
+        match = re.match(
+            r"^\| `([^`]+)` \| `([^`]+)` \| `([^`]+)` \| ([^|]+) \|$",
+            line,
+        )
+        if match:
+            tool_id, capability_id, operation_id, raw_targets = match.groups()
+            target_names = {"URL": "url", "Hostname": "hostname", "IP": "ip"}
+            target_types = tuple(
+                target_names[target.strip()] for target in raw_targets.split(",")
+            )
+            documented_operations[tool_id] = (
+                capability_id, operation_id, target_types,
+            )
+    expected_operations = {
+        tool_id: (f"tool.{tool_id}", operation_id, EXPECTED_V2_TARGET_TYPES[tool_id])
+        for tool_id, operation_id in EXPECTED_V2_SEMANTIC_OPERATIONS.items()
+    }
+    assert documented_operations == expected_operations
 
