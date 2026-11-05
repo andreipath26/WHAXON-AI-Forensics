@@ -1,5 +1,26 @@
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
+
+
+def _boolean_result(value: str) -> bool:
+    """Evaluate numeric comparisons used by SQLmap without a database."""
+    comparisons = re.findall(r"(\d+)\s*(=|!=|>=|<=|>|<)\s*(\d+)", value)
+    if not comparisons:
+        return True
+    for left_text, operator, right_text in comparisons:
+        left, right = int(left_text), int(right_text)
+        result = {
+            "=": left == right,
+            "!=": left != right,
+            ">=": left >= right,
+            "<=": left <= right,
+            ">": left > right,
+            "<": left < right,
+        }[operator]
+        if not result:
+            return False
+    return True
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -17,7 +38,7 @@ class Handler(BaseHTTPRequestHandler):
             # constant response and never access or mutate a database.
             if "'" in value:
                 status, body = 500, b"SQLite error: near quote: syntax error"
-            elif " and " in value and any(a != b for a, b in __import__("re").findall(r"(\d+)=(\d+)", value)):
+            elif " and " in value and not _boolean_result(value):
                 status, body = 200, b"No products found"
             else:
                 status, body = 200, b"Product: fixture-item"
