@@ -93,11 +93,11 @@ WHAXON is an **actively developed beta**, not a finished autonomous penetration-
 - **Verification is deliberately limited.** Supported checks produce specific outcomes; unsupported, ambiguous or unreproducible findings must not be presented as independently verified. Stateful POST replay and arbitrary authenticated request replay are not generally supported.
 - **Scope controls do not replace network isolation.** External tools may perform additional network operations; application-level checks are not a firewall or a connection-time DNS pin.
 - **Evidence integrity is not the same as an external trust anchor.** Local digests and consistency checks can detect some changes, but do not themselves prove independent, tamper-proof custody.
-- **Durability is being hardened.** Queue persistence, lease fencing, budget and cancellation controls exist, while full external-effect crash recovery, daemon/container operation and backup/restore acceptance remain open.
+- **Durability is boundedly engineered, not production-certified.** Queue persistence, lease fencing, mission controls, cancellation and conservative recovery have implemented tests; Ubuntu systemd and paired Docker worker/restart/offline-restore *staging* passed E5 engineering smokes. External-effect crash/real-target, operator security, independent audit anchors and complete production disaster-recovery acceptance remain open.
 - **Interface and installation acceptance is incomplete.** The supplied UI, supported external tools, cross-platform installation, accessibility and end-to-end deployment still need exact-environment verification.
 - **Larger expansions remain gated.** Broad autonomous bounty campaigns, multi-target orchestration, advanced session/Metasploit breadth and enterprise integrations are not part of the accepted solo-v1.0 baseline.
 
-For the latest tested commit and outstanding release criteria, use [GitHub Actions](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml), the [project state](WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md) and the [v1.0 acceptance register](docs/V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md). CI passing does not mean every external tool or security claim is validated.
+For the latest tested commit and outstanding release criteria, use [GitHub Actions](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/workflows/ci.yml), the [project state](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and the [v1.0 acceptance register](docs/V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md). CI passing does not mean every external tool or security claim is validated.
 
 ## Documentation
 

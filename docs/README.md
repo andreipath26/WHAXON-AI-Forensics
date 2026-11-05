@@ -1,5 +1,7 @@
 # WHAXON documentation — canonical index
 
+> **Current verified evidence (2026-11-05):** [main CI at `fc056d0`](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849) passed all 13 jobs, including Python 3.11–3.13, SearchSploit, systemd, Docker and platform setup. Subsequent commits must pass **their own** exact-head checks. E5 bounded engineering work is merged, while complete client migration, D1–D6, independent real-target/evidence acceptance and V1 G01–G10 release gates remain OPEN.
+
 **Consolidated 2026-11-05.** One authoritative master per subject. Superseded documentation has been absorbed into the linked masters and removed from the live tree. Git history preserves its original revisions. Do not create competing architecture, roadmap, audit, acceptance, or status documents. For current feature claims, consult code and exact-HEAD CI rather than historical narratives embedded within masters.
 
 | Area | Single authoritative document | Scope |

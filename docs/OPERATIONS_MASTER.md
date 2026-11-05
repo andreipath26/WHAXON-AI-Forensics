@@ -20,7 +20,7 @@
 
 # Getting Started
 
-This guide describes the current `main` checkout of **andreipath26/WHAXON-AI-Forensics**. The PyPI package is version 0.11.16; the repository may contain unreleased changes. Use `whaxon --help` to confirm the commands available in your installed copy.
+This guide describes the current `main` checkout of **andreipath26/WHAXON-AI-Forensics**. The inspected source declares version `0.11.16` in `pyproject.toml`; PyPI publication/version identity was not independently verified here. The repository may contain unreleased changes. Use `whaxon --help` to confirm the commands available in your installed copy.
 
 ## Requirements
 

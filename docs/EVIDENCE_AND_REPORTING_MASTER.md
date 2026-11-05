@@ -1,6 +1,6 @@
 # WHAXON — FINDINGS, REPORTS, EVIDENCE AND RETENTION MASTER
 
-> **Current source audit (2026-11-05):** `core/findings.py` defines Finding and supported parsers; `core/report.py` contains Markdown, JSON, HTML and PDF render paths; CLI and Flask expose reports, per-job findings and evidence endpoints. These source surfaces do not establish all-scanner validation or independently witnessed evidence. Historical report redesign and visual plans below are not proof of deployed capabilities.
+> **Current code/acceptance boundary — 2026-11-05.** `src/whaxon/core/findings.py` defines typed findings and parser routines; `core/report.py` provides Markdown, JSON, HTML and PDF paths; web and CLI report/evidence endpoints exist. The 13/13 [CI success at `fc056d0`](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849) covers its actual tests, **not** independently witnessed evidence custody, all scanners in customer environments, or G04 report/reproducibility acceptance. Historical design sections below remain historical.
 
 **Canonical findings/reporting/evidence lifecycle reference, consolidated 2026-11-05.** Preserve raw evidence, provenance, verification state and deterministic authorization. Design proposals are not released features. Data retention requirements and evidence integrity remain binding where applicable, independent of the consolidation.
 

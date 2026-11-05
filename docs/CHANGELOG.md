@@ -1,3 +1,10 @@
+## 2026-11-05 — Source-versus-documentation reconciliation (unreleased)
+
+- Corrected the active roadmap/V1 descriptions of the previously fixed one-shot `Core.initialize(drain=False)` CLI isolation, desktop `/ui-v2` default, and merged E5 bounded engineering service. Retained prior historical snapshots explicitly as dated evidence rather than live defects.
+- Reconciled current service/deployment descriptions with staged systemd/Docker and offline-state restore checks; real-target, externally anchored evidence, full legacy-client migration and V1 release gates remain open.
+- Verified the 75-row Engine V2 requirements CSV (4 historically bounded ACCEPTED, 71 NOT_ACCEPTED), 10 E0–E9 engineering gate entries and separate open G01–G10 release gates. Do not turn implementation or green tests into new acceptance without exact requirement-level evidence.
+- Last completed green main-branch baseline at audit: [`fc056d0`, 13/13 CI jobs](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849); later commits require their own CI. No v1.0 release or production deployment approval is claimed.
+
 ## 2026-11-02 — One-shot isolation, catalog consolidation and desktop default
 
 - Prevent coverage, validation, retest and reconnaissance commands from draining unrelated pending jobs during startup; add real-store normal/refusal regressions.

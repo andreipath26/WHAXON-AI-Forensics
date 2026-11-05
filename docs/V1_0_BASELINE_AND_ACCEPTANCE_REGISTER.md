@@ -85,35 +85,27 @@ Paths are relative to the repository. Named test files exist in the inspected tr
 
 The AI proposal path remains `interfaces/cli/ai_cmd.py` or web AI routes → `core/ai_bridge.py` → `ai/executor.py` → guarded runner. Its approvals/phase/resume tests and `test_ai_boundary.py` protect existing behavior. It has not been wholly migrated to the mission DAG. Existing worker, Automator and AI paths are active, not dead modules removable by naming them legacy.
 
-## 4. Open correctness finding: initialization dispatch
+## 4. Resolved one-shot dispatch finding — current source reconciliation
 
-`Core.initialize(drain=True)` binds the event loop, reconciles state and calls `worker.drain_async()` when draining is enabled. It documents `drain=False` for one-shot commands. Current call sites:
-
-| CLI entry point | Initialization | Disposition |
-|---|---|---|
-| `run_cmd.py` | Explicit `drain=False`, then drains its own newly generated follow-ups | Preserve implemented behavior |
-| `workflow_cmd.py` | Explicit `drain=False` before plan run | Preserve implemented behavior |
-| `coverage_cmd.py` | Default `drain=True` before job lookup | Unexpected historical pending-job dispatch can precede a read-only coverage result |
-| `validate_cmd.py`, `retest_cmd.py` | Default `drain=True` before finding eligibility/scope checks | Pending jobs can execute before the requested finding action is accepted or refused |
-| `recon_cmd.py` | Default `drain=True` before the requested recon | Audit and separate unrelated historical work from explicit command intent |
-
-This is a source-confirmed side-effect risk, not a locally executed exploit demonstration. Existing `test_initialize_drain.py` proves the different `drain=True`/`False` behaviors; per-command regression coverage must assert that unrelated pending jobs remain pending while explicit run/follow-up and long-lived-worker behavior still works. P1/G02 owns the repair. Green baseline CI does not imply this missing expectation is covered.
+**Status: fixed, with explicit regression coverage.** The previous section was a source snapshot before the correction. At the inspected 2026-11-05 code HEAD, `run_cmd.py`, `coverage_cmd.py`, `validate_cmd.py`, `retest_cmd.py` and `recon_cmd.py` explicitly use `Core.initialize(drain=False)`; workflow CLI initialization follows the same isolation policy. `tests/test_cli_initialization_isolation.py`, `tests/test_initialize_drain.py` and `tests/test_run_cmd.py` test unrelated pending jobs and intentional own-follow-up draining. The optional `drain=True` Core behavior remains intentional for long-lived execution. **P1-01 is the bounded accepted requirement in the source-linked ledger; G02 is still OPEN** because it includes many more security boundaries than this fix.
 
 ## 5. Implemented components versus outstanding acceptance
 
 | Area | Implemented now | Acceptance or migration still open |
 |---|---|---|
-| E1 guards | Leases/ownership/heartbeat, stale recovery, session/pivot identity and immediate pre-process scope checks | Initialization issue; DNS/redirect/follow-up/pivot boundary, cancellation and race acceptance |
+| E1 guards | One-shot isolation, leases/ownership/heartbeat, stale recovery, session/pivot identity and immediate pre-process scope checks | Cross-transport DNS/redirect/follow-up/pivot boundary, cancellation and adversarial race acceptance remain open; the one-shot defect itself is closed |
 | E2 contracts | Immutable versioned WorkflowTask/WorkflowPlan and manifests, plan digests, exact ApprovalBinding, durable mission/task/attempt persistence | Common lifecycle and real-workflow recovery evidence |
-| E3 scheduler | Atomic dependency claims, retries, per-task deadlines, fencing, uncertain outcomes, bounded concurrency and per-run task limits | Durable mission-wide resource/rate/cost/time budgets, cancellation intent, audit/outbox guarantees and uncertain-effect reconciliation |
+| E3 scheduler | Atomic claims, retries, per-task deadlines, fencing and uncertain outcomes; durable mission cost/rate/deadline limits, cancellation intent and audit/outbox paths exist | Full external-effect recovery, real-provider side effects, transport parity and independent audit-anchor acceptance remain open |
 | E4 providers | Constrained catalog-backed scanner bridge with default catalog inputs; registered manifests | Portfolio reconciliation, readiness/permission/impact truthfulness, separately authorized session/API transports |
-| E5 services/headless | Core mission/plan/scheduler APIs, workflow CLI and passing no-display smoke | Shared CLI/API/UI lifecycle, durable progress/evidence/coverage/verification and deployment recovery |
-| E6 supplied UI | Routes/templates and page-specific browser tests; web default switched | All-control, visual, responsive/accessibility, parity, external asset and desktop-default acceptance |
+| E5 services/headless | E5 bounded engineering-accepted shared V2 service, durable run requests, CLI/API/headless worker, Docker/systemd startup and offline restore smokes; PR #124 merged 2026-11-05 | Legacy direct-path migration, broad UI parity, real-target/production security, external audit anchors, full disaster recovery and V1 release gates remain open |
+| E6 supplied UI | 22 V2 templates, browser routes and page-specific tests; web and desktop defaults already switched to `/ui-v2` | Every-control completion, D1–D6 visual/manual accessibility/security/parity, external assets and final production acceptance remain open |
 | Setup and deployment | Profiles/doctor/plans/approval-bound installers and selected cross-platform smoke | Full clean-machine/upgrade/offline/partial-failure/restart, optional-extra and advertised service-mode matrix |
 
 The provider bridge's allowlist and registered manifests are an initial slice. They do not establish every tool as independently verified, safe for every parameter set, installed or authorized. Current `core/remediation.py` plans dependency repairs; it is not the deferred vulnerability patch/application engine.
 
-## 6. Repository cleanup and branch disposition
+## 6. Repository cleanup and branch disposition (historical 2026-11-02 baseline)
+
+The following counts and pre-cleanup code/catalog assertions are preserved as dated baseline evidence, **not current tracked-file counts or pending tasks**. The later documentation consolidation and migrated catalog consumers supersede those cleanup details.
 
 [Due diligence](PROJECT_GOVERNANCE_MASTER.md) is the exact removal/retirement register. Cleanup removes Batches A/B (23 non-runtime files); no runtime code or branches are deleted. Byte-identical loose UI copies and unconsumed imports/exports differ from live compatibility paths, unique historical rationale, legal notices or retained evidence. Root `data/tools.json` still has test/runtime consumers; migration must precede removal. Distinct supplied designs and the legacy UI design remain preserved.
 
@@ -124,9 +116,9 @@ Remote comparison of all 55 non-main tips against the baseline found **10 strict
 Follow the trajectory's dependency gates, using batches with bounded ownership:
 
 1. **P0:** finish exhaustive capability/control inventory and maintain the cleanup register; principal-path tracing and baseline evidence are refreshed here, not universally complete.
-2. **P1:** fix one-shot initialization dispatch and close authorization, validation/retest and evidence-boundary gaps without rebuilding implemented fixes.
-3. **P2:** complete shared durable lifecycle, mission-wide bounds/cancellation/audit/reconciliation and migration parity.
-4. **P3/P4:** after their service contracts stabilize, run independent install/headless recovery and supplied-page acceptance batches; desktop must load the accepted new UI.
+2. **P1:** preserve accepted one-shot isolation and close other authorization, validation/retest, policy and evidence-boundary gaps without rebuilding implemented fixes.
+3. **P2:** preserve bounded E5 shared-service engineering acceptance; close remaining direct legacy dispatch, provider-effect recovery, cross-client parity and independent audit/witness gaps.
+4. **P3/P4:** extend already-passing staged systemd/Docker/installer checks to production/operator conditions and complete D1–D6 supplied-page approval; desktop already targets `/ui-v2`.
 5. **P5:** controlled-lab end-to-end proof and all §38 G01–G10 release checks on one exact candidate, including honest skips/unsupported combinations and release identity.
 6. **P6–P8:** broader bounty autonomy, multi-target/competitive measurement, full Metasploit, expanded candidate onboarding/upstream monitoring, remediation application, enterprise and platform expansion remain gated/deferred.
 

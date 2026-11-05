@@ -50,7 +50,7 @@ The previous `ENGINE_V2_*.md` documents were consolidated here and removed from 
 
 ### WHAXON Engine v2 — Architecture Specification & Roadmap Crosswalk
 
-> **E5 bounded engineering review (2026-11-04):** [E5 acceptance review](#source-1-engine_v2_architecture_and_roadmap_crosswalkmd) records 12/12 source CI at `557311dfa125` and staged Docker/systemd recovery verification. This is a conditional phase-freeze candidate pending final documentation-head CI/PR review; **legacy direct dispatch still requires P2/E4 migration**, and operator production deployment is not accepted. Supersedes earlier E5 OPEN engineering candidate observations only within the supported V2 service scope.
+> **E5 post-merge disposition (2026-11-05, superseding 2026-11-04 pending status):** [E5 acceptance review](#source-10-engine_v2_e5_phase_acceptancemd) and merged [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) establish bounded shared-service E5 engineering acceptance. Its reviewed PR head passed 12/12 CI. This does **not** authorize production deployment or certify migration of legacy direct dispatch; all integrated Engine V2 operator gates remain separately open.
 
 **Status:** Target architecture and implementation contract. This document does not claim the design is implemented.  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
