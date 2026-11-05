@@ -142,11 +142,40 @@ handler binding for all Flask `/api/*` routes, including read/status/export
 routes. The matrix below summarizes consequential ownership and authorization
 boundaries; it does not claim to guard UI controls.
 
-A static decorator census currently finds 104 `/api/*` method/path bindings and
-22 `/ui-v2/*` page routes in `interfaces/web/server.py` (five other routes are
-health/root/settings/favicon pages). The matrix below covers consequential
+A static decorator census currently finds 104 `/api/*` method/path bindings,
+22 distinct `/ui-v2/*` page handlers with 23 route aliases, and five other
+health/root/settings/favicon routes in `interfaces/web/server.py`. The matrix below covers consequential
 execution, authorization-state, cancellation and provisioning routes. This census makes every method/path/handler binding reviewable. It does not replace the handler-family semantics, persistence, access-control or test evidence mapped below; those remain bounded and are not inferred from route registration.
 The UI page/control inventory is frozen and is not being edited here.
+
+The UI route aliases below are recorded as an Engine V2 caller crosswalk; this
+is not UI acceptance or authorization to change the frozen pages.
+
+| Method | Exact route | Handler |
+| --- | --- | --- |
+| `GET` | `/ui-v2` | `ui_v2_home` |
+| `GET` | `/ui-v2/dashboard` | `ui_v2_home` |
+| `GET` | `/ui-v2/run` | `ui_v2_run` |
+| `GET` | `/ui-v2/findings` | `ui_v2_findings` |
+| `GET` | `/ui-v2/scope` | `ui_v2_scope` |
+| `GET` | `/ui-v2/report` | `ui_v2_report` |
+| `GET` | `/ui-v2/reports` | `ui_v2_reports` |
+| `GET` | `/ui-v2/history` | `ui_v2_history` |
+| `GET` | `/ui-v2/diagnostics` | `ui_v2_diagnostics` |
+| `GET` | `/ui-v2/evidence` | `ui_v2_evidence` |
+| `GET` | `/ui-v2/ai` | `ui_v2_ai` |
+| `GET` | `/ui-v2/retest` | `ui_v2_retest` |
+| `GET` | `/ui-v2/chains` | `ui_v2_chains` |
+| `GET` | `/ui-v2/adapters` | `ui_v2_adapters` |
+| `GET` | `/ui-v2/settings` | `ui_v2_settings` |
+| `GET` | `/ui-v2/audit` | `ui_v2_audit` |
+| `GET` | `/ui-v2/monitoring` | `ui_v2_monitoring` |
+| `GET` | `/ui-v2/bas` | `ui_v2_bas` |
+| `GET` | `/ui-v2/bug-bounty` | `ui_v2_bug_bounty` |
+| `GET` | `/ui-v2/compliance` | `ui_v2_compliance` |
+| `GET` | `/ui-v2/ptaas` | `ui_v2_ptaas` |
+| `GET` | `/ui-v2/threat-intel` | `ui_v2_threat_intel` |
+| `GET` | `/ui-v2/approvals` | `ui_v2_approvals` |
 
 #### Exact Flask API method/path/handler census
 
