@@ -10,28 +10,28 @@
 2. **Dated phase acceptance and operational evidence:** Part II (retain baseline SHAs and acceptance caveats; newer exact-head evidence can supersede older evidence but must be validated).
 3. **Historical inventories, audit, provider scope and evidence mapping:** Part III (traceability, not a second roadmap).
 
-The previous `ENGINE_V2_*.md` documents remain as **historical source records** for stable links, auditability and Git history. Edit this master for any new, authoritative Engine V2 synthesis; do not create another competing current-state Engine V2 document. Move future raw CI artifacts or evidence snapshots to dated archival files only when required for provenance. Do not remove acceptance evidence or amend historical results retroactively.
+The previous `ENGINE_V2_*.md` documents were consolidated here and removed from the working tree; their commits remain in Git history. Edit this master for any new, authoritative Engine V2 synthesis; do not create another competing current-state Engine V2 document. Move future raw CI artifacts or evidence snapshots to dated archival files only when required for provenance. Do not remove acceptance evidence or amend historical results retroactively.
 
 ## Consolidated source map
 
 | Purpose | Original retained source | Consolidated location |
 |---|---|---|
-| Architecture / implementation | [ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) | Part I, source 1 |
-| Baseline / audit | [ENGINE_V2_BASELINE_INVENTORY.md](ENGINE_V2_BASELINE_INVENTORY.md) | Part III, source 2 |
-| Baseline / audit | [ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md](ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md) | Part III, source 3 |
-| Phase-specific acceptance | [ENGINE_V2_E1_ACCEPTANCE.md](ENGINE_V2_E1_ACCEPTANCE.md) | Part II, source 4 |
-| Phase-specific acceptance | [ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md](ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md) | Part II, source 5 |
-| Phase-specific acceptance | [ENGINE_V2_E3_PHASE_ACCEPTANCE.md](ENGINE_V2_E3_PHASE_ACCEPTANCE.md) | Part II, source 6 |
-| Phase-specific acceptance | [ENGINE_V2_E3_RECOVERY_BOUNDARIES.md](ENGINE_V2_E3_RECOVERY_BOUNDARIES.md) | Part II, source 7 |
-| Phase-specific acceptance | [ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md](ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md) | Part II, source 8 |
-| Phase-specific acceptance | [ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md](ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md) | Part II, source 9 |
-| Phase-specific acceptance | [ENGINE_V2_E5_PHASE_ACCEPTANCE.md](ENGINE_V2_E5_PHASE_ACCEPTANCE.md) | Part II, source 10 |
-| Phase-specific acceptance | [ENGINE_V2_E5_SERVICE_READINESS.md](ENGINE_V2_E5_SERVICE_READINESS.md) | Part II, source 11 |
-| Phase-specific acceptance | [ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md](ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md) | Part II, source 12 |
-| Phase-specific acceptance | [ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md](ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md) | Part II, source 13 |
-| Phase-specific acceptance | [ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md](ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md) | Part II, source 14 |
-| Evidence / provider | [ENGINE_V2_EVIDENCE_MATRIX.md](ENGINE_V2_EVIDENCE_MATRIX.md) | Part III, source 15 |
-| Evidence / provider | [ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md](ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md) | Part III, source 16 |
+| Architecture / implementation | [ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md](./ENGINE_V2_MASTER.md) | Part I, source 1 |
+| Baseline / audit | [ENGINE_V2_BASELINE_INVENTORY.md](./ENGINE_V2_MASTER.md) | Part III, source 2 |
+| Baseline / audit | [ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md](./ENGINE_V2_MASTER.md) | Part III, source 3 |
+| Phase-specific acceptance | [ENGINE_V2_E1_ACCEPTANCE.md](./ENGINE_V2_MASTER.md) | Part II, source 4 |
+| Phase-specific acceptance | [ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md](./ENGINE_V2_MASTER.md) | Part II, source 5 |
+| Phase-specific acceptance | [ENGINE_V2_E3_PHASE_ACCEPTANCE.md](./ENGINE_V2_MASTER.md) | Part II, source 6 |
+| Phase-specific acceptance | [ENGINE_V2_E3_RECOVERY_BOUNDARIES.md](./ENGINE_V2_MASTER.md) | Part II, source 7 |
+| Phase-specific acceptance | [ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md](./ENGINE_V2_MASTER.md) | Part II, source 8 |
+| Phase-specific acceptance | [ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md](./ENGINE_V2_MASTER.md) | Part II, source 9 |
+| Phase-specific acceptance | [ENGINE_V2_E5_PHASE_ACCEPTANCE.md](./ENGINE_V2_MASTER.md) | Part II, source 10 |
+| Phase-specific acceptance | [ENGINE_V2_E5_SERVICE_READINESS.md](./ENGINE_V2_MASTER.md) | Part II, source 11 |
+| Phase-specific acceptance | [ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md](./ENGINE_V2_MASTER.md) | Part II, source 12 |
+| Phase-specific acceptance | [ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md](./ENGINE_V2_MASTER.md) | Part II, source 13 |
+| Phase-specific acceptance | [ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md](./ENGINE_V2_MASTER.md) | Part II, source 14 |
+| Evidence / provider | [ENGINE_V2_EVIDENCE_MATRIX.md](./ENGINE_V2_MASTER.md) | Part III, source 15 |
+| Evidence / provider | [ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md](./ENGINE_V2_MASTER.md) | Part III, source 16 |
 
 ---
 
@@ -44,11 +44,11 @@ The previous `ENGINE_V2_*.md` documents remain as **historical source records** 
 
 ## Source 1: ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md
 
-**Provenance:** [Original source](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### WHAXON Engine v2 — Architecture Specification & Roadmap Crosswalk
 
-> **E5 bounded engineering review (2026-11-04):** [E5 acceptance review](ENGINE_V2_E5_PHASE_ACCEPTANCE.md) records 12/12 source CI at `557311dfa125` and staged Docker/systemd recovery verification. This is a conditional phase-freeze candidate pending final documentation-head CI/PR review; **legacy direct dispatch still requires P2/E4 migration**, and operator production deployment is not accepted. Supersedes earlier E5 OPEN engineering candidate observations only within the supported V2 service scope.
+> **E5 bounded engineering review (2026-11-04):** [E5 acceptance review](./ENGINE_V2_MASTER.md) records 12/12 source CI at `557311dfa125` and staged Docker/systemd recovery verification. This is a conditional phase-freeze candidate pending final documentation-head CI/PR review; **legacy direct dispatch still requires P2/E4 migration**, and operator production deployment is not accepted. Supersedes earlier E5 OPEN engineering candidate observations only within the supported V2 service scope.
 
 **Status:** Target architecture and implementation contract. This document does not claim the design is implemented.  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
@@ -802,7 +802,7 @@ This operator decision supersedes earlier requirements to finish deployment-leve
 
 ## Source 4: ENGINE_V2_E1_ACCEPTANCE.md
 
-**Provenance:** [Original source](ENGINE_V2_E1_ACCEPTANCE.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine v2 E1 — Correctness and security acceptance
 
@@ -828,7 +828,7 @@ Historical E1 branch note (2026-11-02): `fix/engine-v2-e1-acceptance-2026-11-02`
 
 ## Source 5: ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md
 
-**Provenance:** [Original source](ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E1/E5 — Run-queue lease credential isolation
 
@@ -863,7 +863,7 @@ configuration still require separate security verification.
 
 ## Source 6: ENGINE_V2_E3_PHASE_ACCEPTANCE.md
 
-**Provenance:** [Original source](ENGINE_V2_E3_PHASE_ACCEPTANCE.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E3 — whole-phase acceptance register
 
@@ -925,7 +925,7 @@ The candidate E3 lifecycle digest now includes persisted plan JSON plus task inp
 
 ## Source 7: ENGINE_V2_E3_RECOVERY_BOUNDARIES.md
 
-**Provenance:** [Original source](ENGINE_V2_E3_RECOVERY_BOUNDARIES.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E3 — Durable recovery boundary hardening (2026-11-03)
 
@@ -993,7 +993,7 @@ The candidate E3 lifecycle digest now includes persisted plan JSON plus task inp
 
 ## Source 8: ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md
 
-**Provenance:** [Original source](ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### E3 — Auditing uncertain durable run requests
 
@@ -1026,7 +1026,7 @@ crash, audit-failure, recovery and release acceptance gates remain open.
 
 ## Source 9: ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md
 
-**Provenance:** [Original source](ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E5 — caller and execution-authority inventory with rollback controls
 
@@ -1088,7 +1088,7 @@ This inventory does not authorize direct security tooling, scanner use or any un
 
 ## Source 10: ENGINE_V2_E5_PHASE_ACCEPTANCE.md
 
-**Provenance:** [Original source](ENGINE_V2_E5_PHASE_ACCEPTANCE.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E5 — whole-phase engineering acceptance register
 
@@ -1238,7 +1238,7 @@ caller inventory.
 
 ## Caller-inventory and rollback checkpoint
 
-Read [E5 caller and execution-authority inventory](ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md) before any claim of E5-A/G completion. It distinguishes the sole supervised V2 queue worker from preserved legacy CLI/web/AI tool execution and specifies fail-closed rollback and full-state recovery. As of this document update, **E5-A through E5-G remain OPEN** pending exact-head CI, remaining migration decisions and operator acceptance.
+Read [E5 caller and execution-authority inventory](./ENGINE_V2_MASTER.md) before any claim of E5-A/G completion. It distinguishes the sole supervised V2 queue worker from preserved legacy CLI/web/AI tool execution and specifies fail-closed rollback and full-state recovery. As of this document update, **E5-A through E5-G remain OPEN** pending exact-head CI, remaining migration decisions and operator acceptance.
 
 ### Two independent worker processes — adversarial claim test
 
@@ -1317,7 +1317,7 @@ No unapproved real scanner or target execution, no externally retained immutable
 
 ## Source 11: ENGINE_V2_E5_SERVICE_READINESS.md
 
-**Provenance:** [Original source](ENGINE_V2_E5_SERVICE_READINESS.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E5 — Core service readiness and optional integration health
 
@@ -1356,7 +1356,7 @@ acceptance remains open under the master roadmap's P2/P3 and E5 gates.
 
 ## Source 12: ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md
 
-**Provenance:** [Original source](ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 E6 — contract-first integration and UI readiness boundary
 
@@ -1410,7 +1410,7 @@ Do not redesign, edit, restyle, silently complete, or declare accepted the suppl
 
 ## Source 13: ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md
 
-**Provenance:** [Original source](ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### E6 deployment acceptance ledger — non-waivable release gates
 
@@ -1452,7 +1452,7 @@ Every gate requires: exact final commit SHA, affected requirement IDs, exact tes
 
 ## Source 14: ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md
 
-**Provenance:** [Original source](ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### E6 service-to-UI handoff matrix — backend evidence only
 
@@ -1500,7 +1500,7 @@ When the new design is formally ready, map each visible control to an approved r
 
 ## Source 2: ENGINE_V2_BASELINE_INVENTORY.md
 
-**Provenance:** [Original source](ENGINE_V2_BASELINE_INVENTORY.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine v2 — E0 Repository Baseline & Execution-Path Inventory
 
@@ -1511,7 +1511,7 @@ When the new design is formally ready, map each visible control to an approved r
 **Roadmap authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, §0 and §49  
 **Review type:** Static source, test, configuration and repository-tree inspection. No runtime tests were executed in this inventory pass. No runtime code was changed.
 
-> **Historical baseline (2026-11-01).** This is a point-in-time E0 inventory at the commit above. Its statements that Engine v2 contracts, scheduler, mission persistence or leases do not exist are superseded by the dated implementation update in master roadmap §49 and the current [Engine v2 crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md). Use this file only to understand the migration starting point, not current implementation status.
+> **Historical baseline (2026-11-01).** This is a point-in-time E0 inventory at the commit above. Its statements that Engine v2 contracts, scheduler, mission persistence or leases do not exist are superseded by the dated implementation update in master roadmap §49 and the current [Engine v2 crosswalk](./ENGINE_V2_MASTER.md). Use this file only to understand the migration starting point, not current implementation status.
 
 ## 1. Executive result
 
@@ -1801,7 +1801,7 @@ This is an architecture/static inventory finding, not a claim that the proposed 
 
 ## Source 3: ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md
 
-**Provenance:** [Original source](ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 — source versus roadmap audit (2026-11-03)
 
@@ -1904,14 +1904,14 @@ The separate 75-row roadmap-index ledger still records **0/75 formally accepted 
 
 ## Source 15: ENGINE_V2_EVIDENCE_MATRIX.md
 
-**Provenance:** [Original source](ENGINE_V2_EVIDENCE_MATRIX.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2 — Roadmap requirement evidence matrix
 
-> **2026-11-03 update:** Four bounded rows (P0-04, P1-01, P2-07, P4-01) now have ACCEPTED status on exact source `f0b25d3629d7`, backed by [acceptance reconciliation](V1_0_ACCEPTANCE_RECONCILIATION_2026-11-03.md) and [CI #41642767222](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41642767222). This file's older `NOT_ACCEPTED` accounting is historical for its stated earlier baseline. All ten G gates remain open.
+> **2026-11-03 update:** Four bounded rows (P0-04, P1-01, P2-07, P4-01) now have ACCEPTED status on exact source `f0b25d3629d7`, backed by [acceptance reconciliation](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) and [CI #41642767222](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41642767222). This file's older `NOT_ACCEPTED` accounting is historical for its stated earlier baseline. All ten G gates remain open.
 
-**Source of truth:** [master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and [architecture crosswalk](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md).  
-**Original audited baseline:** `c75c03888e35f6147cfae3547f286202bb09fd6e` (main, 2026-11-03). **Current-head source reconciliation:** `f0b25d3629d776b433f72c83db679bb41313c812`; see [checkpoint audit](ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md) and [48-row bounded checkpoint ledger](ENGINE_V2_AUDIT_CHECKPOINTS_2026-11-03.csv). The figures below remain a historical mapping of compound roadmap requirements, not current completeness.  
+**Source of truth:** [master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and [architecture crosswalk](./ENGINE_V2_MASTER.md).  
+**Original audited baseline:** `c75c03888e35f6147cfae3547f286202bb09fd6e` (main, 2026-11-03). **Current-head source reconciliation:** `f0b25d3629d776b433f72c83db679bb41313c812`; see [checkpoint audit](./ENGINE_V2_MASTER.md) and [48-row bounded checkpoint ledger](ENGINE_V2_AUDIT_CHECKPOINTS_2026-11-03.csv). The figures below remain a historical mapping of compound roadmap requirements, not current completeness.  
 **Detailed ledger:** [ENGINE_V2_ROADMAP_REQUIREMENTS.csv](ENGINE_V2_ROADMAP_REQUIREMENTS.csv).
 
 ## Coverage and limitations
@@ -1933,7 +1933,7 @@ The separate 75-row roadmap-index ledger still records **0/75 formally accepted 
 ## Verified from source
 
 - **E0:** Architecture crosswalk and dated baseline inventory are present. Historical inventory is not evidence of current implementation state.
-- **E1:** Fail-closed scope, Nikto regression, replay/retest and approval tests exist. [E1 acceptance](ENGINE_V2_E1_ACCEPTANCE.md) explicitly remains **OPEN**.
+- **E1:** Fail-closed scope, Nikto regression, replay/retest and approval tests exist. [E1 acceptance](./ENGINE_V2_MASTER.md) explicitly remains **OPEN**.
 - **E2:** `src/whaxon/core/workflow.py` has typed workflow tasks/plans, digest and approval binding; `src/whaxon/core/capabilities.py` has manifests, requirements and deterministic resolution, with persistence and compatibility tests.
 - **E3:** `src/whaxon/core/scheduler.py` implements scheduler execution/heartbeat and retries; workflow/worker tests cover durable leases, deadlines, mission limits, cancellation and uncertain attempts. Wider crash/audit/outbox acceptance remains open.
 - **E4:** `src/whaxon/core/providers.py` implements the local catalog-adapter provider bridge with pinned version and readiness; remote/session/browser/cloud transport acceptance is not established.
@@ -1953,11 +1953,11 @@ Do **not** use arbitrary percentages. For every atomic requirement, record a dur
 
 ## Source 16: ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md
 
-**Provenance:** [Original source](ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](./ENGINE_V2_MASTER.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### Engine V2: Provider and Capability Abstraction
 
-> **2026-11-03 main reconciliation:** The branch and pre-merge gate notes later in this file are development history, not current merge instructions. Current main `f0b25d3629d776b433f72c83db679bb41313c812` includes semantic aliases, explicit provider selection, plan-pinned identity, operation-level reconciliation, and live missing-adapter / manifest / catalog-drift refusal. Full E4 multi-transport parity, live provider substitution and legacy autochain cutover remain unaccepted. See [dated audit reconciliation](ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md).
+> **2026-11-03 main reconciliation:** The branch and pre-merge gate notes later in this file are development history, not current merge instructions. Current main `f0b25d3629d776b433f72c83db679bb41313c812` includes semantic aliases, explicit provider selection, plan-pinned identity, operation-level reconciliation, and live missing-adapter / manifest / catalog-drift refusal. Full E4 multi-transport parity, live provider substitution and legacy autochain cutover remain unaccepted. See [dated audit reconciliation](./ENGINE_V2_MASTER.md).
 
 The capability registry stores immutable versioned declarations and resolves
 requirements deterministically, returning an explainable rejection and a registry

@@ -35,4 +35,4 @@ The following are not in scope:
 - HTML reports HTML-escape markdown before rendering.
 - The AI layer cannot emit shell commands - only run_tool, ask_human, or stop actions, each carrying a catalog tool id.
 
-See docs/scope.md and docs/ai.md for details.
+See docs/APPLICATION_ARCHITECTURE_MASTER.md and docs/APPLICATION_ARCHITECTURE_MASTER.md for details.

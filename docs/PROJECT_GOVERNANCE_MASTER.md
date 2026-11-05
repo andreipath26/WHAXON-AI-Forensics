@@ -1,6 +1,12 @@
+# WHAXON — REPOSITORY GOVERNANCE, EXECUTION RULES AND RETIREMENT MASTER
+
+**Consolidated 2026-11-05.** Records engineering execution ownership, documented AI-use audit limitations and prior repository due diligence. Legal licenses, SECURITY.md, CONTRIBUTING.md, CLA.md, AGENTS.md and third-party notices remain separate binding documents. The [documentation index](README.md) and [documentation ownership policy](DOCUMENTATION_OWNERSHIP.md) determine which subject master to edit. Historical retention/deletion candidates in the register are *not* automatically approved changes; review runtime consumers and present HEAD.
+
+## Part I — Repository due diligence and retirement audit (historical)
+
 # WHAXON repository disposition and retirement register
 
-> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](UI_CONTROL_INVENTORY.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
+> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](V2_UI_MANDATORY_CROSSWALK.md) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
 
 
 **Review date:** 2026-11-02
@@ -207,3 +213,96 @@ For each diverged ref: identify associated PRs and merged/superseded decisions; 
 Use isolated reviewable commits; apply dependent migrations before their removals. Record exact candidate, checks/results and any untested external-compatibility assumptions. After runtime or packaging deletions run affected tests, build/inspect wheel and sdist, install a clean wheel, then required CI once at the integration boundary. Documentation-only changes need link/content/diff checks; they do not justify claiming runtime acceptance.
 
 Rollback: revert the bounded cleanup commit to restore tracked files; restore a branch from its recorded SHA while the object remains reachable, using a retained archival ref when required. Do not rewrite Git history. This register authorizes no live data removal and is not an automatic deletion script. Revalidate every candidate after main moves.
+
+
+---
+
+## Part II — Engineering execution model
+
+# WHAXON Engineering Execution Model
+
+**Status:** Main engineering rule — non-negotiable  
+**Applies to:** Every WHAXON phase, subsystem, interface, and release.
+
+## Main rule
+
+**NON-NEGOTIABLE. Applies to every WHAXON phase, subsystem, interface, and release.**
+
+Develop WHAXON through coordinated parallel workstreams wherever work can safely proceed independently. Roadmap phases define scope, dependencies, and acceptance criteria; they do not require needless serial execution. Optimise for the shortest verified end-to-end delivery time without sacrificing architecture, security, evidence, or release quality.
+
+### Required rules
+
+1. **One source of truth:** the roadmap, repository state, dependency graph, decisions, PRs, and acceptance evidence must stay aligned.
+2. **Map dependencies first:** identify prerequisites and stable interfaces. Parallelise independent work; sequence only genuine dependencies and safety gates.
+3. **Prioritise the critical path:** work first on blockers that prevent the most downstream progress. Recalculate when conditions change.
+4. **Agree contracts before parallel work:** define shared schemas, APIs, state machines, error semantics, security boundaries, evidence formats, and compatibility requirements.
+5. **Bounded ownership:** assign each workstream explicit scope, owner, files/interfaces, dependencies, deliverables, and tests. Avoid concurrent edits to the same files; coordinate shared-file changes through one integration owner.
+6. **Integrate continuously:** merge small increments against shared contracts; run focused tests immediately and broader regression at integration boundaries. Do not wait for an entire phase.
+7. **Independent adversarial review:** security, authorization, scope enforcement, evidence integrity, and recovery require review separate from implementation wherever practical.
+8. **Verification is part of the task:** code presence or an agent's assertion is not completion. Require relevant unit, integration, security, browser/E2E, packaging, and compatibility checks; record actual results.
+9. **Preserve the five principles:** know the environment; understand impact; recommend before acting; act only with consent; leave durable, attributable, tamper-evident evidence. Parallelism never bypasses them.
+10. **Bound concurrency:** use isolated branches/worktrees where available, sensible worker limits, small changesets, explicit merge order, and one integration authority. Avoid duplicated effort and uncontrolled agent spawning.
+11. **Record failure and recovery:** blocked work, failed checks, partial effects, cancellation, uncertain outcomes, conflicts, and recovery must be visible. Never claim success when outcome or evidence is unknown.
+12. **Release on integrated evidence:** phase/release completion requires all components to work together and acceptance gates to pass. Individually completed components do not equal a working platform.
+
+### Standard workstream lifecycle
+
+Define outcome and acceptance tests → map dependencies and interfaces → assign bounded ownership → implement independent tasks concurrently → test against contracts → integrate continuously → conduct independent review → run cross-component regression → record evidence and update status.
+
+### Required coordination records
+
+Maintain an active dependency graph and critical path; a workstream register (scope, ownership, status, blockers, affected paths, acceptance); shared contract/version decisions; integration queue and merge order; and verification records linking completion claims to commands, CI runs, reviews, and limitations.
+
+### Concurrency decision
+
+Parallelise only when interfaces are stable, ownership is isolated, and outcomes are independently testable. Sequence work when another task changes its contract, data model, security boundary, migration, or precondition. If safe ownership is unclear, resolve or split the work first. Do not parallelise merely to increase agent count.
+
+### Success measures
+
+Optimise verified end-to-end lead time, early blocker discovery, low integration conflict, reduced rework, and reliable release acceptance—not agent count, branch count, lines of code, or reported completion percentages.
+
+**This rule supersedes older roadmap wording that implies unnecessary serial execution.** Existing phase order remains binding wherever a real dependency, safety gate, or acceptance prerequisite requires it.
+
+---
+
+
+
+---
+
+## Part III — AI usage audit
+
+> **Historical disclosure (2026-10-02):** This statement records the author's described AI-tool usage through the date shown. It is not a continuously maintained provenance log, a guarantee that no other tooling was used later, or a substitute for reviewing commit history and the actual contribution process for a specific financing, licensing or legal representation.
+
+# AI Usage Audit
+
+**Date:** 2026-10-02
+**Author:** Vasile-Andrei ([GitHub: andreipath26](https://github.com/andreipath26))
+
+## Statement of Human Authorship
+
+WHAXON was designed, architected, and developed by a human author. AI tools (Claude, Copilot, ChatGPT) were used as development aids for:
+- Autocomplete suggestions on code the author was actively writing
+- Boilerplate scaffolding (imports, class skeletons, error message templates)
+- Documentation formatting
+- Test case expansion from author-written test logic
+
+## Human Creative Contributions
+
+The following elements represent original human creative choices:
+- **Architecture:** The adapter/catalog/runner/event-bus separation
+- **Deterministic guardrails design:** The "planner proposes, executor disposes" pattern (ai/executor.py, ai/scope_policy.py)
+- **Correlation rules:** The 8 rule definitions in core/correlator.py
+- **Auto-chaining logic:** core/automation.py, core/autopivot.py
+- **Scope enforcement:** core/scope.py (fail-closed model)
+- **Pivot chain graph:** core/pivot.py, core/routes.py
+- **CLI command structure:** interfaces/cli/*
+- **Data model:** core/findings.py, core/store.py
+
+## Iteration Evidence
+
+221 commits to `main` over the project lifetime demonstrate iterative human development, not bulk AI generation. Code was written, tested, refactored, and debugged by the author across multiple sessions.
+
+## Remediation
+
+Files identified as potentially high-AI-content (GUI/TUI scaffolding, provider wrappers) have been reviewed and manually modified to ensure human creative contribution. Detailed per-file audit available on request.
+
