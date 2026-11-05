@@ -165,6 +165,30 @@ The legacy `/api/tools` catalog and `/api/v2/capabilities` registry are differen
 advertisements: catalog presence is not V2 admission, and provider installation
 does not prove smoke, lab, end-to-end or authorization acceptance.
 
+### Read, status and export API semantics
+
+The remaining HTTP GET surfaces are mapped by handler class below. Exact route
+and handler names are pinned by the 104-binding AST guard; this table records
+which state each family reads and what it cannot establish.
+
+| API family | Handlers/routes | Data owner and truth limit | Existing evidence |
+| --- | --- | --- | --- |
+| V2 capabilities and providers | `/api/v2/capabilities`, `/providers`, `/portfolio-audit` | Core registries and inventory; registered, bound, installed and executable are distinct from smoke/lab/end-to-end acceptance. | `test_server_workflow_v2.py`, `test_providers.py` |
+| V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit` | Core mission, plan, budget and rate-limit records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
+| V2 run and plan state | `/api/v2/workflow-runs/summary`, `/workflow-runs/<id>`, `/snapshot`, `/workflows/<id>` | Durable run request, queue and workflow store. Queued, active, terminal and successful remain distinct; snapshots are not atomic cross-table reads. | `test_workflow_run_requests.py`, `test_server_workflow_v2.py` |
+| V2 approval, attempts and proof | `/api/v2/workflows/<id>/approvals`, `/attempts`, `/audit`, `/event-inbox`, `/events`, `/evidence`, `/limits`, `/progress`, `/readiness`, `/reconciliation`, `/resources` | Core store and workflow integrity/readiness services; only persisted attempts/evidence count, unavailable cost/worker signals are not inferred. | `test_server_workflow_v2.py`, `test_workflow.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
+| Health and advertised tools | `/api/health`, `/api/health/simple`, `/api/status`, `/api/tools` | Health checks database/data-dir writability and optional MSF status. Catalog rows and health do not prove V2 admission or worker liveness. | `test_server.py`, `test_server_workflow_v2.py` |
+| Legacy AI, jobs and history | `/api/ai/pending`, `/api/ai/runs*`, `/api/jobs/active`, `/api/jobs/<id>`, `/history`, `/jobs/<id>/stream` | Legacy AI run records, JobRegistry, event bus and JobStore. These are not V2 plan/request status. | `test_server_ai.py`, `test_server.py` |
+| Legacy findings, evidence and exports | `/api/coverage/<id>`, `/api/jobs/<id>/evidence*`, `/findings`, `/findings.csv`, `/findings.json`, `/output.txt`, `/report`, `/api/report`, `/api/loot`, `/api/tree`, `/api/ui-v2/findings` | Legacy finding/evidence/report stores and export serializers. Their presence does not establish V2 evidence-seal provenance or complete coverage. | `test_server.py`, `test_coverage.py`, `test_report.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
+| MSF and pivot inspection | `/api/msf/status`, `/sessions`, `/sessions/<id>`, `/modules/<type>`, `/api/pivot/graph`, `/pivot/candidates`, `/pivot/sessions/<id>/chain` | Live RPC inventory and stored pivot graph. Session/module visibility is legacy capability discovery; derived pivot edges are not proof a path is executable or authorized. | `test_server_msf.py`, `test_server_portfwd.py`, `test_server.py` |
+| Dependency readiness | `/api/dependencies`, `/audit`, `/history`, `/drift`, `/install/<operation_id>` | Local dependency report, snapshots and install-operation records. They do not establish target capability or Engine V2 workflow readiness. | `test_dependencies.py`, `test_dependency_installer.py`, dependency server tests |
+| Scope and settings | `/api/scope`, `/api/settings` | Core scope and settings records. Scope configuration is policy input; settings output must preserve secret redaction. | `test_web_scope.py`, `test_scope_failclosed.py`, `test_server.py` |
+
+The static inventory contains 40 V2 and 64 legacy `/api/*` method/path
+bindings. The API remains mixed during migration: route presence does not imply
+that the route delegates to V2, and legacy exports must not be presented as
+V2-owned evidence.
+
 ### Deployment entry points and readiness semantics
 
 | Entry point or report | Current source behavior | G01 limit |
