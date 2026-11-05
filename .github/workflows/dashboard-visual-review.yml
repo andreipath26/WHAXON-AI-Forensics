@@ -33,10 +33,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[web,dev]"
           python -m playwright install --with-deps chromium
+      - name: Install automated accessibility audit
+        run: npm install --no-save --ignore-scripts --no-audit --no-fund axe-core@4.10.3
       - name: Browser regressions and crosswalk
         run: python -m pytest -q -ra tests/test_web_ui_v2_dashboard.py tests/test_v2_ui_mandatory_crosswalk.py
       - name: Capture desktop and mobile screenshot candidates
         run: python -m pytest -q -ra tests/test_web_ui_v2_dashboard_visual.py
+      - name: Automated desktop/mobile WCAG audit
+        run: python -m pytest -q -ra tests/test_web_ui_v2_dashboard_accessibility.py
       - name: Retain screenshots and external asset failure evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
