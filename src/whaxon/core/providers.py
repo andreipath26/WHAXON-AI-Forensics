@@ -723,12 +723,18 @@ class FindingVerificationProvider:
         _, selected = self._source_finding(task)
 
         target_parts = urlsplit(task.target)
-        origin = (target_parts.scheme.lower(), target_parts.hostname.lower(), target_parts.port, target_parts.path)
+        target_host = target_parts.hostname
+        if target_host is None:
+            raise ValueError("verification requires an absolute HTTP(S) target")
+        origin = (target_parts.scheme.lower(), target_host.lower(), target_parts.port, target_parts.path)
 
         def authorize_probe(url: str) -> bool:
             try:
                 parsed = urlsplit(url)
-                request_origin = (parsed.scheme.lower(), parsed.hostname.lower(), parsed.port, parsed.path)
+                request_host = parsed.hostname
+                if request_host is None:
+                    return False
+                request_origin = (parsed.scheme.lower(), request_host.lower(), parsed.port, parsed.path)
                 if (
                     request_origin != origin or parsed.username is not None
                     or parsed.password is not None or parsed.fragment

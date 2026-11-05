@@ -126,7 +126,7 @@ def main() -> None:
             from whaxon.core import Core
             from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
-            async def run_v2_sqlmap() -> tuple[dict, dict]:
+            async def run_v2_sqlmap() -> tuple[dict, dict, list[dict]]:
                 core = Core(root / "v2-data")
                 await core.initialize(drain=False)
                 task = WorkflowTask(
@@ -162,11 +162,13 @@ def main() -> None:
                     "loopback-smoke-plan", max_tasks=1, max_concurrency=1,
                 )
                 evidence = core.workflow_evidence("loopback-smoke-plan")
-                return result, evidence
+                job_id = evidence["attempts"][0].get("job_id")
+                output = core.store.lines_since(job_id) if job_id else []
+                return result, evidence, output
 
             with request_lock:
                 before_v2 = len(requests)
-            v2_result, v2_evidence = asyncio.run(run_v2_sqlmap())
+            v2_result, v2_evidence, v2_output = asyncio.run(run_v2_sqlmap())
             assert v2_result["complete"] is True, v2_result
             assert v2_result["tasks"] == [{"id": "sqlmap-loopback", "status": "succeeded"}], v2_result
             assert v2_evidence["all_evidence_recorded"] is True, v2_evidence
@@ -180,7 +182,10 @@ def main() -> None:
                 finding["kind"] == "sqli"
                 for attempt in v2_evidence["attempts"]
                 for finding in attempt["findings"]
-            ), "Engine V2 SQLmap evidence did not retain the detected SQL injection finding"
+            ), (
+                "Engine V2 SQLmap evidence did not retain the detected SQL injection finding; "
+                f"evidence={v2_evidence!r}; output={v2_output[-80:]!r}"
+            )
 
             nuclei = shutil.which("nuclei")
             if os.environ.get("WHAXON_REQUIRE_NUCLEI") == "1" and not nuclei:
