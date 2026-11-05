@@ -10,7 +10,7 @@ The original product roadmap below is the governing source. The competitor-capab
 
 # WHAXON — Product trajectory and release gates
 
-> **E5 engineering review (2026-11-04):** E5's supported durable V2 service has [bounded engineering acceptance evidence](docs/ENGINE_V2_MASTER.md) on source SHA `557311dfa125`, [12/12 CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41815823360), and passing supervised Ubuntu systemd plus Docker worker/restore smokes. Final documentation-head CI and [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) phase-review/merge remain required. **This is not production acceptance:** legacy direct dispatch remains a recorded P2/E4 migration obligation, and G01–G10, real-target, external audit-anchor and full deployment gates remain OPEN. Earlier pre-E5 status notes below are historical.
+> **E5 engineering review (2026-11-04):** E5's supported durable V2 service has [bounded engineering acceptance evidence](docs/ENGINE_V2_MASTER.md) on source SHA `557311dfa125`, [12/12 CI](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41815823360), and passing supervised Ubuntu systemd plus Docker worker/restore smokes. **Historical status at the time of this 2026-11-04 review:** final documentation-head CI and PR #124 phase-review/merge were still pending then; PR #124 subsequently merged on 2026-11-05. See the current-head reconciliation above. **This is not production acceptance:** legacy direct dispatch remains a recorded P2/E4 migration obligation, and G01–G10, real-target, external audit-anchor and full deployment gates remain OPEN. Earlier pre-E5 status notes below are historical.
 
 ## Engine V2 E0–E9 phase-freeze policy (operator decision, 2026-11-03)
 
