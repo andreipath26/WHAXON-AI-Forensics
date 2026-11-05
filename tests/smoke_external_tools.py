@@ -125,7 +125,8 @@ def main() -> None:
             ), (
                 "SQLmap did not retain a confirmed finding after final confirmation; "
                 f"stdout={sqlmap_direct.stdout[-5000:]!r}; "
-                f"stderr={sqlmap_direct.stderr[-2000:]!r}"
+                f"stderr={sqlmap_direct.stderr[-2000:]!r}; "
+                f"recent_requests={sqlmap_requests[-50:]!r}"
             )
 
             # Exercise the installed scanner through the actual Engine V2 plan,
