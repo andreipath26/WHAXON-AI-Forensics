@@ -948,3 +948,81 @@ def test_dashboard_export_is_single_flight_during_pending_request(page, live_ser
         "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Exported 0 recorded job')",
         timeout=8000,
     )
+
+
+def test_dashboard_renders_untrusted_history_and_scope_as_text(page, live_server):
+    """Records received from APIs must never be interpreted as executable HTML."""
+    marker = '<img src=x onerror="window.__dashboardInjected=1">'
+    import json
+    page.route(
+        "**/api/history",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps([{
+                "id": "markup-record", "target": marker, "tool": "nmap",
+                "status": "finished", "created_at": "2026-11-05T08:00:00Z",
+            }]),
+        ),
+    )
+    page.route(
+        "**/api/scope",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps({"enabled": True, "in_scope": [marker], "engagement": "Fixture"}),
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => document.querySelector('table tbody')?.textContent.includes('markup-record')",
+        timeout=8000,
+    )
+    assert marker in page.locator("table tbody").inner_text()
+    assert marker in page.locator("#dashboard-session-target").inner_text()
+    assert page.evaluate("() => window.__dashboardInjected === 1") is False
+    assert page.locator("table tbody img").count() == 0
+
+
+def test_dashboard_all_visible_links_resolve_to_canonical_ui_pages(page, live_server):
+    """Post-initialization navigation must expose no inert or unsafe anchors."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_function(
+        "() => [...document.querySelectorAll('aside a[data-path]')].every(a => a.getAttribute('href')?.startsWith('/ui-v2'))",
+        timeout=8000,
+    )
+    links = page.locator("a:visible").evaluate_all(
+        """elements => elements.map(node => ({
+          href: node.getAttribute('href'),
+          name: (node.getAttribute('aria-label') || node.innerText || '').trim()
+        }))"""
+    )
+    assert links
+    assert all(link["name"] for link in links)
+    assert all(link["href"] and link["href"].startswith("/ui-v2") for link in links)
+
+
+def test_dashboard_rejected_cancel_never_claims_halt_succeeded(page, live_server):
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='[{"id":"restricted-job","status":"running"}]',
+        ),
+    )
+    page.route(
+        "**/api/jobs/restricted-job/cancel",
+        lambda route: route.fulfill(
+            status=403, content_type="application/json",
+            body='{"error":"not authorized"}',
+        ),
+    )
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile("Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1')",
+        timeout=8000,
+    )
+    assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
+    assert "1 of 1" not in page.locator("#dashboard-action-status").inner_text()
