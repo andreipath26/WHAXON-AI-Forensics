@@ -102,6 +102,36 @@ EXPECTED_SERVICE_CALLS = Counter(
     }
 )
 
+# Consequential API surfaces: direct effects, authorization state, V2 lifecycle,
+# cancellation, and deployment provisioning. This deliberately complements the
+# full UI/control inventory; it does not claim to pin every read-only API route.
+EXPECTED_API_ROUTE_HANDLERS = {
+    ("GET", "/api/v2/capabilities"): "workflow_v2_capabilities",
+    ("GET", "/api/v2/providers"): "workflow_v2_providers",
+    ("GET", "/api/v2/providers/portfolio-audit"): "workflow_v2_portfolio_audit",
+    ("POST", "/api/v2/workflows"): "workflow_v2_save_plan",
+    ("POST", "/api/v2/workflows/<plan_id>/run"): "workflow_v2_run",
+    ("POST", "/api/v2/workflow-runs/<request_id>/cancel"): "workflow_v2_cancel_run_request",
+    ("POST", "/api/run"): "run_tool",
+    ("POST", "/api/ai/run"): "ai_run",
+    ("POST", "/api/msf/run"): "msf_run",
+    ("POST", "/api/msf/sessions/<session_id>/exec"): "msf_session_exec",
+    ("GET", "/api/msf/sessions/<session_id>/portfwd"): "pf_list",
+    ("POST", "/api/msf/sessions/<session_id>/portfwd"): "pf_add",
+    ("DELETE", "/api/msf/sessions/<session_id>/portfwd"): "pf_del",
+    ("POST", "/api/validate/<job_id>/<int:seq>"): "api_validate",
+    ("POST", "/api/retest/<job_id>/<int:seq>"): "api_retest",
+    ("POST", "/api/approvals/<job_id>/<int:seq>/resolve"): "api_approval_resolve",
+    ("GET", "/api/scope"): "get_scope",
+    ("POST", "/api/scope"): "save_scope",
+    ("POST", "/api/scope/check"): "check_scope",
+    ("POST", "/api/scope/override"): "log_override",
+    ("POST", "/api/jobs/<job_id>/cancel"): "cancel_job",
+    ("POST", "/api/dependencies/install"): "api_dependencies_install",
+    ("POST", "/api/dependencies/install-batch"): "api_dependencies_install_batch",
+    ("POST", "/api/dependencies/install/<operation_id>/cancel"): "api_dependencies_install_cancel",
+}
+
 SERVICE_CALL_NAMES = {item[2] for item in EXPECTED_SERVICE_CALLS}
 
 
@@ -188,6 +218,50 @@ def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
         "updating this map. "
         f"Unexpected: {actual - EXPECTED_SERVICE_CALLS}; "
         f"missing: {EXPECTED_SERVICE_CALLS - actual}"
+    )
+
+
+def test_consequential_api_route_methods_and_handlers_are_explicit() -> None:
+    server = SOURCE_ROOT / "interfaces" / "web" / "server.py"
+    tree = ast.parse(server.read_text(encoding="utf-8"), filename=str(server))
+    actual: dict[tuple[str, str], str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for decorator in node.decorator_list:
+            if not isinstance(decorator, ast.Call):
+                continue
+            func = decorator.func
+            if (
+                not isinstance(func, ast.Attribute)
+                or not isinstance(func.value, ast.Name)
+                or func.value.id != "app"
+                or not decorator.args
+            ):
+                continue
+            if func.attr in {"get", "post", "put", "patch", "delete"}:
+                route = ast.literal_eval(decorator.args[0])
+                methods = [func.attr.upper()]
+            elif func.attr == "route":
+                route = ast.literal_eval(decorator.args[0])
+                methods = next(
+                    (ast.literal_eval(item.value) for item in decorator.keywords
+                     if item.arg == "methods"),
+                    ["GET"],
+                )
+            else:
+                continue
+            for method in methods:
+                key = (method.upper(), route)
+                if key in EXPECTED_API_ROUTE_HANDLERS:
+                    actual[key] = node.name
+
+    assert actual == EXPECTED_API_ROUTE_HANDLERS, (
+        "Consequential API method/handler bindings changed. Review the G01 route "
+        "ownership and authorization map before updating it. "
+        f"Unexpected: {actual.keys() - EXPECTED_API_ROUTE_HANDLERS.keys()}; "
+        f"missing: {EXPECTED_API_ROUTE_HANDLERS.keys() - actual.keys()}; "
+        f"changed: {[key for key in actual.keys() & EXPECTED_API_ROUTE_HANDLERS.keys() if actual[key] != EXPECTED_API_ROUTE_HANDLERS[key]]}"
     )
 
 
