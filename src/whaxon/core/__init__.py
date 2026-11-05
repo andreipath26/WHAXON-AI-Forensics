@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from .catalog import ToolCatalog
 from .events import (
@@ -486,7 +487,7 @@ class Core:
                 for item in stage_reports if item.get("stage") != "retest"
             )
         )
-        synthesized_stages = [
+        synthesized_stages: list[dict[str, Any]] = [
             {
                 "stage": "scope",
                 "status": "complete" if scope_complete else "partial",
