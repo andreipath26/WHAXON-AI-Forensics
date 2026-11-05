@@ -102,34 +102,113 @@ EXPECTED_SERVICE_CALLS = Counter(
     }
 )
 
-# Consequential API surfaces: direct effects, authorization state, V2 lifecycle,
-# cancellation, and deployment provisioning. This deliberately complements the
-# full UI/control inventory; it does not claim to pin every read-only API route.
+# Pin every Flask API method/path/handler binding. UI page routes are excluded;
+# their ownership is frozen and tracked by the separate UI inventory.
 EXPECTED_API_ROUTE_HANDLERS = {
-    ("GET", "/api/v2/capabilities"): "workflow_v2_capabilities",
-    ("GET", "/api/v2/providers"): "workflow_v2_providers",
-    ("GET", "/api/v2/providers/portfolio-audit"): "workflow_v2_portfolio_audit",
-    ("POST", "/api/v2/workflows"): "workflow_v2_save_plan",
-    ("POST", "/api/v2/workflows/<plan_id>/run"): "workflow_v2_run",
-    ("POST", "/api/v2/workflow-runs/<request_id>/cancel"): "workflow_v2_cancel_run_request",
-    ("POST", "/api/run"): "run_tool",
-    ("POST", "/api/ai/run"): "ai_run",
-    ("POST", "/api/msf/run"): "msf_run",
-    ("POST", "/api/msf/sessions/<session_id>/exec"): "msf_session_exec",
-    ("GET", "/api/msf/sessions/<session_id>/portfwd"): "pf_list",
-    ("POST", "/api/msf/sessions/<session_id>/portfwd"): "pf_add",
-    ("DELETE", "/api/msf/sessions/<session_id>/portfwd"): "pf_del",
-    ("POST", "/api/validate/<job_id>/<int:seq>"): "api_validate",
-    ("POST", "/api/retest/<job_id>/<int:seq>"): "api_retest",
-    ("POST", "/api/approvals/<job_id>/<int:seq>/resolve"): "api_approval_resolve",
-    ("GET", "/api/scope"): "get_scope",
-    ("POST", "/api/scope"): "save_scope",
-    ("POST", "/api/scope/check"): "check_scope",
-    ("POST", "/api/scope/override"): "log_override",
-    ("POST", "/api/jobs/<job_id>/cancel"): "cancel_job",
-    ("POST", "/api/dependencies/install"): "api_dependencies_install",
-    ("POST", "/api/dependencies/install-batch"): "api_dependencies_install_batch",
-    ("POST", "/api/dependencies/install/<operation_id>/cancel"): "api_dependencies_install_cancel",
+    ('DELETE', '/api/jobs/<job_id>/evidence/<int:seq>'): 'delete_evidence',
+    ('DELETE', '/api/msf/sessions/<session_id>/portfwd'): 'pf_del',
+    ('GET', '/api/ai/pending'): 'ai_pending_list',
+    ('GET', '/api/ai/runs'): 'ai_runs_list',
+    ('GET', '/api/ai/runs/<run_id>'): 'ai_run_get',
+    ('GET', '/api/ai/runs/<run_id>/stream'): 'ai_run_stream',
+    ('GET', '/api/coverage/<job_id>'): 'api_coverage',
+    ('GET', '/api/dependencies'): 'api_dependencies_get',
+    ('GET', '/api/dependencies/audit'): 'api_dependencies_audit_get',
+    ('GET', '/api/dependencies/drift'): 'api_dependencies_drift_get',
+    ('GET', '/api/dependencies/history'): 'api_dependencies_history_get',
+    ('GET', '/api/dependencies/install/<operation_id>'): 'api_dependencies_install_status',
+    ('GET', '/api/health'): 'health_probe',
+    ('GET', '/api/health/simple'): 'health_simple',
+    ('GET', '/api/history'): 'list_history',
+    ('GET', '/api/jobs/<job_id>'): 'get_job',
+    ('GET', '/api/jobs/<job_id>/evidence'): 'list_evidence',
+    ('GET', '/api/jobs/<job_id>/evidence/<int:seq>/download'): 'download_evidence',
+    ('GET', '/api/jobs/<job_id>/findings'): 'get_job_findings',
+    ('GET', '/api/jobs/<job_id>/findings.csv'): 'download_findings_csv',
+    ('GET', '/api/jobs/<job_id>/findings.json'): 'download_findings_json',
+    ('GET', '/api/jobs/<job_id>/output.txt'): 'download_output_txt',
+    ('GET', '/api/jobs/<job_id>/report'): 'get_report',
+    ('GET', '/api/jobs/<job_id>/stream'): 'stream_job',
+    ('GET', '/api/jobs/active'): 'list_active_jobs',
+    ('GET', '/api/loot'): 'api_loot',
+    ('GET', '/api/msf/modules/<module_type>'): 'msf_list_modules',
+    ('GET', '/api/msf/sessions'): 'msf_sessions',
+    ('GET', '/api/msf/sessions/<session_id>'): 'msf_session_info',
+    ('GET', '/api/msf/sessions/<session_id>/portfwd'): 'pf_list',
+    ('GET', '/api/msf/status'): 'msf_status',
+    ('GET', '/api/pivot/candidates'): 'api_pivot_candidates',
+    ('GET', '/api/pivot/graph'): 'api_pivot_graph',
+    ('GET', '/api/pivot/sessions/<session_id>/chain'): 'api_pivot_chain',
+    ('GET', '/api/report'): 'api_report',
+    ('GET', '/api/scope'): 'get_scope',
+    ('GET', '/api/settings'): 'api_settings_get',
+    ('GET', '/api/status'): 'api_status',
+    ('GET', '/api/tools'): 'list_tools',
+    ('GET', '/api/tree'): 'get_tree',
+    ('GET', '/api/ui-v2/findings'): 'api_ui_v2_findings',
+    ('GET', '/api/v2/capabilities'): 'workflow_v2_capabilities',
+    ('GET', '/api/v2/missions'): 'workflow_v2_missions',
+    ('GET', '/api/v2/missions/<mission_id>/budget'): 'workflow_v2_mission_budget',
+    ('GET', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',
+    ('GET', '/api/v2/missions/<mission_id>/plans'): 'workflow_v2_mission_plans',
+    ('GET', '/api/v2/missions/<mission_id>/rate-limit'): 'workflow_v2_mission_rate_limit',
+    ('GET', '/api/v2/providers'): 'workflow_v2_providers',
+    ('GET', '/api/v2/providers/portfolio-audit'): 'workflow_v2_portfolio_audit',
+    ('GET', '/api/v2/workflow-runs/<request_id>'): 'workflow_v2_run_request_status',
+    ('GET', '/api/v2/workflow-runs/<request_id>/snapshot'): 'workflow_v2_run_snapshot',
+    ('GET', '/api/v2/workflow-runs/summary'): 'workflow_v2_run_queue_summary',
+    ('GET', '/api/v2/workflows/<plan_id>'): 'workflow_v2_plan_details',
+    ('GET', '/api/v2/workflows/<plan_id>/approvals'): 'workflow_v2_approvals',
+    ('GET', '/api/v2/workflows/<plan_id>/attempts'): 'workflow_v2_attempts',
+    ('GET', '/api/v2/workflows/<plan_id>/audit'): 'workflow_v2_audit',
+    ('GET', '/api/v2/workflows/<plan_id>/event-inbox'): 'workflow_v2_event_inbox',
+    ('GET', '/api/v2/workflows/<plan_id>/events'): 'workflow_v2_events',
+    ('GET', '/api/v2/workflows/<plan_id>/evidence'): 'workflow_v2_evidence',
+    ('GET', '/api/v2/workflows/<plan_id>/limits'): 'workflow_v2_limits',
+    ('GET', '/api/v2/workflows/<plan_id>/progress'): 'workflow_v2_progress',
+    ('GET', '/api/v2/workflows/<plan_id>/readiness'): 'workflow_v2_readiness',
+    ('GET', '/api/v2/workflows/<plan_id>/reconciliation'): 'workflow_v2_reconciliation',
+    ('GET', '/api/v2/workflows/<plan_id>/resources'): 'workflow_v2_resources',
+    ('POST', '/api/ai/run'): 'ai_run',
+    ('POST', '/api/ai/runs/<run_id>/answer'): 'ai_run_answer',
+    ('POST', '/api/approvals/<job_id>/<int:seq>/resolve'): 'api_approval_resolve',
+    ('POST', '/api/bounty/import'): 'import_bounty_program',
+    ('POST', '/api/dependencies/install'): 'api_dependencies_install',
+    ('POST', '/api/dependencies/install-batch'): 'api_dependencies_install_batch',
+    ('POST', '/api/dependencies/install/<operation_id>/cancel'): 'api_dependencies_install_cancel',
+    ('POST', '/api/dependencies/plan'): 'api_dependencies_plan',
+    ('POST', '/api/dependencies/snapshots'): 'api_dependencies_snapshot_post',
+    ('POST', '/api/dependencies/verify'): 'api_dependencies_verify_post',
+    ('POST', '/api/import/burp'): 'import_burp',
+    ('POST', '/api/jobs/<job_id>/cancel'): 'cancel_job',
+    ('POST', '/api/jobs/<job_id>/evidence'): 'add_evidence',
+    ('POST', '/api/msf/run'): 'msf_run',
+    ('POST', '/api/msf/sessions/<session_id>/exec'): 'msf_session_exec',
+    ('POST', '/api/msf/sessions/<session_id>/portfwd'): 'pf_add',
+    ('POST', '/api/retest/<job_id>/<int:seq>'): 'api_retest',
+    ('POST', '/api/run'): 'run_tool',
+    ('POST', '/api/scope'): 'save_scope',
+    ('POST', '/api/scope/check'): 'check_scope',
+    ('POST', '/api/scope/override'): 'log_override',
+    ('POST', '/api/settings'): 'api_settings_post',
+    ('POST', '/api/v2/missions'): 'workflow_v2_missions',
+    ('POST', '/api/v2/missions/<mission_id>/budget'): 'workflow_v2_mission_budget',
+    ('POST', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',
+    ('POST', '/api/v2/missions/<mission_id>/deadline'): 'workflow_v2_mission_deadline',
+    ('POST', '/api/v2/missions/<mission_id>/rate-limit'): 'workflow_v2_mission_rate_limit',
+    ('POST', '/api/v2/workflow-runs/<request_id>/cancel'): 'workflow_v2_cancel_run_request',
+    ('POST', '/api/v2/workflows'): 'workflow_v2_save_plan',
+    ('POST', '/api/v2/workflows/<plan_id>/approvals'): 'workflow_v2_approvals',
+    ('POST', '/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke'): 'workflow_v2_revoke_approval',
+    ('POST', '/api/v2/workflows/<plan_id>/cancel'): 'workflow_v2_cancel',
+    ('POST', '/api/v2/workflows/<plan_id>/deadline'): 'workflow_v2_set_deadline',
+    ('POST', '/api/v2/workflows/<plan_id>/event-ack'): 'workflow_v2_event_ack',
+    ('POST', '/api/v2/workflows/<plan_id>/limits'): 'workflow_v2_set_limits',
+    ('POST', '/api/v2/workflows/<plan_id>/rate-limit'): 'workflow_v2_set_rate_limit',
+    ('POST', '/api/v2/workflows/<plan_id>/reconcile'): 'workflow_v2_reconcile',
+    ('POST', '/api/v2/workflows/<plan_id>/run'): 'workflow_v2_run',
+    ('POST', '/api/v2/workflows/attempts/<attempt_id>/cost'): 'workflow_v2_attempt_cost',
+    ('POST', '/api/validate/<job_id>/<int:seq>'): 'api_validate',
 }
 
 SERVICE_CALL_NAMES = {item[2] for item in EXPECTED_SERVICE_CALLS}
@@ -221,7 +300,7 @@ def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
     )
 
 
-def test_consequential_api_route_methods_and_handlers_are_explicit() -> None:
+def test_api_route_methods_and_handlers_are_explicit() -> None:
     server = SOURCE_ROOT / "interfaces" / "web" / "server.py"
     tree = ast.parse(server.read_text(encoding="utf-8"), filename=str(server))
     actual: dict[tuple[str, str], str] = {}
@@ -253,12 +332,12 @@ def test_consequential_api_route_methods_and_handlers_are_explicit() -> None:
                 continue
             for method in methods:
                 key = (method.upper(), route)
-                if key in EXPECTED_API_ROUTE_HANDLERS:
+                if route.startswith("/api/"):
                     actual[key] = node.name
 
     assert actual == EXPECTED_API_ROUTE_HANDLERS, (
-        "Consequential API method/handler bindings changed. Review the G01 route "
-        "ownership and authorization map before updating it. "
+        "API method/handler bindings changed. Review the G01 route ownership and "
+        "authorization map before updating it. "
         f"Unexpected: {actual.keys() - EXPECTED_API_ROUTE_HANDLERS.keys()}; "
         f"missing: {EXPECTED_API_ROUTE_HANDLERS.keys() - actual.keys()}; "
         f"changed: {[key for key in actual.keys() & EXPECTED_API_ROUTE_HANDLERS.keys() if actual[key] != EXPECTED_API_ROUTE_HANDLERS[key]]}"
