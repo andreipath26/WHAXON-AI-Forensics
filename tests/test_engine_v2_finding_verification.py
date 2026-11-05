@@ -7,6 +7,7 @@ import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from whaxon.core import Core
@@ -208,6 +209,36 @@ def test_v2_retest_requires_a_prior_v2_verified_finding(tmp_path):
     asyncio.run(exercise())
 
 
+def test_v2_verify_rejects_mutated_source_after_evidence_seal(tmp_path):
+    async def exercise():
+        core = Core(tmp_path / "data")
+        await core.initialize(drain=False)
+        target = "http://127.0.0.1:8000/search?id=1"
+        source_job = await _seed_sealed_source(
+            core, plan_id="source-plan", target=target,
+        )
+        assert core.store.has_valid_workflow_evidence_seal(source_job) is True
+        core.store.update_verification(
+            source_job, 0, "verified", by="operator", reason="post-seal mutation",
+        )
+        assert core.store.has_valid_workflow_evidence_seal(source_job) is False
+        _bound_plan(
+            core, plan_id="mutated-source-verification-plan",
+            capability_id=FindingVerificationProvider.VERIFY,
+            target=target,
+            inputs={"source_job_id": source_job, "finding_seq": 0},
+        )
+        result = await core.run_workflow_plan(
+            "mutated-source-verification-plan", max_tasks=1, max_concurrency=1,
+        )
+        assert result["tasks"] == [{"id": "verification", "status": "blocked"}]
+        assert core.workflow_evidence(
+            "mutated-source-verification-plan",
+        )["all_evidence_recorded"] is False
+
+    asyncio.run(exercise())
+
+
 def test_v2_verification_rejects_hostname_targets_before_dispatch(tmp_path):
     async def exercise():
         core = Core(tmp_path / "data")
@@ -228,6 +259,43 @@ def test_v2_verification_rejects_hostname_targets_before_dispatch(tmp_path):
             assert "IP literal" in str(exc)
         else:
             raise AssertionError("hostname verification target must be rejected")
+
+    asyncio.run(exercise())
+
+
+def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
+    async def exercise():
+        core = Core(tmp_path / "data")
+        await core.initialize(drain=False)
+        rows = [
+            row for row in core.providers.inventory()
+            if row.get("provider_id") == FindingVerificationProvider.PROVIDER_ID
+        ]
+        assert {row["capability_id"] for row in rows} == {
+            FindingVerificationProvider.VERIFY,
+            FindingVerificationProvider.RETEST,
+        }
+        assert all(
+            row["provider_version"] == FindingVerificationProvider.PROVIDER_VERSION
+            and row["readiness"] == "registered"
+            and row["smoke_tested"] is False
+            and row["lab_validated"] is False
+            and row["end_to_end_verified"] is False
+            for row in rows
+        )
+        inventory = (
+            Path(__file__).resolve().parents[1]
+            / "docs"
+            / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+        ).read_text(encoding="utf-8")
+        section = inventory[
+            inventory.index("The separately bound HTTP verifier"):
+            inventory.index("The built-in adapter registry")
+        ]
+        assert all(capability in section for capability in (
+            FindingVerificationProvider.VERIFY,
+            FindingVerificationProvider.RETEST,
+        ))
 
     asyncio.run(exercise())
 

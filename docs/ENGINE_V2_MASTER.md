@@ -1458,7 +1458,7 @@ XSS, timing, and observation validation are not integrated, each operation is
 a separate plan, and no initial-access capability or controlled full-chain
 proof exists.
 
-Local focused results: **254** G01 tests pass across capability serialization,
+Local focused results: **255** G01 tests pass across capability serialization,
 provider/workflow, API/CLI, callsite inventory, and Burp import. Ruff, Python
 compilation, and `git diff --check` pass. The API now serializes nested
 capability-schema arrays as JSON arrays while retaining immutable manifests.
