@@ -38,6 +38,7 @@ EXPECTED_SERVICE_CALLS = Counter(
         ("interfaces/cli/retest_cmd.py", "main", "validator.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
         ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
+        ("interfaces/web/server.py", "create_app.msf_run._do_run", "adapter.run_module"): 1,
         ("core/validator.py", "revalidate", "self.validate"): 1,
     }
 )
