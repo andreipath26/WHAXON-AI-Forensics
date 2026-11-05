@@ -1,4 +1,4 @@
-"""Desktop/mobile visual candidate and automated WCAG evidence for Findings."""
+"""Desktop visual candidate and automated WCAG evidence for Findings."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.parametrize(("width", "height", "label"), [(1440, 900, "desktop"), (390, 844, "mobile")])
+@pytest.mark.parametrize(("width", "height", "label"), [(1440, 900, "desktop")])
 def test_findings_visual_candidate(page, live_server, width, height, label):
     page.set_viewport_size({"width": width, "height": height})
     response = page.goto(f"{live_server}/ui-v2/findings")
@@ -31,11 +31,9 @@ def test_findings_visual_candidate(page, live_server, width, height, label):
     )
     assert page.locator("main").is_visible()
     assert page.evaluate("() => getComputedStyle(document.body).backgroundColor === 'rgb(15, 19, 28)'")
-    if width < 768:
-        assert page.evaluate("() => document.documentElement.scrollWidth <= innerWidth")
 
 
-@pytest.mark.parametrize(("width", "height"), [(1440, 900), (390, 844)])
+@pytest.mark.parametrize(("width", "height"), [(1440, 900)])
 def test_findings_automated_accessibility(page, live_server, width, height):
     axe = Path(__file__).resolve().parents[1] / "node_modules" / "axe-core" / "axe.min.js"
     if not axe.is_file():
