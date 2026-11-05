@@ -78,7 +78,10 @@ def inventory():
             attrs = control["attrs"]
             label = attrs.get("aria-label") or attrs.get("title") or attrs.get("placeholder") or " ".join(control["text"])
             label = " ".join(label.split()) or attrs.get("id") or "(unnamed)"
-            binding = attrs.get("href") or attrs.get("onclick") or attrs.get("data-path") or attrs.get("id") or "—"
+            binding = attrs.get("href") or attrs.get("onclick") or attrs.get("data-path") or attrs.get("id")
+            if attrs.get("data-filter-action"):
+                binding = f"filter:{attrs['data-filter-action']}:{attrs.get('data-filter-value', '')}"
+            binding = binding or "—"
             if control["hidden"]:
                 state = "source-hidden"
             elif "disabled" in attrs or attrs.get("aria-disabled") == "true":
@@ -87,7 +90,7 @@ def inventory():
                 state = "declared-nav"
             elif any(key.startswith("on") for key in attrs):
                 state = "inline-handler"
-            elif any(attrs.get(key) and attrs[key] in scripts for key in ("id", "data-path")):
+            elif any(attrs.get(key) and attrs[key] in scripts for key in ("id", "data-path", "data-filter-action", "data-filter-value")):
                 state = "script-reference"
             else:
                 state = "unresolved-static"
@@ -109,3 +112,13 @@ def test_visible_sidebar_navigation_has_real_canonical_destinations(page, live_s
         assert links, f"{route}: no visible sidebar destinations"
         for link in links:
             assert link["href"] in ROUTES, f"{route}: exposed inert/unknown destination {link}"
+
+
+def test_findings_filter_controls_have_explicit_script_bindings():
+    controls = inventory()["ui_v2_findings.html"]
+    filters = [control for control in controls if control["binding"].startswith("filter:")]
+    assert len(filters) == 13
+    assert all(control["state"] == "script-reference" for control in filters)
+    assert {control["binding"] for control in filters} >= {
+        "filter:severity:all", "filter:status:review_needed", "filter:adapter:nikto",
+    }
