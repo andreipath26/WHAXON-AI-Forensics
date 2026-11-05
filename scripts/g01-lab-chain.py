@@ -13,7 +13,7 @@ from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 MISSION_ID = "g01-controlled-lab"
-SQLI_URL = "http://172.28.0.12:8080/search?id=1"
+SQLI_URL = "http://172.28.0.10:8080/search?id=1"
 
 
 def _task(core: Core, *, task_id: str, capability: str, target: str,
@@ -64,9 +64,9 @@ async def run(data_dir: Path, artifact: Path) -> dict:
     scope_path.write_text(json.dumps({
         "engagement": "repository-owned Engine V2 G01 lab",
         "enabled": True,
-        "in_scope": ["172.28.0.10/32", "172.28.0.12/32"],
+        "in_scope": ["172.28.0.10/32"],
         "out_of_scope": [],
-        "notes": "Fixed internal Compose network; callback runner .11 is excluded as a target.",
+        "notes": "Single target .10 hosts Samba and the seeded verifier fixture; callback runner .11 is excluded.",
     }, sort_keys=True), encoding="utf-8")
 
     catalog_path = data_dir / "tools.json"
@@ -76,7 +76,7 @@ async def run(data_dir: Path, artifact: Path) -> dict:
     wordlist.parent.mkdir(parents=True, exist_ok=True)
     wordlist.write_text("admin\nrobots.txt\nsearch\n", encoding="utf-8")
     overrides = {
-        "nmap": "-sT -sV -Pn -n -p 139,445 {target}",
+        "nmap": "-sT -sV -Pn -n -p 139,445,8080 {target}",
         "gobuster": (
             "dir -u http://{target}:8080 -w /usr/share/wordlists/whaxon-g01.txt "
             "-q -t 1 --no-error --timeout 3s"
@@ -105,7 +105,7 @@ async def run(data_dir: Path, artifact: Path) -> dict:
     )))
     stages.append(await _run_stage(core, "enumeration", (
         _task(core, task_id="gobuster-enum", capability="tool.gobuster",
-              target="172.28.0.12", permissions=("network.scan",), impact="moderate"),
+              target="172.28.0.10", permissions=("network.scan",), impact="moderate"),
         _task(core, task_id="sqlmap-source", capability="tool.sqlmap",
               target=SQLI_URL, permissions=("network.scan",), impact="moderate",
               depends_on=("gobuster-enum",)),
@@ -133,47 +133,17 @@ async def run(data_dir: Path, artifact: Path) -> dict:
     ))
     stages.append(access)
 
-    verification = await _run_stage(core, "verification", (
-        _task(core, task_id="verify-sqli", capability="tool.verify_sqli",
-              target=SQLI_URL, permissions=("network.verify",), impact="moderate",
-              inputs={"source_job_id": source_job_id,
-                      "finding_seq": source_finding["seq"]}),
-    ))
-    stages.append(verification)
-    verification_evidence = core.workflow_evidence(verification["plan_id"])
-    verified_attempt = verification_evidence["attempts"][0]
-    verified_job_id = verified_attempt.get("job_id")
-    verified_finding = next(
-        (finding for finding in verified_attempt.get("findings", [])
-         if (finding.get("data") or {}).get("status") == "verified"),
-        None,
-    )
-    if not verified_job_id or verified_finding is None:
-        raise RuntimeError("independent SQLi verification did not persist a verified result")
-
-    retest = await _run_stage(core, "retest", (
-        _task(core, task_id="retest-sqli", capability="tool.retest_sqli",
-              target=SQLI_URL, permissions=("network.verify",), impact="moderate",
-              inputs={"source_job_id": verified_job_id,
-                      "finding_seq": verified_finding["seq"]}),
-    ))
-    stages.append(retest)
-
-    mission_report = core.workflow_mission_report(MISSION_ID)
-    if mission_report.get("status") != "complete":
-        raise RuntimeError(json.dumps(mission_report, sort_keys=True))
-
     access_attempt = core.workflow_evidence(access["plan_id"])["attempts"][0]
     session_id = str(access_attempt["findings"][0]["data"]["session_id"])
     artifact.parent.mkdir(parents=True, exist_ok=True)
     result = {
         "schema_version": "whaxon.g01-controlled-lab.v1",
         "mission_id": MISSION_ID,
-        "status": "complete",
+        "status": "partial",
         "required_chain": ["scope", "recon", "enumeration", "initial_access",
                            "verification", "report", "retest"],
         "stages": stages,
-        "mission_report": mission_report,
+        "mission_report": None,
         "operator_session_cleanup": {"session_id": session_id, "result": "pending"},
     }
 
@@ -181,24 +151,81 @@ async def run(data_dir: Path, artifact: Path) -> dict:
         result.pop("artifact_sha256", None)
         encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"
         artifact.write_text(encoded, encoding="utf-8")
-        return hashlib.sha256(encoded.encode()).hexdigest()
+        digest = hashlib.sha256(encoded.encode()).hexdigest()
+        artifact.with_suffix(artifact.suffix + ".sha256").write_text(
+            f"{digest}  {artifact.name}\n", encoding="ascii",
+        )
+        return digest
 
-    persist()
+    chain_error = None
+    cleanup_error = None
     try:
-        stop_reply = core.msf.connect().call("session.stop", [session_id])
-        if not isinstance(stop_reply, dict) or stop_reply.get("result") != "success":
-            raise RuntimeError("Metasploit did not confirm session.stop")
-        if session_id in core.msf.sessions():
-            raise RuntimeError("CI lab shell session remained open after cleanup")
+        verification = await _run_stage(core, "verification", (
+            _task(core, task_id="verify-sqli", capability="tool.verify_sqli",
+                  target=SQLI_URL, permissions=("network.verify",), impact="moderate",
+                  inputs={"source_job_id": source_job_id,
+                          "finding_seq": source_finding["seq"]}),
+        ))
+        stages.append(verification)
+        result["stages"] = stages
+        verification_evidence = core.workflow_evidence(verification["plan_id"])
+        verified_attempt = verification_evidence["attempts"][0]
+        verified_job_id = verified_attempt.get("job_id")
+        verified_finding = next(
+            (finding for finding in verified_attempt.get("findings", [])
+             if (finding.get("data") or {}).get("status") == "verified"),
+            None,
+        )
+        if not verified_job_id or verified_finding is None:
+            raise RuntimeError("independent SQLi verification did not persist a verified result")
+
+        retest = await _run_stage(core, "retest", (
+            _task(core, task_id="retest-sqli", capability="tool.retest_sqli",
+                  target=SQLI_URL, permissions=("network.verify",), impact="moderate",
+                  inputs={"source_job_id": verified_job_id,
+                          "finding_seq": verified_finding["seq"]}),
+        ))
+        stages.append(retest)
+        result["stages"] = stages
+
+        mission_report = core.workflow_mission_report(MISSION_ID)
+        result["mission_report"] = mission_report
+        if mission_report.get("status") != "complete":
+            raise RuntimeError(json.dumps(mission_report, sort_keys=True))
+        result["status"] = "complete"
     except Exception as exc:
-        result["operator_session_cleanup"] = {
-            "session_id": session_id, "result": "failed",
-            "reason": type(exc).__name__,
-        }
+        chain_error = exc
+        result["status"] = "failed"
+        result["failure"] = type(exc).__name__
+        try:
+            result["mission_report"] = core.workflow_mission_report(MISSION_ID)
+        except Exception:
+            result["mission_report"] = {"status": "unavailable"}
+    finally:
+        try:
+            stop_reply = core.msf.connect().call("session.stop", [session_id])
+            if not isinstance(stop_reply, dict) or stop_reply.get("result") != "success":
+                raise RuntimeError("Metasploit did not confirm session.stop")
+            if session_id in core.msf.sessions(strict=True):
+                raise RuntimeError("CI lab shell session remained open after cleanup")
+            result["operator_session_cleanup"] = {
+                "session_id": session_id, "result": "success",
+            }
+        except Exception as exc:
+            cleanup_error = exc
+            result["operator_session_cleanup"] = {
+                "session_id": session_id, "result": "failed",
+                "reason": type(exc).__name__,
+            }
+            result["status"] = "failed"
         result["artifact_sha256"] = persist()
-        raise
-    result["operator_session_cleanup"] = {"session_id": session_id, "result": "success"}
-    result["artifact_sha256"] = persist()
+
+    if chain_error is not None:
+        raise chain_error
+    if cleanup_error is not None:
+        raise RuntimeError("controlled-lab Metasploit session cleanup was not confirmed") from cleanup_error
+    if result["status"] != "complete":
+        raise RuntimeError("controlled-lab mission did not complete")
     return result
 
 

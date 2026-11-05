@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 30404)
+Total output lines: 1079
+
 Warning: truncated output (original token count: 60794)
 Total output lines: 2154
 
@@ -466,21 +469,7 @@ The provider seam must support at least one independently authored second provid
 | Authenticated APIs / browser workflows | Explicit auth/identity/session/reference, redirect/DNS/network boundaries, versioned I/O, recording, cancellation | Each transport needs its own approved adapter and lifecycle/evidence tests. |
 | Cloud / containers / code / SBOM / Kubernetes | Account/project/region/cluster/resource identity, role/privilege, secret refs, cost and inventory provenance | Typed SDK/source-analysis providers under P8, not general CLI-string escape hatches. |
 | Bug bounty and autonomy | Independent activated programme policy, bounded consent envelope, human gates, plan versioning, stop/recovery | P6/E7 only after foundation and isolation acceptance. |
-| Multi-target / subnet work | Canonical assets, scope proofs, bounded graph fan-out/joins, per-asset budgets, aggregation and partial outcomes | P7/E8 after supplied UI and …30794 tokens truncated…e current [Engine v2 crosswalk](#source-2-engine_v2_baseline_inventorymd). Use this file only to understand the migration starting point, not current implementation status.
-
-## 1. Executive result
-
-The repository has a substantial and useful execution foundation, but the current system is not yet a general-purpose, capability-driven mission engine. It is a composition of a low-level tool runner, a durable-but-minimal pending-job queue, event subscribers, a deterministic single-rule Automator, and a separate sequential AI action loop.
-
-**Decision:** evolve the existing core behind stable application-service boundaries. Do not replace the runner, adapters, parsers, scope manager, SQLite store or event contracts wholesale. Add a mission/task-graph layer, typed capability/provider contracts, independent policy/approval services and a real durable scheduler. Migrate the existing paths incrementally and preserve their tested behavior.
-
-### High-confidence current state
-
-- The main execution path is traceable from CLI/web/AI into `Core`, `ToolRunner`, the event bus and SQLite persistence.
-- Local process execution uses argument arrays through `create_subprocess_exec`, with process-group termination and output caps.
-- Scope enforcement has strict defaults, DNS resolution checks, out-of-scope precedence and auditable CLI overrides.
-- Existing adapter parsers and the catalog provide a reasonable migration base, but their contracts are tool-centric rather than capability-centric.
-- Auto-chain jobs survive process exit as SQLite pending rows and are claimed atomically.
+| Multi-target / subnet work | Canonical assets, scope proofs, bounded graph fan-out/joins, …404 tokens truncated…ain jobs survive process exit as SQLite pending rows and are claimed atomically.
 - AI is structurally separated from core execution: it proposes typed `Action` objects, while an executor validates them.
 - Customer engagement execution, bug-bounty policy evaluation, and AI approvals are not yet unified under the target authorization model.
 - There is no persisted mission/plan/task graph, scheduler lease model, budget ledger, durable event log/outbox, or plan-digest approval contract in the inspected schema.
@@ -1053,4 +1042,27 @@ A missing preferred provider cannot silently fall back to an installed
 alternative. A selected provider with a missing binary remains non-executable.
 These claims have synthetic-provider regression coverage and do not certify
 external tool readiness, parity or a full E4 acceptance gate.
+
+## G01 controlled-lab candidate — 2026-11-05
+
+PR #132 extends the capability/interface crosswalk with a fixed, opt-in
+Metasploitable2 Samba access provider and an isolated Compose acceptance chain.
+The seeded SQLi fixture shares the target's `.10` network namespace so recon,
+enumeration, initial access, verification and retest use one normalized target.
+Mission aggregation now rejects plans whose task targets do not resolve to the
+same host. The provider persists its local job before Metasploit dispatch,
+records the remote job ID, refuses to reuse existing matching sessions and
+stops a newly opened session if evidence persistence fails. The CI harness
+closes its session in `finally` and uploads the report with a SHA-256 sidecar.
+
+Rapid7 Framework 6.5.4 source was checked for the pinned Samba module,
+`cmd/unix/reverse_netcat` payload, session RPC fields, stop call and daemon
+flags. This confirms API compatibility only, not exploit success on the pinned
+target image. Local workflow/Engine V2 regression tests pass (422 tests), as do
+Ruff, mypy, Python compilation and `git diff --check`. Earlier exact-head CI
+found and exposed fixes for Compose credential ordering and SQLmap fixture
+confirmation. Actual Docker image startup, callback/RPC, new session, full
+chain and retained evidence remain to be proven by exact-head CI. Timing and
+observation verification are explicitly unsupported in this crosswalk and
+remain a separate G03 gap. G01 remains open and unfrozen; G02 stays parked.
 

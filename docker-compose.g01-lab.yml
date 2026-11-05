@@ -53,15 +53,17 @@ services:
     command: ["python", "/fixture.py"]
     volumes:
       - ./scripts/g01-sqli-fixture.py:/fixture.py:ro
-    networks:
-      whaxon-lab:
-        ipv4_address: 172.28.0.12
+    network_mode: "service:msf-target"
+    depends_on:
+      msf-target:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
       interval: 2s
       timeout: 3s
       retries: 20
-    # This seeded boolean-only service is for verification tests, not a real DB.
+    # Shares .10's network namespace, so the seeded verifier fixture is part of
+    # the same target that receives recon and the fixed Samba exploit.
 
 networks:
   whaxon-lab:

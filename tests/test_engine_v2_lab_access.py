@@ -12,19 +12,39 @@ from whaxon.core.workflow import WorkflowTask
 
 
 class _FixedMsf:
-    def __init__(self, host="127.0.0.1"):
+    def __init__(self, host="127.0.0.1", *, preexisting=False):
         self.calls = []
         self.config = type("Config", (), {"host": host})()
+        self._sessions = {}
+        self.stopped = []
+        if preexisting:
+            self._sessions["7"] = self._matching_session()
 
     def execute(self, module_type, module, options, *, payload, timeout_s):
         self.calls.append((module_type, module, options, payload, timeout_s))
+        if not self._sessions:
+            self._sessions["7"] = self._matching_session()
         return {"job_id": "msf-remote-23"}
 
-    def sessions(self):
-        return {"7": {
+    @staticmethod
+    def _matching_session():
+        return {
             "via_exploit": "exploit/multi/samba/usermap_script",
             "target_host": "172.28.0.10:139", "type": "shell",
-        }}
+        }
+
+    def sessions(self, *, strict=False):
+        return dict(self._sessions)
+
+    def connect(self):
+        return self
+
+    def call(self, method, args):
+        assert method == "session.stop"
+        session_id = str(args[0])
+        self.stopped.append(session_id)
+        self._sessions.pop(session_id, None)
+        return {"result": "success"}
 
 
 @pytest.fixture
@@ -153,3 +173,34 @@ async def test_lab_access_uses_only_fixed_exploit_options_and_seals_job(lab_prov
     session = store.get_session("7")
     assert session["info"]["msf_job_id"] == "msf-remote-23"
     assert session["info"]["evidence_job_id"] == result["job_id"]
+
+
+@pytest.mark.asyncio
+async def test_lab_access_does_not_reuse_a_preexisting_matching_session(
+    lab_provider, monkeypatch,
+):
+    provider, store, msf = lab_provider
+    msf._sessions["7"] = msf._matching_session()
+    monkeypatch.setattr(provider, "SESSION_WAIT_S", 0.0)
+    with pytest.raises(RuntimeError, match="no new matching target session"):
+        await provider.dispatch(_task())
+    row = store.history(limit=10)[0]
+    assert row["status"] == "failed"
+    assert "msf-remote-23" in " ".join(
+        line["text"] for line in store.get(row["id"])["lines"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_lab_access_stops_new_session_if_evidence_persistence_fails(lab_provider, monkeypatch):
+    provider, store, msf = lab_provider
+
+    def fail_session_persist(*args, **kwargs):
+        raise OSError("injected evidence persistence error")
+
+    monkeypatch.setattr(store, "upsert_session", fail_session_persist)
+    with pytest.raises(OSError, match="injected evidence persistence error"):
+        await provider.dispatch(_task())
+    assert msf.stopped == ["7"]
+    row = store.history(limit=10)[0]
+    assert row["status"] == "failed"

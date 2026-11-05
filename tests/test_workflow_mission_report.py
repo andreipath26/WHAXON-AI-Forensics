@@ -70,6 +70,46 @@ def test_mission_report_requires_every_stage_in_order():
     assert report["stages"][0]["status"] == "complete"
     assert report["stages"][0]["plan_evidence"][0]["plan_bound_authorization"] is True
     assert report["stages"][-2]["source"] == "this mission aggregate"
+    assert report["target_binding"] == {
+        "status": "complete", "target": "127.0.0.1", "mismatched_plans": [],
+        "rule": "every task in every plan must resolve to the same single target",
+    }
+
+
+def test_mission_report_rejects_cross_target_stage_chains():
+    core = _core_for(_PLAN_STAGES)
+    original = core.workflow_plan_details
+
+    def other_target(plan_id):
+        details = original(plan_id)
+        if plan_id == "plan-3":
+            details["plan"]["tasks"][0]["target"] = "127.0.0.2"
+        return details
+
+    core.workflow_plan_details = other_target
+    report = Core.workflow_mission_report(core, "mission-1")
+    assert report["status"] == "partial"
+    assert report["target_binding"]["status"] == "partial"
+    assert report["target_binding"]["target"] == "127.0.0.1"
+    assert report["target_binding"]["mismatched_plans"] == [
+        {"plan_id": "plan-3", "targets": ["127.0.0.2"]},
+    ]
+
+
+def test_mission_report_normalizes_url_and_ip_to_the_same_target():
+    core = _core_for(_PLAN_STAGES)
+    original = core.workflow_plan_details
+
+    def target_url(plan_id):
+        details = original(plan_id)
+        if plan_id == "plan-1":
+            details["plan"]["tasks"][0]["target"] = "http://127.0.0.1:8080/search?id=1"
+        return details
+
+    core.workflow_plan_details = target_url
+    report = Core.workflow_mission_report(core, "mission-1")
+    assert report["status"] == "complete"
+    assert report["target_binding"]["target"] == "127.0.0.1"
 
 
 def test_mission_report_rejects_out_of_order_or_missing_stage():

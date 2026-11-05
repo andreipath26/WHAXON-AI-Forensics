@@ -215,12 +215,14 @@ class MSFClient:
 
     # ---- sessions ----
 
-    def sessions(self) -> dict[str, dict]:
+    def sessions(self, *, strict: bool = False) -> dict[str, dict]:
         """Return a mapping of session-id -> session info dict."""
         c = self.connect()
         try:
             raw = c.sessions.list
         except Exception:
+            if strict:
+                raise
             return {}
         if isinstance(raw, dict):
             return {str(k): dict(v) if isinstance(v, dict) else {"info": v}

@@ -8,8 +8,9 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     entrypoint = (root / "scripts/g01-lab-runner-entrypoint.sh").read_text(encoding="utf-8")
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
 
-    for address in ("172.28.0.10", "172.28.0.11", "172.28.0.12"):
+    for address in ("172.28.0.10", "172.28.0.11"):
         assert address in compose
+    assert 'network_mode: "service:msf-target"' in compose
     assert "internal: true" in compose
     assert "ports:" not in compose
     assert "WHAXON_ENABLE_V2_LAB_INITIAL_ACCESS: \"1\"" in compose
@@ -26,6 +27,10 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
         "Validate isolated fixed-address lab topology"
     )
+    assert "sha256sum -c g01-mission-report.json.sha256" in workflow
+    assert 'SQLI_URL = "http://172.28.0.10:8080/search?id=1"' in (
+        root / "scripts/g01-lab-chain.py"
+    ).read_text(encoding="utf-8")
     assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
         "Validate isolated fixed-address lab topology"
     )

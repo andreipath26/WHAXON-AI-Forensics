@@ -917,12 +917,14 @@ jobs:
             --data-dir /var/lib/whaxon \
             --artifact /artifacts/g01-mission-report.json
           test -s artifacts/g01/g01-mission-report.json
+          test -s artifacts/g01/g01-mission-report.json.sha256
+          (cd artifacts/g01 && sha256sum -c g01-mission-report.json.sha256)
       - name: Preserve controlled-lab evidence artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: engine-v2-g01-controlled-lab-report
-          path: artifacts/g01/g01-mission-report.json
+          path: artifacts/g01/g01-mission-report.json*
           if-no-files-found: warn
           retention-days: 30
       - name: Stop lab services and remove ephemeral state

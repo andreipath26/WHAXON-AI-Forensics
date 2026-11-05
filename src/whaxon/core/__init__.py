@@ -368,6 +368,9 @@ class Core:
         stage_reports = []
         stage_positions = []
         scope_plans = []
+        bound_target = None
+        target_binding_ok = True
+        mismatched_target_plans = []
         stage_capabilities = {
             "recon": {"tool.nmap", "network.services.discover"},
             "enumeration": {
@@ -383,6 +386,31 @@ class Core:
             plan = details["plan"]
             if plan.get("mission_id") != mission_id:
                 raise ValueError("mission report plan belongs to a different mission")
+            from .workflow import WorkflowPlan
+
+            try:
+                canonical_plan = WorkflowPlan.from_dict(plan)
+                task_targets = {
+                    self._workflow_target_identity(task.target)
+                    for task in canonical_plan.tasks
+                }
+            except (KeyError, TypeError, ValueError):
+                task_targets = {None}
+            if len(task_targets) != 1 or None in task_targets:
+                target_binding_ok = False
+                mismatched_target_plans.append({
+                    "plan_id": plan_id,
+                    "targets": sorted(str(target) for target in task_targets),
+                })
+            else:
+                plan_target = next(iter(task_targets))
+                if bound_target is None:
+                    bound_target = plan_target
+                elif plan_target != bound_target:
+                    target_binding_ok = False
+                    mismatched_target_plans.append({
+                        "plan_id": plan_id, "targets": [plan_target],
+                    })
             stage = (plan.get("metadata") or {}).get("release_stage")
             if stage not in plan_stages:
                 stage_reports.append({
@@ -415,10 +443,7 @@ class Core:
             # Re-evaluate scope and exact plan-bound authorization at report
             # time. This is fail-closed if scope, provider binding, plan digest,
             # or a required approval has changed since the attempt.
-            from .workflow import WorkflowPlan
-
             try:
-                canonical_plan = WorkflowPlan.from_dict(plan)
                 task_authorization = [
                     {
                         "task_id": task.id,
@@ -508,6 +533,7 @@ class Core:
         ]
         complete = bool(
             ordered and scope_complete and plan_stage_complete and report_complete
+            and target_binding_ok
             and all(item["status"] == "complete" for item in synthesized_stages)
         )
         return {
@@ -516,6 +542,12 @@ class Core:
             "status": "complete" if complete else "partial",
             "required_stages": list(stages),
             "stage_order_valid": ordered and plan_stages_ordered,
+            "target_binding": {
+                "status": "complete" if target_binding_ok else "partial",
+                "target": bound_target,
+                "mismatched_plans": mismatched_target_plans,
+                "rule": "every task in every plan must resolve to the same single target",
+            },
             "missing_stages": [
                 stage for stage in stages
                 if stage not in {item.get("stage") for item in synthesized_stages}
@@ -527,6 +559,30 @@ class Core:
                 "A complete mission report is not production deployment approval.",
             ],
         }
+
+    @staticmethod
+    def _workflow_target_identity(target: str) -> str | None:
+        """Normalize an IP, URL or host:port to its mission-chain target."""
+        import ipaddress
+        from urllib.parse import urlsplit
+
+        value = str(target or "").strip()
+        if not value:
+            return None
+        if "://" not in value and "/" in value:
+            try:
+                network = ipaddress.ip_network(value, strict=False)
+            except ValueError:
+                return None
+            return network.network_address.compressed if network.num_addresses == 1 else None
+        parsed = urlsplit(value if "://" in value else f"//{value}")
+        host = parsed.hostname
+        if host is None:
+            return None
+        try:
+            return ipaddress.ip_address(host).compressed
+        except ValueError:
+            return host.rstrip(".").lower()
 
     def workflow_resource_summary(self, plan_id: str):
         return self.store.get_workflow_resource_summary(plan_id)
