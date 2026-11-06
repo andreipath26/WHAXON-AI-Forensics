@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tomllib
 
 import pytest
 
 from whaxon.core.dependencies import collect_dependency_report, load_dependency_manifest
+
+
+def _distribution_id(requirement: str) -> str:
+    name = re.split(r"[<>=!~;]", requirement.strip(), maxsplit=1)[0]
+    name = name.split("[", 1)[0].strip()
+    return name.lower().replace("_", "-").replace(".", "-")
 
 
 def test_dependency_report_is_read_only_and_versioned():
@@ -159,14 +166,14 @@ def test_manifest_covers_all_declared_runtime_dependencies():
         (Path(__file__).parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     )["project"]
     declared = {
-        requirement.split(">=", 1)[0].split("[", 1)[0].lower().replace("_", "-")
+        _distribution_id(requirement)
         for requirement in project.get("dependencies", [])
     }
     for extra, requirements in project.get("optional-dependencies", {}).items():
         if extra == "dev":
             continue
         declared.update(
-            requirement.split(">=", 1)[0].split("[", 1)[0].lower().replace("_", "-")
+            _distribution_id(requirement)
             for requirement in requirements
         )
     manifest_ids = {
