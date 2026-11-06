@@ -153,11 +153,11 @@ def _md_ai_runs(md: list[str], runs: list[dict]) -> None:
     md.append("| Run | Goal | Phase | Status | Steps |")
     md.append("|-----|------|-------|--------|-------|")
     for r in runs:
-        goal = (r.get("goal") or "").replace("|", "/")[:60]
-        rid = r["id"]
-        phase = r["phase"]
-        status = r["status"]
-        steps = r["step_count"]
+        goal = _md_inline(r.get("goal") or "")[:60]
+        rid = _md_inline(r.get("id") or "")
+        phase = _md_inline(r.get("phase") or "")
+        status = _md_inline(r.get("status") or "")
+        steps = _safe_count(r.get("step_count"))
         md.append(f"| `{rid}` | {goal} | {phase} | {status} | {steps} |")
     md.append("")
     for r in runs:
@@ -166,8 +166,8 @@ def _md_ai_runs(md: list[str], runs: list[dict]) -> None:
         except Exception:
             hist = []
         if len(hist) > 1:
-            path = " -> ".join(h.get("phase", "?") for h in hist)
-            rid = r["id"]
+            path = " -> ".join(_md_inline(h.get("phase", "?")) for h in hist if isinstance(h, dict))
+            rid = _md_inline(r.get("id") or "")
             md.append(f"- `{rid}` phase history: {path}")
     md.append("")
 
@@ -192,7 +192,7 @@ def _md_session_findings(md: list[str], findings: list[dict]) -> None:
         src = f.get("source", "")
         sid = d.get("session_id", "")
         job = f.get("_job_id", "")
-        md.append("| " + str(src) + " | " + detail + " | " + str(sid) + " | " + str(job) + " |")
+        md.append(f"| {_md_inline(src)} | {_md_inline(detail)} | {_md_inline(sid)} | {_md_inline(job)} |")
     md.append("")
 
 
@@ -305,7 +305,7 @@ def _md_loot(md: list[str], loot: list[dict]) -> None:
     md.append("## Loot Summary\n")
     for kind in sorted(by_kind):
         items = by_kind[kind]
-        md.append(f"### {kind} ({len(items)})\n")
+        md.append(f"### {_md_inline(kind)} ({len(items)})\n")
         md.append("| Detail | Job |")
         md.append("|--------|-----|")
         for f in items:
@@ -326,9 +326,7 @@ def _md_loot(md: list[str], loot: list[dict]) -> None:
                 detail = f"{d.get('ip','')}/{d.get('cidr','')}"
             else:
                 detail = _truncate_preserving_urls(f.get("raw_line") or json.dumps(d), 200)
-            # escape pipes
-            detail = detail.replace("|", "\\|")
-            md.append(f"| {detail} | {f.get('_job_id','')} |")
+            md.append(f"| {_md_inline(detail)} | {_md_inline(f.get('_job_id', ''))} |")
         md.append("")
 
 
@@ -353,13 +351,13 @@ def _md_coverage(md, report):
     md.append("| PTES Phase | Count |")
     md.append("| --- | --- |")
     for phase in sorted(by_phase):
-        md.append(f"| {phase} | {len(by_phase[phase])} |")
+        md.append(f"| {_md_inline(phase)} | {len(by_phase[phase])} |")
     md.append("")
 
     for phase in sorted(by_phase):
-        md.append(f"### Phase: {phase} ({len(by_phase[phase])})\n")
+        md.append(f"### Phase: {_md_inline(phase)} ({len(by_phase[phase])})\n")
         for c in by_phase[phase]:
-            md.append(f"- **{c['kind']}** — {c['tool_id']} against `{c['target']}`: {c['detail']}")
+            md.append(f"- **{_md_inline(c.get('kind', 'unknown'))}** — {_md_inline(c.get('tool_id', 'unknown'))} against `{_md_inline(c.get('target', 'unknown'))}`: {_md_inline(c.get('detail', ''))}")
         md.append("")
 
 
@@ -367,9 +365,9 @@ def to_markdown(report: dict[str, Any], chains: list | None = None,
                 all_findings: bool = False, lookup: bool = True) -> str:
     md: list[str] = []
     md.append("# WHAXON Engagement Report\n")
-    md.append(f"Scope: **{report['engagement']}**  ")
-    md.append(f"Generated: {report['generated']}  ")
-    md.append(f"Jobs: {report['job_count']}  Findings: {report['finding_count']}\n")
+    md.append(f"Scope: **{_md_inline(report.get('engagement', ''))}**  ")
+    md.append(f"Generated: {_md_inline(report.get('generated', ''))}  ")
+    md.append(f"Jobs: {_safe_count(report.get('job_count'))}  Findings: {_safe_count(report.get('finding_count'))}\n")
 
     _md_exec_summary(md, report)
     _md_remediation_roadmap(md, report)
@@ -1518,5 +1516,10 @@ def _md_job_history_appendix(md, report):
     md.append("|-----|------|--------|--------|------|")
     for entry in report["jobs"]:
         j = entry["job"]
-        md.append("| `" + j["id"] + "` | " + j.get("tool", "") + " | " + j.get("target", "") + " | " + j.get("status", "") + " | " + str(j.get("exit_code", "")) + " |")
+        job_id = _md_inline(j.get("id", ""))
+        tool = _md_inline(j.get("tool", ""))
+        target = _md_inline(j.get("target", ""))
+        status = _md_inline(j.get("status", ""))
+        exit_code = _md_inline(j.get("exit_code", ""))
+        md.append(f"| `{job_id}` | {tool} | {target} | {status} | {exit_code} |
     md.append("")

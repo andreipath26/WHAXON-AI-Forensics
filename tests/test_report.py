@@ -540,3 +540,53 @@ def test_markdown_priority_order_keeps_business_impact_and_evidence():
     assert markdown.index("medium but high impact") < markdown.index("critical but low impact")
     assert "/ Business: critical" in markdown
     assert "**[critical]** open_port" in markdown
+
+
+def test_engagement_markdown_escapes_untrusted_table_values():
+    report = _report_dict()
+    report["engagement"] = "<script>engagement</script>"
+    report["jobs"][0]["job"].update({
+        "id": "job|id\\nnext",
+        "tool": "tool|<script>",
+        "target": "host|target",
+        "status": "finished|<img>",
+    })
+    report["jobs"][0]["coverage"] = [{
+        "phase": "phase|<script>",
+        "kind": "scope|blocked",
+        "tool_id": "scanner|<img>",
+        "target": "host|target",
+        "detail": "detail|<script>",
+    }]
+    report["session_findings"] = [{
+        "kind": "sysinfo",
+        "source": "session|<script>",
+        "data": {
+            "field": "OS|<img>",
+            "value": "Linux\\n|verified",
+            "session_id": "sid|<svg>",
+        },
+        "_job_id": "job|id",
+    }]
+    report["ai_runs"] = [{
+        "id": "run|id",
+        "goal": "goal|<script>",
+        "phase": "phase|<script>",
+        "status": "status|<img>",
+        "step_count": 1,
+        "phase_history": '[{"phase":"recon"},{"phase":"phase|<svg>"}]',
+    }]
+    report["loot"] = [{
+        "kind": "env_var",
+        "data": {"name": "TOKEN|<script>", "value": "secret|<img>"},
+        "_job_id": "job|id",
+    }]
+
+    markdown = to_markdown(report, lookup=False)
+
+    assert "<script>" not in markdown
+    assert "<img>" not in markdown
+    assert "<svg>" not in markdown
+    assert "`job\\|id next`" in markdown
+    assert "tool\\|&lt;script&gt;" in markdown
+    assert "secret\\|&lt;img&gt;" in markdown
