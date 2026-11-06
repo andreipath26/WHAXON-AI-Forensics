@@ -388,7 +388,6 @@ jobs:
           python -m twine check dist/*
 
       - name: Verify source distribution includes runtime data and payloads
-        if: matrix.python-version == '3.12'
         run: |
           python - <<'PY'
           import tarfile
@@ -412,7 +411,6 @@ jobs:
           PY
 
       - name: Smoke-test built wheel in a clean environment
-        if: matrix.python-version == '3.12'
         run: |
           set -eu
           python -m venv /tmp/whaxon-ci-smoke
