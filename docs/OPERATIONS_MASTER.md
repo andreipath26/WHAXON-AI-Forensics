@@ -2,7 +2,9 @@
 
 > **Verified setup/deployment (2026-11-06):** Python `>=3.11`, optional `[web]`, `[tui]`, `[gui]`, `[metasploit]`, `[dev]` dependencies. `whaxon setup --profile core` previews, not installs. Curated automatic external-tool installation is bounded to supported Debian/Ubuntu/Kali `apt` and macOS Homebrew mappings/architectures; Windows package managers are diagnostics/manual. `whaxon serve` uses Waitress; the systemd web service uses Gunicorn and a separate `workflow plan serve-requests` worker; paired Docker E5 config is staged. G07 PR #143 upgrade smoke passed 22/22 checks across Python 3.11–3.13 for 0.11.14→candidate 0.11.16 and same-version 0.11.16 reinstall; production security, package rollback and disaster recovery remain open. Wheel installation alone does not start or production-authorize these services.
 
-**Authoritative operator guide, consolidated 2026-11-05.** Contains first-run, dependencies, deployment, troubleshooting, demos, screenshots and installation design. Verify configuration and commands against current CLI/service code and installed package; historical aspirations are not current shipped functionality. Use current acceptance and release gates before production deployment.
+**Authoritative operator guide, consolidated 2026-11-05.** Contains first-run, dependencies, deployment, troubleshooting, demos, screenshots and installation design. Verify configuration and commands against current CLI/service code and installed package; historical aspirations are not current shipped functionality.
+
+> **Engine V2 sequence:** This deployment guidance is for qualification after implementation. Complete the agreed Engine V2, Engine V2 UI, and remaining solo-v1.0 implementation scope first, with internal tests throughout. Defer real-target runs and production-like install/upgrade/rollback/recovery exercises until implementation is complete and internal checks pass. Use staging for candidate qualification; deploy to production only after qualification succeeds.
 
 ## Guide navigation
 

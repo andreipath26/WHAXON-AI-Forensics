@@ -1,41 +1,51 @@
-# Engine V2 G10 Release Decision
+# Engine V2 G10 Delivery Status and Release Decision
 
 **Assessment date:** 2026-11-06  
 **Decision:** **HOLD — NOT READY TO DEPLOY**  
-**Source reviewed before this documentation-only reconciliation:** `main` at `0cef416155623199d8cb551b809dd469d62b4778`; exact-head CI run `42253317306` passed all 20/20 jobs. **Release authorization:** None. No V2 release tag, package publication, or deployment was created by this assessment.
+**Current main:** `a05949a885ce3b2060d180dab2904b8a681d112e` (documentation reconciliation); implementation baseline: `0cef416155623199d8cb551b809dd469d62b4778`. The recorded exact-head CI run for the implementation baseline passed 20/20 jobs. No V2 release tag, package publication, or production deployment exists.
 
-## Decision basis
+## Delivery sequence
 
-The bounded acceptance evidence for G01–G05 and G07–G09 is recorded in the [product roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and [requirements register](ENGINE_V2_ROADMAP_REQUIREMENTS.csv). Those records represent bounded engineering checkpoints, not complete production sign-off.
+Complete the agreed V2 engine, V2 UI, and remaining solo-v1.0 implementation scope first. Continue internal unit, integration, security, static, and browser testing throughout development. Do not hold implementation work waiting for real-target, independent-review, manual-accessibility, or production-like deployment evidence.
 
-The release decision remains **NO-GO** because G06 UI acceptance is explicitly deferred until last and is still open. Current code has page-level browser suites across all 22 production routes, but these do not establish complete control behavior, approved desktop visuals, manual keyboard/accessibility review, independent security review, or rollout/rollback acceptance. `AGENTS.md` makes the product desktop-only and freezes UI implementation; historical mobile/responsive requirements in older records are superseded. Re-review G10 only after the remaining gates are evidenced and G06 is explicitly reopened and accepted.
+After the full agreed implementation is complete and internal checks pass, perform final external qualification: authorized real-target testing, independent evidence/security review, manual accessibility review, and production-like multi-worker, installation, upgrade, rollback, backup, and recovery exercises. Production rollout follows a passing exact-candidate qualification. Deferred P6–P8 / E7–E9 expansion is not part of this completion gate.
+
+Previously recorded bounded CI and lab runs remain evidence for their stated scope. They do not prove the complete product is finished, and they do not need to be repeated during implementation unless an internal regression requires it.
+
+## Current decision basis
+
+The decision remains **HOLD** because the implementation is not complete. The open implementation work includes exhaustive V1 execution-path coverage, migration of remaining legacy clients to shared V2 lifecycle services, full transport/client parity, provider-effect recovery, and completion of all agreed UI controls and workflows. The repository has route-level browser suites, but route coverage alone does not prove every UI action is implemented and wired to real services.
+
+The release checklist also contains post-implementation external qualification items. Those items remain pending by sequence; they are not prerequisites for continuing implementation.
 
 ## Gate record
 
-| Gate | Current record | Deployment status |
+| Gate | Implemented or recorded now | Remaining work and sequence |
 |---|---|---|
-| G01 | Bounded V2 crosswalk/lab acceptance is frozen; current main adds a top-level CLI inventory and AST guard. Exhaustive V1 caller inventory and real authorized-target evidence remain open | Open beyond bounded scope |
-| G02 | Bounded authorization/execution acceptance frozen, including legacy /api/run scope-override and redirect authorization regressions | Open beyond bounded scope |
-| G03 | Bounded independent validation/retest acceptance frozen; unsupported methods and kinds remain conservative candidates | Open beyond bounded scope |
-| G04 | Bounded report/coverage acceptance remains frozen; PR #144 report overhaul merged at `edb427b` from exact head `28543e3`, exact-head CI run `42249696631` passed 20/20. Unsigned digests and external audit anchoring remain open | Open beyond bounded scope |
-| G05 | Bounded shared lifecycle acceptance frozen; legacy-client migration and provider-effect/production recovery remain open | Open beyond bounded scope |
-| G06 | Browser test suites cover the 22 production routes, but all 22 deployment rows and D1–D6 sign-offs remain OPEN. UI implementation is frozen; acceptance is desktop-only under `AGENTS.md` | **Open — release blocker** |
-| G07 | Bounded setup/staging acceptance is frozen. PR #143 expanded upgrade smoke to six runs across Python 3.11–3.13: 0.11.14→candidate 0.11.16 and same-version 0.11.16 reinstall; exact-head CI run `42232819920` passed 22/22 and merge `78470c8`. Catalog/scope/job/V2 state preserved; production security, rollback, broader compatibility and disaster recovery remain open | Open beyond bounded scope |
-| G08 | Bounded candidate-CI acceptance remains frozen at PR #139 / CI #2239 (14/14); current main exact-head CI run `42253317306` also passed | Accepted bounded scope |
-| G09 | Bounded release-safety code/tests exist, but no V2 tag, package publication or GitHub Release exists; full release identity remains open | Open until a real release identity/publication is validated |
-| G10 | This record sets the current no-go decision. Final release approval is pending the remaining gates and a new review after G06 | **No-go checkpoint recorded** |
+| G01 | Bounded V2 crosswalk/lab evidence; top-level CLI inventory and AST guard | Complete exhaustive V1 caller and dispatch-path inventory during implementation. Defer additional real-target qualification until the full scope and internal checks are complete |
+| G02 | Bounded authorization/execution regressions, including legacy `/api/run` bypass and redirect cases | Close remaining caller, session, pivot, cancellation, and cross-transport authorization gaps with internal tests |
+| G03 | Bounded independent-validation/retest behavior; unsupported methods and kinds remain conservative | Complete supported-method and finding-state behavior and internal regression coverage |
+| G04 | Report overhaul and bounded evidence/coverage checks | Complete implementation of evidence and report requirements. Defer independent audit anchoring, external custody review, and final evidence qualification until implementation is complete |
+| G05 | Bounded shared lifecycle and durable service work | Complete legacy-client migration, provider-effect reconciliation, client parity, and internal crash/recovery handling |
+| G06 | 22 production routes and page-level browser suites exist | Complete all agreed UI workflows, control wiring, service behavior, and internal browser/API tests. Final visual, manual accessibility/security, and deployment qualification happen after implementation; there is no UI implementation freeze |
+| G07 | Bounded setup/staging and upgrade-smoke evidence | Complete implementation and internal install/recovery checks. Defer production-like upgrade, rollback, and disaster-recovery qualification until the whole product scope is ready |
+| G08 | Bounded candidate-CI acceptance is recorded | Run required exact-candidate CI after implementation is complete |
+| G09 | Release-safety code and tests exist; no V2 release identity/publication exists | Create and verify the release identity and artifacts after the candidate passes qualification |
+| G10 | This HOLD record | Reassess only after implementation, internal checks, external qualification, and release-artifact verification are complete |
 
-## Known deployment blockers
+## Deferred external qualification checklist
 
-- G01 exhaustive V1 caller coverage and real authorized-target evidence remain open.
-- G06 is not ready for acceptance and is intentionally scheduled last; UI implementation is frozen and all 22 page rows remain OPEN.
-- The V1 caller inventory is not exhaustive; desktop, terminal, legacy API, AI, and provider paths remain outside complete V2 lifecycle ownership.
-- G04 has no independent external audit trust anchor. Report SHA-256 envelopes are unsigned and do not prove authenticity.
-- G05 production recovery and reconciliation of provider-side effects are not fully accepted.
-- G07 production upgrade, partial-failure recovery, security review, and disaster-recovery acceptance are incomplete.
-- G09 has no new V2 release candidate, matching tag, successful release workflow, or verified PyPI publication. The existing v0.11.16 tag is unsigned and has no exact-SHA CI run in this repository.
-- The accepted record does not yet establish a real authorized production target or an independently preserved external audit anchor.
+After implementation is complete, record evidence for:
+
+- A controlled target WHAXON is explicitly authorized to assess, with scope, constraints, and retained run evidence.
+- Independent review of evidence integrity and audit anchoring.
+- Manual UI review against the agreed desktop design and accessibility criteria.
+- Security review of the completed candidate.
+- Production-like install, upgrade, rollback, backup/restore, worker recovery, and preservation of queued or uncertain work.
+- Exact candidate SHA, CI/lab outcomes, limitations, verified publication artifacts, and the final release decision.
+
+These items are deliberately sequenced after feature completion. This record does not authorize testing a target or deploying to production.
 
 ## Reopen condition
 
-Keep this decision at **HOLD** until the open non-UI deployment criteria are resolved and G06 is completed last. Then perform an exact release-candidate review, verify the release workflow and published artifacts, and record a new explicit G10 decision. This checkpoint does not authorize publishing or deployment.
+Keep this decision at **HOLD** while implementation or internal checks remain incomplete. Once they pass, proceed to the deferred external qualification checklist. Record a new G10 decision after the exact release candidate and its qualification evidence are reviewed.

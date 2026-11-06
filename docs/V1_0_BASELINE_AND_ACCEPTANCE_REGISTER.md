@@ -1,6 +1,6 @@
 # WHAXON — V1 RELEASE AND ACCEPTANCE MASTER
 
-> **Codebase reconciliation (2026-11-06; implementation baseline at main `0cef416155623199d8cb551b809dd469d62b4778`):** `pyproject.toml` declares **0.11.16 Beta**, Python `>=3.11`; V1.0 production acceptance remains OPEN. Current main CI run [42253317306](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42253317306) passed all 20/20 jobs, but the 4/75 accepted figure remains a dated 2026-11-03 checkpoint, not a current-HEAD audit of all 75 requirements. Engine V2 is HOLD / NOT READY TO DEPLOY; G06, exhaustive V1 caller inventory, production recovery, external evidence anchoring and a V2 release identity/publication remain open.
+> **Current release and sequencing status (2026-11-06):** `pyproject.toml` declares **0.11.16 Beta**, Python `>=3.11`; V1.0 acceptance remains OPEN. The live 75-row requirements ledger records 12 accepted bounded entries (four product-requirement rows plus G01–G05 and G07–G09); this is acceptance accounting, not code-completion percentage. The implementation baseline `0cef416` passed its recorded 20/20 CI run; current `main` `a05949a` is documentation-only. Complete all agreed V2 engine/UI and remaining solo-v1.0 implementation first, with internal testing throughout; only then begin deferred external qualification. Current HOLD reflects incomplete implementation and the lack of a qualified release candidate.
 
 **Consolidated 2026-11-05.** This is the single V1 baseline, 75-requirement and release acceptance narrative. The product roadmap remains authoritative for priorities. Older checkpoint assertions have their original dates and SHAs, and must not be treated as live deployment approval. CSV ledgers and CI remain machine-checkable underlying evidence.
 
@@ -113,13 +113,13 @@ Remote comparison of all 55 non-main tips against the baseline found **10 strict
 
 ## 7. Remaining work and order
 
-Follow the trajectory's dependency gates, using batches with bounded ownership:
+Finish implementation before external qualification, while continuing internal testing throughout:
 
-1. **P0:** finish exhaustive capability/control inventory and maintain the cleanup register; principal-path tracing and baseline evidence are refreshed here, not universally complete.
-2. **P1:** preserve accepted one-shot isolation and close other authorization, validation/retest, policy and evidence-boundary gaps without rebuilding implemented fixes.
-3. **P2:** preserve bounded E5 shared-service engineering acceptance; close remaining direct legacy dispatch, provider-effect recovery, cross-client parity and independent audit/witness gaps.
-4. **P3/P4:** extend already-passing staged systemd/Docker/installer checks to production/operator conditions and complete D1–D6 supplied-page approval; desktop already targets `/ui-v2`.
-5. **P5:** controlled-lab end-to-end proof and all §38 G01–G10 release checks on one exact candidate, including honest skips/unsupported combinations and release identity.
+1. **P0–P2:** complete the execution-path/capability inventory; close authorization, validation, evidence, shared-lifecycle, legacy migration, provider-effect recovery, and cross-client parity gaps.
+2. **P3:** complete setup, packaging, headless worker, installation, upgrade, and recovery implementation; use internal tests and staging fixtures to find and fix defects during development.
+3. **P4:** finish all agreed V2 UI workflows and control wiring against real services; complete internal browser/API and accessibility automation. The UI is active implementation work.
+4. **P5:** integrate the complete solo-v1.0 scope and establish a green exact-source internal test/CI baseline.
+5. **Post-completion qualification:** only after P0–P5 implementation is complete and internal checks pass, run authorized real-target validation, independent evidence/security review, manual accessibility review, production-like install/upgrade/rollback/restore, then record the final release identity and decision.
 6. **P6–P8:** broader bounty autonomy, multi-target/competitive measurement, full Metasploit, expanded candidate onboarding/upstream monitoring, remediation application, enterprise and platform expansion remain gated/deferred.
 
 A current green matrix is substantial engineering evidence. It does not close the open product gates or justify a global completion percentage. Refresh this register when source/CI evidence changes, rather than carrying forward old failure tables or forecasts.

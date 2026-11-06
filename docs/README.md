@@ -1,6 +1,6 @@
 # WHAXON documentation — canonical index
 
-> **Current verified evidence (2026-11-06):** Implementation baseline reviewed at main `0cef416155623199d8cb551b809dd469d62b4778`; exact-head CI run [42253317306](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42253317306) passed all 20/20 jobs. G01’s top-level CLI inventory is present, G04 report overhaul PR #144 and G07 upgrade PR #143 are merged with recorded exact-head CI evidence, and G06 acceptance remains OPEN across 22 pages. V2 is **not ready to deploy**: exhaustive V1 inventory, G06, external evidence anchoring, production recovery and release identity/publication remain open. Subsequent commits require their own exact-head checks.
+> **Current delivery status (2026-11-06):** The recorded implementation baseline is `0cef416155623199d8cb551b809dd469d62b4778` (20/20 exact-head CI); current `main` `a05949a` contains documentation reconciliation only. V2 is not ready to deploy because implementation/integration remains incomplete, including exhaustive legacy caller coverage, shared lifecycle parity, provider-effect recovery, and completion of the UI workflows/controls. Continue implementation and internal tests. Defer additional real-target, external review, manual accessibility, and production-like deployment/rollback qualification until the agreed V2 engine, V2 UI, and remaining solo-v1.0 implementation scope are complete and internal checks pass.
 
 **Consolidated 2026-11-05.** One authoritative master per subject. Superseded documentation has been absorbed into the linked masters and removed from the live tree. Git history preserves its original revisions. Do not create competing architecture, roadmap, audit, acceptance, or status documents. For current feature claims, consult code and exact-HEAD CI rather than historical narratives embedded within masters.
 
@@ -30,6 +30,6 @@
 ## Integrity rules
 
 1. The root product roadmap decides priorities and release gates. The subject masters provide detailed explanation but cannot overrule it.
-2. Draft UI V2 and Engine V2 acceptance does not mean production-ready; do not relax deployment gates because documents were consolidated.
+2. Complete the agreed Engine V2, UI V2, and remaining solo-v1.0 implementation scope before final external qualification. Internal tests continue during development; do not confuse those checks with post-completion release qualification.
 3. Update the subject master in place. Add standalone files only for legally independent documents, functional source assets, or reproducible machine-readable evidence.
 4. The old standalone narrative documents have been removed. Locate past revisions in Git history when needed, not through dead links.
