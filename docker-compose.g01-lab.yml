@@ -10,7 +10,7 @@ services:
       - ./scripts/target-entrypoint.sh:/opt/entrypoint.sh:ro
     cap_add: [NET_ADMIN]
     healthcheck:
-      test: ["CMD-SHELL", "ss -tln | grep -q ':445 ' || exit 1"]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/445'"]
       interval: 5s
       timeout: 3s
       retries: 20
