@@ -993,7 +993,7 @@ def test_dependency_audit_integrity_endpoint_fails_on_corruption(tmp_path, monke
     assert response.get_json()["valid"] is False
 
 
-# ---------------------------------------------------------------- G03 conservative retest outcomes
+# ---------------------------------------------------------------- G03 API retest eligibility and conservative outcomes
 
 def test_retest_api_refuses_candidate_without_replay(tmp_path, monkeypatch):
     from whaxon.core.validator import Validator
