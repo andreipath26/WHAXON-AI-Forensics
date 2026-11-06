@@ -1347,7 +1347,7 @@ def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
     ])
     if not actionable:
         md.extend([
-            f"{len(findings)} refuted finding(s) are excluded from remediation priorities "
+            f"Refuted records remain in the technical appendix. {len(findings)} finding(s) are excluded from remediation priorities "
             "and retained in the technical appendix.",
             "",
         ])
@@ -1429,7 +1429,7 @@ def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
     refuted_count = sum(1 for finding in findings if _md_status(finding) == "refuted")
     if refuted_count:
         md.extend([
-            f"{refuted_count} refuted finding(s) are excluded from remediation priorities "
+            f"Refuted records remain in the technical appendix. {refuted_count} finding(s) are excluded from remediation priorities "
             "and retained in the technical appendix.",
             "",
         ])

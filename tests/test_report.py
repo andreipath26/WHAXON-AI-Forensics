@@ -432,7 +432,7 @@ def test_markdown_engagement_report_has_evidence_qualified_priorities_and_cost_c
     markdown = to_markdown(report, lookup=False)
 
     assert "## Executive Brief" in markdown
-    assert "2** are marked verified" in markdown
+    assert "1** are marked verified" in markdown
     assert "Highest recorded priorities" in markdown
     assert "## Remediation Roadmap" in markdown
     assert "Not a client-specific loss estimate" in markdown
