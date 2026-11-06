@@ -157,3 +157,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Verify exact artifacts on PyPI
+        timeout-minutes: 10
+        run: python -m scripts.verify_pypi_release "${GITHUB_REF_NAME#v}"
