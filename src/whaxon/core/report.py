@@ -599,7 +599,7 @@ def to_html(report, overrides=None, static=False):
     if static:
         finding_count = _safe_count(payload.get("finding_count"), len(findings))
         job_count = _safe_count(payload.get("job_count"), len(payload.get("jobs") or []))
-        tpl = tpl.replace(">Loading findings...</p>", f">{finding_count} findings identified across {job_count} execution jobs</p>")
+        tpl = tpl.replace(">Loading findings...</p>", f">{finding_count} unique findings from {job_count} recorded jobs</p>")
         sev = payload.get("severity_counts", {})
         if not isinstance(sev, dict):
             sev = {}
