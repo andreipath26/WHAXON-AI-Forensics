@@ -330,7 +330,8 @@ jobs:
         run: docker compose -f docker-compose.e5.yml down || true
 
   test:
-    runs-on: ubuntu-latest
+    # Keep package-install tests on the stable runner; newest Ubuntu release is exercised in dedicated smoke jobs.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
