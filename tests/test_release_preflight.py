@@ -11,10 +11,14 @@ import pytest
 from scripts import verify_release_commit
 
 
-def test_verify_main_ancestry_checks_exact_tag_commit():
+def test_verify_main_ancestry_checks_exact_tag_commit(monkeypatch):
     run = Mock()
+    monkeypatch.setattr(verify_release_commit.subprocess, "run", run)
     verify_release_commit.verify_main_ancestry("abc123")
-    # This test uses the real function with a patched process runner below.
+    run.assert_called_once_with(
+        ["git", "merge-base", "--is-ancestor", "abc123", "FETCH_HEAD"],
+        check=True,
+    )
 
 
 def test_verify_main_ancestry_rejects_commit_outside_main(monkeypatch):
