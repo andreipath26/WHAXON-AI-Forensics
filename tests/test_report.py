@@ -627,3 +627,34 @@ def test_markdown_proof_blocks_cannot_be_closed_by_recorded_text():
     }]
     engagement_report = to_markdown(report, lookup=False)
     assert "    ~~~~text\n    first line\n    ~~~\n    <script>alert(1)</script>\n    ~~~~" in engagement_report
+
+
+def test_engagement_load_deduplicates_findings_per_normalized_target():
+    class Store:
+        jobs = [
+            {"id": "one", "tool": "nmap", "target": "EXAMPLE.test:443"},
+            {"id": "two", "tool": "nmap", "target": "example.test"},
+            {"id": "three", "tool": "nmap", "target": "other.test"},
+        ]
+
+        def history(self, limit=500):
+            return self.jobs
+
+        def get_findings(self, job_id):
+            return [{
+                "kind": "open_port",
+                "severity": "high",
+                "source": "nmap",
+                "data": {"port": 22, "protocol": "tcp"},
+                "raw_line": "22/tcp open ssh",
+            }]
+
+    report = _load(Store(), "engagement")
+
+    assert report["raw_finding_count"] == 3
+    assert report["finding_count"] == 2
+    assert report["severity_counts"]["high"] == 2
+    findings = {finding["target"]: finding for finding in report["unique_findings"]}
+    assert findings["example.test"]["count"] == 2
+    assert findings["example.test"]["job_ids"] == ["one", "two"]
+    assert findings["other.test"]["count"] == 1

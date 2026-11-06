@@ -61,6 +61,7 @@ def _is_test_job(job: dict) -> bool:
 
 def _load(store, engagement: str | None, limit: int = 500) -> dict[str, Any]:
     """Collect all jobs + findings for an engagement into one dict."""
+    from .scope import _normalize_target
     from .store import _signature_for
     all_jobs = store.history(limit=limit)
     jobs = [j for j in all_jobs if not _is_test_job(j)]
@@ -68,9 +69,8 @@ def _load(store, engagement: str | None, limit: int = 500) -> dict[str, Any]:
     sev_counts = {s: 0 for s in _SEV_ORDER}
     loot_items = []
     session_findings = []
-    # Deduped findings across all jobs. Key is (kind, signature) —
-    # target is not part of the key because the report is per-engagement,
-    # not per-target. Duplicates accumulate a count and a job list.
+    # Deduplicate repeated observations by normalized target, kind and signature.
+    # The same issue on different targets remains separately actionable.
     unique_findings: list[dict] = []
     seen: dict[tuple, int] = {}
     for j in jobs:
@@ -87,13 +87,17 @@ def _load(store, engagement: str | None, limit: int = 500) -> dict[str, Any]:
                 sig = _signature_for(kind, data)
             except Exception:
                 sig = (f.get("raw_line") or "")[:120]
-            key = (kind, sig)
+            raw_target = str(f.get("target") or j.get("target") or "").strip()
+            target_key = _normalize_target(raw_target)[0] or raw_target
+            key = (target_key, kind, sig)
             if key in seen:
                 idx = seen[key]
                 unique_findings[idx]["count"] += 1
                 unique_findings[idx].setdefault("job_ids", []).append(j["id"])
                 continue
             entry = dict(f)
+            if target_key:
+                entry["target"] = target_key
             entry["count"] = 1
             entry["job_ids"] = [j["id"]]
             seen[key] = len(unique_findings)
