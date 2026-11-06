@@ -451,7 +451,10 @@
       const findingCount = reportData.finding_count || (reportData.unique_findings || []).length;
 
       // Render Headers & KPIs
-      document.getElementById('findings-summary').textContent = `${findingCount} unique findings from ${jobCount} recorded jobs`;
+      const findingLabel = findingCount === 1 ? 'unique finding' : 'unique findings';
+      const jobLabel = jobCount === 1 ? 'recorded job' : 'recorded jobs';
+      document.getElementById('findings-summary').textContent =
+        `${findingCount} ${findingLabel} from ${jobCount} ${jobLabel}`;
       document.getElementById('kpi-critical').textContent = sev.critical || 0;
       document.getElementById('kpi-high').textContent = sev.high || 0;
       document.getElementById('kpi-medium').textContent = sev.medium || 0;
