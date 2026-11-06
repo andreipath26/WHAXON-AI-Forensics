@@ -307,3 +307,22 @@ def test_html_report_empty_and_coverage_states_are_explicit():
     assert "No coverage gaps were recorded for this report." in html
     assert "This does not prove that every relevant check was performed." in html
     assert "No job history was recorded." in html
+
+def test_html_report_does_not_expand_template_tokens_from_untrusted_data():
+    report = _report_dict()
+    report["unique_findings"] = [{
+        "kind": "literal {{COVERAGE}} in title",
+        "severity": "low",
+        "source": "fixture",
+        "target": "127.0.0.1",
+        "raw_line": "literal {{ACTIVITY}} in evidence",
+        "remediation": "Preserve {{COVERAGE}} exactly as recorded.",
+        "verification_status": "candidate",
+    }]
+
+    html = to_html(report, static=True)
+
+    assert "literal {{COVERAGE}} in title" in html
+    assert "literal {{ACTIVITY}} in evidence" in html
+    assert "Preserve {{COVERAGE}} exactly as recorded." in html
+    assert "{{FINDINGS}}" not in html

@@ -847,6 +847,7 @@ def to_html(report, overrides=None, static=False):
     """
     import json
     import os
+    import re
     from pathlib import Path
 
     from whaxon.core.business_impact import cost_range
@@ -897,9 +898,11 @@ def to_html(report, overrides=None, static=False):
         "ACTIVITY": _html_activity(report),
         "REPORT_JSON": safe_json,
     }
-    for key, value in values.items():
-        template = template.replace("{{" + key + "}}", value)
-    return template
+    return re.sub(
+        r"\{\{([A-Z_]+)\}\}",
+        lambda match: values.get(match.group(1), match.group(0)),
+        template,
+    )
 
 
 def _build_job_report(job, findings):
