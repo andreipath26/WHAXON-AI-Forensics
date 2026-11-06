@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+
+import pytest
 
 
 def test_report_page_loads_and_uses_live_report_counts(page, live_server):
@@ -78,6 +81,10 @@ def test_report_exports_live_json_download(page, live_server):
     assert isinstance(report.get("generated"), str)
 
 
+@pytest.mark.skipif(
+    not (shutil.which("pandoc") and shutil.which("weasyprint")),
+    reason="pandoc and weasyprint are validated in the Python 3.11 matrix lane",
+)
 def test_report_exports_pdf_download(page, live_server):
     page.goto(f"{live_server}/ui-v2/report")
     page.wait_for_selector("#whaxon-report-status")
