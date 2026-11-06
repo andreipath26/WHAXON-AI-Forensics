@@ -944,6 +944,11 @@ jobs:
       - name: Collect controlled-lab startup diagnostics
         if: always()
         run: |
+          # The lab runner writes its report through a root-owned bind mount.
+          # Return ownership to the hosted runner before writing diagnostics/uploading.
+          if [[ -d artifacts/g01 ]]; then
+            sudo chown -R "$(id -u):$(id -g)" artifacts/g01
+          fi
           mkdir -p artifacts/g01
           docker compose -f docker-compose.g01-lab.yml ps -a > artifacts/g01/compose-ps.txt 2>&1 || true
           docker compose -f docker-compose.g01-lab.yml logs --no-color > artifacts/g01/compose.log 2>&1 || true
