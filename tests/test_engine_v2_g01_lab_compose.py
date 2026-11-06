@@ -20,6 +20,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "ports:" not in compose
     assert "WHAXON_ENABLE_V2_LAB_INITIAL_ACCESS: \"1\"" in compose
     assert "WHAXON_MSF_HOST: 127.0.0.1" in compose
+    assert 'WHAXON_MSF_TIMEOUT: "30"' in compose
     assert "metasploitframework/metasploit-framework:6.5.4@sha256:5ede8e5bccb4be4461754326ae2096e3a6bc2e0227aae4fa6b569f4ae442e548" in runner
     assert "git -C /opt/sqlmap checkout 5a12bd290d16992d0b46837b17b2694c8b64c746" in runner
     assert "gobuster_Linux_x86_64.tar.gz" in runner
