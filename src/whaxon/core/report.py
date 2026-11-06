@@ -1436,7 +1436,7 @@ def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
         ])
 
 
-def _md_findings_appendix(md, report, all_findings=False):
+def _md_findings_appendix(md: list[str], report: dict[str, Any], all_findings: bool = False) -> None:
     unique = report.get("unique_findings") or []
     if not unique:
         return
@@ -1452,38 +1452,50 @@ def _md_findings_appendix(md, report, all_findings=False):
                 for finding in unique
             )
         )
-    md.append("## Appendix: Technical Findings\n")
+    md.append("## Appendix: Technical Findings\\n")
     for sev in detail_sevs:
         bucket = [f for f in unique if (f.get("severity") or "").lower() == sev]
         if not bucket:
             continue
-        md.append("### " + sev.capitalize() + " (" + str(len(bucket)) + ")\n")
-        for f in bucket:
-            raw = _truncate_preserving_urls((f.get("raw_line") or "").strip().replace(chr(10), " "), 200)
-            count = f.get("count", 1)
-            jobs_seen = len(f.get("job_ids") or [])
+        md.append("### " + sev.capitalize() + " (" + str(len(bucket)) + ")\\n")
+        for finding in bucket:
+            raw = _truncate_preserving_urls(
+                (finding.get("raw_line") or "").strip().replace(chr(10), " "), 200,
+            )
+            kind = _md_inline(finding.get("kind") or "Finding")
+            raw = _md_inline(raw)
+            count = finding.get("count", 1)
+            jobs_seen = len(finding.get("job_ids") or [])
             suffix = ""
             if count > 1:
                 suffix = "  _(seen " + str(count) + " times across " + str(jobs_seen) + " jobs)_"
-            _label = sev
-            _bi = f.get("business_impact")
-            if _bi:
-                _label = sev + " / Business: " + str(_bi)
-            md.append("- **[" + _label + "]** " + raw + suffix)
-            _vstat = f.get("verification_status") or "candidate"
-            _vby = f.get("verified_by") or "engine"
-            _vreason = f.get("verification_reason") or ""
-            _vline = "  _Verification: " + _vstat + " by " + _vby
-            if _vreason:
-                _vline += " \u2014 " + _vreason
-            _vline += "_"
-            md.append(_vline)
-            if f.get("proof"):
-                md.append("")
-                md.append("  **Proof of Exploit:**")
-                md.append("  ```bash")
-                md.append("  " + f["proof"])
-                md.append("  ```")
+            label = _md_inline(sev)
+            business_impact = finding.get("business_impact")
+            if business_impact:
+                label += " / Business: " + _md_inline(business_impact)
+            md.append("- **[" + label + "] " + kind + "** " + raw + suffix)
+            status = _md_inline(finding.get("verification_status") or "candidate")
+            verified_by = _md_inline(finding.get("verified_by") or "engine")
+            reason = finding.get("verification_reason") or ""
+            verification = "  _Verification: " + status + " by " + verified_by
+            if reason:
+                verification += " — " + _md_inline(reason)
+            md.append(verification + "_")
+            proof = finding.get("proof")
+            if proof:
+                proof_text = str(proof).replace("\\r\\n", "\\n").replace("\\r", "\\n")
+                longest_tick_run = 0
+                current_tick_run = 0
+                for character in proof_text:
+                    if character == chr(96):
+                        current_tick_run += 1
+                        longest_tick_run = max(longest_tick_run, current_tick_run)
+                    else:
+                        current_tick_run = 0
+                fence = chr(96) * max(3, longest_tick_run + 1)
+                md.extend(["", "  **Proof of Exploit:**", "", "  " + fence + "text"])
+                md.extend("  " + line for line in proof_text.split(chr(10)))
+                md.extend(["  " + fence])
         md.append("")
 
 
