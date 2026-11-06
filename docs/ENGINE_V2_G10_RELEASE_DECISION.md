@@ -20,7 +20,7 @@ The release decision remains **NO-GO** because G06 UI acceptance is explicitly d
 | G04 | Bounded report/coverage acceptance frozen; envelope digests are unsigned and external audit anchoring remains open | Open beyond bounded scope |
 | G05 | Bounded shared lifecycle acceptance frozen; legacy-client migration and provider-effect/production recovery remain open | Open beyond bounded scope |
 | G06 | UI functional, responsive, visual, keyboard/accessibility, and unsupported-feature checks remain incomplete; work is deferred until last per operator instruction | **Open — release blocker** |
-| G07 | Bounded setup/staging acceptance frozen; production security, upgrade/partial-failure, and whole-system disaster recovery remain open | Open beyond bounded scope |
+| G07 | Bounded setup/staging acceptance frozen; PR #141 merged at d8ed413, exact head 8132269, CI #2266 passed 14/14. The upgrade smoke preserved custom catalog, scope, job history, and initialized V2 mission storage from published 0.11.16 to the candidate wheel. Production security, version-bump upgrade matrix, partial-failure recovery, and whole-system disaster recovery remain open | Open beyond bounded scope |
 | G08 | Bounded candidate-CI acceptance frozen at PR #139 merge 390fa6b; exact-head CI #2239 passed 14/14, including sdist and clean-wheel smoke on Python 3.11–3.13 | Accepted bounded scope |
 | G09 | Bounded release-safety acceptance frozen at PR #140 merge 1d4a8f2; exact-head CI #2249 passed 14/14. No V2 tag or publication exists | Open until a real release identity/publication is validated |
 | G10 | This record sets the current no-go decision. Final release approval is pending the remaining gates and a new review after G06 | **No-go checkpoint recorded** |
