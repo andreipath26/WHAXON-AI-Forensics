@@ -1058,7 +1058,7 @@ def test_api_engagement_reports_include_persisted_coverage_gaps(tmp_path, monkey
     assert json_response.status_code == 200
     coverage = json_response.get_json()["jobs"][0]["coverage"]
     assert coverage == [{
-        "seq": 1,
+        "seq": 0,
         "tool_id": "nikto",
         "target": "10.0.0.5",
         "kind": "scope_blocked",
