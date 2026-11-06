@@ -134,3 +134,20 @@ def test_engagement_html_escapes_untrusted_finding_values():
         assert "<script>alert(5)</script>" not in html
         assert "<img src=x onerror=alert(6)>" not in html
         assert "<svg onload=alert(7)>" not in html
+
+
+def test_engagement_html_discloses_recorded_evidence_scope_and_count_limits():
+    report = _report_dict()
+
+    for static in (False, True):
+        html = to_html(report, static=static)
+        assert "Evidence snapshot." in html
+        assert "summarizes findings and jobs recorded by WHAXON" in html
+        assert "does not establish that a target is free of vulnerabilities" in html
+        assert "Recorded evidence" in html
+        assert "Deterministic Correlation" not in html
+        assert "unique finding" in html
+        assert "findings identified across" not in html
+
+    static_html = to_html(report, static=True)
+    assert ">2 unique findings from 1 recorded job</p>" in static_html
