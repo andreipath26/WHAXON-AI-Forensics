@@ -1070,3 +1070,10 @@ def test_api_engagement_reports_include_persisted_coverage_gaps(tmp_path, monkey
     assert "## Coverage Gaps" in markdown
     assert "scope_blocked" in markdown
     assert "out of scope; no request was sent" in markdown
+
+    html_response = client.get("/api/report?format=html")
+    assert html_response.status_code == 200
+    html = html_response.get_data(as_text=True)
+    assert "Coverage and untested work" in html
+    assert "scope_blocked" in html
+    assert "out of scope; no request was sent" in html
