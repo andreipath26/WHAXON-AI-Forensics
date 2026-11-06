@@ -1426,6 +1426,13 @@ def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
                 f"({ _safe_count(finding.get('count'), 1) } recorded observations)"
             )
         md.append("")
+    refuted_count = sum(1 for finding in findings if _md_status(finding) == "refuted")
+    if refuted_count:
+        md.extend([
+            f"{refuted_count} refuted finding(s) are excluded from remediation priorities "
+            "and retained in the technical appendix.",
+            "",
+        ])
 
 
 def _md_findings_appendix(md, report, all_findings=False):
