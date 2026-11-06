@@ -49,7 +49,6 @@ services:
 
   sqli-fixture:
     image: python:3.12.10-slim-bookworm
-    hostname: g01-sqli-fixture
     command: ["python", "/fixture.py"]
     volumes:
       - ./scripts/g01-sqli-fixture.py:/fixture.py:ro
