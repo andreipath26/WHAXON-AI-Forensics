@@ -265,6 +265,11 @@ def test_html_report_escapes_untrusted_values_in_every_section():
         "proof": "</script><script>alert(10)</script>",
         "verification_status": "candidate",
         "verification_reason": "<svg onload=alert(11)>",
+        "cost_range": {
+            "incident_pattern": "<img src=x onerror=alert(13)>",
+            "median": 1200,
+            "source": "<script>alert(14)</script>",
+        },
         "job_ids": ['<img src=x onerror=alert(12)>'],
     }]
 
@@ -283,6 +288,8 @@ def test_html_report_escapes_untrusted_values_in_every_section():
         "</script><script>alert(10)</script>",
         "<svg onload=alert(11)>",
         "<img src=x onerror=alert(12)>",
+        "<img src=x onerror=alert(13)>",
+        "<script>alert(14)</script>",
     ):
         assert payload not in html
     assert "&lt;script&gt;" in html
@@ -326,3 +333,60 @@ def test_html_report_does_not_expand_template_tokens_from_untrusted_data():
     assert "literal {{ACTIVITY}} in evidence" in html
     assert "Preserve {{COVERAGE}} exactly as recorded." in html
     assert "{{FINDINGS}}" not in html
+
+
+def test_html_report_renders_executive_brief_and_remediation_roadmap():
+    report = _report_dict()
+    report["unique_findings"] = [
+        {
+            "kind": "known exploited issue",
+            "severity": "critical",
+            "target": "api.example.test",
+            "remediation": "Disable the affected endpoint and patch the service.",
+            "verification_status": "verified",
+            "kev": True,
+        },
+        {
+            "kind": "sqli",
+            "severity": "high",
+            "target": "app.example.test",
+            "remediation": "Validate the input handling and use parameterized queries.",
+            "verification_status": "candidate",
+            "cvss": 8.1,
+        },
+        {
+            "kind": "shared configuration weakness",
+            "severity": "medium",
+            "target": "admin.example.test",
+            "remediation": "Apply the hardened configuration.",
+            "verification_status": "inconclusive",
+            "cvss": 4.5,
+            "count": 2,
+        },
+        {
+            "kind": "informational observation",
+            "severity": "info",
+            "target": "docs.example.test",
+            "remediation": "Review during routine maintenance.",
+            "verification_status": "refuted",
+        },
+    ]
+
+    html = to_html(report, static=True)
+
+    assert html.index("Executive overview") < html.index("Executive brief")
+    assert html.index("Executive brief") < html.index("Remediation roadmap")
+    assert html.index("Remediation roadmap") < html.index("Technical findings")
+    assert "Top three recorded priorities" in html
+    assert "1 of 4 recorded findings are marked verified" in html
+    assert "known exploited issue" in html
+    assert "Disable the affected endpoint and patch the service." in html
+    assert "Immediate" in html
+    assert "Short-term" in html
+    assert "Medium-term" in html
+    assert "Reference incident-cost data" in html
+    assert "USD 266,000" in html
+    assert "not a client-specific loss estimate" in html
+    assert "Cyentia IRIS 2022 (geometric mean)" in html
+    assert "Refuted records retained for context" in html
+    assert "excluded from remediation priorities" in html

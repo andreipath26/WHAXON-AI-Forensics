@@ -576,6 +576,34 @@ def _md_to_text_appendix(report):
     return chr(10).join(md)
 
 
+def _html_cost_context(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    pattern = _escape_html(value.get("incident_pattern") or "Incident pattern not recorded")
+    source = _escape_html(value.get("source") or "Source not recorded")
+    amounts: list[str] = []
+    for key, label in (("median", "Median"), ("p90", "90th percentile")):
+        amount = value.get(key)
+        if amount is None:
+            continue
+        formatted = (
+            f"USD {amount:,.0f}"
+            if isinstance(amount, (int, float)) and not isinstance(amount, bool)
+            else _escape_html(amount)
+        )
+        amounts.append(f"<span><strong>{label}:</strong> {formatted}</span>")
+    if not amounts:
+        return ""
+    return (
+        '<aside class="impact-context"><h4>Reference incident-cost data</h4>'
+        f"<p>{pattern}</p>"
+        '<div class="impact-values">' + "".join(amounts) + "</div>"
+        f'<p class="muted">Source: {source}. Published incident distribution; not a '
+        "client-specific loss estimate. The finding-to-pattern mapping is WHAXON's "
+        "derivation.</p></aside>"
+    )
+
+
 def _html_finding_card(f: dict[str, Any], index: int) -> str:
     severity = str(f.get("severity") or "info").lower()
     if severity not in _SEV_ORDER:
@@ -643,8 +671,11 @@ def _html_finding_card(f: dict[str, Any], index: int) -> str:
         "</section>",
         "<section><h4>Recommended remediation</h4>",
         f"<p>{_escape_html(remediation) if remediation else 'No remediation guidance was recorded.'}</p>",
-        f'<p class="muted">Recorded in: {attributed}</p>',
     ])
+    cost_context = _html_cost_context(f.get("cost_range"))
+    if cost_context:
+        parts.append(cost_context)
+    parts.append(f'<p class="muted">Recorded in: {attributed}</p>')
     if proof:
         parts.extend([
             '<h4 class="subheading">Reproduction material</h4>',
@@ -655,6 +686,16 @@ def _html_finding_card(f: dict[str, Any], index: int) -> str:
     return "".join(parts)
 
 
+def _html_priority_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
+    return sorted(findings, key=lambda finding: (
+        _BAND_ORDER.index(_priority_band(finding)),
+        ranks.get(str(finding.get("severity") or "info").lower(), 99),
+        str(finding.get("kind") or "").casefold(),
+        str(finding.get("target") or "").casefold(),
+    ))
+
+
 def _html_findings(findings: list[dict[str, Any]]) -> str:
     if not findings:
         return (
@@ -662,16 +703,9 @@ def _html_findings(findings: list[dict[str, Any]]) -> str:
             "<p>Review the recorded job history and coverage section. An empty finding "
             "list does not establish that the targets are free of vulnerabilities.</p></div>"
         )
-    ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
-    ordered = sorted(findings, key=lambda f: (
-        _BAND_ORDER.index(_priority_band(f)),
-        ranks.get(str(f.get("severity") or "info").lower(), 99),
-        str(f.get("kind") or "").casefold(),
-        str(f.get("target") or "").casefold(),
-    ))
     return "".join(
         _html_finding_card(finding, index)
-        for index, finding in enumerate(ordered, start=1)
+        for index, finding in enumerate(_html_priority_findings(findings), start=1)
     )
 
 
@@ -839,6 +873,161 @@ def _html_overview(report: dict[str, Any], findings: list[dict[str, Any]]) -> tu
     return overview, label
 
 
+def _html_executive_brief(findings: list[dict[str, Any]]) -> str:
+    if not findings:
+        return (
+            '<div class="empty-state"><h3>No priority actions are available</h3>'
+            "<p>This report contains no recorded findings to prioritize.</p></div>"
+        )
+
+    verified = sum(
+        1 for finding in findings
+        if str(finding.get("verification_status") or "candidate").lower() == "verified"
+    )
+    unverified = len(findings) - verified
+    summary = (
+        f"{verified} of {len(findings)} recorded findings are marked verified. "
+        f"{unverified} are not marked verified and must not be described as confirmed."
+    )
+    actions = [
+        finding for finding in _html_priority_findings(findings)
+        if str(finding.get("verification_status") or "candidate").lower() != "refuted"
+    ][:3]
+    if not actions:
+        return (
+            f'<p class="executive-summary">{_escape_html(summary)}</p>'
+            '<div class="empty-state"><h3>No remediation priorities</h3>'
+            "<p>All recorded findings in this snapshot are marked refuted.</p></div>"
+        )
+
+    cards: list[str] = []
+    for finding in actions:
+        status = str(finding.get("verification_status") or "candidate").lower()
+        if status not in {"verified", "refuted", "candidate", "inconclusive"}:
+            status = "candidate"
+        band = _BAND_LABELS[_priority_band(finding)]
+        title = finding.get("kind") or "Finding"
+        target = finding.get("target") or "Target not recorded"
+        remediation = finding.get("remediation") or "No remediation guidance was recorded."
+        cards.append(
+            '<article class="brief-card">'
+            f'<div class="brief-card-head"><span class="priority">{_escape_html(band)} priority</span>'
+            f'<span class="tag tag-verification {_escape_html(status)}">{_escape_html(status)}</span></div>'
+            f'<h3>{_escape_html(title)}</h3>'
+            f'<p class="muted">Target: {_escape_html(target)}</p>'
+            f'<p><strong>Recommended action:</strong> {_escape_html(remediation)}</p>'
+            "</article>"
+        )
+
+    return (
+        f'<p class="executive-summary">{_escape_html(summary)}</p>'
+        '<p class="section-intro">Top three recorded priorities, ordered by deterministic urgency rules. '
+        "deterministic urgency rules. Review evidence and authorization before acting.</p>"
+        '<div class="brief-grid">' + "".join(cards) + "</div>"
+    )
+
+
+def _html_remediation_roadmap(findings: list[dict[str, Any]]) -> str:
+    if not findings:
+        return (
+            '<div class="empty-state"><h3>No remediation items are available</h3>'
+            "<p>No findings were recorded in this report snapshot.</p></div>"
+        )
+
+    actionable = [
+        finding for finding in findings
+        if str(finding.get("verification_status") or "candidate").lower() != "refuted"
+    ]
+    bands: dict[str, list[dict[str, Any]]] = {band: [] for band in _BAND_ORDER}
+    for finding in actionable:
+        bands[_priority_band(finding)].append(finding)
+
+    sections: list[str] = []
+    for band in _BAND_ORDER:
+        items = bands[band]
+        if not items:
+            continue
+        cards: list[str] = []
+        for finding in items:
+            status = str(finding.get("verification_status") or "candidate").lower()
+            if status not in {"verified", "refuted", "candidate", "inconclusive"}:
+                status = "candidate"
+            title = finding.get("kind") or "Finding"
+            target = finding.get("target") or "Target not recorded"
+            remediation = finding.get("remediation") or "No remediation guidance was recorded."
+            count = _safe_count(finding.get("count"), 1)
+            tags = [
+                f'<span class="tag tag-verification {_escape_html(status)}">{_escape_html(status)}</span>'
+            ]
+            for key, label in (("cve", None), ("cvss", "CVSS"), ("epss", "EPSS")):
+                value = finding.get(key)
+                if value is not None:
+                    display_value = value if label is None else f"{label} {value}"
+                    tags.append(
+                        f'<span class="tag">{_escape_html(display_value)}</span>'
+                    )
+            if finding.get("kev"):
+                tags.append('<span class="tag tag-kev">Known exploited</span>')
+            cards.append(
+                '<article class="roadmap-item">'
+                f'<h4>{_escape_html(title)}</h4>'
+                f'<p class="muted">Target: {_escape_html(target)} · Observed {count} time(s)</p>'
+                '<div class="finding-meta">' + "".join(tags) + "</div>"
+                f'<p>{_escape_html(remediation)}</p>'
+                "</article>"
+            )
+        sections.append(
+            '<section class="roadmap-band">'
+            f'<div class="roadmap-band-head"><h3>{_escape_html(_BAND_LABELS[band])}</h3>'
+            f'<span class="tag">{len(items)} item(s)</span></div>'
+            + "".join(cards)
+            + "</section>"
+        )
+
+    recurring = [
+        finding for finding in actionable
+        if _safe_count(finding.get("count"), 1) > 1
+        and str(finding.get("severity") or "").lower() in {"critical", "high"}
+    ]
+    if recurring:
+        repeat_rows = "".join(
+            '<li><strong>' + _escape_html(finding.get("kind") or "Finding")
+            + "</strong> · " + _escape_html(finding.get("target") or "Target not recorded")
+            + f' <span class="muted">({ _safe_count(finding.get("count"), 1) } recorded observations)</span></li>'
+            for finding in recurring[:10]
+        )
+        sections.append(
+            '<div class="recurring-panel"><h3>Recurring high-priority records</h3>'
+            "<p>Repeated records may point to a shared root cause; confirm the relationship "
+            "before treating them as one remediation item.</p><ul>"
+            + repeat_rows + "</ul></div>"
+        )
+
+    refuted = [
+        finding for finding in findings
+        if str(finding.get("verification_status") or "candidate").lower() == "refuted"
+    ]
+    refuted_note = ""
+    if refuted:
+        refuted_note = (
+            '<div class="empty-state"><h3>Refuted records retained for context</h3>'
+            f"<p>{len(refuted)} refuted finding(s) are shown in the findings section and "
+            "are excluded from remediation priorities.</p></div>"
+        )
+    if not sections:
+        return (
+            '<div class="empty-state"><h3>No remediation priorities</h3>'
+            "<p>All recorded findings in this snapshot are marked refuted.</p></div>"
+        )
+    return (
+        '<p class="section-intro">Priority bands use recorded KEV, EPSS, CVSS, technical '
+        "severity, and business impact when present. They are scheduling aids, not "
+        "independent verification or proof of exploitability.</p>"
+        '<div class="roadmap-grid">' + "".join(sections) + "</div>"
+        + refuted_note
+    )
+
+
 def to_html(report, overrides=None, static=False):
     """Render a complete server-filled report for screen and PDF output.
 
@@ -863,6 +1052,8 @@ def to_html(report, overrides=None, static=False):
         findings.append(item)
 
     overview, finding_summary = _html_overview(report, findings)
+    executive_brief = _html_executive_brief(findings)
+    roadmap = _html_remediation_roadmap(findings)
     options = overrides if isinstance(overrides, dict) else {}
     engagement = report.get("engagement") or "default"
     metadata = {
@@ -893,6 +1084,8 @@ def to_html(report, overrides=None, static=False):
         "GENERATED": _escape_html(metadata["generated"]),
         "FINDING_SUMMARY": _escape_html(finding_summary),
         "OVERVIEW": overview,
+        "BRIEF": executive_brief,
+        "ROADMAP": roadmap,
         "FINDINGS": _html_findings(findings),
         "COVERAGE": _html_coverage(report),
         "ACTIVITY": _html_activity(report),

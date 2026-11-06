@@ -58,6 +58,25 @@
     .section-head p { margin: 4px 0 0; color: var(--muted); }
     .executive-summary { margin: 0 0 16px; padding: 17px 18px;
       border: 1px solid #cfe1e8; border-radius: 9px; background: #f0f7fa; font-size: 16px; font-weight: 600; }
+    .brief-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .brief-card, .roadmap-band { min-width: 0; padding: 15px; border: 1px solid var(--line);
+      border-radius: 10px; background: var(--paper); break-inside: avoid; }
+    .brief-card-head, .roadmap-band-head { display: flex; justify-content: space-between;
+      align-items: center; gap: 8px; margin-bottom: 10px; }
+    .brief-card h3, .roadmap-band h3 { color: var(--navy); font-size: 15px; }
+    .brief-card p { margin: 8px 0 0; }
+    .roadmap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .roadmap-band-head h3 { margin: 0; }
+    .roadmap-item { margin-top: 10px; padding: 11px; border-radius: 8px; background: var(--soft);
+      break-inside: avoid; }
+    .roadmap-item h4 { margin-bottom: 4px; }
+    .roadmap-item p { margin: 5px 0; }
+    .roadmap-item .finding-meta { margin: 6px 0; }
+    .recurring-panel { margin-top: 12px; padding: 15px; border: 1px solid #cfe1e8;
+      border-radius: 9px; background: #f0f7fa; break-inside: avoid; }
+    .recurring-panel h3 { color: var(--navy); font-size: 15px; }
+    .recurring-panel p { margin: 5px 0; color: var(--muted); }
+    .recurring-panel li { margin: 5px 0; }
     .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
     .metric-card { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
     .metric-label, .metric-note { display: block; color: var(--muted); }
@@ -126,7 +145,12 @@
     .empty-state { padding: 20px; border: 1px dashed #bdc8d3; border-radius: 9px; background: white; color: var(--muted); }
     .empty-state h3 { margin-bottom: 6px; }
     .empty-state p { margin: 3px 0; }
-    .method-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .method-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .impact-context { margin-top: 12px; padding: 11px; border-left: 3px solid var(--teal);
+      border-radius: 7px; background: #e9f2f6; }
+    .impact-context h4 { margin-bottom: 5px; }
+    .impact-context p { margin: 5px 0; }
+    .impact-values { display: flex; flex-wrap: wrap; gap: 12px; color: var(--navy); font-size: 12px; }
     .method-card { padding: 14px; border: 1px solid var(--line); border-radius: 9px; background: white; }
     .method-card strong { display: block; margin-bottom: 4px; color: var(--navy); font-size: 12px; }
     .method-card p { margin: 0; color: var(--muted); font-size: 12px; }
@@ -136,9 +160,13 @@
       .page { padding: 18px; }
       .meta-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .finding-columns { grid-template-columns: 1fr; }
+      .brief-grid, .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .severity-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .method-list { grid-template-columns: 1fr; }
       .finding-title-row { flex-direction: column; }
+    }
+    @media (max-width: 520px) {
+      .brief-grid, .roadmap-grid { grid-template-columns: 1fr; }
     }
     @media print {
       html, body { background: white !important; color: #17202d !important; }
@@ -149,7 +177,7 @@
       h2, h3, h4 { break-after: avoid; }
       table { break-inside: auto; }
       tr, .metric-card, .severity-row { break-inside: avoid; }
-      .finding-card { break-inside: avoid; }
+      .finding-card, .brief-card, .roadmap-band, .roadmap-item, .recurring-panel { break-inside: avoid; }
       a { color: inherit; text-decoration: none; }
     }
     @page {
@@ -201,10 +229,30 @@
       {{OVERVIEW}}
     </section>
 
-    <section class="section" aria-labelledby="findings-heading">
+    <section class="section" aria-labelledby="brief-heading">
       <div class="section-head">
         <span class="section-number">02</span>
-        <div><h2 id="findings-heading">Findings and remediation</h2>
+        <div><h2 id="brief-heading">Executive brief</h2>
+          <p>The highest recorded priorities, with verification state and recommended action.</p>
+        </div>
+      </div>
+      {{BRIEF}}
+    </section>
+
+    <section class="section" aria-labelledby="roadmap-heading">
+      <div class="section-head">
+        <span class="section-number">03</span>
+        <div><h2 id="roadmap-heading">Remediation roadmap</h2>
+          <p>Group findings into deterministic urgency bands for review and planning.</p>
+        </div>
+      </div>
+      {{ROADMAP}}
+    </section>
+
+    <section class="section" aria-labelledby="findings-heading">
+      <div class="section-head">
+        <span class="section-number">04</span>
+        <div><h2 id="findings-heading">Technical findings</h2>
           <p>Review verification state and recorded evidence before prioritizing action.</p>
         </div>
       </div>
@@ -217,7 +265,7 @@
 
     <section class="section" aria-labelledby="coverage-heading">
       <div class="section-head">
-        <span class="section-number">03</span>
+        <span class="section-number">05</span>
         <div><h2 id="coverage-heading">Coverage and untested work</h2>
           <p>Persisted records of checks that were skipped or otherwise incomplete.</p>
         </div>
@@ -227,7 +275,7 @@
 
     <section class="section" aria-labelledby="activity-heading">
       <div class="section-head">
-        <span class="section-number">04</span>
+        <span class="section-number">06</span>
         <div><h2 id="activity-heading">Job history and provenance</h2>
           <p>Source jobs that contributed records to this report.</p>
         </div>
@@ -237,7 +285,7 @@
 
     <section class="section" aria-labelledby="method-heading">
       <div class="section-head">
-        <span class="section-number">05</span>
+        <span class="section-number">07</span>
         <div><h2 id="method-heading">Interpretation and limitations</h2>
           <p>Use this report as an evidence summary, not as a claim of exhaustive coverage.</p>
         </div>
@@ -246,6 +294,7 @@
         <div class="method-card"><strong>Verification</strong><p>Only findings explicitly marked verified have that recorded state. Candidate, inconclusive, and refuted outcomes remain distinct.</p></div>
         <div class="method-card"><strong>Coverage</strong><p>Coverage gaps are shown when persisted. An empty gap list is not proof that all relevant checks were performed.</p></div>
         <div class="method-card"><strong>Provenance</strong><p>Finding counts are deduplicated for readability. Job IDs and the job-history table retain attribution to recorded source work.</p></div>
+        <div class="method-card"><strong>Incident-cost context</strong><p>Published incident distributions provide context only. Finding-to-pattern mapping is WHAXON's derivation and does not estimate this client's losses.</p></div>
       </div>
     </section>
 
