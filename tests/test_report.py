@@ -549,7 +549,7 @@ def test_engagement_markdown_escapes_untrusted_table_values():
     report = _report_dict()
     report["engagement"] = "<script>engagement</script>"
     report["jobs"][0]["job"].update({
-        "id": "job|id\\nnext",
+        "id": "job|id\nnext",
         "tool": "tool|<script>",
         "target": "host|target",
         "status": "finished|<img>",
