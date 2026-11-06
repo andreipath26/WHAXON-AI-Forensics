@@ -33,7 +33,7 @@ The release decision remains **NO-GO** because G06 UI acceptance is explicitly d
 - G05 production recovery and reconciliation of provider-side effects are not fully accepted.
 - G07 production upgrade, partial-failure recovery, security review, and disaster-recovery acceptance are incomplete.
 - G09 has no new V2 release candidate, matching tag, successful release workflow, or verified PyPI publication. The existing v0.11.16 tag is unsigned and has no exact-SHA CI run in this repository.
-- The exact authorized production target and external audit anchor have not been supplied or accepted.
+- The accepted record does not yet establish a real authorized production target or an independently preserved external audit anchor.
 
 ## Reopen condition
 
