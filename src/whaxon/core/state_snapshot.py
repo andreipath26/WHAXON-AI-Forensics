@@ -144,10 +144,19 @@ def create_offline_snapshot(state_dir: Path, destination: Path) -> dict:
 def restore_offline_snapshot(snapshot: Path, destination: Path, *,
                              expected_manifest_sha256: str | None = None) -> dict:
     """Restore a verified snapshot into a new directory, never overwrite state."""
+    snapshot = Path(snapshot)
     verified = verify_offline_snapshot(
         snapshot, expected_manifest_sha256=expected_manifest_sha256,
     )
-    snapshot = Path(snapshot).resolve(strict=True)
+    manifest_path = snapshot / _MANIFEST
+    manifest_bytes = manifest_path.read_bytes()
+    manifest_digest = hashlib.sha256(manifest_bytes).hexdigest()
+    if verified["manifest_sha256"] != manifest_digest:
+        raise ValueError("snapshot manifest changed during verification")
+    manifest = json.loads(manifest_bytes.decode("utf-8"))
+    expected_files = manifest["sha256"]
+
+    snapshot = snapshot.resolve(strict=True)
     destination = Path(destination).resolve(strict=False)
     if destination.exists() or destination == snapshot or snapshot in destination.parents:
         raise ValueError("restore destination must be new and outside snapshot")
@@ -155,14 +164,18 @@ def restore_offline_snapshot(snapshot: Path, destination: Path, *,
     stage = Path(tempfile.mkdtemp(prefix=".whaxon-e5-restore-", dir=destination.parent))
     stage.chmod(0o700)
     try:
-        for name, source in _inventory(snapshot).items():
-            if name == _MANIFEST:
-                continue
+        entries = _inventory(snapshot)
+        entries.pop(_MANIFEST, None)
+        if set(entries) != set(expected_files):
+            raise ValueError("snapshot file inventory mismatch")
+        for name, source in entries.items():
             target = stage / name
             target.parent.mkdir(parents=True, exist_ok=True)
             # Stream large evidence instead of loading it entirely into RAM.
             shutil.copyfile(source, target)
             target.chmod(0o600)
+            if _sha256(target) != expected_files[name]:
+                raise ValueError(f"snapshot checksum mismatch: {name}")
         _validate_database(stage / _DB)
         os.replace(stage, destination)
     except Exception:

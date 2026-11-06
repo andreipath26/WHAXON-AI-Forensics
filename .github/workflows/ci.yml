@@ -496,27 +496,33 @@ jobs:
 
 
   g07-upgrade-smoke:
-    name: G07 installed-release upgrade and state preservation
+    name: G07 upgrade ${{ matrix['baseline-version'] }} to candidate (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+        baseline-version: ["0.11.14", "0.11.16"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Build candidate wheel
         run: |
           python -m pip install --upgrade pip build
           python -m build --wheel --outdir "$RUNNER_TEMP/candidate"
 
-      - name: Seed data with the last published release
+      - name: Seed data with the installed release
         env:
           UPGRADE_DATA: ${{ runner.temp }}/whaxon-upgrade-data
+          BASELINE_VERSION: ${{ matrix['baseline-version'] }}
         run: |
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/upgrade-env"
-          "$RUNNER_TEMP/upgrade-env/bin/python" -m pip install "whaxon==0.11.16"
+          "$RUNNER_TEMP/upgrade-env/bin/python" -m pip install "whaxon==${BASELINE_VERSION}"
           "$RUNNER_TEMP/upgrade-env/bin/python" - <<'PY'
           import json
           import os
@@ -551,7 +557,7 @@ jobs:
               "upgrade-preserved-job", "stdout", "pre-upgrade evidence",
           )
           core.store.set_finished("upgrade-preserved-job", 0, 0.1)
-          print("Seeded user catalog, scope and legacy job state.")
+          print(f"Seeded user state with whaxon {os.environ['BASELINE_VERSION']}.")
           PY
 
       - name: Upgrade to candidate wheel and verify preserved state
@@ -560,7 +566,7 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/upgrade-env/bin/python" -m pip install \
-            --force-reinstall --no-deps "$RUNNER_TEMP"/candidate/*.whl
+            --force-reinstall "$RUNNER_TEMP"/candidate/*.whl
           "$RUNNER_TEMP/upgrade-env/bin/whaxon" --help >/dev/null
           "$RUNNER_TEMP/upgrade-env/bin/python" - <<'PY'
           import asyncio
@@ -597,7 +603,6 @@ jobs:
           print("Upgrade preserved operator catalog, scope and job history.")
           print("Post-upgrade Engine V2 mission storage initialized.")
           PY
-
   setup-platform-smoke:
     name: setup smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
