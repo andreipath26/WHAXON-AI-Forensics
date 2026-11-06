@@ -199,12 +199,12 @@ def _md_session_findings(md: list[str], findings: list[dict]) -> None:
 def _md_inline(value: Any) -> str:
     """Render an untrusted value as a safe, single-line Markdown fragment."""
     text = str(value if value is not None else "")
-    text = " ".join(text.replace("\\r", " ").replace("\\n", " ").split())
+    text = " ".join(text.replace(chr(13), " ").replace(chr(10), " ").split())
+    slash = chr(92)
     return (
         text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        .replace("|", "\\\\|").replace(chr(96), "\\\\" + chr(96))
+        .replace("|", slash + "|").replace(chr(96), slash + chr(96))
     )
-
 
 def _md_status(finding: dict[str, Any]) -> str:
     status = str(finding.get("verification_status") or "candidate").lower()
