@@ -219,7 +219,8 @@ def test_html_report_is_fully_server_rendered_for_pdf_and_browser():
 
     assert "Generating narrative..." not in html
     assert "Executive overview" in html
-    assert "Findings and remediation" in html
+    assert "Remediation roadmap" in html
+    assert "Technical findings" in html
     assert "Job history and provenance" in html
     assert "WHAXON recorded 1 unique finding(s)" in html
     assert "Recorded observations" in html
