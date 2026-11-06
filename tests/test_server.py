@@ -1041,3 +1041,32 @@ def test_retest_api_persists_inconclusive_instead_of_fixed(tmp_path, monkeypatch
     stored = core.store.get_findings("j1")[0]
     assert stored["verification_status"] == "inconclusive"
     assert stored["verification_reason"] == "replay unavailable; no fix inferred"
+
+
+# ---------------------------------------------------------------- G04 API report coverage
+
+def test_api_engagement_reports_include_persisted_coverage_gaps(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding()])
+    core.store.record_coverage(
+        "j1", "nikto", "10.0.0.5", "scope_blocked",
+        "out of scope; no request was sent", phase="reconnaissance",
+    )
+    client = app.test_client()
+
+    json_response = client.get("/api/report?format=json")
+    assert json_response.status_code == 200
+    coverage = json_response.get_json()["jobs"][0]["coverage"]
+    assert coverage == [{
+        "seq": 1,
+        "tool_id": "nikto",
+        "target": "10.0.0.5",
+        "kind": "scope_blocked",
+        "detail": "out of scope; no request was sent",
+        "phase": "reconnaissance",
+    }]
+
+    markdown = client.get("/api/report?format=md").get_data(as_text=True)
+    assert "## Coverage Gaps" in markdown
+    assert "scope_blocked" in markdown
+    assert "out of scope; no request was sent" in markdown
