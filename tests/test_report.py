@@ -658,3 +658,18 @@ def test_engagement_load_deduplicates_findings_per_normalized_target():
     assert findings["example.test"]["count"] == 2
     assert findings["example.test"]["job_ids"] == ["one", "two"]
     assert findings["other.test"]["count"] == 1
+
+
+def test_engagement_report_target_counts_use_canonical_host_identity():
+    report = _report_dict()
+    report["job_count"] = 2
+    report["jobs"] = [
+        {"job": {"id": "one", "target": "EXAMPLE.test:443"}, "findings": []},
+        {"job": {"id": "two", "target": "https://example.test/path"}, "findings": []},
+    ]
+
+    markdown = to_markdown(report, lookup=False)
+    html = to_html(report, static=True)
+
+    assert "**2 recorded job(s)** and **1 target(s)**" in markdown
+    assert "2 recorded job(s) and 1 distinct target(s)" in html

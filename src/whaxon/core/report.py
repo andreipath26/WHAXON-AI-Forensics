@@ -59,9 +59,18 @@ def _is_test_job(job: dict) -> bool:
     return bool(t.startswith("prod.example.com"))
 
 
+def _report_target(value: Any) -> str:
+    """Return the canonical host used to group report findings and targets."""
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    from .scope import _normalize_target
+    normalized, _kind = _normalize_target(raw)
+    return normalized or raw
+
+
 def _load(store, engagement: str | None, limit: int = 500) -> dict[str, Any]:
     """Collect all jobs + findings for an engagement into one dict."""
-    from .scope import _normalize_target
     from .store import _signature_for
     all_jobs = store.history(limit=limit)
     jobs = [j for j in all_jobs if not _is_test_job(j)]
@@ -87,8 +96,7 @@ def _load(store, engagement: str | None, limit: int = 500) -> dict[str, Any]:
                 sig = _signature_for(kind, data)
             except Exception:
                 sig = (f.get("raw_line") or "")[:120]
-            raw_target = str(f.get("target") or j.get("target") or "").strip()
-            target_key = _normalize_target(raw_target)[0] or raw_target
+            target_key = _report_target(f.get("target") or j.get("target"))
             key = (target_key, kind, sig)
             if key in seen:
                 idx = seen[key]
@@ -253,7 +261,7 @@ def _md_exec_summary(md: list[str], report: dict[str, Any]) -> None:
     entries = report.get("jobs") or []
     job_count = _safe_count(report.get("job_count"), len(entries))
     targets = {
-        str((entry.get("job") or {}).get("target"))
+        _report_target((entry.get("job") or {}).get("target"))
         for entry in entries
         if isinstance(entry, dict) and (entry.get("job") or {}).get("target")
     }
@@ -920,7 +928,7 @@ def _html_overview(report: dict[str, Any], findings: list[dict[str, Any]]) -> tu
     for entry in entries:
         job = _html_job_record(entry)
         if job.get("target"):
-            targets.add(str(job["target"]))
+            targets.add(_report_target(job["target"]))
 
     finding_count = _safe_count(report.get("finding_count"), len(findings))
     job_count = _safe_count(report.get("job_count"), len(entries))
