@@ -175,3 +175,135 @@ def test_engagement_html_discloses_persisted_coverage_safely():
     empty_html = to_html(_report_dict(), static=True)
     assert "No coverage gaps were recorded for this report." in empty_html
     assert "does not prove that every relevant check was performed" in empty_html
+
+def test_html_report_is_fully_server_rendered_for_pdf_and_browser():
+    report = _report_dict()
+    report["unique_findings"] = [{
+        "kind": "sqli",
+        "severity": "high",
+        "source": "validator",
+        "target": "127.0.0.1",
+        "raw_line": "parameter id accepts SQL syntax",
+        "remediation": "Use parameterized queries.",
+        "verification_status": "verified",
+        "verified_by": "validator",
+        "verification_reason": "Loopback fixture confirmed the behavior.",
+        "job_ids": ["job-1"],
+        "count": 2,
+        "cvss": 8.1,
+    }]
+    report["raw_finding_count"] = 2
+    report["jobs"] = [{
+        "job": {
+            "id": "job-1",
+            "tool": "fixture",
+            "target": "127.0.0.1",
+            "status": "finished",
+            "exit_code": 0,
+            "started_at": "2026-11-06T12:00:00",
+        },
+        "findings": [],
+        "coverage": [{
+            "phase": "reconnaissance",
+            "kind": "scope_blocked",
+            "tool_id": "fixture",
+            "target": "127.0.0.1",
+            "detail": "authorization check blocked a request",
+        }],
+    }]
+
+    html = to_html(report, overrides={
+        "client": "Example Client",
+        "prepared_by": "Security Team",
+    }, static=True)
+
+    assert "Generating narrative..." not in html
+    assert "Executive overview" in html
+    assert "Findings and remediation" in html
+    assert "Job history and provenance" in html
+    assert "WHAXON recorded 1 unique finding(s)" in html
+    assert "Recorded observations" in html
+    assert "Use parameterized queries." in html
+    assert "Loopback fixture confirmed the behavior." in html
+    assert "Example Client" in html
+    assert "Security Team" in html
+    assert "scope_blocked" in html
+    assert "job-1" in html
+    assert "{{" not in html
+    assert "0 findings total" not in html
+
+
+def test_html_report_escapes_untrusted_values_in_every_section():
+    report = _report_dict()
+    report["engagement"] = "</title><script>alert(1)</script>"
+    report["client"] = '<img src=x onerror="alert(2)">'
+    report["jobs"] = [{
+        "job": {
+            "id": "<svg onload=alert(3)>",
+            "tool": "tool<script>",
+            "target": "host<img src=x>",
+            "status": "finished",
+            "exit_code": 0,
+            "started_at": "now",
+        },
+        "findings": [],
+        "coverage": [{
+            "phase": "<script>alert(4)</script>",
+            "kind": "scope_blocked",
+            "tool_id": "tool",
+            "target": "host",
+            "detail": "<img src=x onerror=alert(5)>",
+        }],
+    }]
+    report["unique_findings"] = [{
+        "kind": "<script>alert(6)</script>",
+        "severity": "high",
+        "source": "adapter",
+        "target": "<svg onload=alert(7)>",
+        "raw_line": "<img src=x onerror=alert(8)>",
+        "remediation": "<script>alert(9)</script>",
+        "proof": "</script><script>alert(10)</script>",
+        "verification_status": "candidate",
+        "verification_reason": "<svg onload=alert(11)>",
+        "job_ids": ['<img src=x onerror=alert(12)>'],
+    }]
+
+    html = to_html(report, static=True)
+
+    for payload in (
+        "</title><script>alert(1)</script>",
+        '<img src=x onerror="alert(2)">',
+        "<svg onload=alert(3)>",
+        "<script>alert(4)</script>",
+        "<img src=x onerror=alert(5)>",
+        "<script>alert(6)</script>",
+        "<svg onload=alert(7)>",
+        "<img src=x onerror=alert(8)>",
+        "<script>alert(9)</script>",
+        "</script><script>alert(10)</script>",
+        "<svg onload=alert(11)>",
+        "<img src=x onerror=alert(12)>",
+    ):
+        assert payload not in html
+    assert "&lt;script&gt;" in html
+    assert "&lt;img" in html
+    assert "&lt;svg" in html
+    assert "u003c/script" in html
+
+
+def test_html_report_empty_and_coverage_states_are_explicit():
+    report = _report_dict()
+    report["finding_count"] = 0
+    report["raw_finding_count"] = 0
+    report["severity_counts"] = {
+        severity: 0 for severity in ("critical", "high", "medium", "low", "info")
+    }
+    report["unique_findings"] = []
+    report["jobs"] = []
+
+    html = to_html(report, static=True)
+
+    assert "No findings are available in this snapshot" in html
+    assert "No coverage gaps were recorded for this report." in html
+    assert "This does not prove that every relevant check was performed." in html
+    assert "No job history was recorded." in html

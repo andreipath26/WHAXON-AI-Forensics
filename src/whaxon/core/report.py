@@ -576,104 +576,323 @@ def _md_to_text_appendix(report):
     return chr(10).join(md)
 
 
+def _html_finding_card(f: dict[str, Any], index: int) -> str:
+    severity = str(f.get("severity") or "info").lower()
+    if severity not in _SEV_ORDER:
+        severity = "info"
+    verification = str(f.get("verification_status") or "candidate").lower()
+    if verification not in {"verified", "refuted", "candidate", "inconclusive"}:
+        verification = "candidate"
+
+    title = f.get("kind") or "Finding"
+    target = f.get("target") or "Target not recorded"
+    source = f.get("source") or "Source not recorded"
+    evidence = f.get("raw_line") or "No raw observation was recorded."
+    remediation = f.get("remediation") or ""
+    proof = f.get("proof") or ""
+    job_ids = [str(value) for value in (f.get("job_ids") or [])]
+    count = _safe_count(f.get("count"), 1)
+    search = _escape_html(" ".join(
+        str(value) for value in (title, target, source, evidence, remediation)
+    ).lower())
+
+    tags = [
+        f'<span class="tag tag-severity {severity}">{severity.upper()}</span>',
+        f'<span class="tag tag-verification {verification}">{_escape_html(verification)}</span>',
+        f'<span class="tag">Target: {_escape_html(target)}</span>',
+        f'<span class="tag">Source: {_escape_html(source)}</span>',
+    ]
+    for key, label in (("cve", None), ("cvss", "CVSS"), ("epss", "EPSS")):
+        value = f.get(key)
+        if value is not None:
+            text = _escape_html(value if label is None else f"{label} {value}")
+            tags.append(f'<span class="tag">{text}</span>')
+    if f.get("kev"):
+        tags.append('<span class="tag tag-kev">Known exploited</span>')
+    if f.get("business_impact"):
+        tags.append(
+            f'<span class="tag">Business impact: '
+            f'{_escape_html(f.get("business_impact"))}</span>'
+        )
+    if count > 1:
+        tags.append(f'<span class="tag">Observed {count} times</span>')
+
+    attributed = (
+        ", ".join(f"<code>{_escape_html(value)}</code>" for value in job_ids)
+        if job_ids else "Job attribution unavailable"
+    )
+    priority = _BAND_LABELS[_priority_band(f)]
+    parts = [
+        f'<article class="finding-card severity-{severity}" data-report-search="{search}">',
+        f'<div class="finding-number">F{index:03d}</div>',
+        '<div class="finding-content">',
+        '<div class="finding-title-row"><div><p class="eyebrow">Recorded finding</p>',
+        f'<h3>{_escape_html(title)}</h3></div>',
+        f'<span class="priority">{_escape_html(priority)} priority</span></div>',
+        '<div class="finding-meta">' + "".join(tags) + "</div>",
+        '<div class="finding-columns">',
+        '<section><h4>Evidence recorded</h4>',
+        f"<pre>{_escape_html(evidence)}</pre>",
+        f'<p class="muted">Verification: <strong>{_escape_html(verification)}</strong>'
+        f' by {_escape_html(f.get("verified_by") or "engine")}.</p>',
+    ]
+    reason = f.get("verification_reason")
+    if reason:
+        parts.append(f'<p class="muted">{_escape_html(reason)}</p>')
+    parts.extend([
+        "</section>",
+        "<section><h4>Recommended remediation</h4>",
+        f"<p>{_escape_html(remediation) if remediation else 'No remediation guidance was recorded.'}</p>",
+        f'<p class="muted">Recorded in: {attributed}</p>',
+    ])
+    if proof:
+        parts.extend([
+            '<h4 class="subheading">Reproduction material</h4>',
+            '<p class="muted">Review scope and safety before running recorded material.</p>',
+            f"<pre>{_escape_html(proof)}</pre>",
+        ])
+    parts.extend(["</section>", "</div>", "</div>", "</article>"])
+    return "".join(parts)
+
+
+def _html_findings(findings: list[dict[str, Any]]) -> str:
+    if not findings:
+        return (
+            '<div class="empty-state"><h3>No findings are available in this snapshot</h3>'
+            "<p>Review the recorded job history and coverage section. An empty finding "
+            "list does not establish that the targets are free of vulnerabilities.</p></div>"
+        )
+    ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
+    ordered = sorted(findings, key=lambda f: (
+        _BAND_ORDER.index(_priority_band(f)),
+        ranks.get(str(f.get("severity") or "info").lower(), 99),
+        str(f.get("kind") or "").casefold(),
+        str(f.get("target") or "").casefold(),
+    ))
+    return "".join(
+        _html_finding_card(finding, index)
+        for index, finding in enumerate(ordered, start=1)
+    )
+
+
+def _html_coverage(report: dict[str, Any]) -> str:
+    gaps = []
+    for entry in report.get("jobs") or []:
+        if not isinstance(entry, dict):
+            continue
+        job = entry.get("job") if isinstance(entry.get("job"), dict) else {}
+        gaps.extend(entry.get("coverage") or job.get("coverage") or [])
+    if not gaps:
+        return (
+            '<div class="empty-state"><p>No coverage gaps were recorded for this report.</p>'
+            '<p class="muted">This does not prove that every relevant check was performed.</p></div>'
+        )
+    rows = []
+    for gap in gaps:
+        if not isinstance(gap, dict):
+            continue
+        values = (
+            gap.get("phase") or "Unphased",
+            gap.get("kind") or "Unknown",
+            gap.get("tool_id") or "Unknown",
+            gap.get("target") or "Unknown",
+            gap.get("detail") or "",
+        )
+        rows.append(
+            "<tr>" + "".join(f"<td>{_escape_html(value)}</td>" for value in values) + "</tr>"
+        )
+    if not rows:
+        return (
+            '<div class="empty-state"><p>No valid persisted coverage records were available.</p>'
+            '<p class="muted">This does not prove that every relevant check was performed.</p></div>'
+        )
+    return (
+        '<p class="section-intro">These are persisted records of checks that were skipped '
+        "or otherwise not completed. They are not vulnerability findings.</p>"
+        '<div class="table-scroll"><table><thead><tr><th>Phase</th><th>Result</th>'
+        "<th>Check</th><th>Target</th><th>Reason</th></tr></thead><tbody>"
+        + "".join(rows) + "</tbody></table></div>"
+    )
+
+
+def _html_activity(report: dict[str, Any]) -> str:
+    rows = []
+    for entry in report.get("jobs") or []:
+        if not isinstance(entry, dict):
+            continue
+        job = entry.get("job") if isinstance(entry.get("job"), dict) else entry
+        exit_code = job.get("exit_code")
+        rows.append(
+            "<tr>"
+            f"<td><code>{_escape_html(job.get('id') or 'Unknown')}</code></td>"
+            f"<td>{_escape_html(job.get('tool') or 'Unknown')}</td>"
+            f"<td>{_escape_html(job.get('target') or 'Unknown')}</td>"
+            f"<td>{_escape_html(job.get('status') or 'Unknown')}</td>"
+            f"<td>{_escape_html(job.get('started_at') or 'Not recorded')}</td>"
+            f"<td>{_escape_html(exit_code if exit_code is not None else '—')}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return '<div class="empty-state"><p>No job history was recorded.</p></div>'
+    return (
+        '<div class="table-scroll"><table><thead><tr><th>Job ID</th><th>Tool</th>'
+        "<th>Target</th><th>Status</th><th>Started</th><th>Exit</th></tr></thead>"
+        "<tbody>" + "".join(rows) + "</tbody></table></div>"
+    )
+
+
+def _html_overview(report: dict[str, Any], findings: list[dict[str, Any]]) -> tuple[str, str]:
+    entries = report.get("jobs") or []
+    targets = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        job = entry.get("job") if isinstance(entry.get("job"), dict) else entry
+        if job.get("target"):
+            targets.add(str(job["target"]))
+
+    finding_count = _safe_count(report.get("finding_count"), len(findings))
+    job_count = _safe_count(report.get("job_count"), len(entries))
+    raw_count = _safe_count(
+        report.get("raw_finding_count"),
+        sum(_safe_count(f.get("count"), 1) for f in findings),
+    )
+    verification = {
+        "verified": sum(1 for f in findings if f.get("verification_status") == "verified"),
+        "candidate": sum(
+            1 for f in findings
+            if f.get("verification_status") in (None, "", "candidate", "inconclusive")
+        ),
+        "refuted": sum(1 for f in findings if f.get("verification_status") == "refuted"),
+    }
+    counts = report.get("severity_counts")
+    if not isinstance(counts, dict):
+        counts = {}
+        for finding in findings:
+            severity = str(finding.get("severity") or "info").lower()
+            if severity in _SEV_ORDER:
+                counts[severity] = counts.get(severity, 0) + 1
+    counts = {severity: _safe_count(counts.get(severity)) for severity in _SEV_ORDER}
+    highest = next((severity for severity in _SEV_ORDER if counts[severity]), None)
+
+    if finding_count:
+        summary = (
+            f"WHAXON recorded {finding_count} unique finding(s) across {job_count} "
+            f"recorded job(s) and {len(targets)} distinct target(s)."
+        )
+        if highest:
+            summary += f" Highest recorded severity: {highest}."
+        summary += (
+            f" {verification['verified']} are marked verified, "
+            f"{verification['candidate']} remain candidate or inconclusive, and "
+            f"{verification['refuted']} are marked refuted."
+        )
+    else:
+        summary = (
+            f"No findings were recorded across {job_count} recorded job(s) and "
+            f"{len(targets)} distinct target(s). This is a snapshot of recorded work, "
+            "not proof that the targets are free of vulnerabilities."
+        )
+
+    metrics = [
+        ("Unique findings", finding_count, "Deduplicated records"),
+        ("Recorded observations", raw_count, "Before report-level deduplication"),
+        ("Jobs", job_count, "Included in this snapshot"),
+        ("Targets", len(targets), "Represented in recorded jobs"),
+    ]
+    cards = "".join(
+        '<div class="metric-card"><span class="metric-label">'
+        + _escape_html(label)
+        + '</span><strong class="metric-value">'
+        + str(value)
+        + '</strong><span class="metric-note">'
+        + _escape_html(note)
+        + "</span></div>"
+        for label, value, note in metrics
+    )
+    severities = "".join(
+        '<div class="severity-row"><span class="severity-name">'
+        f'<span class="severity-dot {severity}"></span>{severity.capitalize()}</span>'
+        f"<strong>{counts[severity]}</strong></div>"
+        for severity in _SEV_ORDER
+    )
+    overview = (
+        f'<p class="executive-summary">{_escape_html(summary)}</p>'
+        f'<div class="metric-grid">{cards}</div>'
+        '<div class="severity-panel"><h3>Severity distribution</h3>'
+        f'<div class="severity-list">{severities}</div>'
+        '<p class="muted">Severity values reproduce recorded labels; they are not '
+        "independent validation results.</p></div>"
+    )
+    label = (
+        f"{finding_count} unique finding from {job_count} recorded job"
+        if finding_count == 1 and job_count == 1
+        else f"{finding_count} unique findings from {job_count} recorded jobs"
+    )
+    return overview, label
+
+
 def to_html(report, overrides=None, static=False):
+    """Render a complete server-filled report for screen and PDF output.
+
+    The static parameter remains accepted for compatibility. Rendering is
+    server-side so PDF generation contains the same substantive content.
+    """
     import json
+    import os
     from pathlib import Path
 
     from whaxon.core.business_impact import cost_range
-    here = Path(__file__).parent
-    tpl = (here / "report.html").read_text(encoding="utf-8")
+
     findings = []
-    for f in (report.get("unique_findings") or []):
-        g = dict(f)
-        cr = cost_range(g)
-        if cr:
-            g["cost_range"] = cr
-        findings.append(g)
+    for finding in (report.get("unique_findings") or []):
+        if not isinstance(finding, dict):
+            continue
+        item = dict(finding)
+        estimate = cost_range(item)
+        if estimate:
+            item["cost_range"] = estimate
+        findings.append(item)
+
+    overview, finding_summary = _html_overview(report, findings)
+    options = overrides if isinstance(overrides, dict) else {}
+    engagement = report.get("engagement") or "default"
+    metadata = {
+        "client": options.get("client") or report.get("client") or "Not specified",
+        "classification": options.get("classification")
+        or report.get("classification")
+        or "Confidential",
+        "prepared_by": options.get("prepared_by")
+        or report.get("prepared_by")
+        or os.environ.get("WHAXON_REPORT_PREPARED_BY")
+        or "Not specified",
+        "generated": report.get("generated") or "Not recorded",
+    }
     payload = dict(report)
     payload["unique_findings"] = findings
-    safe = json.dumps(payload, default=str).replace("<", chr(92) + "u003c")
-    tpl = tpl.replace("{{REPORT_JSON}}", safe)
-    tpl = tpl.replace("{{ENGAGEMENT}}", _escape_html(report.get("engagement", "")))
-    
-    if static:
-        finding_count = _safe_count(payload.get("finding_count"), len(findings))
-        job_count = _safe_count(payload.get("job_count"), len(payload.get("jobs") or []))
-        finding_label = "unique finding" if finding_count == 1 else "unique findings"
-        job_label = "recorded job" if job_count == 1 else "recorded jobs"
-        summary = f"{finding_count} {finding_label} from {job_count} {job_label}"
-        tpl = tpl.replace(">Loading findings...</p>", f">{summary}</p>")
-        sev = payload.get("severity_counts", {})
-        if not isinstance(sev, dict):
-            sev = {}
-        tpl = tpl.replace('id="kpi-critical">0</div>', f'id="kpi-critical">{_safe_count(sev.get("critical"))}</div>')
-        tpl = tpl.replace('id="kpi-high">0</div>', f'id="kpi-high">{_safe_count(sev.get("high"))}</div>')
-        tpl = tpl.replace('id="kpi-medium">0</div>', f'id="kpi-medium">{_safe_count(sev.get("medium"))}</div>')
-        low = _safe_count(sev.get("low")) + _safe_count(sev.get("info"))
-        tpl = tpl.replace('id="kpi-low">0</div>', f'id="kpi-low">{low}</div>')
-        
-        rows = []
-        for f in findings:
-            raw_severity = str(f.get("severity") or "info").lower()
-            sev_val = raw_severity if raw_severity in ("critical", "high", "medium", "low", "info") else "info"
-            title = _escape_html(f.get("kind") or "Finding")
-            target = _escape_html(f.get("target") or "Unknown")
-            source = _escape_html(f.get("kind") or "Adapter")
-            status_raw = str(f.get("status") or "candidate")
-            status = _escape_html(status_raw)
-            color = "var(--low)" if status_raw == "verified" else "var(--text-muted)"
-            raw_vstat = str(f.get("verification_status") or "candidate")
-            vstat_class = raw_vstat if raw_vstat in ("verified", "refuted") else "info"
-            vstat = _escape_html(raw_vstat)
-            vby = _escape_html(f.get("verified_by") or "engine")
-            vreason = _escape_html(f.get("verification_reason") or "")
-            vcell = f'<span class="pill pill-{vstat_class}" style="font-size:11px;">{vstat}</span> <small style="color:var(--text-muted); font-size:11px;">by {vby}'
-            if vreason:
-                vcell += ' — ' + vreason
-            vcell += '</small>'
-            rows.append(f'<tr><td><span class="pill pill-{sev_val}">{sev_val}</span></td><td style="font-weight:600;">{title}</td><td style="font-family:var(--font-mono); font-size:12px;">{target}</td><td><span class="chip">{source}</span></td><td><span style="color:{color}; font-size:12px;">{status}</span></td><td>{vcell}</td></tr>')
-
-        tpl = tpl.replace('<tbody id="findings-tbody">\n        <!-- Dynamic Rows -->\n      </tbody>', f'<tbody id="findings-tbody">{"".join(rows)}</tbody>')
-        tpl = tpl.replace('id="donut-summary">0 findings total</div>', f'id="donut-summary">{len(findings)} findings total</div>')
-
-    coverage = [
-        gap
-        for entry in (report.get("jobs") or [])
-        for gap in (entry.get("coverage") or [])
-    ]
-    explanation = (
-        "These are persisted records of checks that were skipped or otherwise not completed. "
-        "No listed gaps does not prove that every relevant check was performed."
+    safe_json = (
+        json.dumps(payload, default=str)
+        .replace("&", "\\u0026")
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
     )
-    if coverage:
-        rows = []
-        for gap in coverage:
-            values = (
-                gap.get("phase") or "unphased",
-                gap.get("kind") or "unknown",
-                gap.get("tool_id") or "unknown",
-                gap.get("target") or "unknown",
-                gap.get("detail") or "",
-            )
-            rows.append(
-                "<tr>" + "".join(f"<td>{_escape_html(value)}</td>" for value in values) + "</tr>"
-            )
-        body = (
-            "<table><thead><tr><th>Phase</th><th>Status</th><th>Check</th>"
-            "<th>Target</th><th>Reason</th></tr></thead><tbody>"
-            + "".join(rows) + "</tbody></table>"
-        )
-    else:
-        body = "<p>No coverage gaps were recorded for this report.</p>"
-    section = (
-        '<section aria-labelledby="coverage-gaps-heading" '
-        'style="margin:32px 0;padding:20px;border:1px solid #d1d5db;border-radius:8px;">'
-        '<h2 id="coverage-gaps-heading">Coverage and untested work</h2>'
-        f"<p>{_escape_html(explanation)}</p>{body}</section>"
-    )
-    tpl = tpl.replace("</body>", section + "</body>")
-
-    return tpl
+    template = (Path(__file__).parent / "report.html").read_text(encoding="utf-8")
+    values = {
+        "TITLE": _escape_html(engagement),
+        "CLIENT": _escape_html(metadata["client"]),
+        "CLASSIFICATION": _escape_html(metadata["classification"]),
+        "PREPARED_BY": _escape_html(metadata["prepared_by"]),
+        "GENERATED": _escape_html(metadata["generated"]),
+        "FINDING_SUMMARY": _escape_html(finding_summary),
+        "OVERVIEW": overview,
+        "FINDINGS": _html_findings(findings),
+        "COVERAGE": _html_coverage(report),
+        "ACTIVITY": _html_activity(report),
+        "REPORT_JSON": safe_json,
+    }
+    for key, value in values.items():
+        template = template.replace("{{" + key + "}}", value)
+    return template
 
 
 def _build_job_report(job, findings):
