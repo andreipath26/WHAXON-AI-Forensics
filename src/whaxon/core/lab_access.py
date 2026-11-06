@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import os
+import re
 import time
 import uuid
 
@@ -194,6 +195,14 @@ class MetasploitableLabAccessProvider:
             pass
         return errors
 
+    def _safe_diagnostic(self, value: object) -> str:
+        """Keep bounded RPC diagnostics useful without retaining credentials."""
+        text = str(value or "")
+        password = str(getattr(getattr(self.msf, "config", None), "password", "") or "")
+        if password:
+            text = text.replace(password, "[REDACTED]")
+        return re.sub(r"[\\x00-\\x1f\\x7f]+", " ", text).strip()[:2000]
+
     def _fail_evidence_job(self, job_id: str, message: str) -> None:
         try:
             self.store.append_line(job_id, "stderr", message[:500])
@@ -225,7 +234,9 @@ class MetasploitableLabAccessProvider:
                 payload=self.PAYLOAD, timeout_s=60.0,
             )
             if not isinstance(result, dict) or not result.get("job_id"):
-                raise RuntimeError("fixed Metasploit lab exploit did not start")
+                detail = self._safe_diagnostic(result.get("console_output") if isinstance(result, dict) else "")
+                message = "fixed Metasploit lab exploit did not start"
+                raise RuntimeError(f"{message}: {detail}" if detail else message)
             remote_job_id = str(result["job_id"])
             self.store.append_line(
                 job_id, "stdout", f"Metasploit remote job started: {remote_job_id}",
@@ -235,7 +246,10 @@ class MetasploitableLabAccessProvider:
                 await self._cleanup_remote_resources(
                     remote_job_id, before_sessions, job_id,
                 )
-            self._fail_evidence_job(job_id, f"Metasploit dispatch failed: {type(exc).__name__}")
+            detail = self._safe_diagnostic(exc)
+            self._fail_evidence_job(
+                job_id, f"Metasploit dispatch failed: {type(exc).__name__}: {detail}",
+            )
             raise
 
         session_id = None
