@@ -36,8 +36,8 @@ def _core_for(stages, *, statuses=None):
         stage = metadata[plan_id]["metadata"]["release_stage"]
         finding = (
             {"kind": "msf_session"} if stage == "initial_access"
-            else {"data": {"status": "verified"}} if stage == "verification"
-            else {"data": {"status": "still_vulnerable"}} if stage == "retest"
+            else {"kind": "sqli", "source": "engine-v2-verifier"}
+            if stage in {"verification", "retest"}
             else {"kind": "open_port"}
         )
         return {
@@ -48,6 +48,7 @@ def _core_for(stages, *, statuses=None):
                 "all_evidence_integrity_verified": True,
                 "attempts": [{
                     "capability_id": capabilities[stage],
+                    "job_id": f"job-{int(plan_id.split('-')[1])}",
                     "evidence_status": "recorded", "integrity_status": "verified",
                 }],
             },
@@ -57,6 +58,29 @@ def _core_for(stages, *, statuses=None):
         }
 
     core.workflow_report = report
+    class _Store:
+        def get_findings(self, job_id):
+            if job_id == "job-3":
+                return [{
+                    "kind": "sqli", "source": "engine-v2-verifier",
+                    "verification_status": "verified", "verified_by": "engine-v2",
+                    "data": {
+                        "operation": "tool.verify_sqli", "status": "verified",
+                        "source_job_id": "source-job", "source_finding_seq": 0,
+                    },
+                }]
+            if job_id == "job-4":
+                return [{
+                    "kind": "sqli", "source": "engine-v2-verifier",
+                    "verification_status": "still_vulnerable", "verified_by": "engine-v2",
+                    "data": {
+                        "operation": "tool.retest_sqli", "status": "still_vulnerable",
+                        "source_job_id": "job-3", "source_finding_seq": 0,
+                    },
+                }]
+            return []
+
+    core.store = _Store()
     return core
 
 

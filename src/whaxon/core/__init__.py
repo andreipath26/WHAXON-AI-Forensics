@@ -429,16 +429,43 @@ class Core:
                 stage_evidence_ok = stage_evidence_ok and any(
                     finding.get("kind") == "msf_session" for finding in findings
                 )
-            elif stage == "verification":
+            elif stage in {"verification", "retest"}:
+                # Workflow report findings intentionally omit raw data. Read
+                # the full persisted rows from the same sealed jobs instead of
+                # interpreting the privacy-limited report projection.
+                persisted_findings = []
+                for attempt in attempts:
+                    job_id = attempt.get("job_id")
+                    if not isinstance(job_id, str) or not job_id:
+                        continue
+                    try:
+                        rows = self.store.get_findings(job_id) or []
+                    except (AttributeError, TypeError, ValueError, RuntimeError):
+                        rows = []
+                    for finding in rows:
+                        if isinstance(finding, dict):
+                            persisted_findings.append((attempt, finding))
+
+                if stage == "verification":
+                    accepted_statuses = {"verified"}
+                    accepted_capabilities = {"tool.verify_sqli", "tool.verify_xss"}
+                else:
+                    accepted_statuses = {"still_vulnerable", "fixed"}
+                    accepted_capabilities = {"tool.retest_sqli", "tool.retest_xss"}
                 stage_evidence_ok = stage_evidence_ok and any(
-                    (finding.get("data") or {}).get("status") == "verified"
-                    for finding in findings
-                )
-            elif stage == "retest":
-                stage_evidence_ok = stage_evidence_ok and any(
-                    (finding.get("data") or {}).get("status")
-                    in {"still_vulnerable", "fixed"}
-                    for finding in findings
+                    attempt.get("capability_id") in accepted_capabilities
+                    and finding.get("source") == "engine-v2-verifier"
+                    and finding.get("kind") in {"sqli", "sql_injection", "xss"}
+                    and finding.get("verification_status") in accepted_statuses
+                    and finding.get("verified_by") == "engine-v2"
+                    and isinstance(finding.get("data"), dict)
+                    and finding["data"].get("operation") == attempt.get("capability_id")
+                    and finding["data"].get("status") in accepted_statuses
+                    and isinstance(finding["data"].get("source_job_id"), str)
+                    and bool(finding["data"].get("source_job_id"))
+                    and type(finding["data"].get("source_finding_seq")) is int
+                    and finding["data"].get("source_finding_seq") >= 0
+                    for attempt, finding in persisted_findings
                 )
             # Re-evaluate scope and exact plan-bound authorization at report
             # time. This is fail-closed if scope, provider binding, plan digest,
