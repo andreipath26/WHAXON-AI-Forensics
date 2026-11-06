@@ -48,6 +48,25 @@
     }
 
     /* Layout & Header */
+    .report-scope-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: -8px 0 20px;
+      padding: 14px 16px;
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--info);
+      border-radius: 8px;
+      background: var(--bg-surface);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    .report-scope-note strong { color: var(--text-main); }
+    .report-scope-note .note-mark {
+      flex: 0 0 auto;
+      color: var(--info);
+      font-weight: 800;
+    }
     .header {
       display: flex;
       justify-content: space-between;
@@ -260,6 +279,11 @@
     </div>
   </header>
 
+  <aside class="report-scope-note" aria-label="Report scope and interpretation">
+    <span class="note-mark" aria-hidden="true">i</span>
+    <span><strong>Evidence snapshot.</strong> This report summarizes findings and jobs recorded by WHAXON for this engagement. A missing finding or an empty result does not establish that a target is free of vulnerabilities; review job evidence and verification status before drawing conclusions.</span>
+  </aside>
+
   <!-- KPI Grid & Donut -->
   <div class="grid-dashboard">
     <div>
@@ -286,7 +310,7 @@
       <div class="card">
         <div class="card-title">
           <span>Executive Summary & Risk Narrative</span>
-          <span class="chip" style="color:#3B82F6;">Deterministic Correlation</span>
+          <span class="chip" style="color:#3B82F6;">Recorded evidence</span>
         </div>
         <p class="exec-narrative" id="exec-summary">Generating narrative...</p>
       </div>
@@ -427,7 +451,10 @@
       const findingCount = reportData.finding_count || (reportData.unique_findings || []).length;
 
       // Render Headers & KPIs
-      document.getElementById('findings-summary').textContent = `${findingCount} findings identified across ${jobCount} execution jobs`;
+      const findingLabel = findingCount === 1 ? 'unique finding' : 'unique findings';
+      const jobLabel = jobCount === 1 ? 'recorded job' : 'recorded jobs';
+      document.getElementById('findings-summary').textContent =
+        `${findingCount} ${findingLabel} from ${jobCount} ${jobLabel}`;
       document.getElementById('kpi-critical').textContent = sev.critical || 0;
       document.getElementById('kpi-high').textContent = sev.high || 0;
       document.getElementById('kpi-medium').textContent = sev.medium || 0;
