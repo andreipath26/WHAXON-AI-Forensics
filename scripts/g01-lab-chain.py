@@ -185,7 +185,27 @@ async def run(data_dir: Path, artifact: Path) -> dict:
         ))
         stages.append(access)
         access_attempt = core.workflow_evidence(access["plan_id"])["attempts"][0]
-        session_id = str(access_attempt["findings"][0]["data"]["session_id"])
+        if (
+            access_attempt.get("evidence_status") != "recorded"
+            or access_attempt.get("integrity_status") != "verified"
+        ):
+            raise RuntimeError("initial-access evidence is not recorded and sealed")
+        access_job_id = access_attempt.get("job_id")
+        if not isinstance(access_job_id, str) or not access_job_id:
+            raise RuntimeError("initial-access evidence has no linked job")
+        access_findings = core.store.get_findings(access_job_id) or []
+        session_finding = next((
+            finding for finding in access_findings
+            if isinstance(finding, dict)
+            and finding.get("kind") == "msf_session"
+            and finding.get("source") == "engine-v2-lab-access"
+            and isinstance(finding.get("data"), dict)
+            and finding["data"].get("host") == "172.28.0.10"
+            and finding["data"].get("module") == "multi/samba/usermap_script"
+        ), None)
+        session_id = str((session_finding or {}).get("data", {}).get("session_id") or "")
+        if not session_id.isdigit():
+            raise RuntimeError("sealed initial-access finding has no valid lab session id")
     except Exception as exc:
         cleanup_exception = None
         try:
