@@ -46,6 +46,7 @@ services:
     command: ["python", "/fixture.py"]
     volumes:
       - ./scripts/g01-sqli-fixture.py:/fixture.py:ro
+      - ./scripts/sqlmap_boolean_oracle.py:/sqlmap_boolean_oracle.py:ro
     network_mode: "service:msf-target"
     depends_on:
       msf-target:

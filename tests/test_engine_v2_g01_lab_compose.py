@@ -28,6 +28,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "-a 127.0.0.1" in entrypoint
     assert "engine-v2-g01-controlled-lab:" in workflow
     assert "scripts/g01-lab-chain.py" in workflow
+    assert "./scripts/sqlmap_boolean_oracle.py:/sqlmap_boolean_oracle.py:ro" in compose
     assert "socket.create_connection(('172.28.0.10', 139)" in compose
     assert compose.count("condition: service_started") == 2
     assert "fixture-health.json" in workflow
