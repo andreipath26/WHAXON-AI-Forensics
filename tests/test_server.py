@@ -991,3 +991,52 @@ def test_dependency_audit_integrity_endpoint_fails_on_corruption(tmp_path, monke
     response = app.test_client().get("/api/dependencies/audit")
     assert response.status_code == 409
     assert response.get_json()["valid"] is False
+
+
+# ---------------------------------------------------------------- G03 conservative retest outcomes
+
+def test_retest_api_refuses_candidate_without_replay(tmp_path, monkeypatch):
+    from whaxon.core.validator import Validator
+
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding()])
+    called = []
+    monkeypatch.setattr(
+        Validator, "revalidate",
+        lambda *args, **kwargs: called.append(True),
+    )
+
+    response = app.test_client().post("/api/retest/j1/0")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "not verified"
+    assert called == []
+    assert core.store.get_findings("j1")[0]["verification_status"] == "candidate"
+
+
+def test_retest_api_persists_inconclusive_instead_of_fixed(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from whaxon.core.validator import Validator
+
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding()])
+    core.store.update_verification("j1", 0, "verified", by="test", reason="seeded proof")
+    monkeypatch.setattr(
+        core.scope, "check",
+        lambda target: SimpleNamespace(allowed=True, reason="in scope", matched_rule="test"),
+    )
+    monkeypatch.setattr(
+        Validator, "revalidate",
+        lambda *args, **kwargs: ("inconclusive", "replay unavailable; no fix inferred"),
+    )
+
+    response = app.test_client().post("/api/retest/j1/0")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "status": "inconclusive",
+        "reason": "replay unavailable; no fix inferred",
+    }
+    stored = core.store.get_findings("j1")[0]
+    assert stored["verification_status"] == "inconclusive"
+    assert stored["verification_reason"] == "replay unavailable; no fix inferred"
