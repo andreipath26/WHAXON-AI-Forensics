@@ -264,13 +264,28 @@ async def run(data_dir: Path, artifact: Path) -> dict:
         result["stages"] = stages
         verification_evidence = core.workflow_evidence(verification["plan_id"])
         verified_attempt = verification_evidence["attempts"][0]
+        if (
+            verified_attempt.get("evidence_status") != "recorded"
+            or verified_attempt.get("integrity_status") != "verified"
+        ):
+            raise RuntimeError("verification evidence is not recorded and sealed")
         verified_job_id = verified_attempt.get("job_id")
-        verified_finding = next(
-            (finding for finding in verified_attempt.get("findings", [])
-             if (finding.get("data") or {}).get("status") == "verified"),
-            None,
-        )
-        if not verified_job_id or verified_finding is None:
+        if not isinstance(verified_job_id, str) or not verified_job_id:
+            raise RuntimeError("verification evidence has no linked job")
+        verification_findings = core.store.get_findings(verified_job_id) or []
+        verified_finding = next((
+            finding for finding in verification_findings
+            if isinstance(finding, dict)
+            and finding.get("kind") == "sqli"
+            and finding.get("source") == "engine-v2-verifier"
+            and finding.get("verification_status") == "verified"
+            and finding.get("verified_by") == "engine-v2"
+            and isinstance(finding.get("data"), dict)
+            and finding["data"].get("status") == "verified"
+            and finding["data"].get("source_job_id") == source_job_id
+            and finding["data"].get("source_finding_seq") == source_finding["seq"]
+        ), None)
+        if verified_finding is None:
             raise RuntimeError("independent SQLi verification did not persist a verified result")
 
         retest = await _run_stage(core, "retest", (
