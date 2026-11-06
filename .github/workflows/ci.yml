@@ -947,10 +947,10 @@ jobs:
           mkdir -p artifacts/g01
           docker compose -f docker-compose.g01-lab.yml ps -a > artifacts/g01/compose-ps.txt 2>&1 || true
           docker compose -f docker-compose.g01-lab.yml logs --no-color > artifacts/g01/compose.log 2>&1 || true
-          target_id="$(docker compose -f docker-compose.g01-lab.yml ps -q msf-target 2>/dev/null || true)"
-          if [[ -n "$target_id" ]]; then
-            docker inspect --format '{{json .State.Health}}' "$target_id" > artifacts/g01/target-health.json 2>&1 || true
-            docker exec "$target_id" bash -c 'for port in 139 445; do if (echo >"/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1; then echo "$port=open"; else echo "$port=closed"; fi; done' > artifacts/g01/target-port-probe.txt 2>&1 || true
+          fixture_id="$(docker compose -f docker-compose.g01-lab.yml ps -q sqli-fixture 2>/dev/null || true)"
+          if [[ -n "$fixture_id" ]]; then
+            docker inspect --format '{{json .State.Health}}' "$fixture_id" > artifacts/g01/fixture-health.json 2>&1 || true
+            docker exec "$fixture_id" python -c 'import socket; [(lambda p: (socket.create_connection(("172.28.0.10", p), timeout=2).close(), print(f"{p}=open")))(p) for p in (139, 445)]' > artifacts/g01/target-port-probe.txt 2>&1 || true
           fi
       - name: Preserve controlled-lab evidence and diagnostics
         if: always()

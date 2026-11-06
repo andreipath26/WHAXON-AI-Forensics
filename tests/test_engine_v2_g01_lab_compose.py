@@ -28,8 +28,9 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "-a 127.0.0.1" in entrypoint
     assert "engine-v2-g01-controlled-lab:" in workflow
     assert "scripts/g01-lab-chain.py" in workflow
-    assert "127.0.0.1/139" in compose
-    assert "target-health.json" in workflow
+    assert "socket.create_connection(('172.28.0.10', 139)" in compose
+    assert "service_started" in compose
+    assert "fixture-health.json" in workflow
     assert "target-port-probe.txt" in workflow
     assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
     assert 'metasploit = ["pymetasploit3==1.0.6"]' in project

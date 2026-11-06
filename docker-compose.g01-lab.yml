@@ -9,12 +9,6 @@ services:
     volumes:
       - ./scripts/target-entrypoint.sh:/opt/entrypoint.sh:ro
     cap_add: [NET_ADMIN]
-    healthcheck:
-      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/139'"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 20s
 
   g01-runner:
     build:
@@ -36,7 +30,7 @@ services:
         ipv4_address: 172.28.0.11
     depends_on:
       msf-target:
-        condition: service_healthy
+        condition: service_started
       sqli-fixture:
         condition: service_healthy
     healthcheck:
@@ -57,10 +51,11 @@ services:
       msf-target:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
-      interval: 2s
+      test: ["CMD", "python", "-c", "import socket, urllib.request; socket.create_connection(('172.28.0.10', 139), timeout=2).close(); urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 150s
     # Shares .10's network namespace, so the seeded verifier fixture is part of
     # the same target that receives recon and the fixed Samba exploit.
 
