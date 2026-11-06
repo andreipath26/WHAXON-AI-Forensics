@@ -915,6 +915,12 @@ jobs:
             echo "Docker Engine $engine_version is below the required 29.4.3 socketcall-compatible release" >&2
             exit 1
           fi
+          security_options="$(docker info --format '{{json .SecurityOptions}}')"
+          echo "Docker security options: $security_options"
+          if [[ "$security_options" != *seccomp* || "$security_options" != *apparmor* ]]; then
+            echo "G01 requires both seccomp and AppArmor host protections" >&2
+            exit 1
+          fi
       - name: Generate ephemeral Metasploit RPC credential
         run: echo "G01_MSF_PASS=$(python -c 'import secrets; print(secrets.token_hex(24))')" >> "$GITHUB_ENV"
       - name: Validate isolated fixed-address lab topology
