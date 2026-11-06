@@ -1,6 +1,6 @@
 # WHAXON — INSTALLATION, DEPLOYMENT AND OPERATIONS MASTER
 
-> **Verified setup/deployment (2026-11-05):** Python `>=3.11`, optional `[web]`, `[tui]`, `[gui]`, `[metasploit]`, `[dev]` dependencies. `whaxon setup --profile core` previews, not installs. Curated automatic external-tool installation is bounded to supported Debian/Ubuntu/Kali `apt` and macOS Homebrew mappings/architectures; Windows package managers are diagnostics/manual. `whaxon serve` uses Waitress; the systemd web service uses Gunicorn and separate `workflow plan serve-requests` worker; paired Docker E5 config is staged. Wheel installation alone does not start or production-authorize these services.
+> **Verified setup/deployment (2026-11-06):** Python `>=3.11`, optional `[web]`, `[tui]`, `[gui]`, `[metasploit]`, `[dev]` dependencies. `whaxon setup --profile core` previews, not installs. Curated automatic external-tool installation is bounded to supported Debian/Ubuntu/Kali `apt` and macOS Homebrew mappings/architectures; Windows package managers are diagnostics/manual. `whaxon serve` uses Waitress; the systemd web service uses Gunicorn and a separate `workflow plan serve-requests` worker; paired Docker E5 config is staged. G07 PR #143 upgrade smoke passed 22/22 checks across Python 3.11–3.13 for 0.11.14→candidate 0.11.16 and same-version 0.11.16 reinstall; production security, package rollback and disaster recovery remain open. Wheel installation alone does not start or production-authorize these services.
 
 **Authoritative operator guide, consolidated 2026-11-05.** Contains first-run, dependencies, deployment, troubleshooting, demos, screenshots and installation design. Verify configuration and commands against current CLI/service code and installed package; historical aspirations are not current shipped functionality. Use current acceptance and release gates before production deployment.
 
@@ -279,7 +279,7 @@ A failed, timed-out or interrupted pip operation may have partially changed the 
 - Physical offline-host acceptance, writable destination validation, resource integrity hashes, and a complete artifact/transitive-dependency integrity and pinning strategy.
 - Full functional verification coverage for every advertised external-tool capability; the existing loopback checks cover only the selected curated tools and scenarios.
 - Worker restart/recovery guarantees. The installer worker is a background thread in the web process; a process crash can interrupt an operation. Persisted state detects interruption but does not provide durable execution across restarts.
-- Complete browser acceptance for responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows.
+- Complete browser acceptance on supported desktop targets for keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and all UI-to-API flows.
 - Independent audit trust anchoring and realistic failure/recovery acceptance.
 
 These are roadmap/release gates, not an instruction to keep a pull request in draft. The repository currently has no open pull request for this work. Do not publish dependency readiness as a finished production feature until the outstanding gates are closed with evidence.
@@ -834,7 +834,7 @@ A failed, timed-out or interrupted pip operation may have partially changed the 
 - Physical offline-host acceptance, writable destination validation, resource integrity hashes, and a complete artifact/transitive-dependency integrity and pinning strategy.
 - Complete functional verification for every advertised external tool; current loopback checks cover selected tools and scenarios only.
 - Durable worker restart/recovery. Installation work runs in a background thread in the web process; a crash can interrupt an operation. Persisted state detects interruption but does not guarantee execution survives process restarts.
-- Complete browser acceptance for responsive behavior, keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and every UI-to-API flow.
+- Complete browser acceptance on supported desktop targets for keyboard navigation, screen-reader announcements, cancellation races, empty/error/loading states and every UI-to-API flow.
 - Independent audit trust anchoring and realistic failure/recovery acceptance.
 
 These are roadmap/release gates, not an instruction to keep a pull request in draft. The repository currently has no open pull request for this work. Do not publish dependency readiness as a finished production feature until the outstanding gates are closed with evidence.

@@ -2,7 +2,7 @@
 
 The Engine V2 requirement and checkpoint ledgers are live CSV navigation indexes. Keep their `implementation_candidate`, `test_candidate`, `source_paths` and `related_test_definition` columns pointing to existing files after every consolidation. `tests/test_documentation_integrity.py` enforces this condition and the 75-entry cardinality in CI. Dated narrative history remains intact.
 
-**Active inventory after consolidation, 2026-11-05.** This document specifies the canonical owners; [docs/README](README.md) is the reader-facing index.
+**Active inventory after consolidation; status checked 2026-11-06 at `main` `0cef416155623199d8cb551b809dd469d62b4778`.** This document specifies canonical owners; [docs/README](README.md) is the reader-facing index.
 
 ## Authoritative subject ownership
 

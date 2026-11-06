@@ -1,8 +1,10 @@
 # WHAXON — UI V2 DESIGN, INTERACTION AND ACCEPTANCE MASTER
 
-> **Verified current UI / CI reconciliation — 2026-11-05.** `main` is at `9bd4dfe` after Scope & Targets PR [#127](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/127) merged. The merge does not authorize production deployment or lift the Engine V2 E6 freeze. On the final pre-merge head `bf89063`, the focused Scope acceptance run [42063514871](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514871) and Dashboard visual run [42063514383](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514383) succeeded. Full CI run [42063514323](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42063514323) failed when the Python 3.13 lane's Ubuntu mirror download exceeded the 17-minute pandoc-install timeout; its tests did not run, while Python 3.11/3.12 and the other reported jobs passed. This branch increases the bounded timeout without skipping report/PDF tests. The 22 production pages remain subject to D1–D6 evidence and sign-off; all deployment gates stay OPEN.
+> **Current UI / CI reconciliation — 2026-11-06.** Implementation baseline reviewed at main `0cef416155623199d8cb551b809dd469d62b4778`; exact-head CI [42253317306](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42253317306) passed all 20/20 jobs. The code contains page-level browser suites across all 22 production routes; route/test coverage is not deployment sign-off, and every page row plus D1–D6 remains OPEN. UI implementation remains frozen. The binding operator instruction in `AGENTS.md` makes WHAXON desktop-only and supersedes historical mobile/responsive acceptance text below. The Engine V2 E6 freeze and release HOLD remain in effect.
 
-**Canonical UI design and acceptance reference, consolidated 2026-11-05.** Source, tests, screenshots and exact-head CI are required to establish implemented behavior. The design crosswalk determines planned UI scope; historical audits and templates are evidence, not production-ready declarations. Keep D1–D6 deployment gates open until demonstrated and approved. Do not infer that Dashboard approval implies Scope or Engine E6 approval.
+**Canonical UI design and acceptance reference, consolidated 2026-11-05; current status reconciled 2026-11-06.** Source, tests, screenshots and exact-head CI are required to establish implemented behavior. The design crosswalk determines planned UI scope; historical audits and templates are evidence, not production-ready declarations. Keep D1–D6 deployment gates open until demonstrated and approved. Do not infer that Dashboard approval implies Scope or Engine E6 approval.
+
+**Scope correction:** Mobile viewport, mobile navigation, and responsive/mobile layout references retained later in this historical record are superseded and are not requirements or acceptance evidence. Desktop visual and behavior checks remain applicable. Do not modify or test UI implementation while the operator freeze is active.
 
 ## Part I — Canonical UI V2 contract and page crosswalk
 
@@ -18,7 +20,7 @@
 2. **Propose a bounded change:** user-visible outcome; affected UI IDs/controls; ownership and dependencies; exact backend endpoints, authorization/scope/approval policy; loading, empty, unavailable, error, cancellation, reconnect and offline behavior.
 3. **Verify honest state:** API 200 is not proof of success; queued is not completed; completed is not verified; do not synthesize findings, active sessions, PTES coverage, audit cryptography, live workers or UI permissions. Unsupported actions must be labelled and disabled/hidden safely.
 4. **Keep one owner for a shared file.** Batch independent work using explicit interfaces and no conflicting concurrent writes, per the engineering execution model. No uncontrolled UI parallel rewrite.
-5. **Write regression tests with the change:** source/binding checks, Playwright interactions (including negative/malformed responses), client authorization and same Core contracts where relevant; test desktop and mobile, focus/keyboard, assistive technology, dark appearance and no overflow.
+5. **Write regression tests with the change:** source/binding checks, Playwright interactions (including negative/malformed responses), client authorization and same Core contracts where relevant; test supported desktop behavior, focus/keyboard, assistive technology, dark appearance and no overflow.
 6. **Record exact candidate evidence:** code SHA, test command, CI URL/outcomes/skips, approved visual PNG baseline comparison, accessibility/manual outcomes, network/font/icon policy and actual supported deployment environment. A test file or static inventory entry alone is not proof.
 7. **Review/merge gate:** check all relevant rows of this crosswalk and roadmap G06/G07/G08; preserve incomplete states as OPEN and do not merge claimed ready status without evidence. The E6 freeze and G01–G10 remain independent.
 
@@ -55,7 +57,7 @@ All templates live under `src/whaxon/interfaces/web/templates/`; browser tests l
 
 | Gate | Required proof | Default |
 |---|---|---|
-| D1 Design | Exact approved supplied screen and variant; desktop/mobile screenshot comparisons and no accidental visual changes | OPEN |
+| D1 Design | Exact approved supplied screen and variant; desktop screenshot comparisons and no accidental visual changes | OPEN |
 | D2 Controls | Every visible enabled control reachable, named, authorized and mapped to a real action; disabled/hidden ones documented with rationale | OPEN |
 | D3 Runtime truth | Live API data, empty/unavailable/error/unauthorized/blocked/race states and rollback truthful, no invented records | OPEN |
 | D4 Security | Scope/approval/consent on server; CSRF/Origin, XSS and secret redaction; no UI-only policy | OPEN |
@@ -66,7 +68,7 @@ A page becomes `DEPLOYMENT_READY` **only when D1–D6 each have exact-source evi
 
 ## Work queue and Dashboard-first checkpoint
 
-**Priority UI-01 Dashboard:** current template `ui_v2_dashboard.html`, route `/ui-v2`, browser suite `test_web_ui_v2_dashboard.py`, and supplied `web ui files and rendering/dashboard_engagement_hub_zero_state/`. Existing live functionality includes history/filters/JSON export, scope routing, job halt, Burp XML import, health/readiness labels, mobile navigation. Known blocker: full approved screenshot and accessibility verification, complete per-control permission/malformed-response mapping, packaging/network asset policy.
+**Priority UI-01 Dashboard:** current template `ui_v2_dashboard.html`, route `/ui-v2`, browser suite `test_web_ui_v2_dashboard.py`, and supplied `web ui files and rendering/dashboard_engagement_hub_zero_state/`. Existing live functionality includes history/filters/JSON export, scope routing, job halt, Burp XML import, health/readiness labels. Known blocker: full approved screenshot and accessibility verification, complete per-control permission/malformed-response mapping, packaging/network asset policy.
 
 Dashboard batch 1 hardens malformed-history export: a successful HTTP response with non-array payload must **fail visibly** rather than export a misleading empty archive; added browser regression. It does not alter visual design. **Dashboard remains NOT deployment-ready** until all D1–D6 complete.
 
@@ -92,7 +94,7 @@ The Dashboard is the **first** page in this UI-wide crosswalk, not a separate cr
 
 | Gate | Latest assessment | Evidence still required to close |
 |---|---|---|
-| D1 Design | OPEN | Approver-approved comparison to `web ui files and rendering/dashboard_engagement_hub_zero_state/screen.png` at representative desktop/mobile viewports |
+| D1 Design | OPEN | Approver-approved comparison to `web ui files and rendering/dashboard_engagement_hub_zero_state/screen.png` at representative supported desktop viewports |
 | D2 Controls | PARTIAL | Runtime inventory of every visible control with final expected action, loading/empty/error and authorization behavior, including generated elements |
 | D3 Runtime truth | CANDIDATE | New negative-case Playwright assertions, exact-head CI success, cross-client integration and monitored supported staging |
 | D4 Security | PARTIAL | Independent server-side authorization/CSRF review, malicious content escaping, permission-denied/timeout/cancel proofs |
@@ -116,7 +118,7 @@ The Dashboard browser suite includes adversarial browser checks that scope and j
 The Dashboard now serves a build-time compiled, pinned Tailwind stylesheet from `/static/dashboard-v2.css`, with the build recipe `scripts/build_dashboard_css.cjs` and isolated branch-only vendor workflow. The runtime Tailwind CDN script is removed; its checked-in theme configuration remains non-executable for reproducible asset builds. Browser regression coverage blocks remote Tailwind and Google Fonts and verifies canonical background styling and live page operation using the bundled CSS. D6 **remains OPEN** because font/icon/image availability, final source-distribution install checks, approved network/offline support policy, target rollout and rollback, and operator acceptance require independent proof.
 
 ### Dashboard WCAG audit remediation
-Automated axe-core WCAG 2 A/AA and 2.1 A/AA review on the integrated browser candidate found exactly one rule family failing at desktop and mobile: `document-title`. The production Dashboard now provides a descriptive HTML `<title>`, with a browser regression. The automated audit must be rerun on the exact post-fix SHA before its result is accepted. Automated success does not replace manual assistive-technology, contrast, zoom and keyboard review.
+**Historical candidate result (mobile viewport scope superseded):** **Historical candidate result (mobile viewport scope superseded):** Automated axe-core WCAG 2 A/AA and 2.1 A/AA review on the integrated browser candidate found exactly one rule family failing at desktop and mobile: `document-title`. The production Dashboard now provides a descriptive HTML `<title>`, with a browser regression. The automated audit must be rerun on the exact post-fix SHA before its result is accepted. Automated success does not replace manual assistive-technology, contrast, zoom and keyboard review.
 
 ### Dashboard independently hosted static assets
 
@@ -132,7 +134,7 @@ A second, independent GitHub Actions job builds the wheel+sdist, checks all pack
 
 At candidate `106c64f18e9762f4635043accee1338f513dd2f3`, [full CI run 42010899550](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42010899550) has now **completed SUCCESS**, including Python 3.11/3.12/3.13 test lanes and platform setup smoke. Python 3.11 and 3.13 source-distribution and clean-wheel smoke steps were **skipped**, while the Python 3.12 equivalents passed; do not count skips as passes. [Focused Dashboard run 42010899499](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42010899499) completed SUCCESS in both `dashboard` (browser, screenshot capture, automated axe) and `dashboard-install` (wheel/sdist manifest SHA and isolated loopback HTTP) jobs. These outcomes were verified against the exact PR head before this documentation update; **this documentation commit creates a new head requiring fresh exact-head CI**.
 
-**Outstanding acceptance blockers (do not close D1–D6):** D1 requires owner-selected/approved supplied baseline and signed desktop/mobile visual comparisons; D2 requires a complete per-visible/generated-control, permission, state and service mapping with reviewer sign-off; D3 needs supported staging/cross-client operational acceptance; D4 requires independent server-side scope/consent/CSRF/XSS/secret review; D5 requires manual screen-reader, high-zoom, keyboard and contrast review; D6 requires actual target deployment, desktop and upgrade/rollback evidence plus explicit release approval. Automated axe success is not manual accessibility approval. No reviewer approvals are recorded on PR #126. E6 remains frozen, PR remains draft and unmerged.
+**Outstanding acceptance blockers (do not close D1–D6):** D1 requires an owner-approved supplied baseline and signed desktop visual comparison; D2 requires a complete visible/generated-control, permission, state and service mapping with reviewer sign-off; D3 needs supported staging and cross-client operational acceptance; D4 requires independent server-side scope/consent/CSRF/XSS/secret review; D5 requires manual screen-reader, high-zoom, keyboard and contrast review; D6 requires target deployment, desktop upgrade/rollback evidence and explicit release approval. Automated axe success is not manual accessibility approval. PR #126 is merged, but no D1–D6 approval is recorded; E6 remains frozen.
 
 ## Operator freeze — Dashboard UI-01, 2026-11-05
 
