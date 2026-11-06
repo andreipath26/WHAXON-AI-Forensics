@@ -17,7 +17,10 @@ class Handler(BaseHTTPRequestHandler):
             # Deterministic boolean oracle for the fixed SQLmap smoke. A quote
             # probe emits a parser marker; boolean conditions vary only a
             # constant response and never access or mutate a database.
-            status, body = 200, sqlmap_boolean_oracle(value)
+            if value.strip() == "'":
+                status, body = 200, b"SQLite error: near \"'\": syntax error\\n"
+            else:
+                status, body = 200, sqlmap_boolean_oracle(value)
         else:
             status, body = 404, b"not found"
         self.send_response(status)
