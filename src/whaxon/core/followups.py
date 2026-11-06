@@ -145,7 +145,15 @@ class EvidenceFollowupPlanner:
         provenance: list[dict] = []
         blocked: list[dict] = []
         seen: set[tuple[str, str]] = set()
-        for row in self.store.get_workflow_evidence(source_plan_id, limit=1000):
+        evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
+        rows = evidence.get("attempts") if isinstance(evidence, dict) else evidence
+        if not isinstance(rows, list):
+            rows = []
+            blocked.append({"source_task": None, "reason": "evidence_unavailable"})
+        for row in rows:
+            if not isinstance(row, dict):
+                blocked.append({"source_task": None, "reason": "invalid_evidence_row"})
+                continue
             key = row.get("task_key")
             if (row.get("attempt_status") != "succeeded"
                     or row.get("evidence_status") != "recorded"

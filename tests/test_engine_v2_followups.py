@@ -31,7 +31,12 @@ class Store:
         return self.row if plan_id == "source" else None
 
     def get_workflow_evidence(self, plan_id, *, limit):
-        return self.evidence
+        return {
+            "plan_id": plan_id, "mission_id": self.row["mission_id"],
+            "plan_digest": self.row["digest"], "attempts": self.evidence,
+            "all_evidence_recorded": True,
+            "all_evidence_integrity_verified": True,
+        }
 
     def get(self, job_id):
         return self.job if job_id == "j1" else None

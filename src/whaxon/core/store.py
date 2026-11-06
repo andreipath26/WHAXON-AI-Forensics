@@ -145,9 +145,14 @@ def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id
         "SELECT id, tool, target, status, exit_code, error, started_at, finished_at, "
         "duration_s FROM jobs WHERE id=?", (job_id,),
     ).fetchone()
+    if not isinstance(capability_id, str) or not capability_id:
+        return None
+    expected_tool = (
+        capability_id.removeprefix("tool.")
+        if capability_id.startswith("tool.") else capability_id
+    )
     if (
-        job is None or not capability_id.startswith("tool.")
-        or job["tool"] != capability_id.removeprefix("tool.")
+        job is None or job["tool"] != expected_tool
         or job["target"] != target or job["status"] != "finished"
         or job["exit_code"] != 0
     ):
@@ -3176,7 +3181,7 @@ class JobStore:
                     (plan_row["plan_id"], row["task_id"], attempt_id,
                      "task_" + status, json.dumps({"error": error}), now),
                 )
-                # Seal matching tool evidence inside the terminal-outcome transaction.
+                # Seal matching provider evidence inside the terminal-outcome transaction.
                 # Missing, in-progress or cross-target jobs remain unsealed.
                 if status == "succeeded" and isinstance(result, dict):
                     job_id = result.get("job_id")
