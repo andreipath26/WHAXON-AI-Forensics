@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 : "${WHAXON_MSF_PASS:?CI-only MSF RPC password required}"
-msfrpcd -U "$WHAXON_MSF_USER" -P "$WHAXON_MSF_PASS" -a 127.0.0.1 -p 55553 -S -f -n >/tmp/g01-msfrpcd.log 2>&1 &
+ruby /usr/src/metasploit-framework/msfrpcd -U "$WHAXON_MSF_USER" -P "$WHAXON_MSF_PASS" -a 127.0.0.1 -p 55553 -S -f -n >/tmp/g01-msfrpcd.log 2>&1 &
 rpc_pid=$!
 trap 'kill "$rpc_pid" 2>/dev/null || true' EXIT INT TERM
 for attempt in $(seq 1 60); do
