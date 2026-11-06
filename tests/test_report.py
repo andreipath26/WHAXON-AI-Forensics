@@ -421,7 +421,7 @@ def test_markdown_engagement_report_has_evidence_qualified_priorities_and_cost_c
         },
         {
             "kind": "refuted record",
-            "severity": "critical",
+            "severity": "info",
             "target": "docs.example.test",
             "verification_status": "refuted",
             "remediation": "Should not appear as an action.",
@@ -441,6 +441,8 @@ def test_markdown_engagement_report_has_evidence_qualified_priorities_and_cost_c
     roadmap = markdown.split("## Remediation Roadmap", 1)[1].split("## Appendix", 1)[0]
     assert "Should not appear as an action." not in roadmap
     assert "Refuted records remain in the technical appendix." in roadmap
+    assert "### Info" in markdown
+    assert "refuted record" in markdown
 
 
 def test_markdown_report_escapes_untrusted_priority_fields():

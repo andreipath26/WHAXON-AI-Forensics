@@ -1347,8 +1347,8 @@ def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
     ])
     if not actionable:
         md.extend([
-            "All findings in this snapshot are marked refuted; no remediation "
-            "priorities are listed. Refuted records remain in the technical appendix.",
+            f"{len(findings)} refuted finding(s) are excluded from remediation priorities "
+            "and retained in the technical appendix.",
             "",
         ])
         return
@@ -1432,7 +1432,18 @@ def _md_findings_appendix(md, report, all_findings=False):
     unique = report.get("unique_findings") or []
     if not unique:
         return
-    detail_sevs = list(_SEV_ORDER) if all_findings else ["critical", "high"]
+    if all_findings:
+        detail_sevs = list(_SEV_ORDER)
+    else:
+        detail_sevs = ["critical", "high"]
+        detail_sevs.extend(
+            severity for severity in _SEV_ORDER
+            if severity not in detail_sevs and any(
+                (finding.get("severity") or "").lower() == severity
+                and _md_status(finding) == "refuted"
+                for finding in unique
+            )
+        )
     md.append("## Appendix: Technical Findings\n")
     for sev in detail_sevs:
         bucket = [f for f in unique if (f.get("severity") or "").lower() == sev]
