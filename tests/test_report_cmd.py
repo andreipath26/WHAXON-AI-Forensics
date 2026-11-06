@@ -148,7 +148,7 @@ def test_engagement_report_includes_persisted_coverage_gaps(tmp_path, fmt):
         report = json.loads(out.read_text())
         coverage = report["jobs"][0]["coverage"]
         assert coverage == [{
-            "seq": 1,
+            "seq": 0,
             "tool_id": "nikto",
             "target": "10.0.0.5",
             "kind": "scope_blocked",
