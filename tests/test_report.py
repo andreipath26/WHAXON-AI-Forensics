@@ -72,7 +72,7 @@ def test_render_html_escapes_script_in_raw_line():
 def test_to_markdown_has_waxon_banner_and_tables():
     md = to_markdown(_report_dict())
     assert "# WHAXON Engagement Report" in md
-    assert "## Executive Summary" in md
+    assert "## Executive Brief" in md
     assert "## Appendix: Job History" in md
     assert "| Job | Tool | Target | Status | Exit |" in md
 
@@ -490,7 +490,7 @@ def test_per_job_markdown_report_is_structured_and_preserves_evidence_state():
     assert "## Executive Brief" in markdown
     assert "1 finding(s) were recorded" in markdown
     assert "### F001 **[HIGH]** `open_port`" in markdown
-    assert "Verification: candidate" in markdown
+    assert "**Verification:** candidate" in markdown
     assert "Evidence recorded" in markdown
     assert "22/tcp open ssh" in markdown
     assert "Recommended remediation" in markdown
