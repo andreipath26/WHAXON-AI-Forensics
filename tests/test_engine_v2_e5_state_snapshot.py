@@ -1,4 +1,5 @@
 """E5 cold state recovery includes evidence/config and rejects tampering."""
+import shutil
 import sqlite3
 import time
 from pathlib import Path
@@ -185,3 +186,77 @@ def test_e5_snapshot_rejects_inventory_addition_or_missing_file(tmp_path):
     with pytest.raises(ValueError, match="inventory mismatch"):
         restore_offline_snapshot(second, tmp_path / "should-not-exist")
     assert not (tmp_path / "should-not-exist").exists()
+
+
+def test_e5_restore_detects_snapshot_file_changed_after_initial_verification(tmp_path, monkeypatch):
+    original = tmp_path / "original"
+    original.mkdir()
+    _make_state(original)
+    snapshot = tmp_path / "snapshot"
+    create_offline_snapshot(original, snapshot)
+    destination = tmp_path / "restored"
+
+    copyfile = shutil.copyfile
+
+    def tamper_while_copying(source, target):
+        source = Path(source)
+        if source.name == "proof.bin":
+            source.write_bytes(b"changed after the initial verification")
+        return copyfile(source, target)
+
+    monkeypatch.setattr("whaxon.core.state_snapshot.shutil.copyfile", tamper_while_copying)
+    with pytest.raises(ValueError, match=r"snapshot checksum mismatch: evidence/proof\.bin"):
+        restore_offline_snapshot(snapshot, destination)
+
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".whaxon-e5-restore-*"))
+
+
+def test_e5_snapshot_copy_failure_cleans_temporary_stage(tmp_path, monkeypatch):
+    original = tmp_path / "original"
+    original.mkdir()
+    _make_state(original)
+    destination = tmp_path / "snapshot"
+
+    copyfile = shutil.copyfile
+    calls = 0
+
+    def fail_during_copy(source, target):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("simulated snapshot copy interruption")
+        return copyfile(source, target)
+
+    monkeypatch.setattr("whaxon.core.state_snapshot.shutil.copyfile", fail_during_copy)
+    with pytest.raises(OSError, match="simulated snapshot copy interruption"):
+        create_offline_snapshot(original, destination)
+
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".whaxon-e5-*"))
+
+
+def test_e5_restore_copy_failure_cleans_temporary_stage(tmp_path, monkeypatch):
+    original = tmp_path / "original"
+    original.mkdir()
+    _make_state(original)
+    snapshot = tmp_path / "snapshot"
+    create_offline_snapshot(original, snapshot)
+    destination = tmp_path / "restored"
+
+    copyfile = shutil.copyfile
+    calls = 0
+
+    def fail_during_copy(source, target):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("simulated restore copy interruption")
+        return copyfile(source, target)
+
+    monkeypatch.setattr("whaxon.core.state_snapshot.shutil.copyfile", fail_during_copy)
+    with pytest.raises(OSError, match="simulated restore copy interruption"):
+        restore_offline_snapshot(snapshot, destination)
+
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".whaxon-e5-restore-*"))
