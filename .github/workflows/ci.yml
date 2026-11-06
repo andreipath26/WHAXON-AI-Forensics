@@ -895,10 +895,26 @@ jobs:
 
   engine-v2-g01-controlled-lab:
     name: Engine V2 G01 fixed controlled-lab chain
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install patched Docker Engine with 32-bit socket compatibility
+        run: |
+          set -euo pipefail
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc >/dev/null
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          sudo systemctl restart docker
+          docker version
+          engine_version="$(docker version --format '{{.Server.Version}}')"
+          if [[ "$(printf '%s\n' 29.4.3 "$engine_version" | sort -V | head -n1)" != "29.4.3" ]]; then
+            echo "Docker Engine $engine_version is below the required 29.4.3 socketcall-compatible release" >&2
+            exit 1
+          fi
       - name: Generate ephemeral Metasploit RPC credential
         run: echo "G01_MSF_PASS=$(python -c 'import secrets; print(secrets.token_hex(24))')" >> "$GITHUB_ENV"
       - name: Validate isolated fixed-address lab topology
