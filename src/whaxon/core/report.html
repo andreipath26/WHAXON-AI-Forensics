@@ -156,18 +156,6 @@
     .method-card p { margin: 0; color: var(--muted); font-size: 12px; }
     .report-footer { margin-top: 36px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
     [hidden] { display: none !important; }
-    @media (max-width: 800px) {
-      .page { padding: 18px; }
-      .meta-grid, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .finding-columns { grid-template-columns: 1fr; }
-      .brief-grid, .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .severity-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .method-list { grid-template-columns: 1fr; }
-      .finding-title-row { flex-direction: column; }
-    }
-    @media (max-width: 520px) {
-      .brief-grid, .roadmap-grid { grid-template-columns: 1fr; }
-    }
     @media print {
       html, body { background: white !important; color: #17202d !important; }
       .page { max-width: none; margin: 0; padding: 0; }
