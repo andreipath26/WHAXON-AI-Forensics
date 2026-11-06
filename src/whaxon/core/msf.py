@@ -77,6 +77,10 @@ class MSFClient:
 
     # ---- connection ----
 
+    def _bounded_timeout(self) -> float:
+        """Respect configured RPC latency while keeping a finite upper bound."""
+        return max(1.0, min(60.0, float(self.config.timeout)))
+
     def _validate_transport(self) -> None:
         """Never send RPC credentials over plaintext to a non-loopback host."""
         import ipaddress
@@ -115,7 +119,7 @@ class MSFClient:
                 "Run: pip install -e '.[metasploit]'"
             ) from e
 
-        timeout = max(1.0, min(5.0, self.config.timeout))
+        timeout = self._bounded_timeout()
         ca_bundle = os.environ.get("WHAXON_MSF_CA_BUNDLE") or None
 
         class _VerifiedMsfRpcClient(MsfRpcClient):
@@ -145,7 +149,7 @@ class MSFClient:
         import socket
         import ssl as _ssl
 
-        timeout = max(1.0, min(5.0, self.config.timeout))
+        timeout = self._bounded_timeout()
 
         try:
             sock = socket.create_connection(
