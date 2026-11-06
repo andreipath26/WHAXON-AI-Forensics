@@ -9,11 +9,11 @@ on:
 permissions:
   contents: read
 
-# Preserve in-flight validation when commits arrive close together. Each
-# pushed commit must retain its own CI result; do not silently cancel it.
+# Preserve independent main-branch runs; for pull requests, validate only
+# the newest head so a stuck superseded candidate cannot block its successor.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   engine-v2-e5-systemd-deployment:
