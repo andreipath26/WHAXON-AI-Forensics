@@ -1554,5 +1554,5 @@ def _md_job_history_appendix(md, report):
         target = _md_inline(j.get("target", ""))
         status = _md_inline(j.get("status", ""))
         exit_code = _md_inline(j.get("exit_code", ""))
-        md.append(f"| `{job_id}` | {tool} | {target} | {status} | {exit_code} |
+        md.append(f"| `{job_id}` | {tool} | {target} | {status} | {exit_code} |")
     md.append("")

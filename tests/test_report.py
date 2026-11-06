@@ -11,7 +11,7 @@ Guards:
 """
 from __future__ import annotations
 
-from whaxon.core.report import render_html, render_markdown, to_html, to_json, to_markdown
+from whaxon.core.report import _load, render_html, render_markdown, to_html, to_json, to_markdown
 
 
 def _job():
