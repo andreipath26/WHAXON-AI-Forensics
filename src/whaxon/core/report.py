@@ -593,7 +593,7 @@ def render_markdown(job: dict, findings: list[dict]) -> str:
                 f"{_md_inline(gap.get('detail') or 'Reason not recorded')}"
             )
         md.extend(["", "Coverage gaps are not vulnerability findings.", ""])
-    return "\\n".join(md)
+    return chr(10).join(md)
 
 
 def render_html(job: dict, findings: list[dict]) -> str:
@@ -605,12 +605,13 @@ def render_html(job: dict, findings: list[dict]) -> str:
     """
     import html as _html
     md = render_markdown(job, findings)
+    escaped = _html.escape(md)
+    escaped = escaped.replace("&amp;lt;", "&lt;").replace("&amp;gt;", "&gt;")
     return (
         "<pre style=\"font-family:ui-monospace,monospace\">"
-        + _html.escape(md)
+        + escaped
         + "</pre>"
     )
-
 
 _TEMPLATE_DIR = Path(__file__).parent
 
