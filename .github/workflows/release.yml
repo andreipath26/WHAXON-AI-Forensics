@@ -67,7 +67,7 @@ jobs:
 
       - name: Static checks
         run: |
-          ruff check src tests
+          ruff check src tests scripts
           mypy src
 
       - name: Install Playwright Chromium
