@@ -538,4 +538,5 @@ def test_markdown_priority_order_keeps_business_impact_and_evidence():
     markdown = to_markdown(report, lookup=False)
 
     assert markdown.index("medium but high impact") < markdown.index("critical but low impact")
+    assert "/ Business: critical" in markdown
     assert "**[critical]** open_port" in markdown

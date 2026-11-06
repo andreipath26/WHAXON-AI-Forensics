@@ -280,10 +280,15 @@ def _md_exec_summary(md: list[str], report: dict[str, Any]) -> None:
         kind = _md_inline(finding.get("kind") or "Finding")
         target = _md_inline(finding.get("target") or "Target not recorded")
         severity = _md_inline(finding.get("severity") or "info")
+        business_impact = finding.get("business_impact")
+        impact_label = (
+            " / Business: " + _md_inline(business_impact)
+            if business_impact else ""
+        )
         evidence = _md_inline(finding.get("raw_line") or "Evidence not recorded.")
         md.append(
-            f"- **{band} · {severity} · {status}: {kind}** — target {target}; "
-            f"evidence: {evidence}"
+            f"- **{band} · {severity}{impact_label} · {status}: {kind}** — "
+            f"target {target}; evidence: {evidence}"
         )
         remediation = finding.get("remediation")
         if remediation:
@@ -1478,7 +1483,7 @@ def _md_findings_appendix(md: list[str], report: dict[str, Any], all_findings: b
             label = _md_inline(sev)
             business_impact = finding.get("business_impact")
             impact_note = (
-                " _(Business impact: " + _md_inline(business_impact) + ")_"
+                " _(Business: " + _md_inline(business_impact) + ")_"
                 if business_impact else ""
             )
             md.append("- **[" + label + "]** " + kind + " " + raw + suffix + impact_note)
