@@ -457,7 +457,7 @@ def _md_lookup(md, report, per_hint_limit=5):
 
     for hint in sorted(hints):
         data = _searchsploit_json(hint)
-        md.append("### " + hint + "\n")
+        md.append("### " + _md_inline(hint) + "\n")
         if not data:
             md.append("_No local searchsploit results (mirror may be stale)._")
             md.append("")
@@ -472,8 +472,8 @@ def _md_lookup(md, report, per_hint_limit=5):
         md.append("| EDB-ID | Title | CVEs |")
         md.append("|--------|-------|------|")
         for row in rows[:per_hint_limit]:
-            eid = row.get("EDB-ID", "?")
-            title = (row.get("Title") or "")[:70].replace("|", "\\|")
+            eid = _md_inline(row.get("EDB-ID", "?"))
+            title = _md_inline((row.get("Title") or "")[:70])
             codes = row.get("Codes") or ""
             cves = ",".join(
                 c.strip() for c in codes.split(";")
@@ -491,20 +491,27 @@ def _md_chains(md, chains, heading="## Pivot Chains"):
     if not chains:
         return
     md.append(heading + "\n")
-    for c in chains:
-        root = c.get("root", {})
-        md.append(f"- **{root.get('kind','?')} `{root.get('id','?')}`**"
-                  + (f" — {root.get('evidence','')}" if root.get("evidence") else ""))
-        for d in c.get("descendants", []):
-            rel = d.get("relation", "?")
-            arrow = "→" if rel == "from_exploit" else "↳"
-            child = d.get("child", {})
-            ev = d.get("evidence", "")
-            line = f"  {arrow} {child.get('kind','?')} `{child.get('id','?')}`"
-            if ev:
-                line += f"  ({ev})"
+    for chain in chains:
+        root = chain.get("root", {})
+        root_kind = _md_inline(root.get("kind", "?"))
+        root_id = _md_inline(root.get("id", "?"))
+        root_evidence = _md_inline(root.get("evidence", ""))
+        line = f"- **{root_kind} \`{root_id}\`**"
+        if root_evidence:
+            line += f" — {root_evidence}"
+        md.append(line)
+        for descendant in chain.get("descendants", []):
+            arrow = "→" if descendant.get("relation", "?") == "from_exploit" else "↳"
+            child = descendant.get("child", {})
+            child_kind = _md_inline(child.get("kind", "?"))
+            child_id = _md_inline(child.get("id", "?"))
+            evidence = _md_inline(descendant.get("evidence", ""))
+            line = f"  {arrow} {child_kind} \`{child_id}\`"
+            if evidence:
+                line += f"  ({evidence})"
             md.append(line)
     md.append("")
+
 
 def to_json(report: dict[str, Any]) -> str:
     return json.dumps(report, indent=2, default=str)

@@ -590,6 +590,22 @@ def test_engagement_markdown_escapes_untrusted_table_values():
     assert "`job\\|id next`" in markdown
     assert "tool\\|&lt;script&gt;" in markdown
     assert "secret\\|&lt;img&gt;" in markdown
+    chain_markdown = to_markdown(
+        report,
+        chains=[{
+            "root": {"kind": "<script>root</script>", "id": "root|id", "evidence": "<img>"},
+            "descendants": [{
+                "relation": "from_exploit",
+                "child": {"kind": "<svg>", "id": "child|id"},
+                "evidence": "<script>child</script>",
+            }],
+        }],
+        lookup=False,
+    )
+    assert "<script>root</script>" not in chain_markdown
+    assert "<script>child</script>" not in chain_markdown
+    assert "&lt;script&gt;root&lt;/script&gt;" in chain_markdown
+
 
 
 def test_markdown_proof_blocks_cannot_be_closed_by_recorded_text():
