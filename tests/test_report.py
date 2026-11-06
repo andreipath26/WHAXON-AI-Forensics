@@ -676,3 +676,18 @@ def test_engagement_report_target_counts_use_canonical_host_identity():
 
     assert "**2 recorded job(s)** and **1 target(s)**" in markdown
     assert "2 recorded job(s) and 1 distinct target(s)" in html
+
+
+def test_html_summary_counts_unknown_verification_as_candidate():
+    report = _report_dict()
+    report["unique_findings"] = [{
+        "kind": "open_port",
+        "severity": "high",
+        "verification_status": "unexpected-state",
+        "target": "127.0.0.1",
+    }]
+
+    html = to_html(report, static=True)
+
+    assert "0 are marked verified, 1 remain candidate or inconclusive, and 0 are marked refuted." in html
+    assert "tag-verification candidate" in html

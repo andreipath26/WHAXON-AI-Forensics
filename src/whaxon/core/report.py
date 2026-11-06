@@ -934,13 +934,13 @@ def _html_overview(report: dict[str, Any], findings: list[dict[str, Any]]) -> tu
         report.get("raw_finding_count"),
         sum(_safe_count(f.get("count"), 1) for f in findings),
     )
+    statuses = [_md_status(finding) for finding in findings]
     verification = {
-        "verified": sum(1 for f in findings if f.get("verification_status") == "verified"),
+        "verified": sum(1 for status in statuses if status == "verified"),
         "candidate": sum(
-            1 for f in findings
-            if f.get("verification_status") in (None, "", "candidate", "inconclusive")
+            1 for status in statuses if status in {"candidate", "inconclusive"}
         ),
-        "refuted": sum(1 for f in findings if f.get("verification_status") == "refuted"),
+        "refuted": sum(1 for status in statuses if status == "refuted"),
     }
     counts = report.get("severity_counts")
     if not isinstance(counts, dict):
