@@ -20,6 +20,7 @@ services:
       WHAXON_MSF_PORT: "55553"
       WHAXON_MSF_USER: msf
       WHAXON_MSF_PASS: "${G01_MSF_PASS:?set G01_MSF_PASS to a CI-only random value}"
+      WHAXON_MSF_TIMEOUT: "30"
       WHAXON_MSF_SSL: "0"
       WHAXON_DATA: /var/lib/whaxon
       WHAXON_ENABLE_V2_LAB_INITIAL_ACCESS: "1"
