@@ -1477,9 +1477,11 @@ def _md_findings_appendix(md: list[str], report: dict[str, Any], all_findings: b
                 suffix = "  _(seen " + str(count) + " times across " + str(jobs_seen) + " jobs)_"
             label = _md_inline(sev)
             business_impact = finding.get("business_impact")
-            if business_impact:
-                label += " / Business: " + _md_inline(business_impact)
-            md.append("- **[" + label + "]** " + kind + " " + raw + suffix)
+            impact_note = (
+                " _(Business impact: " + _md_inline(business_impact) + ")_"
+                if business_impact else ""
+            )
+            md.append("- **[" + label + "]** " + kind + " " + raw + suffix + impact_note)
             status = _md_inline(finding.get("verification_status") or "candidate")
             verified_by = _md_inline(finding.get("verified_by") or "engine")
             reason = finding.get("verification_reason") or ""

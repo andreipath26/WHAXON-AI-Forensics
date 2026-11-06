@@ -444,7 +444,7 @@ def test_markdown_engagement_report_has_evidence_qualified_priorities_and_cost_c
     assert "Refuted records remain in the technical appendix." in roadmap
     assert "### Info" in markdown
     assert "refuted record" in markdown
-    assert "**[info] refuted record**" in markdown
+    assert "**[info]** refuted record" in markdown
 
 
 def test_markdown_report_escapes_untrusted_priority_fields():
