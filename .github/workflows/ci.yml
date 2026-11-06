@@ -9,11 +9,11 @@ on:
 permissions:
   contents: read
 
-# Preserve in-flight validation when commits arrive close together. Each
-# pushed commit must retain its own CI result; do not silently cancel it.
+# Preserve independent main-branch runs; for pull requests, validate only
+# the newest head so a stuck superseded candidate cannot block its successor.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   engine-v2-e5-systemd-deployment:
@@ -892,3 +892,84 @@ jobs:
           if counts["tests"] < 13 or any(counts[k] for k in ("failures", "errors", "skipped")):
               raise SystemExit("SearchSploit integration must execute all tests without skips or failures")
           PY
+
+  engine-v2-g01-controlled-lab:
+    name: Engine V2 G01 fixed controlled-lab chain
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install patched Docker Engine with 32-bit socket compatibility
+        run: |
+          set -euo pipefail
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc >/dev/null
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          sudo systemctl restart docker
+          docker version
+          engine_version="$(docker version --format '{{.Server.Version}}')"
+          if [[ "$(printf '%s\n' 29.4.3 "$engine_version" | sort -V | head -n1)" != "29.4.3" ]]; then
+            echo "Docker Engine $engine_version is below the required 29.4.3 socketcall-compatible release" >&2
+            exit 1
+          fi
+          security_options="$(docker info --format '{{json .SecurityOptions}}')"
+          echo "Docker security options: $security_options"
+          if [[ "$security_options" != *seccomp* || "$security_options" != *apparmor* ]]; then
+            echo "G01 requires both seccomp and AppArmor host protections" >&2
+            exit 1
+          fi
+      - name: Generate ephemeral Metasploit RPC credential
+        run: |
+          G01_MSF_PASS="$(python -c 'import secrets; print(secrets.token_hex(24))')"
+          echo "::add-mask::$G01_MSF_PASS"
+          echo "G01_MSF_PASS=$G01_MSF_PASS" >> "$GITHUB_ENV"
+      - name: Validate isolated fixed-address lab topology
+        run: docker compose -f docker-compose.g01-lab.yml config --quiet
+      - name: Build and start fixed .10 target, .11 runner, and .12 seeded fixture
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.g01-lab.yml up -d --build --wait --wait-timeout 180
+      - name: Run scope through retest with persisted seals and mission report
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.g01-lab.yml exec -T g01-runner \
+            /opt/whaxon-venv/bin/python /opt/whaxon-src/scripts/g01-lab-chain.py \
+            --data-dir /var/lib/whaxon \
+            --artifact /artifacts/g01-mission-report.json
+          test -s artifacts/g01/g01-mission-report.json
+          test -s artifacts/g01/g01-mission-report.json.sha256
+          (cd artifacts/g01 && sha256sum -c g01-mission-report.json.sha256)
+      - name: Collect controlled-lab startup diagnostics
+        if: always()
+        run: |
+          # The lab runner writes its report through a root-owned bind mount.
+          # Return ownership to the hosted runner before writing diagnostics/uploading.
+          if [[ -d artifacts/g01 ]]; then
+            sudo chown -R "$(id -u):$(id -g)" artifacts/g01
+          fi
+          mkdir -p artifacts/g01
+          docker compose -f docker-compose.g01-lab.yml ps -a > artifacts/g01/compose-ps.txt 2>&1 || true
+          docker compose -f docker-compose.g01-lab.yml logs --no-color > artifacts/g01/compose.log 2>&1 || true
+          fixture_id="$(docker compose -f docker-compose.g01-lab.yml ps -q sqli-fixture 2>/dev/null || true)"
+          if [[ -n "$fixture_id" ]]; then
+            docker inspect --format '{{json .State.Health}}' "$fixture_id" > artifacts/g01/fixture-health.json 2>&1 || true
+            docker exec "$fixture_id" python -c 'import socket; [(lambda p: (socket.create_connection(("172.28.0.10", p), timeout=2).close(), print(f"{p}=open")))(p) for p in (139, 445)]' > artifacts/g01/target-port-probe.txt 2>&1 || true
+          fi
+      - name: Preserve controlled-lab evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: engine-v2-g01-controlled-lab-evidence
+          path: artifacts/g01/**
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Stop lab services and remove ephemeral state
+        if: always()
+        run: |
+          docker compose -f docker-compose.g01-lab.yml down -v --remove-orphans || true
+          sudo rm -rf artifacts/g01

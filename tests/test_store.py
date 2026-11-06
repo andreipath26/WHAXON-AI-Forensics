@@ -442,3 +442,48 @@ def test_workflow_recovery_only_marks_expired_leases_uncertain(tmp_path):
         conn.close()
     assert store.reconcile_workflow_attempts(stale_after_s=60) == 1
     assert store.list_workflow_tasks("p")[0]["status"] == "uncertain"
+
+
+def test_provider_capability_evidence_is_sealed_when_job_tool_matches_capability(tmp_path):
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "provider-evidence-seal.db")
+    mission_id = "provider-mission"
+    plan_id = "provider-plan"
+    target = "172.28.0.10"
+    capability_id = "lab.initial_access.samba_usermap"
+    job_id = "provider-access-job"
+
+    store.create_mission(mission_id, "controlled lab provider evidence")
+    store.save_workflow_plan(
+        plan_id,
+        WorkflowPlan(
+            mission_id,
+            (WorkflowTask(
+                "access", capability_id, target, idempotency_key="access-1",
+            ),),
+        ),
+    )
+    assert store.start_task_attempt(
+        "provider-attempt", "access", 1,
+        worker_id="provider-worker", idempotency_key="access-1",
+    )
+
+    store.create(job_id)
+    store.set_started(job_id, capability_id, target)
+    store.append_finding(
+        job_id,
+        {"kind": "msf_session", "severity": "critical", "source": capability_id,
+         "data": {"session_id": "1"}, "raw_line": "controlled lab session"},
+        0,
+    )
+    store.set_finished(job_id, 0, 0.1)
+    assert store.finish_task_attempt(
+        "provider-attempt", "succeeded",
+        result={"job_id": job_id, "target": target, "tool_id": capability_id},
+    )
+
+    evidence = store.get_workflow_evidence(plan_id)
+    assert evidence["all_evidence_recorded"] is True
+    assert evidence["all_evidence_integrity_verified"] is True
+    assert evidence["attempts"][0]["integrity_status"] == "verified"

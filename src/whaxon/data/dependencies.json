@@ -104,7 +104,7 @@
       "name": "pymetasploit3",
       "kind": "python-package",
       "required": false,
-      "minimum_version": "2.0",
+      "minimum_version": "1.0.6",
       "import_name": "pymetasploit3",
       "extra": "metasploit",
       "capabilities": [

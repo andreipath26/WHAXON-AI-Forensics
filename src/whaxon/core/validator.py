@@ -87,9 +87,15 @@ class Validator:
         "open_port", "http_header_missing", "ssl_cert_invalid", "cookie_insecure",
     }
 
-    def __init__(self, payload_dir: Path, timing_threshold: float = 3.0):
+    def __init__(
+        self, payload_dir: Path, timing_threshold: float = 3.0,
+        authorize_request=None,
+    ):
         self.loader = PayloadLoader(payload_dir)
         self.timing_threshold = timing_threshold
+        if authorize_request is not None and not callable(authorize_request):
+            raise TypeError("authorize_request must be callable")
+        self.authorize_request = authorize_request
         # Payload that produced the last verified result (proof export).
         self.last_payload: str | None = None
 
@@ -135,8 +141,20 @@ class Validator:
         markers = self.SQL_ERROR_MARKERS if family == "sql" else ()
 
         try:
-            baseline_samples = [self._fetch(target_url, param, "whaxon_baseline") for _ in range(3)]
-            injected_samples = [self._fetch(target_url, param, payload) for _ in range(3)]
+            baseline_samples = [
+                self._fetch(
+                    target_url, param, "whaxon_baseline",
+                    authorize_request=self.authorize_request,
+                )
+                for _ in range(3)
+            ]
+            injected_samples = [
+                self._fetch(
+                    target_url, param, payload,
+                    authorize_request=self.authorize_request,
+                )
+                for _ in range(3)
+            ]
         except Exception as e:
             return "candidate", f"replay failed: {e}"
 
@@ -370,14 +388,20 @@ class Validator:
     def _validate_command_injection(self, url: str, param: str) -> tuple[str, str]:
         """Replay canary probes and verify the target's shell produced them."""
         try:
-            baseline_body, _ = self._fetch(url, param, "whaxon_baseline")
+            baseline_body, _ = self._fetch(
+                url, param, "whaxon_baseline",
+                authorize_request=self.authorize_request,
+            )
         except Exception as e:
             return "candidate", f"replay failed: {e}"
         baseline_l = (baseline_body or "").lower()
 
         for payload, marker in self._cmdi_probes():
             try:
-                body, _ = self._fetch(url, param, payload)
+                body, _ = self._fetch(
+                    url, param, payload,
+                    authorize_request=self.authorize_request,
+                )
             except Exception as e:
                 return "candidate", f"replay failed: {e}"
             if marker.lower() in (body or "").lower() and marker.lower() not in baseline_l:
@@ -411,7 +435,9 @@ class Validator:
         return "candidate", f"unexpected revalidation status: {status}"
 
     @staticmethod
-    def _fetch(url: str, param: str, value: str) -> tuple[str, float]:
+    def _fetch(
+        url: str, param: str, value: str, *, authorize_request=None,
+    ) -> tuple[str, float]:
         """Fetch a query-parameter variant without following redirects."""
         import time
         import urllib.error
@@ -424,6 +450,8 @@ class Validator:
         q = dict(parse_qsl(parsed.query))
         q[param] = value
         new_url = urlunparse(parsed._replace(query=urlencode(q)))
+        if authorize_request is not None and authorize_request(new_url) is not True:
+            raise ValueError("scope authorization denied validation request")
 
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -540,6 +568,15 @@ class Validator:
         opener = urllib.request.build_opener(NoRedirect)
 
         def request_once(request_url: str, request_data: bytes | None) -> tuple[str, float]:
+            # The provider must authorize every concrete request immediately
+            # before the socket is opened. Request context can supply a
+            # different path from the target URL, so checking only the target
+            # once at task start would leave a scope and SSRF gap here.
+            if (
+                self.authorize_request is not None
+                and self.authorize_request(request_url) is not True
+            ):
+                raise ValueError("scope authorization denied validation request")
             t0 = time.monotonic()
             req = urllib.request.Request(
                 request_url, data=request_data, headers=headers, method=method

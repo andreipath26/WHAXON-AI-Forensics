@@ -11,12 +11,14 @@ def test_config_from_env(monkeypatch):
     monkeypatch.setenv("WHAXON_MSF_USER", "admin")
     monkeypatch.setenv("WHAXON_MSF_PASS", "secret")
     monkeypatch.setenv("WHAXON_MSF_SSL", "1")
+    monkeypatch.setenv("WHAXON_MSF_TIMEOUT", "30")
     cfg = MSFConfig.from_env()
     assert cfg.host == "10.0.0.1"
     assert cfg.port == 55554
     assert cfg.user == "admin"
     assert cfg.password == "secret"
     assert cfg.ssl is True
+    assert cfg.timeout == 30.0
 
 
 def test_config_display():
@@ -182,3 +184,42 @@ def test_verified_rpc_transport_uses_configured_private_ca(monkeypatch):
         timeout=(3, 3), ca_bundle="/tmp/msf-ca.pem",
     )
     assert captured["verify"] == "/tmp/msf-ca.pem"
+
+
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [(0.1, 1.0), (5.0, 5.0), (30.0, 30.0), (120.0, 60.0)],
+)
+def test_msf_rpc_timeout_respects_configuration_with_safe_bounds(requested, expected):
+    client = MSFClient(MSFConfig(timeout=requested))
+    assert client._bounded_timeout() == expected
+
+def test_msf_execute_rpc_uses_structured_module_execute(monkeypatch):
+    calls = []
+
+    class Rpc:
+        def call(self, *args):
+            calls.append(args)
+            return {"job_id": 0, "uuid": "rpc-run-1"}
+
+    client = MSFClient(MSFConfig())
+    monkeypatch.setattr(client, "connect", lambda: Rpc())
+    result = client.execute_rpc(
+        "exploit", "multi/samba/usermap_script",
+        {"RHOSTS": "172.28.0.10"}, payload="cmd/unix/reverse_netcat",
+        timeout_s=60,
+    )
+
+    assert result["job_id"] == 0
+    assert calls == [(
+        "module.execute", [
+            "exploit", "multi/samba/usermap_script",
+            {"RHOSTS": "172.28.0.10", "PAYLOAD": "cmd/unix/reverse_netcat"},
+        ],
+    )]
+
+
+def test_msf_execute_rpc_rejects_injection_before_connect():
+    client = MSFClient(MSFConfig())
+    with pytest.raises(ValueError, match="command delimiter"):
+        client.execute_rpc("exploit", "multi/handler", {"RHOSTS": "127.0.0.1\nrun"})

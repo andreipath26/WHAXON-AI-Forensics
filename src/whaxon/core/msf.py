@@ -77,6 +77,10 @@ class MSFClient:
 
     # ---- connection ----
 
+    def _bounded_timeout(self) -> float:
+        """Respect configured RPC latency while keeping a finite upper bound."""
+        return max(1.0, min(60.0, float(self.config.timeout)))
+
     def _validate_transport(self) -> None:
         """Never send RPC credentials over plaintext to a non-loopback host."""
         import ipaddress
@@ -115,7 +119,7 @@ class MSFClient:
                 "Run: pip install -e '.[metasploit]'"
             ) from e
 
-        timeout = max(1.0, min(5.0, self.config.timeout))
+        timeout = self._bounded_timeout()
         ca_bundle = os.environ.get("WHAXON_MSF_CA_BUNDLE") or None
 
         class _VerifiedMsfRpcClient(MsfRpcClient):
@@ -145,7 +149,7 @@ class MSFClient:
         import socket
         import ssl as _ssl
 
-        timeout = max(1.0, min(5.0, self.config.timeout))
+        timeout = self._bounded_timeout()
 
         try:
             sock = socket.create_connection(
@@ -215,12 +219,14 @@ class MSFClient:
 
     # ---- sessions ----
 
-    def sessions(self) -> dict[str, dict]:
+    def sessions(self, *, strict: bool = False) -> dict[str, dict]:
         """Return a mapping of session-id -> session info dict."""
         c = self.connect()
         try:
             raw = c.sessions.list
         except Exception:
+            if strict:
+                raise
             return {}
         if isinstance(raw, dict):
             return {str(k): dict(v) if isinstance(v, dict) else {"info": v}
@@ -293,6 +299,56 @@ class MSFClient:
         c = self.connect()
         mod = c.modules.use(module_type, module_name)
         return dict(mod.options)
+
+    def execute_rpc(
+        self,
+        module_type: str,
+        module_name: str,
+        options: dict,
+        payload: str | None = None,
+        timeout_s: float = 30.0,
+    ) -> dict:
+        """Execute a validated module through Metasploit's structured RPC API.
+
+        This avoids parsing terminal output to determine whether a job started.
+        Option values are validated with the same restrictions as console dispatch.
+        """
+        import re
+
+        if module_type not in {"exploit", "auxiliary", "post"}:
+            raise ValueError("unsupported Metasploit module type")
+        if (not isinstance(module_name, str)
+                or not re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", module_name)
+                or any(part in {".", ".."} for part in module_name.split("/"))):
+            raise ValueError("invalid Metasploit module path")
+
+        def safe_value(value, label):
+            text = str(value)
+            if not text or ";" in text or any(ord(ch) < 32 for ch in text):
+                raise ValueError(f"invalid Metasploit {label}: command delimiter/control character")
+            return text
+
+        if payload is not None:
+            payload = safe_value(payload, "payload")
+        validated_options = {}
+        for key, value in (options or {}).items():
+            if key == "PAYLOAD":
+                continue
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", key):
+                raise ValueError("invalid Metasploit option name")
+            validated_options[key] = safe_value(value, f"option {key}")
+        if not 0.1 <= float(timeout_s) <= 180.0:
+            raise ValueError("Metasploit dispatch timeout must be between 0.1 and 180 seconds")
+
+        run_options = dict(validated_options)
+        if payload:
+            run_options["PAYLOAD"] = payload
+        result = self.connect().call(
+            "module.execute", [module_type, module_name, run_options],
+        )
+        if not isinstance(result, dict):
+            raise RuntimeError("Metasploit module.execute returned an invalid response")
+        return result
 
     def execute(
         self,

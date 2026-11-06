@@ -52,6 +52,15 @@ def _freeze(value: Any) -> Any:
     return value
 
 
+def _thaw(value: Any) -> Any:
+    """Return immutable manifest schema data as ordinary JSON containers."""
+    if isinstance(value, dict):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
@@ -114,6 +123,8 @@ class CapabilityManifest:
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
+        value["input_schema"] = _thaw(self.input_schema)
+        value["output_schema"] = _thaw(self.output_schema)
         for name in (
             "transports", "target_types", "protocols", "platforms", "auth_methods",
             "permissions", "side_effects", "limitations",

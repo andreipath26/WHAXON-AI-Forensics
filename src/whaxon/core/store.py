@@ -145,9 +145,14 @@ def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id
         "SELECT id, tool, target, status, exit_code, error, started_at, finished_at, "
         "duration_s FROM jobs WHERE id=?", (job_id,),
     ).fetchone()
+    if not isinstance(capability_id, str) or not capability_id:
+        return None
+    expected_tool = (
+        capability_id.removeprefix("tool.")
+        if capability_id.startswith("tool.") else capability_id
+    )
     if (
-        job is None or not capability_id.startswith("tool.")
-        or job["tool"] != capability_id.removeprefix("tool.")
+        job is None or job["tool"] != expected_tool
         or job["target"] != target or job["status"] != "finished"
         or job["exit_code"] != 0
     ):
@@ -2124,6 +2129,31 @@ class JobStore:
         finally:
             c.close()
 
+    def has_valid_workflow_evidence_seal(self, job_id):
+        """Require source findings to belong to an intact successful V2 attempt."""
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            rows = c.execute(
+                "SELECT s.attempt_id, s.digest, t.target, t.capability_id, p.digest AS plan_digest "
+                "FROM workflow_evidence_seals s "
+                "JOIN task_attempts a ON a.id=s.attempt_id "
+                "JOIN workflow_tasks t ON t.id=a.task_id "
+                "JOIN workflow_plans p ON p.id=t.plan_id "
+                "WHERE s.job_id=? AND a.status='succeeded'",
+                (job_id,),
+            ).fetchall()
+            return any(
+                _workflow_evidence_digest(
+                    c, attempt_id=row["attempt_id"], job_id=job_id,
+                    target=row["target"], capability_id=row["capability_id"],
+                    plan_digest=row["plan_digest"],
+                ) == row["digest"]
+                for row in rows
+            )
+        finally:
+            c.close()
+
     def get_workflow_resource_summary(self, plan_id):
         """Durable, evidence-based utilization; no invented CPU or provider costs."""
         c = self._conn()
@@ -3151,7 +3181,7 @@ class JobStore:
                     (plan_row["plan_id"], row["task_id"], attempt_id,
                      "task_" + status, json.dumps({"error": error}), now),
                 )
-                # Seal matching tool evidence inside the terminal-outcome transaction.
+                # Seal matching provider evidence inside the terminal-outcome transaction.
                 # Missing, in-progress or cross-target jobs remain unsealed.
                 if status == "succeeded" and isinstance(result, dict):
                     job_id = result.get("job_id")

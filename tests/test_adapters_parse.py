@@ -94,6 +94,53 @@ def test_sqlmap_parses_injectable_parameter():
     assert sqli[0].severity == "critical"
 
 
+def test_sqlmap_retains_explicit_injectable_summary_without_report_block():
+    lines = [
+        ("stderr", "[INFO] GET parameter 'id' appears to be 'AND boolean-based blind' injectable"),
+    ]
+    findings = SqlmapAdapter().parse(lines, ctx={"target": "http://127.0.0.1/search?id=1"})
+    sqli = [finding for finding in findings if finding.kind == "sqli"]
+    assert len(sqli) == 1
+    assert sqli[0].data == {"parameter": "id", "type": "injectable"}
+    assert sqli[0].request_context == {
+        "method": "GET", "url": "http://127.0.0.1/search?id=1", "parameter": "id",
+    }
+
+
+def test_sqlmap_prefers_detailed_report_over_summary_fallback():
+    lines = [
+        ("stderr", "[INFO] GET parameter 'id' appears to be injectable"),
+        ("stdout", "Parameter: id (GET)"),
+        ("stdout", "    Type: boolean-based blind"),
+        ("stdout", "    Payload: id=1 AND 1234=1234"),
+    ]
+    findings = SqlmapAdapter().parse(lines)
+    assert len([finding for finding in findings if finding.kind == "sqli"]) == 1
+    assert next(f for f in findings if f.kind == "sqli").data["type"] == "boolean-based blind"
+
+
+def test_sqlmap_retracts_summary_rejected_as_false_positive():
+    lines = _stdout([
+        "[INFO] GET parameter 'id' appears to be 'AND boolean-based blind' injectable",
+        "[WARNING] false positive or unexploitable injection point detected",
+        "[WARNING] GET parameter 'id' does not seem to be injectable",
+    ])
+    findings = SqlmapAdapter().parse(lines)
+    assert not [finding for finding in findings if finding.kind == "sqli"]
+
+
+def test_sqlmap_later_positive_summary_supersedes_earlier_retraction():
+    lines = _stdout([
+        "[INFO] GET parameter 'id' appears to be injectable",
+        "[WARNING] GET parameter 'id' does not seem to be injectable",
+        "[INFO] GET parameter 'id' appears to be 'AND boolean-based blind' injectable",
+    ])
+    findings = SqlmapAdapter().parse(lines)
+    sqli = [finding for finding in findings if finding.kind == "sqli"]
+    assert len(sqli) == 1
+    assert sqli[0].data["type"] == "injectable"
+
+
 def test_sqlmap_parses_current_database_info():
     lines = _stdout(["current database: 'dvwa'"])
     findings = SqlmapAdapter().parse(lines)

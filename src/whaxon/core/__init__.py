@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 from .catalog import ToolCatalog
 from .events import (
@@ -116,12 +117,14 @@ class Core:
             self.catalog.load()
 
         # Engine v2 uses the same catalog, runner, adapter parser and event store
-        # as the existing interfaces. The provider bridge is intentionally
-        # limited to read-only scanners until dedicated approval models exist.
+        # as the existing interfaces. Bounded verification and the opt-in,
+        # fixed-target lab provider have separate approval-bound contracts.
         from .capabilities import CapabilityRegistry
+        from .lab_access import MetasploitableLabAccessProvider
         from .providers import (
             BoundProviderRouter,
             CatalogAdapterProvider,
+            FindingVerificationProvider,
             SemanticOperationProvider,
         )
         self.capabilities = CapabilityRegistry(self.store)
@@ -132,9 +135,17 @@ class Core:
             registry=self.capabilities,
             suppress_legacy_followup=self.automator.suppress_legacy_followup,
         )
+        verification_provider = FindingVerificationProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
+        lab_access_provider = MetasploitableLabAccessProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope, msf=self.msf,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
+            verification_provider,
+            lab_access_provider,
         ))
 
     def _wire_store(self) -> None:
@@ -280,6 +291,325 @@ class Core:
     def workflow_evidence(self, plan_id: str, *, limit: int = 100):
         """Return real, cross-checked workflow-to-tool evidence for reporting."""
         return self.store.get_workflow_evidence(plan_id, limit=limit)
+
+    def workflow_report(self, plan_id: str, *, limit: int = 100):
+        """Build a read-only report exclusively from one plan's persisted evidence.
+
+        Partial, failed, missing, or unsealed attempts remain visible but can
+        never receive a complete/success status.
+        """
+        evidence = self.workflow_evidence(plan_id, limit=limit)
+        readiness = self.workflow_readiness(plan_id)
+        progress = self.workflow_progress(plan_id)
+        attempts = evidence["attempts"]
+        truncated = len(attempts) < progress["attempts"]
+        complete = bool(
+            readiness["ready_to_report_success"]
+            and evidence["all_evidence_recorded"]
+            and evidence["all_evidence_integrity_verified"]
+            and attempts
+            and not truncated
+        )
+        findings = [
+            {**finding, "task_key": attempt["task_key"],
+             "target": attempt["target"], "job_id": attempt["job_id"]}
+            for attempt in attempts
+            if attempt["evidence_status"] == "recorded"
+            and attempt["integrity_status"] == "verified"
+            for finding in attempt["findings"]
+        ]
+        return {
+            "schema_version": "whaxon.workflow-report.v1",
+            "plan_id": evidence["plan_id"],
+            "mission_id": evidence["mission_id"],
+            "plan_digest": evidence["plan_digest"],
+            "status": "complete" if complete else "partial",
+            "readiness": readiness,
+            "truncated": truncated,
+            "evidence": evidence,
+            "summary": {
+                "task_attempts": len(attempts),
+                "recorded_attempts": sum(
+                    attempt["evidence_status"] == "recorded" for attempt in attempts
+                ),
+                "verified_seals": sum(
+                    attempt["integrity_status"] == "verified" for attempt in attempts
+                ),
+                "findings": len(findings),
+            },
+            "findings": findings,
+            "limitations": [
+                "This report contains only evidence linked to the named workflow plan.",
+                "A partial report is not a successful completion or a release acceptance record.",
+            ],
+        }
+
+    def workflow_mission_report(
+        self, mission_id: str, *, plan_ids: list[str] | None = None, limit: int = 100,
+    ):
+        """Aggregate a sequenced release chain from plan-scoped sealed reports.
+
+        Each immutable plan declares ``metadata.release_stage``. Scope is
+        checked for every plan against its exact persisted tasks; the mission
+        report supplies the report stage and never accepts job IDs or invents
+        evidence.
+        """
+        plan_stages = ("recon", "enumeration", "initial_access", "verification", "retest")
+        stages = ("scope", *plan_stages[:4], "report", "retest")
+        recorded = self.mission_workflow_plans(mission_id)
+        recorded_ids = [row["id"] for row in recorded]
+        selected_ids = recorded_ids if plan_ids is None else list(plan_ids)
+        if not selected_ids or len(selected_ids) != len(set(selected_ids)):
+            raise ValueError("mission report requires unique plan IDs")
+        unknown = set(selected_ids) - set(recorded_ids)
+        if unknown:
+            raise ValueError("mission report plan IDs must belong to the named mission")
+
+        stage_reports = []
+        stage_positions = []
+        scope_plans = []
+        bound_target = None
+        target_binding_ok = True
+        mismatched_target_plans = []
+        stage_capabilities = {
+            "recon": {"tool.nmap", "network.services.discover"},
+            "enumeration": {
+                "tool.gobuster", "tool.ffuf", "web.directories.enumerate",
+                "web.paths.fuzz",
+            },
+            "initial_access": {"lab.initial_access.samba_usermap"},
+            "verification": {"tool.verify_sqli", "tool.verify_xss"},
+            "retest": {"tool.retest_sqli", "tool.retest_xss"},
+        }
+        for plan_id in selected_ids:
+            details = self.workflow_plan_details(plan_id)
+            plan = details["plan"]
+            if plan.get("mission_id") != mission_id:
+                raise ValueError("mission report plan belongs to a different mission")
+            from .workflow import WorkflowPlan
+
+            try:
+                canonical_plan = WorkflowPlan.from_dict(plan)
+                task_targets = {
+                    self._workflow_target_identity(task.target)
+                    for task in canonical_plan.tasks
+                }
+            except (KeyError, TypeError, ValueError):
+                task_targets = {None}
+            if len(task_targets) != 1 or None in task_targets:
+                target_binding_ok = False
+                mismatched_target_plans.append({
+                    "plan_id": plan_id,
+                    "targets": sorted(str(target) for target in task_targets),
+                })
+            else:
+                plan_target = next(iter(task_targets))
+                if bound_target is None:
+                    bound_target = plan_target
+                elif plan_target != bound_target:
+                    target_binding_ok = False
+                    mismatched_target_plans.append({
+                        "plan_id": plan_id, "targets": [plan_target],
+                    })
+            stage = (plan.get("metadata") or {}).get("release_stage")
+            if stage not in plan_stages:
+                stage_reports.append({
+                    "plan_id": plan_id, "stage": stage, "status": "partial",
+                    "reason": "missing or unsupported release_stage metadata",
+                })
+                stage_positions.append(-1)
+                continue
+            stage_positions.append(plan_stages.index(stage))
+            report = self.workflow_report(plan_id, limit=limit)
+            attempts = report.get("evidence", {}).get("attempts", [])
+            findings = report.get("findings", [])
+            capabilities = {item.get("capability_id") for item in attempts}
+            stage_evidence_ok = bool(capabilities & stage_capabilities[stage])
+            if stage == "initial_access":
+                stage_evidence_ok = stage_evidence_ok and any(
+                    finding.get("kind") == "msf_session" for finding in findings
+                )
+            elif stage in {"verification", "retest"}:
+                # Workflow report findings intentionally omit raw data. Read
+                # the full persisted rows from the same sealed jobs instead of
+                # interpreting the privacy-limited report projection.
+                persisted_findings = []
+                for attempt in attempts:
+                    job_id = attempt.get("job_id")
+                    if not isinstance(job_id, str) or not job_id:
+                        continue
+                    try:
+                        rows = self.store.get_findings(job_id) or []
+                    except (AttributeError, TypeError, ValueError, RuntimeError):
+                        rows = []
+                    for finding in rows:
+                        if isinstance(finding, dict):
+                            persisted_findings.append((attempt, finding))
+
+                if stage == "verification":
+                    accepted_statuses = {"verified"}
+                    accepted_capabilities = {"tool.verify_sqli", "tool.verify_xss"}
+                else:
+                    accepted_statuses = {"still_vulnerable", "fixed"}
+                    accepted_capabilities = {"tool.retest_sqli", "tool.retest_xss"}
+                stage_evidence_ok = stage_evidence_ok and any(
+                    attempt.get("capability_id") in accepted_capabilities
+                    and finding.get("source") == "engine-v2-verifier"
+                    and finding.get("kind") in {"sqli", "sql_injection", "xss"}
+                    and finding.get("verification_status") in accepted_statuses
+                    and finding.get("verified_by") == "engine-v2"
+                    and isinstance(finding.get("data"), dict)
+                    and finding["data"].get("operation") == attempt.get("capability_id")
+                    and finding["data"].get("status") in accepted_statuses
+                    and isinstance(finding["data"].get("source_job_id"), str)
+                    and bool(finding["data"].get("source_job_id"))
+                    and type(finding["data"].get("source_finding_seq")) is int
+                    and finding["data"].get("source_finding_seq") >= 0
+                    for attempt, finding in persisted_findings
+                )
+            # Re-evaluate scope and exact plan-bound authorization at report
+            # time. This is fail-closed if scope, provider binding, plan digest,
+            # or a required approval has changed since the attempt.
+            try:
+                task_authorization = [
+                    {
+                        "task_id": task.id,
+                        "authorized": self.authorize_workflow_task_for_plan(
+                            plan_id, task,
+                        ) is True,
+                    }
+                    for task in canonical_plan.tasks
+                ]
+            except (KeyError, TypeError, ValueError):
+                task_authorization = []
+            authorized = bool(task_authorization) and all(
+                item["authorized"] for item in task_authorization
+            )
+            readiness = report.get("readiness", {})
+            ready = readiness.get("ready_to_report_success") is True
+            sealed = bool(
+                attempts
+                and report.get("evidence", {}).get("all_evidence_recorded") is True
+                and report.get("evidence", {}).get("all_evidence_integrity_verified") is True
+                and all(
+                    item.get("evidence_status") == "recorded"
+                    and item.get("integrity_status") == "verified"
+                    for item in attempts
+                )
+                and not report.get("truncated", False)
+            )
+            plan_scope_complete = authorized and ready and sealed
+            scope_plans.append({
+                "plan_id": plan_id,
+                "plan_digest": report.get("plan_digest"),
+                "plan_bound_authorization": authorized,
+                "task_authorization": task_authorization,
+                "readiness": readiness,
+                "sealed_attempts": sealed,
+            })
+            stage_reports.append({
+                "plan_id": plan_id, "stage": stage,
+                "status": "complete" if report["status"] == "complete"
+                and stage_evidence_ok and plan_scope_complete
+                else "partial",
+                "evidence_contract_satisfied": stage_evidence_ok,
+                "plan_bound_authorization": authorized,
+                "readiness": readiness,
+                "sealed_attempts": sealed,
+                "report": report,
+            })
+
+        from itertools import pairwise
+
+        ordered = all(left < right for left, right in pairwise(stage_positions))
+        scope_complete = bool(scope_plans) and all(
+            item["plan_bound_authorization"]
+            and item["readiness"].get("ready_to_report_success") is True
+            and item["sealed_attempts"] for item in scope_plans
+        )
+        plan_stage_present = [item.get("stage") for item in stage_reports]
+        plan_stages_ordered = plan_stage_present == list(plan_stages)
+        plan_stage_complete = plan_stages_ordered and all(
+            item["status"] == "complete" for item in stage_reports
+        )
+        report_complete = bool(
+            ordered and scope_complete
+            and all(
+                item["status"] == "complete"
+                for item in stage_reports if item.get("stage") != "retest"
+            )
+        )
+        synthesized_stages: list[dict[str, Any]] = [
+            {
+                "stage": "scope",
+                "status": "complete" if scope_complete else "partial",
+                "plan_evidence": scope_plans,
+            },
+            *[item for item in stage_reports if item.get("stage") != "retest"],
+            {
+                "stage": "report",
+                "status": "complete" if report_complete else "partial",
+                "source": "this mission aggregate",
+                "sealed_source_plans": [
+                    item["plan_id"] for item in stage_reports
+                    if item.get("stage") in plan_stages[:4]
+                    and item.get("status") == "complete"
+                ],
+            },
+            *[item for item in stage_reports if item.get("stage") == "retest"],
+        ]
+        complete = bool(
+            ordered and scope_complete and plan_stage_complete and report_complete
+            and target_binding_ok
+            and all(item["status"] == "complete" for item in synthesized_stages)
+        )
+        return {
+            "schema_version": "whaxon.workflow-mission-report.v1",
+            "mission_id": mission_id,
+            "status": "complete" if complete else "partial",
+            "required_stages": list(stages),
+            "stage_order_valid": ordered and plan_stages_ordered,
+            "target_binding": {
+                "status": "complete" if target_binding_ok else "partial",
+                "target": bound_target,
+                "mismatched_plans": mismatched_target_plans,
+                "rule": "every task in every plan must resolve to the same single target",
+            },
+            "missing_stages": [
+                stage for stage in stages
+                if stage not in {item.get("stage") for item in synthesized_stages}
+            ],
+            "stages": synthesized_stages,
+            "limitations": [
+                "Only plans persisted under the named mission are eligible.",
+                "Each stage report is derived from that plan's sealed persisted evidence.",
+                "A complete mission report is not production deployment approval.",
+            ],
+        }
+
+    @staticmethod
+    def _workflow_target_identity(target: str) -> str | None:
+        """Normalize an IP, URL or host:port to its mission-chain target."""
+        import ipaddress
+        from urllib.parse import urlsplit
+
+        value = str(target or "").strip()
+        if not value:
+            return None
+        if "://" not in value and "/" in value:
+            try:
+                network = ipaddress.ip_network(value, strict=False)
+            except ValueError:
+                return None
+            return network.network_address.compressed if network.num_addresses == 1 else None
+        parsed = urlsplit(value if "://" in value else f"//{value}")
+        host = parsed.hostname
+        if host is None:
+            return None
+        try:
+            return ipaddress.ip_address(host).compressed
+        except ValueError:
+            return host.rstrip(".").lower()
 
     def workflow_resource_summary(self, plan_id: str):
         return self.store.get_workflow_resource_summary(plan_id)
@@ -515,7 +845,9 @@ class Core:
         return self.providers.inventory()
 
     def authorize_workflow_task(self, task) -> bool:
-        """Fail-closed default policy for scoped, read-only catalog scans."""
+        """Fail-closed policy for scoped capabilities with exact plan approval."""
+        import os
+
         from .capabilities import CapabilityUnavailable
 
         try:
@@ -554,7 +886,17 @@ class Core:
         if task.impact != manifest.impact or set(task.permissions) != set(manifest.permissions):
             return False
         if impact_rank[task.impact] > impact_rank["moderate"]:
-            return False
+            # A single narrowly bound critical exception exists for the
+            # explicitly enabled repository Metasploitable2 lab. Provider
+            # resolution has already checked its fixed IP/module/input
+            # contract; plan authorization below still requires exact consent.
+            if not (
+                task.capability_id == "lab.initial_access.samba_usermap"
+                and task.impact == "critical"
+                and os.environ.get("WHAXON_ENABLE_V2_LAB_INITIAL_ACCESS") == "1"
+                and task.target == "172.28.0.10"
+            ):
+                return False
         # The network-execution gate is stricter than a UI scope preview:
         # DNS-rebinding-prone hostnames must not be authorized under CIDR scope.
         try:

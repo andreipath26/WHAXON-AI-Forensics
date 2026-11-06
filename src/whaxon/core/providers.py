@@ -9,6 +9,7 @@ import re
 import shutil
 import uuid
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
@@ -33,7 +34,6 @@ _CATALOG_TARGETS = {
     "sqlmap": ("url",),
     "whois": ("hostname", "ip"),
     "dig": ("hostname",),
-    "whatweb": ("hostname", "ip", "url"),
     "theharvester": ("hostname",),
     "dnsrecon": ("hostname",),
     "arjun": ("url",),
@@ -51,7 +51,6 @@ SEMANTIC_OPERATION_IDS = {
     "sqlmap": "web.sql_injection.assess",
     "whois": "domain.registration.lookup",
     "dig": "dns.records.query",
-    "whatweb": "web.technologies.identify",
     "theharvester": "osint.domain.contacts.search",
     "dnsrecon": "dns.records.enumerate",
     "arjun": "web.parameters.discover",
@@ -568,6 +567,287 @@ class SemanticOperationProvider:
                 "semantic_operation": True,
             })
         return rows
+
+
+class FindingVerificationProvider:
+    """Run bounded SQLi/XSS verification as scheduler-owned V2 tasks.
+
+    Only a stored V2 finding of the exact supported kind can enter its matching
+    verifier. Probes reuse the existing bounded validators; each outbound
+    request rechecks current scope and the exact URL path. Results are written
+    to a separate V2 evidence job so sealed scanner findings remain immutable.
+    """
+
+    VERIFY = "tool.verify_sqli"
+    RETEST = "tool.retest_sqli"
+    VERIFY_XSS = "tool.verify_xss"
+    RETEST_XSS = "tool.retest_xss"
+    PROVIDER_ID = "whaxon.verifier.http"
+    PROVIDER_VERSION = "v2-sqli-xss-verifier.1"
+    _KINDS = {
+        VERIFY: frozenset({"sqli", "sql_injection"}),
+        RETEST: frozenset({"sqli", "sql_injection"}),
+        VERIFY_XSS: frozenset({"xss"}),
+        RETEST_XSS: frozenset({"xss"}),
+    }
+
+    def __init__(self, *, store, registry, scope):
+        self.store = store
+        self.registry = registry
+        self.scope = scope
+        self._manifests = {}
+        schema = {
+            "type": "object",
+            "properties": {
+                "source_job_id": {"type": "string", "minLength": 12, "maxLength": 32},
+                "finding_seq": {"type": "integer", "minimum": 0},
+            },
+            "required": ["source_job_id", "finding_seq"],
+            "additionalProperties": False,
+        }
+        for capability_id, operation in (
+            (self.VERIFY, "independent SQL injection verification"),
+            (self.RETEST, "conservative SQL injection remediation retest"),
+            (self.VERIFY_XSS, "independent reflected XSS verification"),
+            (self.RETEST_XSS, "conservative reflected XSS remediation retest"),
+        ):
+            manifest = CapabilityManifest(
+                capability_id=capability_id,
+                provider_id=self.PROVIDER_ID,
+                provider_version=self.PROVIDER_VERSION,
+                transports=("in_process_http",),
+                target_types=("url",),
+                permissions=("network.verify",),
+                side_effects=("bounded_http_probe", "target_service_logs"),
+                impact="moderate",
+                readiness="registered",
+                timeout_s=75.0,
+                input_schema=schema,
+                output_schema={
+                    "type": "object",
+                    "required": ["job_id", "tool_id", "target", "exit_code", "status", "reason"],
+                },
+                limitations=(
+                    f"Supports {operation} for sealed stored findings of its exact vulnerability kind only.",
+                    "Uses bounded non-destructive probes with three baseline and three injected samples.",
+                    "Accepts IP-literal targets only; hostname targets require a future pinned-address transport.",
+                    "No payload supplied by the caller; redirects are blocked.",
+                    "Retest may return still_vulnerable or inconclusive; it never infers fixed from missing proof.",
+                ),
+            )
+            registry.register(manifest)
+            self._manifests[capability_id] = manifest
+
+    def bindings(self) -> tuple[CapabilityManifest, ...]:
+        return tuple(self._manifests[key] for key in sorted(self._manifests))
+
+    def resolve_task(self, task: WorkflowTask, *, require_installed: bool = False):
+        import ipaddress
+        from urllib.parse import urlsplit
+
+        if not isinstance(task, WorkflowTask):
+            raise TypeError("verification task must be a WorkflowTask")
+        expected = self._manifests.get(task.capability_id)
+        if expected is None:
+            raise CapabilityUnavailable(task.capability_id, ("unsupported verification operation",))
+        if _target_type(task.target) != "url":
+            raise ValueError("verification requires an absolute HTTP(S) URL")
+        try:
+            target_url = urlsplit(task.target)
+            if target_url.scheme.lower() not in {"http", "https"}:
+                raise ValueError
+            if target_url.username is not None or target_url.password is not None:
+                raise ValueError
+            if not target_url.hostname or "%" in target_url.hostname:
+                raise ValueError
+            ipaddress.ip_address(target_url.hostname)
+            _ = target_url.port
+        except (ValueError, TypeError):
+            raise ValueError(
+                "verification requires an HTTP(S) URL with an IP literal; "
+                "hostname targets are disabled to prevent DNS rebinding"
+            ) from None
+        if (
+            not isinstance(task.inputs, dict)
+            or set(task.inputs) != {"source_job_id", "finding_seq"}
+            or not isinstance(task.inputs.get("source_job_id"), str)
+            or not re.fullmatch(r"[A-Fa-f0-9-]{12,36}", task.inputs["source_job_id"])
+            or type(task.inputs.get("finding_seq")) is not int
+            or task.inputs["finding_seq"] < 0
+        ):
+            raise ValueError("verification inputs must pin a stored job and finding sequence")
+        current = next((item for item in self.registry.list(task.capability_id)
+                        if item.provider_id == expected.provider_id
+                        and item.provider_version == expected.provider_version), None)
+        if current is None or current.fingerprint != expected.fingerprint:
+            raise CapabilityUnavailable(task.capability_id, ("verification manifest binding changed",))
+        self._source_finding(task)
+        return self.registry.resolve(
+            task.capability_id,
+            CapabilityRequirements(
+                transport="in_process_http",
+                target_type="url",
+                required_permissions=tuple(task.permissions),
+                maximum_impact=task.impact,
+                allowed_providers=(expected.provider_id,),
+                allowed_versions=(expected.provider_version,),
+                allowed_fingerprints=(expected.fingerprint,),
+                allowed_side_effects=expected.side_effects,
+            ),
+        )
+
+    def _source_finding(self, task: WorkflowTask):
+        source_job_id = task.inputs["source_job_id"]
+        source_seq = task.inputs["finding_seq"]
+        source_job = self.store.get(source_job_id)
+        source_findings = self.store.get_findings(source_job_id)
+        if (
+            source_job is None or source_job.get("status") != "finished"
+            or source_job.get("exit_code") != 0 or source_job.get("target") != task.target
+            or not self.store.is_engine_v2_execution_job(source_job_id)
+            or not self.store.has_valid_workflow_evidence_seal(source_job_id)
+            or source_findings is None
+        ):
+            raise ValueError("verification source must be a successful, same-target V2 job")
+        selected = next((item for item in source_findings if item.get("seq") == source_seq), None)
+        if selected is None or selected.get("kind") not in self._KINDS[task.capability_id]:
+            raise ValueError("verification source kind does not match the selected verifier")
+        verify_capability = {
+            self.RETEST: self.VERIFY,
+            self.RETEST_XSS: self.VERIFY_XSS,
+        }.get(task.capability_id)
+        if verify_capability and (
+            source_job.get("tool") != verify_capability.removeprefix("tool.")
+            or selected.get("verification_status") != "verified"
+            or selected.get("verified_by") != "engine-v2"
+        ):
+            raise ValueError("retest requires a prior V2 verified finding")
+        return source_job, selected
+
+    async def dispatch(self, task: WorkflowTask) -> dict:
+        import time
+        from urllib.parse import urlsplit
+
+        resolution = self.resolve_task(task, require_installed=True)
+        expected = resolution.manifest
+        if task.impact != expected.impact or set(task.permissions) != set(expected.permissions):
+            raise CapabilityUnavailable(task.capability_id, ("task permission/impact differs from verifier contract",))
+        source_job_id = task.inputs["source_job_id"]
+        source_seq = task.inputs["finding_seq"]
+        _, selected = self._source_finding(task)
+
+        target_parts = urlsplit(task.target)
+        target_host = target_parts.hostname
+        if target_host is None:
+            raise ValueError("verification requires an absolute HTTP(S) target")
+        origin = (target_parts.scheme.lower(), target_host.lower(), target_parts.port, target_parts.path)
+
+        def authorize_probe(url: str) -> bool:
+            try:
+                parsed = urlsplit(url)
+                request_host = parsed.hostname
+                if request_host is None:
+                    return False
+                request_origin = (parsed.scheme.lower(), request_host.lower(), parsed.port, parsed.path)
+                if (
+                    request_origin != origin or parsed.username is not None
+                    or parsed.password is not None or parsed.fragment
+                ):
+                    return False
+                self.scope.load()
+                return self.scope.check_for_execution(url).allowed is True
+            except (AttributeError, TypeError, ValueError, RuntimeError):
+                return False
+
+        from .findings import Finding
+        from .validator import Validator
+
+        finding = Finding(
+            kind=selected["kind"], severity=selected["severity"],
+            source=selected["source"], data=selected["data"],
+            raw_line=selected["raw_line"], remediation=selected.get("remediation", ""),
+            impact=selected.get("impact", ""), cvss=selected.get("cvss"),
+            cwe=selected.get("cwe", ""), references=tuple(selected.get("references") or ()),
+            lookup_hint=selected.get("lookup_hint", ""),
+            request_context=selected.get("request_context") or {},
+        )
+        validator = Validator(
+            Path(__file__).resolve().parents[1] / "data" / "payloads",
+            authorize_request=authorize_probe,
+        )
+        started = time.monotonic()
+        if task.capability_id in {self.VERIFY, self.VERIFY_XSS}:
+            status, reason = validator.validate(finding, target_url=task.target)
+        else:
+            status, reason = validator.revalidate(finding, target_url=task.target)
+        reason = str(reason)[:2000]
+        evidence_job_id = uuid.uuid4().hex[:12]
+        if self.store.get(evidence_job_id) is not None:
+            raise RuntimeError("verification evidence id collision")
+        self.store.create(evidence_job_id)
+        if not self.store.set_started(
+            evidence_job_id, task.capability_id.removeprefix("tool."), task.target,
+        ):
+            raise RuntimeError("could not start verification evidence job")
+        self.store.mark_engine_v2_execution_job(evidence_job_id)
+        evidence = Finding(
+            kind=finding.kind,
+            severity=finding.severity,
+            source="engine-v2-verifier",
+            data={
+                "source_job_id": source_job_id,
+                "source_finding_seq": source_seq,
+                "operation": task.capability_id,
+                "status": status,
+                "reason": reason,
+            },
+            raw_line=f"{task.capability_id}: {status}: {reason}",
+            request_context={"method": "GET", "url": task.target,
+                             "parameter": finding.data.get("parameter", "")},
+        )
+        self.store.append_line(evidence_job_id, "stdout", evidence.raw_line)
+        self.store.append_finding(evidence_job_id, evidence, 0)
+        self.store.update_verification(
+            evidence_job_id, 0, status, by="engine-v2", reason=reason,
+        )
+        if not self.store.set_finished(evidence_job_id, 0, time.monotonic() - started):
+            raise RuntimeError("could not finish verification evidence job")
+        return {
+            "job_id": evidence_job_id,
+            "tool_id": task.capability_id.removeprefix("tool."),
+            "target": task.target,
+            "exit_code": 0,
+            "status": status,
+            "reason": reason,
+            "provider_id": expected.provider_id,
+            "provider_version": expected.provider_version,
+            "manifest_fingerprint": expected.fingerprint,
+            "registry_digest": resolution.registry_digest,
+            "transport": "in_process_http",
+        }
+
+    def inventory(self) -> list[dict]:
+        return [
+            {
+                "capability_id": manifest.capability_id,
+                "provider_id": manifest.provider_id,
+                "provider_version": manifest.provider_version,
+                "manifest_fingerprint": manifest.fingerprint,
+                "transport": "in_process_http",
+                "target_types": list(manifest.target_types),
+                "registry_digest": self.registry.digest,
+                "registered": True,
+                "installed": True,
+                "executable": True,
+                "readiness": "registered",
+                "reason": "bounded_verifier_requires_scope_and_exact_approval",
+                "authorization_required": True,
+                "smoke_tested": False,
+                "lab_validated": False,
+                "end_to_end_verified": False,
+            }
+            for manifest in self.bindings()
+        ]
 
 
 class ProviderContract(Protocol):
