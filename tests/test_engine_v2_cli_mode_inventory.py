@@ -41,7 +41,7 @@ def test_every_top_level_cli_mode_has_an_inventory_disposition():
             continue
         if node.left.id != "mode":
             continue
-        for operator, comparator in zip(node.ops, node.comparators):
+        for operator, comparator in zip(node.ops, node.comparators, strict=True):
             if isinstance(operator, (ast.Eq, ast.In)):
                 explicit.update(_mode_literals(comparator))
 
