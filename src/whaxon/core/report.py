@@ -512,7 +512,7 @@ def _md_chains(md, chains, heading="## Pivot Chains"):
         root_kind = _md_inline(root.get("kind", "?"))
         root_id = _md_inline(root.get("id", "?"))
         root_evidence = _md_inline(root.get("evidence", ""))
-        line = f"- **{root_kind} \`{root_id}\`**"
+        line = f"- **{root_kind} `{root_id}`**"
         if root_evidence:
             line += f" — {root_evidence}"
         md.append(line)
@@ -522,7 +522,7 @@ def _md_chains(md, chains, heading="## Pivot Chains"):
             child_kind = _md_inline(child.get("kind", "?"))
             child_id = _md_inline(child.get("id", "?"))
             evidence = _md_inline(descendant.get("evidence", ""))
-            line = f"  {arrow} {child_kind} \`{child_id}\`"
+            line = f"  {arrow} {child_kind} `{child_id}`"
             if evidence:
                 line += f"  ({evidence})"
             md.append(line)
