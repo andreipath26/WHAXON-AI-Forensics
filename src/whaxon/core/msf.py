@@ -300,6 +300,56 @@ class MSFClient:
         mod = c.modules.use(module_type, module_name)
         return dict(mod.options)
 
+    def execute_rpc(
+        self,
+        module_type: str,
+        module_name: str,
+        options: dict,
+        payload: str | None = None,
+        timeout_s: float = 30.0,
+    ) -> dict:
+        """Execute a validated module through Metasploit's structured RPC API.
+
+        This avoids parsing terminal output to determine whether a job started.
+        Option values are validated with the same restrictions as console dispatch.
+        """
+        import re
+
+        if module_type not in {"exploit", "auxiliary", "post"}:
+            raise ValueError("unsupported Metasploit module type")
+        if (not isinstance(module_name, str)
+                or not re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", module_name)
+                or any(part in {".", ".."} for part in module_name.split("/"))):
+            raise ValueError("invalid Metasploit module path")
+
+        def safe_value(value, label):
+            text = str(value)
+            if not text or ";" in text or any(ord(ch) < 32 for ch in text):
+                raise ValueError(f"invalid Metasploit {label}: command delimiter/control character")
+            return text
+
+        if payload is not None:
+            payload = safe_value(payload, "payload")
+        validated_options = {}
+        for key, value in (options or {}).items():
+            if key == "PAYLOAD":
+                continue
+            if not isinstance(key, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", key):
+                raise ValueError("invalid Metasploit option name")
+            validated_options[key] = safe_value(value, f"option {key}")
+        if not 0.1 <= float(timeout_s) <= 180.0:
+            raise ValueError("Metasploit dispatch timeout must be between 0.1 and 180 seconds")
+
+        run_options = dict(validated_options)
+        if payload:
+            run_options["PAYLOAD"] = payload
+        result = self.connect().call(
+            "module.execute", module_type, module_name, run_options,
+        )
+        if not isinstance(result, dict):
+            raise RuntimeError("Metasploit module.execute returned an invalid response")
+        return result
+
     def execute(
         self,
         module_type: str,

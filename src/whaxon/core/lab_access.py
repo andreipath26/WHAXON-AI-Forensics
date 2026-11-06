@@ -145,20 +145,21 @@ class MetasploitableLabAccessProvider:
             raise RuntimeError("Metasploit session remained open after session.stop")
 
     async def _cleanup_remote_resources(
-        self, remote_job_id: str, before_sessions: dict[str, dict], evidence_job_id: str,
+        self, remote_job_id: str | None, before_sessions: dict[str, dict], evidence_job_id: str,
         *, known_session_ids=(),
     ) -> list[str]:
         """Stop a failed exploit handler and any new matching late sessions."""
         errors = []
-        try:
-            client = self.msf.connect()
-            reply = await asyncio.to_thread(client.call, "job.stop", [str(remote_job_id)])
-            if not isinstance(reply, dict) or reply.get("result") != "success":
-                running = await asyncio.to_thread(client.call, "job.list", [])
-                if not isinstance(running, dict) or str(remote_job_id) in running:
-                    errors.append("job.stop was not confirmed")
-        except Exception as exc:
-            errors.append(f"job.stop failed: {type(exc).__name__}")
+        if remote_job_id is not None:
+            try:
+                client = self.msf.connect()
+                reply = await asyncio.to_thread(client.call, "job.stop", [str(remote_job_id)])
+                if not isinstance(reply, dict) or reply.get("result") != "success":
+                    running = await asyncio.to_thread(client.call, "job.list", [])
+                    if not isinstance(running, dict) or str(remote_job_id) in running:
+                        errors.append("job.stop was not confirmed")
+            except Exception as exc:
+                errors.append(f"job.stop failed: {type(exc).__name__}")
 
         stopped = set()
         candidates = {str(sid) for sid in known_session_ids}
@@ -183,7 +184,7 @@ class MetasploitableLabAccessProvider:
 
         try:
             summary = (
-                f"Metasploit failure cleanup job={remote_job_id} "
+                f"Metasploit failure cleanup job={remote_job_id or 'unknown'} "
                 f"stopped_sessions={','.join(sorted(stopped)) or 'none'} "
                 f"errors={','.join(errors) or 'none'}"
             )
@@ -201,7 +202,7 @@ class MetasploitableLabAccessProvider:
         password = str(getattr(getattr(self.msf, "config", None), "password", "") or "")
         if password:
             text = text.replace(password, "[REDACTED]")
-        return re.sub(r"[\\x00-\\x1f\\x7f]+", " ", text).strip()[:2000]
+        return re.sub(r"[\x00-\x1f\x7f]+", " ", text).strip()[:2000]
 
     def _fail_evidence_job(self, job_id: str, message: str) -> None:
         try:
@@ -224,17 +225,19 @@ class MetasploitableLabAccessProvider:
             raise RuntimeError("could not start lab access evidence job")
         self.store.mark_engine_v2_execution_job(job_id)
         remote_job_id = None
+        before_sessions = {}
         try:
             before_sessions = await self._session_snapshot()
             result = await asyncio.to_thread(
-                self.msf.execute,
+                self.msf.execute_rpc,
                 "exploit", self.MODULE,
                 {"RHOSTS": self.TARGET, "RPORT": "139", "LHOST": self.CALLBACK,
                  "LPORT": self.CALLBACK_PORT},
                 payload=self.PAYLOAD, timeout_s=60.0,
             )
-            if not isinstance(result, dict) or not result.get("job_id"):
-                detail = self._safe_diagnostic(result.get("console_output") if isinstance(result, dict) else "")
+            job_value = result.get("job_id") if isinstance(result, dict) else None
+            if job_value is None or not str(job_value).strip():
+                detail = self._safe_diagnostic(result)
                 message = "fixed Metasploit lab exploit did not start"
                 raise RuntimeError(f"{message}: {detail}" if detail else message)
             remote_job_id = str(result["job_id"])
@@ -242,13 +245,14 @@ class MetasploitableLabAccessProvider:
                 job_id, "stdout", f"Metasploit remote job started: {remote_job_id}",
             )
         except Exception as exc:
-            if remote_job_id is not None:
-                await self._cleanup_remote_resources(
-                    remote_job_id, before_sessions, job_id,
-                )
+            cleanup_errors = await self._cleanup_remote_resources(
+                remote_job_id, before_sessions, job_id,
+            )
             detail = self._safe_diagnostic(exc)
             self._fail_evidence_job(
-                job_id, f"Metasploit dispatch failed: {type(exc).__name__}: {detail}",
+                job_id,
+                f"Metasploit dispatch failed: {type(exc).__name__}: {detail}; "
+                f"cleanup_errors={','.join(cleanup_errors) or 'none'}",
             )
             raise
 

@@ -972,4 +972,4 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose.g01-lab.yml down -v --remove-orphans || true
-          rm -rf artifacts/g01
+          sudo rm -rf artifacts/g01

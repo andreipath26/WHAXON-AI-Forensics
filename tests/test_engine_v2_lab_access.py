@@ -12,7 +12,10 @@ from whaxon.core.workflow import WorkflowTask
 
 
 class _FixedMsf:
-    def __init__(self, host="127.0.0.1", *, preexisting=False, fail_poll=False):
+    def __init__(
+        self, host="127.0.0.1", *, preexisting=False, fail_poll=False,
+        missing_job_id=False,
+    ):
         self.calls = []
         self.config = type("Config", (), {"host": host})()
         self._sessions = {}
@@ -20,14 +23,15 @@ class _FixedMsf:
         self.stopped_jobs = []
         self.snapshot_calls = 0
         self.fail_poll = fail_poll
+        self.missing_job_id = missing_job_id
         if preexisting:
             self._sessions["7"] = self._matching_session()
 
-    def execute(self, module_type, module, options, *, payload, timeout_s):
+    def execute_rpc(self, module_type, module, options, *, payload, timeout_s):
         self.calls.append((module_type, module, options, payload, timeout_s))
         if not self._sessions:
             self._sessions["7"] = self._matching_session()
-        return {"job_id": "msf-remote-23"}
+        return {} if self.missing_job_id else {"job_id": "msf-remote-23"}
 
     @staticmethod
     def _matching_session():
@@ -233,3 +237,22 @@ async def test_lab_access_stops_remote_job_when_session_polling_fails(lab_provid
     assert "Metasploit failure cleanup" in " ".join(
         line["text"] for line in store.get(row["id"])["lines"]
     )
+
+
+@pytest.mark.asyncio
+async def test_lab_access_cleans_new_session_when_rpc_omits_job_id(
+    lab_provider, monkeypatch,
+):
+    provider, store, msf = lab_provider
+    msf.missing_job_id = True
+
+    with pytest.raises(RuntimeError, match="exploit did not start"):
+        await provider.dispatch(_task())
+
+    assert msf.stopped == ["7"]
+    assert msf.stopped_jobs == []
+    row = store.history(limit=10)[0]
+    assert row["status"] == "failed"
+    lines = " ".join(line["text"] for line in store.get(row["id"])["lines"])
+    assert "Metasploit module.execute returned an invalid response" not in lines
+    assert "stopped_sessions=7" in lines
