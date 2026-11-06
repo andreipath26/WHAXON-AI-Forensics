@@ -1016,6 +1016,7 @@ def test_retest_api_refuses_candidate_without_replay(tmp_path, monkeypatch):
 
 def test_retest_api_persists_inconclusive_instead_of_fixed(tmp_path, monkeypatch):
     from types import SimpleNamespace
+
     from whaxon.core.validator import Validator
 
     app, core = _make_app(tmp_path, monkeypatch)
