@@ -49,7 +49,7 @@ services:
     network_mode: "service:msf-target"
     depends_on:
       msf-target:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import socket, urllib.request; socket.create_connection(('172.28.0.10', 139), timeout=2).close(); urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
       interval: 5s

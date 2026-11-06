@@ -29,7 +29,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "engine-v2-g01-controlled-lab:" in workflow
     assert "scripts/g01-lab-chain.py" in workflow
     assert "socket.create_connection(('172.28.0.10', 139)" in compose
-    assert "service_started" in compose
+    assert compose.count("condition: service_started") == 2
     assert "fixture-health.json" in workflow
     assert "target-port-probe.txt" in workflow
     assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
