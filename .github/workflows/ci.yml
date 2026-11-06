@@ -919,12 +919,18 @@ jobs:
           test -s artifacts/g01/g01-mission-report.json
           test -s artifacts/g01/g01-mission-report.json.sha256
           (cd artifacts/g01 && sha256sum -c g01-mission-report.json.sha256)
-      - name: Preserve controlled-lab evidence artifact
+      - name: Collect controlled-lab startup diagnostics
+        if: always()
+        run: |
+          mkdir -p artifacts/g01
+          docker compose -f docker-compose.g01-lab.yml ps -a > artifacts/g01/compose-ps.txt 2>&1 || true
+          docker compose -f docker-compose.g01-lab.yml logs --no-color > artifacts/g01/compose.log 2>&1 || true
+      - name: Preserve controlled-lab evidence and diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: engine-v2-g01-controlled-lab-report
-          path: artifacts/g01/g01-mission-report.json*
+          name: engine-v2-g01-controlled-lab-evidence
+          path: artifacts/g01/**
           if-no-files-found: warn
           retention-days: 30
       - name: Stop lab services and remove ephemeral state
