@@ -391,3 +391,72 @@ def test_html_report_renders_executive_brief_and_remediation_roadmap():
     assert "Cyentia IRIS 2022 (geometric mean)" in html
     assert "Refuted records retained for context" in html
     assert "excluded from remediation priorities" in html
+
+
+def test_markdown_engagement_report_has_evidence_qualified_priorities_and_cost_context():
+    report = _report_dict()
+    report["unique_findings"] = [
+        {
+            "kind": "known exploited issue",
+            "severity": "critical",
+            "target": "api.example.test",
+            "raw_line": "exploitable observation",
+            "remediation": "Disable the endpoint and patch the service.",
+            "verification_status": "verified",
+            "kev": True,
+            "count": 2,
+            "cost_range": {
+                "incident_pattern": "Published breach data",
+                "median": 1200,
+                "source": "Public study",
+            },
+            "proof": "safe-fixture-command",
+        },
+        {
+            "kind": "candidate issue",
+            "severity": "high",
+            "target": "app.example.test",
+            "verification_status": "candidate",
+            "remediation": "Review the input handling.",
+        },
+        {
+            "kind": "refuted record",
+            "severity": "critical",
+            "target": "docs.example.test",
+            "verification_status": "refuted",
+            "remediation": "Should not appear as an action.",
+        },
+    ]
+    report["severity_counts"] = {"critical": 2, "high": 1, "medium": 0, "low": 0, "info": 0}
+
+    markdown = to_markdown(report, lookup=False)
+
+    assert "## Executive Brief" in markdown
+    assert "2** are marked verified" in markdown
+    assert "Highest recorded priorities" in markdown
+    assert "## Remediation Roadmap" in markdown
+    assert "Not a client-specific loss estimate" in markdown
+    assert "Public study" in markdown
+    assert "Verified reproduction material" in markdown
+    roadmap = markdown.split("## Remediation Roadmap", 1)[1].split("## Appendix", 1)[0]
+    assert "Should not appear as an action." not in roadmap
+    assert "Refuted records remain in the technical appendix." in roadmap
+
+
+def test_markdown_report_escapes_untrusted_priority_fields():
+    report = _report_dict()
+    report["unique_findings"] = [{
+        "kind": "<script>alert(1)</script> | issue",
+        "severity": "high",
+        "target": "<img src=x> | host",
+        "verification_status": "candidate",
+        "remediation": "Use <safe> handling | always.",
+    }]
+
+    markdown = to_markdown(report, lookup=False)
+
+    assert "<script>" not in markdown
+    assert "<img" not in markdown
+    assert "\\| issue" in markdown
+    assert "\\| host" in markdown
+    assert "Use &lt;safe&gt; handling \\| always." in markdown

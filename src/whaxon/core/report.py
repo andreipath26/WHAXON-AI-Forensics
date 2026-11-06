@@ -196,69 +196,92 @@ def _md_session_findings(md: list[str], findings: list[dict]) -> None:
     md.append("")
 
 
-def _md_exec_summary(md, report):
-    """Write a short deterministic narrative executive summary."""
-    counts = report.get("severity_counts") or {}
-    unique = report.get("unique_findings") or []
-    job_count = report.get("job_count", 0)
-    targets = {e["job"].get("target") for e in report.get("jobs", []) if e["job"].get("target")}
-    target_count = len(targets)
+def _md_inline(value: Any) -> str:
+    """Render an untrusted value as a safe, single-line Markdown fragment."""
+    text = str(value if value is not None else "")
+    text = " ".join(text.replace("\\r", " ").replace("\\n", " ").split())
+    return (
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("|", "\\\\|").replace(chr(96), "\\\\" + chr(96))
+    )
 
-    md.append("## Executive Summary" + chr(10))
+
+def _md_status(finding: dict[str, Any]) -> str:
+    status = str(finding.get("verification_status") or "candidate").lower()
+    return status if status in {"verified", "candidate", "inconclusive", "refuted"} else "candidate"
 
 
-    for sev in _SEV_ORDER:
-        n = counts.get(sev, 0)
-        if n <= 0:
-            continue
-        if sev == "critical":
-            md.append(f"This engagement found **{n} critical** findings across {target_count} targets ({job_count} jobs).")
-        elif sev == "high":
-            md.append(f"No critical findings. **{n} high**-severity findings were identified across {target_count} targets.")
-        elif sev in ("medium", "low"):
-            md.append(f"No critical or high findings. **{n} {sev}**-severity items require attention.")
-        else:
-            md.append(f"Only informational findings ({n}).")
-        break
+def _md_priority_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
+    return sorted(findings, key=lambda finding: (
+        _BAND_ORDER.index(_priority_band(finding)),
+        ranks.get(str(finding.get("severity") or "info").lower(), 99),
+        str(finding.get("kind") or "").casefold(),
+        str(finding.get("target") or "").casefold(),
+    ))
+
+
+def _md_exec_summary(md: list[str], report: dict[str, Any]) -> None:
+    """Write an evidence-qualified executive brief from recorded data."""
+    findings = report.get("unique_findings") or []
+    entries = report.get("jobs") or []
+    job_count = _safe_count(report.get("job_count"), len(entries))
+    targets = {
+        str((entry.get("job") or {}).get("target"))
+        for entry in entries
+        if isinstance(entry, dict) and (entry.get("job") or {}).get("target")
+    }
+    counts = report.get("severity_counts")
+    if not isinstance(counts, dict):
+        counts = {}
+        for finding in findings:
+            severity = str(finding.get("severity") or "info").lower()
+            if severity in _SEV_ORDER:
+                counts[severity] = counts.get(severity, 0) + 1
+    counts = {severity: _safe_count(counts.get(severity)) for severity in _SEV_ORDER}
+    verified = sum(1 for finding in findings if _md_status(finding) == "verified")
+    not_verified = len(findings) - verified
+    md.extend([
+        "## Executive Brief",
+        "",
+        f"This snapshot contains **{len(findings)} unique finding(s)** across "
+        f"**{job_count} recorded job(s)** and **{len(targets)} target(s)**. "
+        f"**{verified}** are marked verified; **{not_verified}** are candidate, "
+        "inconclusive, or otherwise not marked verified.",
+        "",
+        "Severity totals reproduce recorded labels. They do not establish "
+        "independent validation or exhaustive coverage.",
+        "",
+        "### Recorded severity",
+        "",
+    ])
+    for severity in _SEV_ORDER:
+        if counts[severity]:
+            md.append(f"- **{severity.capitalize()}:** {counts[severity]}")
+    if not any(counts.values()):
+        md.append("- No severity totals were recorded.")
     md.append("")
-
-    _sev_idx = {s: i for i, s in enumerate(_SEV_ORDER)}
-    _bi_idx = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    top = sorted(
-        [f for f in unique
-         if (f.get("severity") or "").lower() in ("critical", "high")
-         or (f.get("business_impact") or "").lower() in ("critical", "high")],
-        key=lambda f: (
-            _bi_idx.get((f.get("business_impact") or "").lower(), 99),
-            _sev_idx.get((f.get("severity") or "info").lower(), 99),
-        ),
-    )[:3]
-    if top:
-        md.append("**Top findings:**" + chr(10))
-
-        for f in top:
-            raw = (f.get("raw_line") or "").strip().replace(chr(10), " ")[:140]
-            count = f.get("count", 1)
-            suffix = f" (seen {count}x)" if count > 1 else ""
-            _sev_label = f.get('severity', '?')
-            _bi = f.get("business_impact")
-            if _bi:
-                _sev_label = str(_sev_label) + " / Business: " + str(_bi)
-            md.append(f"- [{_sev_label}] {raw}{suffix}")
-        md.append("")
-
-    if top:
-        rem = (top[0].get("remediation") or "").strip()
-        if rem:
-            md.append(f"**Recommended action:** {rem}")
-            md.append("")
-
-    md.append("### Findings by severity" + chr(10))
-
-    for sev in _SEV_ORDER:
-        n = counts.get(sev, 0)
-        if n:
-            md.append(f"- **{sev.capitalize()}**: {n}")
+    actions = [
+        finding for finding in _md_priority_findings(findings)
+        if _md_status(finding) != "refuted"
+    ][:3]
+    md.extend(["### Highest recorded priorities", ""])
+    if not actions:
+        md.extend(["No actionable findings are recorded in this snapshot.", ""])
+        return
+    md.append("Priority order uses recorded KEV, EPSS, CVSS, severity, and business impact.")
+    md.append("Review scope, evidence, and verification state before taking action.")
+    md.append("")
+    for finding in actions:
+        band = _BAND_LABELS[_priority_band(finding)]
+        status = _md_status(finding)
+        kind = _md_inline(finding.get("kind") or "Finding")
+        target = _md_inline(finding.get("target") or "Target not recorded")
+        severity = _md_inline(finding.get("severity") or "info")
+        md.append(f"- **{band} · {severity} · {status}: {kind}** — target {target}")
+        remediation = finding.get("remediation")
+        if remediation:
+            md.append(f"  - Recommended action: {_md_inline(remediation)}")
     md.append("")
 
 
@@ -1237,69 +1260,103 @@ _BAND_LABELS = {
 _BAND_ORDER = ["immediate", "short-term", "medium-term", "backlog"]
 
 
-def _md_remediation_roadmap(md: list, report: dict) -> None:
-    """Render a prioritized remediation roadmap grouped by urgency."""
-    unique = report.get("unique_findings") or []
-    if not unique:
+def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
+    """Render an urgency-banded plan without promoting refuted records."""
+    findings = report.get("unique_findings") or []
+    if not findings:
         return
-
-    bands: dict = {b: [] for b in _BAND_ORDER}
-    for f in unique:
-        band = _priority_band(f)
-        bands[band].append(f)
-
-    md.append("## Remediation Roadmap\n")
-    md.append(
-        "Findings grouped by urgency. Immediate items have a known-exploited "
-        "CVE, high EPSS, or CVSS 9.0+. Backlog items are informational. "
-        "Each item is shown once; counts indicate how many jobs produced it.\n"
-    )
-
+    actionable = [finding for finding in findings if _md_status(finding) != "refuted"]
+    bands: dict[str, list[dict[str, Any]]] = {band: [] for band in _BAND_ORDER}
+    for finding in _md_priority_findings(actionable):
+        bands[_priority_band(finding)].append(finding)
+    md.extend([
+        "## Remediation Roadmap",
+        "",
+        "Urgency bands are planning aids based on recorded KEV, EPSS, CVSS, "
+        "severity, and business impact. They are not independent verification "
+        "or proof of exploitability.",
+        "",
+    ])
+    if not actionable:
+        md.extend([
+            "All findings in this snapshot are marked refuted; no remediation "
+            "priorities are listed. Refuted records remain in the technical appendix.",
+            "",
+        ])
+        return
     for band in _BAND_ORDER:
         items = bands[band]
         if not items:
             continue
-        md.append("### " + _BAND_LABELS[band] + " (" + str(len(items)) + ")\n")
-        for f in items:
-            raw = (f.get("raw_line") or "").strip().replace(chr(10), " ")[:160]
-            proof = f.get("proof") or ""
-            count = f.get("count", 1)
-            cve = f.get("cve")
-            cvss = f.get("cvss")
-            epss = f.get("epss")
-            tags = []
-            if cve:
-                tags.append(cve)
-            if cvss is not None:
-                tags.append("CVSS " + str(cvss))
-            if epss is not None:
-                tags.append("EPSS " + str(round(epss, 3)))
-            if f.get("kev"):
-                tags.append("KEV")
-            tag_str = (" _(" + ", ".join(tags) + ")_") if tags else ""
-            count_str = (" (x" + str(count) + ")") if count > 1 else ""
-            md.append("- " + raw + count_str + tag_str)
+        md.extend([f"### {_BAND_LABELS[band]} ({len(items)})", ""])
+        for finding in items:
+            status = _md_status(finding)
+            title = _md_inline(finding.get("kind") or "Finding")
+            target = _md_inline(finding.get("target") or "Target not recorded")
+            severity = _md_inline(finding.get("severity") or "info")
+            count = _safe_count(finding.get("count"), 1)
+            tags = [severity, status]
+            for key, label in (("cve", None), ("cvss", "CVSS"), ("epss", "EPSS")):
+                value = finding.get(key)
+                if value is not None:
+                    tags.append(_md_inline(value if label is None else f"{label} {value}"))
+            if finding.get("kev"):
+                tags.append("Known exploited")
+            if finding.get("business_impact"):
+                tags.append("Business impact: " + _md_inline(finding["business_impact"]))
+            md.append(
+                f"- **{title}** — target {target} · {count} recorded observation(s) · "
+                + ", ".join(tags)
+            )
+            remediation = finding.get("remediation")
+            md.append(
+                f"  - Recommended action: {_md_inline(remediation)}"
+                if remediation else "  - No remediation guidance was recorded."
+            )
+            cost = finding.get("cost_range")
+            if isinstance(cost, dict) and (cost.get("median") is not None or cost.get("p90") is not None):
+                amounts = []
+                for key, label in (("median", "median"), ("p90", "90th percentile")):
+                    amount = cost.get(key)
+                    if amount is not None:
+                        formatted = f"USD {amount:,.0f}" if isinstance(amount, (int, float)) and not isinstance(amount, bool) else _md_inline(amount)
+                        amounts.append(f"{label}: {formatted}")
+                context = _md_inline(cost.get("incident_pattern") or "Published incident data")
+                source = _md_inline(cost.get("source") or "Source not recorded")
+                md.append(
+                    "  - Reference incident-cost context (" + context + "): "
+                    + "; ".join(amounts) + f". Source: {source}. "
+                    "Not a client-specific loss estimate; pattern mapping is WHAXON's derivation."
+                )
+            proof = finding.get("proof")
             if proof:
-                md.append("")
-                md.append("  **Verified. Reproduce with:**")
-                md.append("  ```bash")
-                md.append("  " + proof)
-                md.append("  ```")
+                qualifier = "Verified" if status == "verified" else "Recorded"
+                md.extend([
+                    f"  - {qualifier} reproduction material; review scope and safety before use:",
+                    "    ~~~text",
+                    "    " + str(proof).replace("\\n", "\\n    "),
+                    "    ~~~",
+                ])
         md.append("")
-
-    # Choke points: findings that recur across jobs and are high or critical
-    choke = [f for f in unique
-             if f.get("count", 1) > 1
-             and (f.get("severity") or "").lower() in ("critical", "high")]
-    if choke:
-        md.append("### Choke points\n")
-        md.append(
-            "Findings that recur across multiple jobs. One fix removes them "
-            "everywhere they appear.\n"
-        )
-        for f in choke[:10]:
-            raw = (f.get("raw_line") or "").strip().replace(chr(10), " ")[:140]
-            md.append("- " + raw + " (x" + str(f.get("count", 1)) + ")")
+    recurring = [
+        finding for finding in actionable
+        if _safe_count(finding.get("count"), 1) > 1
+        and str(finding.get("severity") or "").lower() in {"critical", "high"}
+    ]
+    if recurring:
+        md.extend([
+            "### Recurring high-priority records",
+            "",
+            "Repeated records may share a root cause; confirm that relationship "
+            "before consolidating remediation work.",
+            "",
+        ])
+        for finding in recurring[:10]:
+            md.append(
+                f"- {_md_inline(finding.get('kind') or 'Finding')} on "
+                f"{_md_inline(finding.get('target') or 'Target not recorded')} "
+                f"({ _safe_count(finding.get('count'), 1) } recorded observations)"
+            )
         md.append("")
 
 
