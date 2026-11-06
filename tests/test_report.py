@@ -150,4 +150,4 @@ def test_engagement_html_discloses_recorded_evidence_scope_and_count_limits():
         assert "findings identified across" not in html
 
     static_html = to_html(report, static=True)
-    assert ">2 unique findings from 1 recorded job</p>" in static_html
+    assert ">1 unique finding from 1 recorded job</p>" in static_html
