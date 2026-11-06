@@ -540,6 +540,9 @@ def test_markdown_priority_order_keeps_business_impact_and_evidence():
     assert markdown.index("medium but high impact") < markdown.index("critical but low impact")
     assert "/ Business: critical" in markdown
     assert "**[critical]** open_port" in markdown
+    html = to_html(report, static=True)
+    assert html.index("sqli") < html.index("open_port")
+
 
 
 def test_engagement_markdown_escapes_untrusted_table_values():

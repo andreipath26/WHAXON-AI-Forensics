@@ -243,16 +243,20 @@ def _md_status(finding: dict[str, Any]) -> str:
     return status if status in {"verified", "candidate", "inconclusive", "refuted"} else "candidate"
 
 
-def _md_priority_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
+def _priority_sort_key(finding: dict[str, Any]) -> tuple:
     impact_ranks = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    return sorted(findings, key=lambda finding: (
+    severity_ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
+    return (
         _BAND_ORDER.index(_priority_band(finding)),
         impact_ranks.get(str(finding.get("business_impact") or "").lower(), 99),
-        ranks.get(str(finding.get("severity") or "info").lower(), 99),
+        severity_ranks.get(str(finding.get("severity") or "info").lower(), 99),
         str(finding.get("kind") or "").casefold(),
         str(finding.get("target") or "").casefold(),
-    ))
+    )
+
+
+def _md_priority_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(findings, key=_priority_sort_key)
 
 
 def _md_exec_summary(md: list[str], report: dict[str, Any]) -> None:
@@ -825,13 +829,7 @@ def _html_finding_card(f: dict[str, Any], index: int) -> str:
 
 
 def _html_priority_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
-    return sorted(findings, key=lambda finding: (
-        _BAND_ORDER.index(_priority_band(finding)),
-        ranks.get(str(finding.get("severity") or "info").lower(), 99),
-        str(finding.get("kind") or "").casefold(),
-        str(finding.get("target") or "").casefold(),
-    ))
+    return sorted(findings, key=_priority_sort_key)
 
 
 def _html_findings(findings: list[dict[str, Any]]) -> str:
@@ -1077,7 +1075,7 @@ def _html_remediation_roadmap(findings: list[dict[str, Any]]) -> str:
         if str(finding.get("verification_status") or "candidate").lower() != "refuted"
     ]
     bands: dict[str, list[dict[str, Any]]] = {band: [] for band in _BAND_ORDER}
-    for finding in actionable:
+    for finding in _html_priority_findings(actionable):
         bands[_priority_band(finding)].append(finding)
 
     sections: list[str] = []
