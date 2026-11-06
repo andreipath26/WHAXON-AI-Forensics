@@ -274,6 +274,7 @@ def test_report_whaxon_envelope(tmp_path, monkeypatch):
     assert env["tool"].startswith("whaxon/")
     assert env["engagement"] == "default"
     assert env["integrity"].startswith("sha256:")
+    assert env["integrity_note"] == "SHA-256 covers the payload for integrity checking only; the envelope is unsigned and has no external trust anchor, so it does not prove authenticity."
     assert "payload" in env
 
 
