@@ -506,26 +506,94 @@ def _md_next_steps(md: list, findings: list) -> None:
 
 
 def render_markdown(job: dict, findings: list[dict]) -> str:
-    """Render a single job + its findings as Markdown. Used by whaxon report."""
-    md: list[str] = []
-    md.append(f"# Job {job.get('id','')}\n")
-    md.append(f"- **Tool**: {job.get('tool','')}")
-    md.append(f"- **Target**: {job.get('target','')}")
-    md.append(f"- **Status**: {job.get('status','')}  exit={job.get('exit_code','')}")
-    md.append(f"- **Started**: {job.get('started_at','')}")
+    """Render a structured, evidence-first per-job report."""
+    findings = [finding for finding in findings if isinstance(finding, dict)]
+    md: list[str] = [
+        f"# WHAXON Job Report · { _md_inline(job.get('id') or 'Unknown job') }",
+        "",
+        f"- **Tool:** {_md_inline(job.get('tool') or 'Not recorded')}",
+        f"- **Target:** {_md_inline(job.get('target') or 'Not recorded')}",
+        f"- **Status:** {_md_inline(job.get('status') or 'Not recorded')}",
+        f"- **Started:** {_md_inline(job.get('started_at') or 'Not recorded')}",
+        f"- **Exit code:** {_md_inline(job.get('exit_code') if job.get('exit_code') is not None else 'Not recorded')}",
+        "",
+        "## Executive Brief",
+        "",
+    ]
+    verified = sum(1 for finding in findings if _md_status(finding) == "verified")
+    md.append(
+        f"{len(findings)} finding(s) were recorded in this job; {verified} are "
+        f"marked verified and {len(findings) - verified} are not marked verified. "
+        "This summarizes recorded output and does not establish exhaustive coverage."
+    )
     md.append("")
     if findings:
-        md.append(f"## Findings ({len(findings)})\n")
-        for f in findings:
-            sev = (f.get('severity') or 'info').upper()
-            raw = (f.get('raw_line') or '').strip().replace('\n', ' ')
-            raw = ' '.join(raw.split())[:500]
-            md.append(f"- **[{sev}]** `{f.get('kind','')}` — {raw}")
-        md.append("")
+        md.extend([f"## Findings ({len(findings)})", ""])
+        for index, finding in enumerate(findings, start=1):
+            severity = str(finding.get("severity") or "info").upper()
+            kind = _md_inline(finding.get("kind") or "finding").replace(chr(96), "")
+            status = _md_status(finding)
+            md.extend([
+                f"### F{index:03d} **[{severity}]** {chr(96)}{kind}{chr(96)}",
+                "",
+                f"- **Verification:** {status}",
+                f"- **Source:** {_md_inline(finding.get('source') or job.get('tool') or 'Not recorded')}",
+            ])
+            for key, label in (("cve", "CVE"), ("cvss", "CVSS"), ("epss", "EPSS")):
+                value = finding.get(key)
+                if value is not None:
+                    md.append(f"- **{label}:** {_md_inline(value)}")
+            if finding.get("kev"):
+                md.append("- **Exploit status:** Listed as known exploited")
+            evidence = finding.get("raw_line") or "No raw observation was recorded."
+            md.extend(["", "**Evidence recorded**", "", "> " + _md_inline(evidence), ""])
+            remediation = finding.get("remediation")
+            md.extend([
+                "**Recommended remediation**",
+                "",
+                _md_inline(remediation) if remediation else "No remediation guidance was recorded.",
+                "",
+            ])
+            reason = finding.get("verification_reason")
+            if reason:
+                md.extend(["**Verification notes**", "", _md_inline(reason), ""])
+            proof = finding.get("proof")
+            if proof:
+                label = "Verified" if status == "verified" else "Recorded"
+                md.extend([
+                    f"**{label} reproduction material**",
+                    "",
+                    "Review authorization and safety before running recorded material.",
+                    "",
+                    "~~~text",
+                    str(proof),
+                    "~~~",
+                    "",
+                ])
         _md_next_steps(md, findings)
     else:
-        md.append("_No findings recorded._\n")
-    return "\n".join(md)
+        md.extend([
+            "## Findings",
+            "",
+            "No findings were recorded for this job. This does not prove that "
+            "the target is free of vulnerabilities.",
+            "",
+        ])
+    coverage = job.get("coverage") or []
+    if coverage:
+        md.extend(["## Coverage and untested work", ""])
+        for gap in coverage:
+            if not isinstance(gap, dict):
+                continue
+            md.append(
+                f"- **{_md_inline(gap.get('phase') or 'Unphased')} · "
+                f"{_md_inline(gap.get('kind') or 'Unknown')}** — "
+                f"{_md_inline(gap.get('tool_id') or job.get('tool') or 'Unknown')} "
+                f"against {_md_inline(gap.get('target') or job.get('target') or 'Unknown')}: "
+                f"{_md_inline(gap.get('detail') or 'Reason not recorded')}"
+            )
+        md.extend(["", "Coverage gaps are not vulnerability findings.", ""])
+    return "\\n".join(md)
 
 
 def render_html(job: dict, findings: list[dict]) -> str:

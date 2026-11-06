@@ -460,3 +460,53 @@ def test_markdown_report_escapes_untrusted_priority_fields():
     assert "\\| issue" in markdown
     assert "\\| host" in markdown
     assert "Use &lt;safe&gt; handling \\| always." in markdown
+
+
+def test_per_job_markdown_report_is_structured_and_preserves_evidence_state():
+    job = _job()
+    job["coverage"] = [{
+        "phase": "reconnaissance",
+        "kind": "scope_blocked",
+        "tool_id": "nmap",
+        "target": "10.0.0.8",
+        "detail": "outside authorized scope",
+    }]
+    findings = [{
+        "kind": "open_port",
+        "severity": "high",
+        "source": "nmap",
+        "raw_line": "22/tcp open ssh",
+        "remediation": "Restrict access to the SSH service.",
+        "verification_status": "candidate",
+        "verification_reason": "Requires owner confirmation.",
+        "proof": "nmap -sV 10.0.0.8",
+    }]
+
+    markdown = render_markdown(job, findings)
+
+    assert "## Executive Brief" in markdown
+    assert "1 finding(s) were recorded" in markdown
+    assert "### F001 **[HIGH]** `open_port`" in markdown
+    assert "Verification: candidate" in markdown
+    assert "Evidence recorded" in markdown
+    assert "22/tcp open ssh" in markdown
+    assert "Recommended remediation" in markdown
+    assert "Recorded reproduction material" in markdown
+    assert "Coverage and untested work" in markdown
+
+
+def test_per_job_markdown_report_escapes_untrusted_client_values():
+    markdown = render_markdown(
+        {**_job(), "target": "<script>alert(1)</script> | host"},
+        [{
+            "kind": "issue",
+            "severity": "high",
+            "raw_line": "<img src=x onerror=alert(2)>",
+            "remediation": "Use <safe> handling | always.",
+            "verification_status": "candidate",
+        }],
+    )
+
+    assert "<script>" not in markdown
+    assert "<img" not in markdown
+    assert "Use &lt;safe&gt; handling \\| always." in markdown
