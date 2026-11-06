@@ -26,6 +26,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert "c8a8c6a966eeb011d682a0ef2305a3e3a86b8b3fabe744350c00a766cc0f8021" in runner
     assert "tleemcjr/metasploitable2@sha256:e559450b37dccc1909eafa2df5b20bb052e1bd801246f4539a3ef183d5f7288a" in compose
     assert "-a 127.0.0.1" in entrypoint
+    assert "ruby /usr/src/metasploit-framework/msfrpcd" in entrypoint
     assert "engine-v2-g01-controlled-lab:" in workflow
     assert "scripts/g01-lab-chain.py" in workflow
     assert "./scripts/sqlmap_boolean_oracle.py:/sqlmap_boolean_oracle.py:ro" in compose
