@@ -509,7 +509,7 @@ def render_markdown(job: dict, findings: list[dict]) -> str:
     """Render a structured, evidence-first per-job report."""
     findings = [finding for finding in findings if isinstance(finding, dict)]
     md: list[str] = [
-        f"# WHAXON Job Report · { _md_inline(job.get('id') or 'Unknown job') }",
+        f"# Job { _md_inline(job.get('id') or 'Unknown job') } · WHAXON Job Report",
         "",
         f"- **Tool:** {_md_inline(job.get('tool') or 'Not recorded')}",
         f"- **Target:** {_md_inline(job.get('target') or 'Not recorded')}",
