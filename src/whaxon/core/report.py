@@ -922,7 +922,7 @@ def _html_executive_brief(findings: list[dict[str, Any]]) -> str:
     return (
         f'<p class="executive-summary">{_escape_html(summary)}</p>'
         '<p class="section-intro">Top three recorded priorities, ordered by deterministic urgency rules. '
-        "deterministic urgency rules. Review evidence and authorization before acting.</p>"
+        "Review evidence and authorization before acting.</p>"
         '<div class="brief-grid">' + "".join(cards) + "</div>"
     )
 

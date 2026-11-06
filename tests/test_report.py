@@ -378,6 +378,7 @@ def test_html_report_renders_executive_brief_and_remediation_roadmap():
     assert html.index("Executive brief") < html.index("Remediation roadmap")
     assert html.index("Remediation roadmap") < html.index("Technical findings")
     assert "Top three recorded priorities" in html
+    assert html.count("deterministic urgency rules") == 1
     assert "1 of 4 recorded findings are marked verified" in html
     assert "known exploited issue" in html
     assert "Disable the affected endpoint and patch the service." in html
