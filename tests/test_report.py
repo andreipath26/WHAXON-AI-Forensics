@@ -514,3 +514,28 @@ def test_per_job_markdown_report_escapes_untrusted_client_values():
     assert "<script>" not in markdown
     assert "<img" not in markdown
     assert "Use &lt;safe&gt; handling \\| always." in markdown
+
+
+def test_markdown_priority_order_keeps_business_impact_and_evidence():
+    report = _report_dict()
+    report["unique_findings"] = [
+        {
+            "kind": "open_port",
+            "severity": "critical",
+            "business_impact": "low",
+            "raw_line": "critical but low impact",
+            "verification_status": "candidate",
+        },
+        {
+            "kind": "sqli",
+            "severity": "medium",
+            "business_impact": "critical",
+            "raw_line": "medium but high impact",
+            "verification_status": "candidate",
+        },
+    ]
+
+    markdown = to_markdown(report, lookup=False)
+
+    assert markdown.index("medium but high impact") < markdown.index("critical but low impact")
+    assert "**[critical]** open_port" in markdown

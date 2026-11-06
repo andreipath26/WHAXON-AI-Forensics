@@ -213,8 +213,10 @@ def _md_status(finding: dict[str, Any]) -> str:
 
 def _md_priority_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ranks = {severity: index for index, severity in enumerate(_SEV_ORDER)}
+    impact_ranks = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     return sorted(findings, key=lambda finding: (
         _BAND_ORDER.index(_priority_band(finding)),
+        impact_ranks.get(str(finding.get("business_impact") or "").lower(), 99),
         ranks.get(str(finding.get("severity") or "info").lower(), 99),
         str(finding.get("kind") or "").casefold(),
         str(finding.get("target") or "").casefold(),
@@ -278,7 +280,11 @@ def _md_exec_summary(md: list[str], report: dict[str, Any]) -> None:
         kind = _md_inline(finding.get("kind") or "Finding")
         target = _md_inline(finding.get("target") or "Target not recorded")
         severity = _md_inline(finding.get("severity") or "info")
-        md.append(f"- **{band} · {severity} · {status}: {kind}** — target {target}")
+        evidence = _md_inline(finding.get("raw_line") or "Evidence not recorded.")
+        md.append(
+            f"- **{band} · {severity} · {status}: {kind}** — target {target}; "
+            f"evidence: {evidence}"
+        )
         remediation = finding.get("remediation")
         if remediation:
             md.append(f"  - Recommended action: {_md_inline(remediation)}")
@@ -1473,7 +1479,7 @@ def _md_findings_appendix(md: list[str], report: dict[str, Any], all_findings: b
             business_impact = finding.get("business_impact")
             if business_impact:
                 label += " / Business: " + _md_inline(business_impact)
-            md.append("- **[" + label + "] " + kind + "** " + raw + suffix)
+            md.append("- **[" + label + "]** " + kind + " " + raw + suffix)
             status = _md_inline(finding.get("verification_status") or "candidate")
             verified_by = _md_inline(finding.get("verified_by") or "engine")
             reason = finding.get("verification_reason") or ""
