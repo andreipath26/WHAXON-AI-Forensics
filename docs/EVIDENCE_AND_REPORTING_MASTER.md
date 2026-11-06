@@ -1,6 +1,6 @@
 # WHAXON — FINDINGS, REPORTS, EVIDENCE AND RETENTION MASTER
 
-> **Current code/acceptance boundary — 2026-11-05.** `src/whaxon/core/findings.py` defines typed findings and parser routines; `core/report.py` provides Markdown, JSON, HTML and PDF paths; web and CLI report/evidence endpoints exist. The 13/13 [CI success at `fc056d0`](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42033360849) covers its actual tests, **not** independently witnessed evidence custody, all scanners in customer environments, or G04 report/reproducibility acceptance. Historical design sections below remain historical.
+> **Current code/acceptance boundary — 2026-11-06.** `src/whaxon/core/findings.py` defines typed findings and parser routines; `core/report.py` provides Markdown, JSON, HTML and PDF paths; web and CLI report/evidence endpoints exist. Bounded G04 report/coverage acceptance is frozen at PR #138 merge `20198b3`; the client-facing engagement HTML/PDF overhaul merged in PR #142 at `9def97978cefda90d8c7e2e47984691a57e9dd4b`, from exact head `1ccf6efeb1aa81da10a64fa2e442914a768e79e6`, with exact-head CI run `42229587213` passing 17/17 checks. This validates recorded report rendering and safety regressions; it does **not** establish independently witnessed evidence custody, every scanner in customer environments, an external audit trust anchor, or production readiness. Historical design sections below remain historical.
 
 **Canonical findings/reporting/evidence lifecycle reference, consolidated 2026-11-05.** Preserve raw evidence, provenance, verification state and deterministic authorization. Design proposals are not released features. Data retention requirements and evidence integrity remain binding where applicable, independent of the consolidation.
 
@@ -11,6 +11,13 @@
 - Part 5: DATA_RETENTION.md
 
 ---
+
+
+## Current engagement report rendering — 2026-11-06
+
+The engagement HTML template and PDF path now render the same server-populated report content. The report presents engagement/client/preparer/classification metadata; recorded job and target counts; unique findings and observations; severity and verification summaries; prioritized finding cards with raw evidence, remediation, job attribution, and recorded CVE/CVSS/EPSS/KEV or reproduction details; persisted coverage gaps; job history; and explicit interpretation limits. Empty reports explain that no findings in the record do not prove that targets are vulnerability-free.
+
+The standalone HTML supports responsive viewing, finding search, source-JSON export, and print-to-PDF. Dynamic report values are escaped for HTML, while the embedded JSON escapes tag delimiters; placeholder substitution is single-pass so user-controlled text cannot expand template tokens. Regression coverage includes populated and empty reports, PDF content, coverage and provenance, XSS payloads across report sections, and literal template tokens. The report can only describe recorded data; it does not create an external evidence trust anchor, prove unrecorded checks, or verify findings independently. Historical sections below preserve their original design proposals and dated implementation descriptions.
 
 **Business-impact implementation source:** [technical severity/cost design](business-impact.md), implemented alongside `src/whaxon/core/business_impact.py` and severity/reporting code. Cost bands are not verified losses for any particular client.
 
