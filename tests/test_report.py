@@ -151,3 +151,27 @@ def test_engagement_html_discloses_recorded_evidence_scope_and_count_limits():
 
     static_html = to_html(report, static=True)
     assert ">1 unique finding from 1 recorded job</p>" in static_html
+
+
+def test_engagement_html_discloses_persisted_coverage_safely():
+    report = _report_dict()
+    report["jobs"][0]["coverage"] = [{
+        "phase": "reconnaissance",
+        "kind": "scope_blocked",
+        "tool_id": "nikto",
+        "target": "10.0.0.5",
+        "detail": "<script>alert(9)</script> out of scope",
+    }]
+
+    for static in (False, True):
+        html = to_html(report, static=static)
+        assert "Coverage and untested work" in html
+        assert "reconnaissance" in html
+        assert "scope_blocked" in html
+        assert "nikto" in html
+        assert "&lt;script&gt;alert(9)&lt;/script&gt;" in html
+        assert "<script>alert(9)</script>" not in html
+
+    empty_html = to_html(_report_dict(), static=True)
+    assert "No coverage gaps were recorded for this report." in empty_html
+    assert "does not prove that every relevant check was performed" in empty_html

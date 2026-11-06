@@ -635,7 +635,44 @@ def to_html(report, overrides=None, static=False):
 
         tpl = tpl.replace('<tbody id="findings-tbody">\n        <!-- Dynamic Rows -->\n      </tbody>', f'<tbody id="findings-tbody">{"".join(rows)}</tbody>')
         tpl = tpl.replace('id="donut-summary">0 findings total</div>', f'id="donut-summary">{len(findings)} findings total</div>')
-        
+
+    coverage = [
+        gap
+        for entry in (report.get("jobs") or [])
+        for gap in (entry.get("coverage") or [])
+    ]
+    explanation = (
+        "These are persisted records of checks that were skipped or otherwise not completed. "
+        "No listed gaps does not prove that every relevant check was performed."
+    )
+    if coverage:
+        rows = []
+        for gap in coverage:
+            values = (
+                gap.get("phase") or "unphased",
+                gap.get("kind") or "unknown",
+                gap.get("tool_id") or "unknown",
+                gap.get("target") or "unknown",
+                gap.get("detail") or "",
+            )
+            rows.append(
+                "<tr>" + "".join(f"<td>{_escape_html(value)}</td>" for value in values) + "</tr>"
+            )
+        body = (
+            "<table><thead><tr><th>Phase</th><th>Status</th><th>Check</th>"
+            "<th>Target</th><th>Reason</th></tr></thead><tbody>"
+            + "".join(rows) + "</tbody></table>"
+        )
+    else:
+        body = "<p>No coverage gaps were recorded for this report.</p>"
+    section = (
+        '<section aria-labelledby="coverage-gaps-heading" '
+        'style="margin:32px 0;padding:20px;border:1px solid #d1d5db;border-radius:8px;">'
+        '<h2 id="coverage-gaps-heading">Coverage and untested work</h2>'
+        f"<p>{_escape_html(explanation)}</p>{body}</section>"
+    )
+    tpl = tpl.replace("</body>", section + "</body>")
+
     return tpl
 
 
