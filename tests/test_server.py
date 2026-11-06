@@ -542,6 +542,53 @@ def test_run_refuses_out_of_scope_target_without_override(tmp_path, monkeypatch)
     assert core.store.history() == before
     assert submitted == []
 
+
+def test_run_ignores_client_scope_override_and_rejects_target_arguments(tmp_path, monkeypatch):
+    """Clients cannot enable an out-of-scope run or inject a second target."""
+    from types import SimpleNamespace
+
+    app, core = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    submitted = []
+    monkeypatch.setattr(
+        core.scope,
+        "check",
+        lambda target: SimpleNamespace(
+            allowed=False,
+            reason="target is not in scope",
+            matched_rule=None,
+        ),
+    )
+    monkeypatch.setattr(core.catalog, "get", lambda tool_id: object())
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, task: submitted.append(task))
+
+    before = core.store.history()
+    payloads = [
+        (
+            {"tool_id": "nmap", "target": "198.51.100.25", "allow_out_of_scope": True},
+            403,
+        ),
+        (
+            {"tool_id": "nmap", "target": "198.51.100.25", "scope_override": True},
+            403,
+        ),
+        (
+            {
+                "tool_id": "nmap",
+                "target": "198.51.100.25",
+                "extra_args": "--target 127.0.0.1",
+            },
+            400,
+        ),
+    ]
+    for payload, expected_status in payloads:
+        response = client.post("/api/run", json=payload)
+        assert response.status_code == expected_status, payload
+        assert "error" in response.get_json()
+
+    assert core.store.history() == before
+    assert submitted == []
+
 # ---------------------------------------------------------------- local browser boundary
 
 def test_loopback_listener_rejects_cross_origin_state_change(tmp_path, monkeypatch):
