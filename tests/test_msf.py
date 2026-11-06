@@ -212,8 +212,10 @@ def test_msf_execute_rpc_uses_structured_module_execute(monkeypatch):
 
     assert result["job_id"] == 0
     assert calls == [(
-        "module.execute", "exploit", "multi/samba/usermap_script",
-        {"RHOSTS": "172.28.0.10", "PAYLOAD": "cmd/unix/reverse_netcat"},
+        "module.execute", [
+            "exploit", "multi/samba/usermap_script",
+            {"RHOSTS": "172.28.0.10", "PAYLOAD": "cmd/unix/reverse_netcat"},
+        ],
     )]
 
 

@@ -344,7 +344,7 @@ class MSFClient:
         if payload:
             run_options["PAYLOAD"] = payload
         result = self.connect().call(
-            "module.execute", module_type, module_name, run_options,
+            "module.execute", [module_type, module_name, run_options],
         )
         if not isinstance(result, dict):
             raise RuntimeError("Metasploit module.execute returned an invalid response")
