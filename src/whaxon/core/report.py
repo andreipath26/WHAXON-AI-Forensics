@@ -206,6 +206,26 @@ def _md_inline(value: Any) -> str:
         .replace("|", slash + "|").replace(chr(96), slash + chr(96))
     )
 
+def _md_fenced_block(value: Any, indent: str = "") -> list[str]:
+    """Render untrusted text in a fenced code block that cannot close itself."""
+    body = str(value if value is not None else "")
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
+    longest = 0
+    current = 0
+    for character in body:
+        if character == "~":
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    fence = "~" * max(3, longest + 1)
+    return [
+        f"{indent}{fence}text",
+        *(indent + line for line in body.split("\n")),
+        f"{indent}{fence}",
+    ]
+
+
 def _md_status(finding: dict[str, Any]) -> str:
     status = str(finding.get("verification_status") or "candidate").lower()
     return status if status in {"verified", "candidate", "inconclusive", "refuted"} else "candidate"
@@ -504,12 +524,12 @@ def _md_next_steps(md: list, findings: list) -> None:
         label = d.get('label') or f.get('raw_line') or 'unspecified'
         tool = d.get('tool') or ''
         extra = d.get('extra_args') or ''
-        line = '- ' + label
+        line = "- " + _md_inline(label)
         if tool:
-            line += '  (tool: `' + tool + '`'
+            line += "  (tool: " + _md_inline(tool)
             if extra:
-                line += ', args: `' + extra + '`'
-            line += ')'
+                line += ", args: " + _md_inline(extra)
+            line += ")"
         md.append(line)
     md.append('')
 
@@ -539,7 +559,7 @@ def render_markdown(job: dict, findings: list[dict]) -> str:
     if findings:
         md.extend([f"## Findings ({len(findings)})", ""])
         for index, finding in enumerate(findings, start=1):
-            severity = str(finding.get("severity") or "info").upper()
+            severity = _md_inline(finding.get("severity") or "info").upper()
             kind = _md_inline(finding.get("kind") or "finding").replace(chr(96), "")
             status = _md_status(finding)
             md.extend([
@@ -574,11 +594,9 @@ def render_markdown(job: dict, findings: list[dict]) -> str:
                     "",
                     "Review authorization and safety before running recorded material.",
                     "",
-                    "~~~text",
-                    str(proof),
-                    "~~~",
-                    "",
                 ])
+                md.extend(_md_fenced_block(proof))
+                md.append("")
         _md_next_steps(md, findings)
     else:
         md.extend([
@@ -1409,12 +1427,10 @@ def _md_remediation_roadmap(md: list[str], report: dict[str, Any]) -> None:
             proof = finding.get("proof")
             if proof:
                 qualifier = "Verified" if status == "verified" else "Recorded"
-                md.extend([
-                    f"  - {qualifier} reproduction material; review scope and safety before use:",
-                    "    ~~~text",
-                    "    " + str(proof).replace("\\n", "\\n    "),
-                    "    ~~~",
-                ])
+                md.append(
+                    f"  - {qualifier} reproduction material; review scope and safety before use:"
+                )
+                md.extend(_md_fenced_block(proof, indent="    "))
         md.append("")
     recurring = [
         finding for finding in actionable

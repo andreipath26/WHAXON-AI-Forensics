@@ -590,3 +590,24 @@ def test_engagement_markdown_escapes_untrusted_table_values():
     assert "`job\\|id next`" in markdown
     assert "tool\\|&lt;script&gt;" in markdown
     assert "secret\\|&lt;img&gt;" in markdown
+
+
+def test_markdown_proof_blocks_cannot_be_closed_by_recorded_text():
+    proof = "first line\n~~~\n<script>alert(1)</script>"
+    job_report = render_markdown(_job(), [{
+        "kind": "command_output",
+        "severity": "high",
+        "raw_line": "recorded",
+        "proof": proof,
+    }])
+    assert "~~~~text\nfirst line\n~~~\n<script>alert(1)</script>\n~~~~" in job_report
+
+    report = _report_dict()
+    report["unique_findings"] = [{
+        "kind": "command_output",
+        "severity": "high",
+        "verification_status": "candidate",
+        "proof": proof,
+    }]
+    engagement_report = to_markdown(report, lookup=False)
+    assert "    ~~~~text\n    first line\n    ~~~\n    <script>alert(1)</script>\n    ~~~~" in engagement_report
