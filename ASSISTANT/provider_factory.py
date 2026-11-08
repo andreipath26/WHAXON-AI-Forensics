@@ -46,6 +46,8 @@ class MistralBackend(OpenAIBackend):
     def __init__(self, model: str, api_key: str | None = None, **options):
         key = api_key or os.environ.get("MISTRAL_API_KEY")
         super().__init__(model=model, host=MISTRAL_URL, api_key=key, **options)
+        # Do not accidentally borrow OPENAI_API_KEY when Mistral is unconfigured.
+        self.api_key = key or ""
 
     def available(self):
         if not self.api_key:
