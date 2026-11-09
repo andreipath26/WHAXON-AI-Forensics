@@ -628,7 +628,7 @@
         (item.task_key === task.task_key || item.task_key === task.id) &&
         !item.revoked_at && Number(item.expires_at) > now && item.policy_version === "policy.v1"
       ));
-      const approvalNote = missing.length ? ` ${missing.length} task(s) lack a current approval; the server will refuse their dispatch until separately approved.` : " Current task approvals are present; the server still revalidates them at dispatch.";
+      const approvalNote = missing.length ? ` No listed unrevoked, unexpired approval exists for ${missing.length} task(s); dispatch requires separate exact-plan approval.` : " Listed approvals are unrevoked and unexpired; the server still checks their exact task binding at dispatch.";
       v2Say(`Plan ${planId} reviewed (${tasks.length} task${tasks.length === 1 ? "" : "s"}).${approvalNote}`);
       v2SetControls();
     } catch (error) {
@@ -646,10 +646,14 @@
       const progress = snapshot.progress || {};
       const counts = progress.counts || {};
       v2Say(`Run ${request.id}: ${request.status || "unknown"}. Persisted tasks: ${JSON.stringify(counts)}. Worker liveness is not verified by this snapshot.`);
-      const terminal = ["complete", "failed", "cancelled", "incomplete"].includes(request.status);
+      const terminal = ["completed", "failed", "cancelled", "incomplete", "uncertain"].includes(request.status);
       if (terminal) {
-        v2RequestId = null;
-        sessionStorage.removeItem("whaxon.v2.run_request_id");
+        if (request.status !== "uncertain") {
+          v2RequestId = null;
+          sessionStorage.removeItem("whaxon.v2.run_request_id");
+        } else {
+          v2Say(`Run ${request.id} is uncertain and requires operator reconciliation. Automatic replay is disabled; polling has paused.`);
+        }
         v2SetControls();
         return;
       }
