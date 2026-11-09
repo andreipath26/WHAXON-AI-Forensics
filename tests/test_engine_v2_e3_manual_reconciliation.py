@@ -68,6 +68,27 @@ def test_verified_no_effect_closes_request_but_requires_new_run(tmp_path):
         "reason": "provider_effect_reconciled",
         "automatic_replay": False,
     }
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_events SET detail_json=? WHERE plan_id=? "
+            "AND event_type='workflow_run_reconciled'",
+            (json.dumps({
+                "request_id": request["id"],
+                "from_status": "uncertain",
+                "to_status": "incomplete",
+                "reason": "tampered",
+                "automatic_replay": False,
+            }, sort_keys=True), "p"),
+        )
+    finally:
+        conn.close()
+    audit = core.store.get_workflow_audit_integrity("p")
+    assert audit["consistent"] is False
+    assert audit["mismatched_run_request_reconciliation_events"] == [request["id"]]
+
     assert core.store.get_workflow_dispatch_reconciliation("p")[0][
         "manual_reconciliation_required"
     ] is False
