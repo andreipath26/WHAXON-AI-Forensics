@@ -613,16 +613,11 @@ def test_v2_ai_proposals_api_validates_and_never_submits_execution(tmp_path, mon
     assert core.store.get_workflow_plan("p-ai") is None
 
     for invalid in (
-        {**payload, "history": "not-an-array"},
-        {**payload, "step": 0},
         {**payload, "save": "yes"},
         {**payload, "target": ""},
         {**payload, "goal": "x" * 10001},
     ):
         response = client.post("/api/v2/ai/proposals", json=invalid)
-        # The first two are validated by the bridge; others by the API.
-        if invalid.get("history") == "not-an-array" or invalid.get("step") == 0:
-            continue  # The fake bridge deliberately does not validate inputs.
         assert response.status_code == 400
     assert client.post(
         "/api/v2/ai/proposals", json=payload,
