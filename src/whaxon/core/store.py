@@ -2099,15 +2099,22 @@ class JobStore:
                 "SELECT attempt_id, task_ref, event_type, detail_json FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
-            run_requests = c.execute(
-                "SELECT id, status FROM workflow_run_requests WHERE plan_id=?",
-                (plan_id,),
-            ).fetchall()
-            run_request_events = c.execute(
-                "SELECT detail_json FROM workflow_events WHERE plan_id=? "
-                "AND event_type='workflow_run_reconciled'",
-                (plan_id,),
-            ).fetchall()
+            has_run_request_queue = c.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' "
+                "AND name='workflow_run_requests'"
+            ).fetchone() is not None
+            run_requests = []
+            run_request_events = []
+            if has_run_request_queue:
+                run_requests = c.execute(
+                    "SELECT id, status FROM workflow_run_requests WHERE plan_id=?",
+                    (plan_id,),
+                ).fetchall()
+                run_request_events = c.execute(
+                    "SELECT detail_json FROM workflow_events WHERE plan_id=? "
+                    "AND event_type='workflow_run_reconciled'",
+                    (plan_id,),
+                ).fetchall()
             run_request_by_id = {row["id"]: row["status"] for row in run_requests}
             run_reconciliation_event_counts = {}
             mismatched_run_reconciliations = set()
