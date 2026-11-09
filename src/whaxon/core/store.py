@@ -1983,8 +1983,14 @@ class JobStore:
                         } if row["disposition"] else None
                     ),
                     "manual_reconciliation_required": (
-                        row["status"] == "running"
-                        or row["disposition"] in (None, "unresolved")
+                        (
+                            row["status"] == "running"
+                            and bool(row["dispatch_recorded"])
+                        )
+                        or (
+                            row["status"] == "uncertain"
+                            and row["disposition"] in (None, "unresolved")
+                        )
                     ),
                 }
                 for row in rows
