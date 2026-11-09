@@ -123,4 +123,12 @@ def test_tampered_plan_downgrades_inflight_success_to_uncertain(tmp_path):
     assert tasks[0]["status"] == "uncertain"
     assert tasks[0]["result"] is None
     assert "integrity failed" in tasks[0]["error"]
-    assert store.get_workflow_evidence_for_plan("p") == []
+    conn = store._conn()
+    try:
+        seal_count = conn.execute(
+            "SELECT COUNT(*) FROM workflow_evidence_seals WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert seal_count == 0
