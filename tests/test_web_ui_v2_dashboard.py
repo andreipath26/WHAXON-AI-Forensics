@@ -101,7 +101,7 @@ def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_s
     )
     page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
     page.wait_for_function(
-        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('No running jobs were found')",
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('No running jobs or durable workflow requests were found')",
         timeout=5000,
     )
 
