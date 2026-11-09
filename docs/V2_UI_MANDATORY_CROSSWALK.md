@@ -82,6 +82,8 @@ Dashboard batch 1 hardens malformed-history export: a successful HTTP response w
 
 **Engine V2 durable run handoff — 2026-11-09:** The Run page now has a separate control for reviewing an already-persisted V2 plan, displaying its task capability/target/impact bindings, checking listed approvals for each moderate-or-higher task, submitting through `POST /api/v2/workflows/<plan_id>/run`, reconnecting through durable snapshots, and requesting cancellation through the durable run-request endpoint. It does not grant approval, claim that a queued request completed, or claim that cancellation stopped an external effect. The active V2 request ID is retained in session storage for same-tab reconnect. The existing guarded `/api/run` path remains a separate legacy control while capability mapping/parity is unfinished. This is one V2 integration slice; full UI-03 migration, browser acceptance and D1–D6 remain **OPEN**.
 
+**Saved plan discovery — 2026-11-09:** The V2 handoff now lists persisted missions and their plans through the bounded mission/plan read APIs. Operators can select a plan and review its immutable tasks before submitting. A plan ID can still be entered directly when working from a CLI/API-created plan. No mission or plan is created by this selector, and all authorization remains in the V2 execution path. Full UI-03 acceptance remains **OPEN**.
+
 **Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1–D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
 
 ## Dashboard implementation checkpoint — 2026-11-05 (D1–D6)
