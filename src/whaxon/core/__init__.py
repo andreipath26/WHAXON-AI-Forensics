@@ -216,12 +216,10 @@ class Core:
         actor: str, evidence_ref: str, note: str,
     ):
         """Record a manual effect decision without certifying success or replaying."""
-        result = self.store.record_workflow_attempt_reconciliation(
+        return self.store.record_workflow_attempt_reconciliation(
             plan_id, attempt_id, disposition=disposition, actor=actor,
             evidence_ref=evidence_ref, note=note,
         )
-        result["run_requests_closed"] = self.workflow_requests.close_reconciled(plan_id)
-        return result
 
     def workflow_event_cursor(self, plan_id: str, consumer_id: str):
         return self.store.get_workflow_event_cursor(plan_id, consumer_id)
