@@ -275,16 +275,24 @@ def test_queue_summary_reports_stale_and_uncertain_without_claiming_live_workers
     core = _core(tmp_path)
     empty = core.workflow_run_queue_summary()
     assert empty["total"] == 0
+    assert empty["active_requests"] == []
     assert empty["worker_liveness_verified"] is False
     queued = core.enqueue_workflow_run("p")
     summary = Core(tmp_path).workflow_run_queue_summary()
     assert summary["counts"]["queued"] == 1
+    assert summary["active_requests"] == [{
+        "id": queued["id"], "plan_id": "p", "status": "queued",
+        "submitted_at": queued["submitted_at"],
+    }]
     assert summary["oldest_queued_age_s"] >= 0
     assert summary["requires_reconciliation_count"] == 0
     claim = core.workflow_requests.claim("worker")
     assert claim["id"] == queued["id"]
     live = core.workflow_run_queue_summary()
     assert live["counts"]["running"] == 1
+    assert live["active_requests"][0]["status"] == "running"
+    assert live["active_requests"][0]["id"] == queued["id"]
+    assert "lease_token" not in json.dumps(live["active_requests"])
     assert live["stale_running_count"] == 0
     assert live["worker_liveness_verified"] is False
     assert "lease_token" not in live
@@ -304,6 +312,8 @@ def test_queue_summary_reports_stale_and_uncertain_without_claiming_live_workers
     assert core.workflow_requests.reconcile_stale() == 1
     uncertain = core.workflow_run_queue_summary()
     assert uncertain["counts"]["uncertain"] == 1
+    assert uncertain["active_requests"][0]["status"] == "uncertain"
+    assert uncertain["active_requests"][0]["id"] == queued["id"]
     assert uncertain["requires_reconciliation_count"] == 1
     assert uncertain["automatic_uncertain_replay"] is False
 

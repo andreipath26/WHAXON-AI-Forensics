@@ -111,6 +111,42 @@ def test_settings_header_halt_button_uses_live_job_history(page, live_server):
     )
 
 
+def test_settings_emergency_halt_includes_durable_v2_run_requests(page, live_server):
+    calls = []
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.route(
+        "**/api/v2/workflow-runs/summary",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"active_requests":[{"id":"settings-v2-request","plan_id":"settings-plan",'
+                 '"status":"uncertain","submitted_at":1}]}',
+        ),
+    )
+    def cancel_run(route):
+        calls.append(route.request.method)
+        route.fulfill(
+            status=200, content_type="application/json",
+            body='{"cancellation_requested":true,"external_effects_stopped":false}',
+        )
+    page.route("**/api/v2/workflow-runs/settings-v2-request/cancel", cancel_run)
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2/settings")
+    page.wait_for_function(
+        "() => document.querySelector('#settings-status')?.textContent.includes('Settings loaded read-only')",
+        timeout=8000,
+    )
+    page.get_by_role("button", name="HALT SCAN").click()
+    page.wait_for_function(
+        "() => document.querySelector('#settings-status')?.textContent.includes('0 of 0 legacy job(s) and 1 of 1 durable workflow run(s)')",
+        timeout=8000,
+    )
+    assert "not confirmed stopped" in page.locator("#settings-status").inner_text()
+    assert calls == ["POST"]
+
+
 def test_settings_reference_controls_are_disabled_except_live_refresh(page, live_server):
     page.goto(f"{live_server}/ui-v2/settings")
     page.wait_for_function(
