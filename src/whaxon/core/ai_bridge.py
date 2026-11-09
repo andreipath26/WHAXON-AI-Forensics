@@ -52,6 +52,14 @@ def propose_v2_workflow_plan(
         history = []
     if not isinstance(history, list) or any(not isinstance(item, dict) for item in history):
         raise ValueError("AI proposal history must be an array of objects")
+    # Bound untrusted history before passing it to any configured AI provider.
+    # Nested payloads are limited as well as the number of prior steps.
+    import json
+    if len(history) > 32 or any(
+        len(json.dumps(item, ensure_ascii=False, allow_nan=False)) > 4096
+        for item in history
+    ):
+        raise ValueError("AI proposal history exceeds allowed limits")
     if step != len(history) + 1:
         raise ValueError("AI proposal step must follow the supplied history")
     if core.store.get_mission(mission_id) is None:
@@ -167,10 +175,14 @@ def propose_v2_workflow_plan(
     if action.target != target:
         return {"status": "blocked", "action": action.to_dict(),
                 "reason": "AI-proposed target does not exactly match the operator-supplied target"}
-    verdict = core.scope.check(target)
-    if not verdict.allowed:
+    try:
+        verdict = core.scope.check(target)
+    except Exception:
         return {"status": "blocked", "action": action.to_dict(),
-                "reason": f"target is outside current scope: {verdict.reason}"}
+                "reason": "scope revalidation failed; no AI proposal was created"}
+    if not getattr(verdict, "allowed", False):
+        return {"status": "blocked", "action": action.to_dict(),
+                "reason": f"target is outside current scope: {getattr(verdict, 'reason', '')}"}
 
     task_id = "task-1"
     task = WorkflowTask(
