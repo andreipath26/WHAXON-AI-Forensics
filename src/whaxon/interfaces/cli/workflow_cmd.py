@@ -137,6 +137,19 @@ def _parser() -> argparse.ArgumentParser:
     followups.add_argument("--max-tasks", type=int, default=16)
     followups.add_argument("--save", action="store_true",
                            help="persist but never approve or run the proposal")
+    ai_propose = plan_commands.add_parser(
+        "ai-propose", help="convert one AI action into a reviewable V2 plan",
+    )
+    ai_propose.add_argument("--mission-id", required=True)
+    ai_propose.add_argument("--id", required=True, help="immutable workflow plan ID")
+    ai_propose.add_argument("--goal", required=True)
+    ai_propose.add_argument("--target", required=True,
+                            help="exact operator-authorized target for this proposal")
+    ai_propose.add_argument("--step", type=int, default=1)
+    ai_propose.add_argument("--history-file", type=Path,
+                            help="JSON array of prior AI action results")
+    ai_propose.add_argument("--save", action="store_true",
+                            help="persist the proposal; approval and execution remain separate")
     show = plan_commands.add_parser("show", help="show a plan and its durable task states")
     show.add_argument("--id", required=True)
     reconcile_report = plan_commands.add_parser(
@@ -363,6 +376,29 @@ def main(args: list[str] | None = None) -> int:
             print(json.dumps({**proposal.to_dict(), "created": bool(created)},
                              indent=2, sort_keys=True))
             return 0 if proposal.plan is not None else 1
+        if options.command == "plan" and options.plan_command == "ai-propose":
+            from whaxon.core.ai_bridge import propose_v2_workflow_plan
+
+            history = []
+            if options.history_file is not None:
+                history = json.loads(options.history_file.read_text(encoding="utf-8"))
+            proposal = propose_v2_workflow_plan(
+                core,
+                mission_id=options.mission_id,
+                plan_id=options.id,
+                goal=options.goal,
+                target=options.target,
+                history=history,
+                step=options.step,
+            )
+            created = False
+            if options.save and proposal.get("status") == "proposed":
+                created = core.save_workflow_plan(
+                    options.id, WorkflowPlan.from_dict(proposal["plan"]),
+                )
+            print(json.dumps({**proposal, "created": bool(created)},
+                             indent=2, sort_keys=True))
+            return 0 if proposal.get("status") == "proposed" else 1
         if options.command == "plan" and options.plan_command == "save":
             raw = json.loads(options.file.read_text(encoding="utf-8"))
             workflow = WorkflowPlan.from_dict(raw)
