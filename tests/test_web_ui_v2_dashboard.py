@@ -106,6 +106,40 @@ def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_s
     )
 
 
+def test_dashboard_emergency_halt_cancels_durable_v2_run_requests(page, live_server):
+    calls = []
+    page.route(
+        "**/api/jobs/active",
+        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
+    )
+    page.route(
+        "**/api/v2/workflow-runs/summary",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"active_requests":[{"id":"v2-request-1","plan_id":"v2-plan",'
+                 '"status":"running","submitted_at":1}]}',
+        ),
+    )
+    def cancel_run(route):
+        calls.append({"method": route.request.method, "url": route.request.url})
+        route.fulfill(
+            status=200, content_type="application/json",
+            body='{"cancellation_requested":true,"external_effects_stopped":false}',
+        )
+    page.route("**/api/v2/workflow-runs/v2-request-1/cancel", cancel_run)
+    page.on("dialog", lambda dialog: dialog.accept())
+    page.goto(f"{live_server}/ui-v2")
+    page.wait_for_selector("#dashboard-action-status", state="attached")
+    page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
+    page.wait_for_function(
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('0 of 0 active job(s) and 1 of 1 durable workflow run(s)')",
+        timeout=8000,
+    )
+    status = page.locator("#dashboard-action-status").inner_text()
+    assert "not confirmed stopped" in status
+    assert len(calls) == 1 and calls[0]["method"] == "POST"
+
+
 def test_dashboard_cli_help_and_credentials_controls_explain_real_setup(page, live_server):
     page.goto(f"{live_server}/ui-v2")
     page.wait_for_function(

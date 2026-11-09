@@ -852,18 +852,32 @@
       if (haltInFlight) return;
       haltInFlight = true;
       try {
-        const response = await fetchBounded("/api/jobs/active");
+        const [response, workflowResponse] = await Promise.all([
+          fetchBounded("/api/jobs/active"),
+          fetchBounded("/api/v2/workflow-runs/summary")
+        ]);
         if (!response.ok) throw new Error("Active jobs HTTP " + response.status);
+        if (!workflowResponse.ok) throw new Error("Workflow queue HTTP " + workflowResponse.status);
         const active = await response.json();
+        const workflowSummary = await workflowResponse.json();
         if (!Array.isArray(active) || !active.every(job => job && typeof job === "object" && !Array.isArray(job))) {
           throw new Error("Active jobs API returned an invalid response.");
         }
-        if (!active.length) {
-          showActionStatus("No running jobs were found. Nothing was cancelled.");
+        if (!workflowSummary || !Array.isArray(workflowSummary.active_requests)
+            || !workflowSummary.active_requests.every(run => run && typeof run === "object" && !Array.isArray(run))) {
+          throw new Error("Workflow queue API returned an invalid active-request list.");
+        }
+        const activeRuns = workflowSummary.active_requests.filter(run =>
+          ["queued", "running", "uncertain"].includes(String(run.status || "").toLowerCase())
+        );
+        if (!active.length && !activeRuns.length) {
+          showActionStatus("No running jobs or durable workflow requests were found. Nothing was cancelled.");
           return;
         }
-        if (!window.confirm("Cancel " + active.length + " active WHAXON job(s)? This cannot be undone.")) return;
-        const results = await Promise.all(active.map(async job => {
+        if (!window.confirm("Request cancellation for " + active.length + " legacy job(s) and "
+            + activeRuns.length + " durable workflow run(s)? Running or uncertain external effects may continue.")) return;
+        const [jobResults, workflowResults] = await Promise.all([
+          Promise.all(active.map(async job => {
           try {
             const id = job.id || job.job_id;
             if (typeof id !== "string" || !id.trim()) return false;
@@ -874,10 +888,26 @@
           } catch (_) {
             return false;
           }
-        }));
-        const cancelled = results.filter(Boolean).length;
-        showActionStatus("Cancellation requested for " + cancelled + " of " + active.length + " active job(s). Refreshing job state.",
-          cancelled === active.length ? "success" : "error");
+          })),
+          Promise.all(activeRuns.map(async run => {
+            try {
+              if (typeof run.id !== "string" || !run.id.trim()) return false;
+              const result = await fetchBounded("/api/v2/workflow-runs/" + encodeURIComponent(run.id) + "/cancel", { method: "POST" });
+              if (!result.ok) return false;
+              const body = await result.json();
+              return body && body.cancellation_requested === true;
+            } catch (_) {
+              return false;
+            }
+          }))
+        ]);
+        const cancelledJobs = jobResults.filter(Boolean).length;
+        const cancelledRuns = workflowResults.filter(Boolean).length;
+        const complete = cancelledJobs === active.length && cancelledRuns === activeRuns.length;
+        showActionStatus("Cancellation requested for " + cancelledJobs + " of " + active.length
+          + " active job(s) and " + cancelledRuns + " of " + activeRuns.length
+          + " durable workflow run(s). A running or uncertain provider effect is not confirmed stopped.",
+          complete ? "success" : "error");
         await load();
       } catch (error) {
         showActionStatus("Emergency halt failed: " + error.message, "error");

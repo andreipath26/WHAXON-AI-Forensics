@@ -365,7 +365,7 @@ class WorkflowRunQueue:
                 conn.close()
 
     def summary(self, *, stale_after_s: float = 120.0) -> dict:
-        """Read-only persisted queue health, never a worker-liveness assertion.
+        """Read-only queue health and safe active identities, not liveness proof.
 
         A recent heartbeat is evidence of a timestamp, not proof of a live
         worker or authorized external effect. No lease token is disclosed.
@@ -401,10 +401,16 @@ class WorkflowRunQueue:
                 "(heartbeat_at IS NULL OR heartbeat_at<?)",
                 (now - stale_after_s,),
             ).fetchone()["total"]
+            active_requests = conn.execute(
+                "SELECT id,plan_id,status,submitted_at FROM workflow_run_requests "
+                "WHERE status IN ('queued','running','uncertain') "
+                "ORDER BY submitted_at,id",
+            ).fetchall()
             result = {
                 "schema_version": "whaxon.workflow-run-queue-summary.v1",
                 "snapshot_at": now,
                 "counts": counts,
+                "active_requests": [dict(row) for row in active_requests],
                 "total": sum(counts.values()),
                 "oldest_queued_age_s": (
                     max(0.0, now - queued) if queued is not None else None
