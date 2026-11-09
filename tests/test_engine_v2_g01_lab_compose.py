@@ -35,7 +35,7 @@ def test_g01_compose_is_fixed_private_lab_without_published_ports():
     assert compose.count("condition: service_started") == 2
     assert "fixture-health.json" in workflow
     assert "target-port-probe.txt" in workflow
-    assert "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02" in workflow
+    assert "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2" in workflow
     assert 'metasploit = ["pymetasploit3==1.0.6"]' in project
     assert workflow.index("Generate ephemeral Metasploit RPC credential") < workflow.index(
         "Validate isolated fixed-address lab topology"
