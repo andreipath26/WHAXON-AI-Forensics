@@ -629,7 +629,7 @@ def test_v2_ai_proposals_api_validates_and_never_submits_execution(tmp_path, mon
 def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monkeypatch):
     from whaxon.core.ai_bridge import propose_v2_workflow_plan
 
-    _, core = _client(tmp_path, monkeypatch)
+    client, core = _client(tmp_path, monkeypatch)
     core.create_mission("m-ai", "authorized proposal")
     for history in ([{}] * 33, [{"untrusted": "x" * 4097}]):
         try:
@@ -642,4 +642,11 @@ def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monk
             assert "history exceeds allowed limits" in str(exc)
         else:
             raise AssertionError("oversized AI history accepted")
+        response = client.post("/api/v2/ai/proposals", json={
+            "mission_id": "m-ai", "id": "p-ai", "goal": "inspect lab",
+            "target": "192.0.2.10", "history": history,
+            "step": len(history) + 1,
+        })
+        assert response.status_code == 400
+        assert "history exceeds allowed limits" in response.get_json()["error"]
     assert core.store.get_workflow_plan("p-ai") is None
