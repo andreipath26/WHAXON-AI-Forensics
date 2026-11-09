@@ -142,7 +142,7 @@ def test_reconciliation_record_and_audit_event_must_match(tmp_path):
     conn = core.store._conn()
     try:
         conn.execute(
-            "UPDATE workflow_events SET detail_json=? "
+            "UPDATE workflow_events SET detail_json=?, task_ref='tampered-task' "
             "WHERE plan_id=? AND attempt_id=? "
             "AND event_type='workflow_attempt_reconciled'",
             ('{"actor_claimed":"operator","disposition":"effect_observed",'

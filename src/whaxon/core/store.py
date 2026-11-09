@@ -2084,12 +2084,13 @@ class JobStore:
                 (plan_id,),
             ).fetchall()
             reconciliations = c.execute(
-                "SELECT attempt_id, disposition, actor, evidence_ref, note "
-                "FROM workflow_attempt_reconciliations WHERE plan_id=?",
+                "SELECT r.attempt_id, r.disposition, r.actor, r.evidence_ref, "
+                "r.note, a.task_id FROM workflow_attempt_reconciliations r "
+                "JOIN task_attempts a ON a.id=r.attempt_id WHERE r.plan_id=?",
                 (plan_id,),
             ).fetchall()
             events = c.execute(
-                "SELECT attempt_id, event_type, detail_json FROM workflow_events "
+                "SELECT attempt_id, task_ref, event_type, detail_json FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
             attempt_by_id = {row["id"]: row["status"] for row in attempts}
@@ -2132,7 +2133,10 @@ class JobStore:
                             "evidence_ref": expected["evidence_ref"],
                             "note": expected["note"],
                         }
-                        if detail != expected_detail:
+                        if (
+                            detail != expected_detail
+                            or event["task_ref"] != expected["task_id"]
+                        ):
                             mismatched_reconciliations.add(attempt_id)
                 if kind in (
                     "task_succeeded", "task_failed", "task_cancelled",
