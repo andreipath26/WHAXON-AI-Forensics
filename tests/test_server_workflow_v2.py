@@ -488,3 +488,44 @@ def test_e4_portfolio_audit_matches_cli_and_api(tmp_path, monkeypatch, capsys):
     assert cli_report == api_report
     assert sum(cli_report["summary"].values()) == len(cli_report["rows"])
     assert client.post("/api/v2/providers/portfolio-audit").status_code == 405
+
+
+
+def test_workflow_v2_api_records_manual_provider_effect_reconciliation(
+    tmp_path, monkeypatch,
+):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled reconciliation")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    request = core.enqueue_workflow_run("p")
+    run_claim = core.workflow_requests.claim("run-worker")
+    task_claim = core.store.claim_ready_workflow_task(
+        "p", "task-worker", max_attempts=2,
+    )
+    assert task_claim is not None
+    attempt_id = task_claim["attempt_id"]
+    assert core.store.mark_workflow_dispatch_started("p", attempt_id)
+    core.store.finish_task_attempt(attempt_id, "uncertain", error="lost")
+    assert core.workflow_requests.finish(
+        request["id"], run_claim["lease_token"], status="uncertain",
+    )
+
+    response = client.post("/api/v2/workflows/p/reconcile", json={
+        "attempt_id": attempt_id,
+        "disposition": "no_effect_verified",
+        "actor": "operator",
+        "evidence_ref": "case://api/17",
+        "note": "Compared provider audit log to target capture.",
+    })
+    assert response.status_code == 200
+    result = response.get_json()
+    assert result["task_retryable"] is True
+    assert result["automatic_replay"] is False
+    assert result["run_requests_closed"] == 1
+
+    malformed = client.post("/api/v2/workflows/p/reconcile", json={
+        "attempt_id": attempt_id, "disposition": "success",
+    })
+    assert malformed.status_code == 400

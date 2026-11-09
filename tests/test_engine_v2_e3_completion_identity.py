@@ -88,3 +88,47 @@ def test_audit_failure_does_not_partially_accept_worker_uncertainty(tmp_path):
     assert row["status"] == "running"
     assert row["completed_at"] is None
     assert core.workflow_requests.heartbeat(request["id"], claim["lease_token"])
+
+
+
+def test_tampered_plan_downgrades_inflight_success_to_uncertain(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "completion-plan-integrity.db")
+    store.create_mission("m", "completion integrity")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("t", "fixture", "192.0.2.10"),)),
+    )
+    attempt = store.claim_ready_workflow_task("p", "worker", max_attempts=1)
+    assert attempt is not None
+    attempt_id = attempt["attempt_id"]
+    assert store.mark_workflow_dispatch_started("p", attempt_id)
+
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET target=? WHERE plan_id=?",
+            ("192.0.2.99", "p"),
+        )
+    finally:
+        conn.close()
+
+    store.finish_task_attempt(
+        attempt_id, "succeeded", result={"job_id": "must-not-seal"},
+    )
+
+    assert store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    tasks = store.list_workflow_tasks("p")
+    assert tasks[0]["status"] == "uncertain"
+    assert tasks[0]["result"] is None
+    assert "integrity failed" in tasks[0]["error"]
+    conn = store._conn()
+    try:
+        seal_count = conn.execute(
+            "SELECT COUNT(*) FROM workflow_evidence_seals WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert seal_count == 0

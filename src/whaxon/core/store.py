@@ -124,6 +124,15 @@ CREATE TABLE IF NOT EXISTS task_attempts (
     started_at REAL NOT NULL, heartbeat_at REAL, finished_at REAL, result_json TEXT, error TEXT,
     UNIQUE(task_id, attempt_no)
 );
+CREATE TABLE IF NOT EXISTS workflow_attempt_reconciliations (
+    attempt_id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,
+    disposition TEXT NOT NULL CHECK(disposition IN
+      ('no_effect_verified','effect_observed','unresolved')),
+    actor TEXT NOT NULL, evidence_ref TEXT NOT NULL, note TEXT NOT NULL,
+    recorded_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attempt_reconciliations_plan
+    ON workflow_attempt_reconciliations(plan_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_task_attempts_task ON task_attempts(task_id, attempt_no);
 CREATE TABLE IF NOT EXISTS workflow_evidence_seals (
     attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, digest TEXT NOT NULL,
@@ -1828,8 +1837,122 @@ class JobStore:
         finally:
             c.close()
 
+    def record_workflow_attempt_reconciliation(
+        self, plan_id, attempt_id, *, disposition, actor, evidence_ref, note,
+    ):
+        """Record an operator-reported outcome and reference; never replay.
+
+        The reference is not independently verified. Actor is a caller-supplied
+        label, not an authenticated-principal claim.
+        no_effect_verified makes the task retryable only after a separate run
+        request; effect_observed blocks it because observation is not a WHAXON
+        verification result. unresolved leaves the task uncertain.
+        """
+        choices = {"no_effect_verified", "effect_observed", "unresolved"}
+        if disposition not in choices:
+            raise ValueError("unsupported reconciliation disposition")
+        values = {"actor": actor, "evidence_ref": evidence_ref, "note": note}
+        limits = {"actor": 128, "evidence_ref": 2048, "note": 4000}
+        for key, value in values.items():
+            if (not isinstance(value, str) or value != value.strip()
+                    or not value or len(value) > limits[key]
+                    or any(ord(char) < 32 and char not in "\\n\\t" for char in value)):
+                raise ValueError(f"{key} must be normalized non-empty text within its limit")
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                self._verify_workflow_plan_integrity_tx(c, plan_id)
+                attempt = c.execute(
+                    "SELECT a.id, a.status AS attempt_status, t.id AS task_ref, "
+                    "t.status AS task_status, t.task_key FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id "
+                    "WHERE t.plan_id=? AND a.id=?",
+                    (plan_id, attempt_id),
+                ).fetchone()
+                if attempt is None:
+                    raise ValueError("unknown workflow attempt for this plan")
+                existing = c.execute(
+                    "SELECT disposition, actor, evidence_ref, note, recorded_at "
+                    "FROM workflow_attempt_reconciliations WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if existing is not None:
+                    if (
+                        existing["disposition"] == disposition
+                        and existing["actor"] == actor
+                        and existing["evidence_ref"] == evidence_ref
+                        and existing["note"] == note
+                    ):
+                        c.execute("COMMIT")
+                        return {
+                            "plan_id": plan_id, "attempt_id": attempt_id,
+                            "disposition": disposition, "actor_claimed": actor,
+                            "evidence_ref": evidence_ref, "note": note,
+                            "recorded_at": existing["recorded_at"],
+                            "task_status": attempt["task_status"],
+                            "task_retryable": disposition == "no_effect_verified",
+                            "automatic_replay": False, "idempotent": True,
+                        }
+                    raise ValueError("workflow attempt already has a different reconciliation")
+                if attempt["attempt_status"] != "uncertain" or attempt["task_status"] != "uncertain":
+                    raise ValueError("only uncertain workflow attempts can be reconciled")
+                if disposition == "no_effect_verified":
+                    task_status = "failed"
+                    task_error = (
+                        "operator recorded no external effect; retry requires a separate run request"
+                    )
+                elif disposition == "effect_observed":
+                    task_status = "blocked"
+                    task_error = (
+                        "external effect observed; WHAXON outcome remains unverified"
+                    )
+                else:
+                    task_status = "uncertain"
+                    task_error = "external effect remains unresolved"
+                c.execute(
+                    "INSERT INTO workflow_attempt_reconciliations "
+                    "(attempt_id,plan_id,disposition,actor,evidence_ref,note,recorded_at) "
+                    "VALUES (?,?,?,?,?,?,?)",
+                    (attempt_id, plan_id, disposition, actor, evidence_ref, note, now),
+                )
+                if disposition != "unresolved":
+                    cursor = c.execute(
+                        "UPDATE workflow_tasks SET status=?,error=?,active_attempt_id=NULL,"
+                        "updated_at=? WHERE id=? AND status='uncertain'",
+                        (task_status, task_error, now, attempt["task_ref"]),
+                    )
+                    if cursor.rowcount != 1:
+                        raise ValueError("workflow task changed during reconciliation")
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id,task_ref,attempt_id,event_type,detail_json,at) "
+                    "VALUES (?,?,?,'workflow_attempt_reconciled',?,?)",
+                    (plan_id, attempt["task_ref"], attempt_id,
+                     json.dumps({
+                         "disposition": disposition, "actor_claimed": actor,
+                         "evidence_ref": evidence_ref, "note": note,
+                     }, sort_keys=True), now),
+                )
+                c.execute("COMMIT")
+                return {
+                    "plan_id": plan_id, "attempt_id": attempt_id,
+                    "disposition": disposition, "actor_claimed": actor,
+                    "evidence_ref": evidence_ref, "note": note,
+                    "recorded_at": now, "task_status": task_status,
+                    "task_retryable": disposition == "no_effect_verified",
+                    "automatic_replay": False, "idempotent": False,
+                }
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
     def get_workflow_dispatch_reconciliation(self, plan_id):
-        """Separate in-flight or uncertain attempts with recorded external dispatch."""
+        """Separate uncertain attempts and expose any operator resolution record."""
         c = self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
@@ -1838,8 +1961,10 @@ class JobStore:
                 "SELECT a.id AS attempt_id, t.task_key, a.status, "
                 "EXISTS(SELECT 1 FROM workflow_events e "
                 "WHERE e.plan_id=t.plan_id AND e.attempt_id=a.id "
-                "AND e.event_type='dispatch_started') AS dispatch_recorded "
+                "AND e.event_type='dispatch_started') AS dispatch_recorded, "
+                "r.disposition, r.actor, r.evidence_ref, r.note, r.recorded_at "
                 "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                "LEFT JOIN workflow_attempt_reconciliations r ON r.attempt_id=a.id "
                 "WHERE t.plan_id=? AND a.status IN ('running', 'uncertain') "
                 "ORDER BY a.started_at, a.id", (plan_id,),
             ).fetchall()
@@ -1848,8 +1973,25 @@ class JobStore:
                     "attempt_id": row["attempt_id"],
                     "task_key": row["task_key"], "status": row["status"],
                     "external_effect_possible": bool(row["dispatch_recorded"]),
-                    "manual_reconciliation_required": bool(row["dispatch_recorded"])
-                    or row["status"] == "uncertain",
+                    "operator_resolution": (
+                        {
+                            "disposition": row["disposition"],
+                            "actor_claimed": row["actor"],
+                            "evidence_ref": row["evidence_ref"],
+                            "note": row["note"],
+                            "recorded_at": row["recorded_at"],
+                        } if row["disposition"] else None
+                    ),
+                    "manual_reconciliation_required": (
+                        (
+                            row["status"] == "running"
+                            and bool(row["dispatch_recorded"])
+                        )
+                        or (
+                            row["status"] == "uncertain"
+                            and row["disposition"] in (None, "unresolved")
+                        )
+                    ),
                 }
                 for row in rows
             ]
@@ -1947,16 +2089,28 @@ class JobStore:
                 "JOIN workflow_tasks t ON t.id=a.task_id WHERE t.plan_id=?",
                 (plan_id,),
             ).fetchall()
+            reconciliations = c.execute(
+                "SELECT r.attempt_id, r.disposition, r.actor, r.evidence_ref, "
+                "r.note, a.task_id FROM workflow_attempt_reconciliations r "
+                "JOIN task_attempts a ON a.id=r.attempt_id WHERE r.plan_id=?",
+                (plan_id,),
+            ).fetchall()
             events = c.execute(
-                "SELECT attempt_id, event_type FROM workflow_events "
+                "SELECT attempt_id, task_ref, event_type, detail_json FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
             attempt_by_id = {row["id"]: row["status"] for row in attempts}
+            reconciliation_by_id = {
+                row["attempt_id"]: row for row in reconciliations
+            }
             claims = {}
             terminal = {}
             dispatch = {}
+            reconciliation_events = {}
             mismatched = set()
+            mismatched_reconciliations = set()
             unknown = set()
+            unknown_reconciliations = set()
             for event in events:
                 attempt_id = event["attempt_id"]
                 kind = event["event_type"]
@@ -1967,6 +2121,29 @@ class JobStore:
                     claims[attempt_id] = claims.get(attempt_id, 0) + 1
                 if kind == "dispatch_started":
                     dispatch[attempt_id] = dispatch.get(attempt_id, 0) + 1
+                if kind == "workflow_attempt_reconciled":
+                    reconciliation_events[attempt_id] = (
+                        reconciliation_events.get(attempt_id, 0) + 1
+                    )
+                    expected = reconciliation_by_id.get(attempt_id)
+                    if expected is None:
+                        unknown_reconciliations.add(attempt_id)
+                    else:
+                        try:
+                            detail = json.loads(event["detail_json"])
+                        except (TypeError, ValueError):
+                            detail = None
+                        expected_detail = {
+                            "disposition": expected["disposition"],
+                            "actor_claimed": expected["actor"],
+                            "evidence_ref": expected["evidence_ref"],
+                            "note": expected["note"],
+                        }
+                        if (
+                            detail != expected_detail
+                            or event["task_ref"] != expected["task_id"]
+                        ):
+                            mismatched_reconciliations.add(attempt_id)
                 if kind in (
                     "task_succeeded", "task_failed", "task_cancelled",
                     "task_blocked", "task_uncertain",
@@ -1986,6 +2163,10 @@ class JobStore:
             duplicate_dispatch = sorted(
                 attempt_id for attempt_id, count in dispatch.items() if count > 1
             )
+            missing_or_duplicate_reconciliations = sorted(
+                attempt_id for attempt_id in reconciliation_by_id
+                if reconciliation_events.get(attempt_id, 0) != 1
+            )
             return {
                 "plan_id": plan_id, "attempts": len(attempts),
                 "missing_or_duplicate_claims": missing_claims,
@@ -1993,9 +2174,18 @@ class JobStore:
                 "mismatched_terminal_events": sorted(mismatched),
                 "duplicate_dispatch_events": duplicate_dispatch,
                 "unknown_attempt_events": sorted(unknown),
+                "missing_or_duplicate_reconciliation_events":
+                    missing_or_duplicate_reconciliations,
+                "mismatched_reconciliation_events":
+                    sorted(mismatched_reconciliations),
+                "unknown_reconciliation_events":
+                    sorted(unknown_reconciliations),
                 "consistent": not (
                     missing_claims or missing_terminal or mismatched
                     or duplicate_dispatch or unknown
+                    or missing_or_duplicate_reconciliations
+                    or mismatched_reconciliations
+                    or unknown_reconciliations
                 ),
             }
         finally:
@@ -3142,7 +3332,8 @@ class JobStore:
             try:
                 c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
-                    "SELECT a.task_id, a.status, p.status AS plan_status "
+                    "SELECT a.task_id, a.status, p.id AS plan_id, "
+                    "p.status AS plan_status "
                     "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                     "JOIN workflow_plans p ON p.id=t.plan_id WHERE a.id=?",
                     (attempt_id,),
@@ -3151,6 +3342,18 @@ class JobStore:
                     raise ValueError(f"unknown task attempt: {attempt_id}")
                 if row["status"] != "running":
                     raise ValueError("task attempt is already terminal")
+                # Revalidate the immutable DAG at the terminal commit boundary.
+                # A provider may have produced effects while persisted task
+                # bindings were changed; such an outcome cannot be certified.
+                try:
+                    self._verify_workflow_plan_integrity_tx(c, row["plan_id"])
+                except ValueError:
+                    status = "uncertain"
+                    result = None
+                    error = (
+                        "workflow plan integrity failed during provider execution; "
+                        "reconcile external effects"
+                    )
                 # The plan cancellation barrier and outcome must serialize in
                 # one write transaction. An external effect cannot be certified
                 # successful after cancellation was durably recorded.

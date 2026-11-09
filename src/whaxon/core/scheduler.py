@@ -207,6 +207,9 @@ class WorkflowScheduler:
             raise ValueError("max_tasks, max_attempts and max_concurrency must be positive integers")
         if self.store.get_workflow_plan(plan_id) is None:
             raise ValueError(f"unknown workflow plan: {plan_id}")
+        # Check even when the plan has no claimable tasks. Without this,
+        # terminal task rows could let a tampered plan return "complete".
+        self.store.verify_workflow_plan_integrity(plan_id)
         # Caller-supplied values may tighten, but never loosen durable limits.
         limits = self.store.get_workflow_limits(plan_id)
         max_tasks = min(max_tasks, limits["max_total_attempts"])

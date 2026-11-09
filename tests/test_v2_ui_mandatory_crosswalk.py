@@ -14,5 +14,5 @@ def test_ui_crosswalk_enumerates_all_production_pages_and_prework_rules():
     for filename in templates:
         assert doc.count("`" + filename + "`") >= 1, filename
     assert "D1" in doc and "D6" in doc
-    assert "E6 engine integration remains frozen" in doc
+    assert "E6 UI integration is active work" in doc
     assert "docs/V2_UI_MANDATORY_CROSSWALK.md" in instructions

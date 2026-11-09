@@ -211,6 +211,18 @@ class Core:
         """Reconcile expired worker leases without repeating external effects."""
         return self.store.reconcile_workflow_plan(plan_id, stale_after_s=stale_after_s)
 
+    def reconcile_workflow_attempt(
+        self, plan_id: str, attempt_id: str, *, disposition: str,
+        actor: str, evidence_ref: str, note: str,
+    ):
+        """Record a manual effect decision without certifying success or replaying."""
+        result = self.store.record_workflow_attempt_reconciliation(
+            plan_id, attempt_id, disposition=disposition, actor=actor,
+            evidence_ref=evidence_ref, note=note,
+        )
+        result["run_requests_closed"] = self.workflow_requests.close_reconciled(plan_id)
+        return result
+
     def workflow_event_cursor(self, plan_id: str, consumer_id: str):
         return self.store.get_workflow_event_cursor(plan_id, consumer_id)
 

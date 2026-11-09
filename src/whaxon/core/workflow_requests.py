@@ -342,6 +342,50 @@ class WorkflowRunQueue:
             finally:
                 conn.close()
 
+    def close_reconciled(self, plan_id: str) -> int:
+        """Close uncertain run intents only after every active effect is resolved.
+
+        This releases duplicate-submission fencing for an operator to submit
+        a new bounded request. It never executes or replays a task.
+        """
+        with self.store._lock:
+            conn = self.store._conn()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                plan = conn.execute(
+                    "SELECT digest FROM workflow_plans WHERE id=?", (plan_id,),
+                ).fetchone()
+                if plan is None:
+                    raise ValueError(f"unknown workflow plan: {plan_id}")
+                unresolved = conn.execute(
+                    "SELECT COUNT(*) FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id "
+                    "LEFT JOIN workflow_attempt_reconciliations r ON r.attempt_id=a.id "
+                    "WHERE t.plan_id=? AND (a.status='running' OR "
+                    "(a.status='uncertain' AND "
+                    "(r.attempt_id IS NULL OR r.disposition='unresolved')))",
+                    (plan_id,),
+                ).fetchone()[0]
+                if unresolved:
+                    conn.execute("COMMIT")
+                    return 0
+                now = time.time()
+                cursor = conn.execute(
+                    "UPDATE workflow_run_requests SET status='incomplete',"
+                    "completed_at=?,owner=NULL,lease_token=NULL,"
+                    "error='operator reconciliation recorded; no automatic replay' "
+                    "WHERE plan_id=? AND plan_digest=? AND status='uncertain'",
+                    (now, plan_id, plan["digest"]),
+                )
+                conn.execute("COMMIT")
+                return cursor.rowcount
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+            finally:
+                conn.close()
+
     def summary(self, *, stale_after_s: float = 120.0) -> dict:
         """Read-only persisted queue health, never a worker-liveness assertion.
 
