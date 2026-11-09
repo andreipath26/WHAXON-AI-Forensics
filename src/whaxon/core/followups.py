@@ -139,14 +139,38 @@ class EvidenceFollowupPlanner:
         if source.get("status") == "cancel_requested":
             raise ValueError("cancelled source plan cannot generate follow-ups")
         verify = getattr(self.store, "verify_workflow_plan_integrity", None)
-        if callable(verify):
-            verify(source_plan_id)
+        if not callable(verify):
+            return FollowupProposal(source_plan_id, None, None, ({
+                "source_task": None,
+                "reason": "source_plan_integrity_verifier_unavailable",
+            },))
+        integrity = verify(source_plan_id)
+        if (
+            not isinstance(integrity, dict)
+            or integrity.get("valid") is not True
+            or integrity.get("plan_id") != source_plan_id
+            or integrity.get("digest") != source.get("digest")
+        ):
+            return FollowupProposal(source_plan_id, None, None, ({
+                "source_task": None,
+                "reason": "source_plan_integrity_mismatch",
+            },))
         tasks: list[WorkflowTask] = []
         provenance: list[dict] = []
         blocked: list[dict] = []
         seen: set[tuple[str, str]] = set()
         evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
-        rows = evidence.get("attempts") if isinstance(evidence, dict) else evidence
+        if (
+            not isinstance(evidence, dict)
+            or evidence.get("plan_id") != source_plan_id
+            or evidence.get("mission_id") != source.get("mission_id")
+            or evidence.get("plan_digest") != source.get("digest")
+        ):
+            return FollowupProposal(source_plan_id, None, None, ({
+                "source_task": None,
+                "reason": "evidence_snapshot_mismatch",
+            },))
+        rows = evidence.get("attempts")
         if not isinstance(rows, list):
             rows = []
             blocked.append({"source_task": None, "reason": "evidence_unavailable"})
@@ -180,6 +204,13 @@ class EvidenceFollowupPlanner:
                     continue
                 for rule in self.rules:
                     if not rule.match(row["capability_id"], finding):
+                        continue
+                    finding_seq = finding.get("seq")
+                    if type(finding_seq) is not int or finding_seq < 0:
+                        blocked.append({
+                            "source_task": key, "rule_id": rule.id,
+                            "reason": "finding_provenance_missing",
+                        })
                         continue
                     try:
                         target = rule.make_target(row["target"], finding)
@@ -232,7 +263,7 @@ class EvidenceFollowupPlanner:
                     tasks.append(task)
                     provenance.append({
                         "source_task": key, "source_job": job_id,
-                        "finding_seq": finding.get("seq"), "rule_id": rule.id,
+                        "finding_seq": finding_seq, "rule_id": rule.id,
                         "provider_fingerprint": manifest.fingerprint,
                     })
         if not tasks:
