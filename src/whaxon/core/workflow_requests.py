@@ -369,16 +369,38 @@ class WorkflowRunQueue:
                 if unresolved:
                     conn.execute("COMMIT")
                     return 0
+                pending = conn.execute(
+                    "SELECT id FROM workflow_run_requests "
+                    "WHERE plan_id=? AND plan_digest=? AND status='uncertain' "
+                    "ORDER BY submitted_at, id",
+                    (plan_id, plan["digest"]),
+                ).fetchall()
                 now = time.time()
-                cursor = conn.execute(
-                    "UPDATE workflow_run_requests SET status='incomplete',"
-                    "completed_at=?,owner=NULL,lease_token=NULL,"
-                    "error='operator reconciliation recorded; no automatic replay' "
-                    "WHERE plan_id=? AND plan_digest=? AND status='uncertain'",
-                    (now, plan_id, plan["digest"]),
-                )
+                closed = 0
+                for row in pending:
+                    cursor = conn.execute(
+                        "UPDATE workflow_run_requests SET status='incomplete',"
+                        "completed_at=?,owner=NULL,lease_token=NULL,"
+                        "error='operator reconciliation recorded; no automatic replay' "
+                        "WHERE id=? AND status='uncertain'",
+                        (now, row["id"]),
+                    )
+                    if cursor.rowcount != 1:
+                        continue
+                    conn.execute(
+                        "INSERT INTO workflow_events "
+                        "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                        (plan_id, "workflow_run_reconciled", json.dumps({
+                            "request_id": row["id"],
+                            "from_status": "uncertain",
+                            "to_status": "incomplete",
+                            "reason": "provider_effect_reconciled",
+                            "automatic_replay": False,
+                        }, sort_keys=True), now),
+                    )
+                    closed += 1
                 conn.execute("COMMIT")
-                return cursor.rowcount
+                return closed
             except Exception:
                 if conn.in_transaction:
                     conn.execute("ROLLBACK")

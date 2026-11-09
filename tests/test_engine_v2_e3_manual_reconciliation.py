@@ -1,6 +1,8 @@
 """Engine V2 manual provider-effect reconciliation is explicit and non-replaying."""
 from __future__ import annotations
 
+import json
+
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
@@ -49,6 +51,44 @@ def test_verified_no_effect_closes_request_but_requires_new_run(tmp_path):
     assert result["run_requests_closed"] == 1
     assert core.workflow_run_request(request["id"])["status"] == "incomplete"
     assert core.store.list_workflow_tasks("p")[0]["status"] == "failed"
+    conn = core.store._conn()
+    try:
+        events = conn.execute(
+            "SELECT detail_json FROM workflow_events WHERE plan_id=? "
+            "AND event_type='workflow_run_reconciled'",
+            ("p",),
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(events) == 1
+    assert json.loads(events[0]["detail_json"]) == {
+        "request_id": request["id"],
+        "from_status": "uncertain",
+        "to_status": "incomplete",
+        "reason": "provider_effect_reconciled",
+        "automatic_replay": False,
+    }
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_events SET detail_json=? WHERE plan_id=? "
+            "AND event_type='workflow_run_reconciled'",
+            (json.dumps({
+                "request_id": request["id"],
+                "from_status": "uncertain",
+                "to_status": "incomplete",
+                "reason": "tampered",
+                "automatic_replay": False,
+            }, sort_keys=True), "p"),
+        )
+    finally:
+        conn.close()
+    audit = core.store.get_workflow_audit_integrity("p")
+    assert audit["consistent"] is False
+    assert audit["mismatched_run_request_reconciliation_events"] == [request["id"]]
+
     assert core.store.get_workflow_dispatch_reconciliation("p")[0][
         "manual_reconciliation_required"
     ] is False
@@ -96,6 +136,15 @@ def test_unresolved_effect_keeps_request_fenced_and_retry_disabled(tmp_path):
     assert result["task_retryable"] is False
     assert result["run_requests_closed"] == 0
     assert core.workflow_run_request(request["id"])["status"] == "uncertain"
+    conn = core.store._conn()
+    try:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM workflow_events WHERE plan_id=? "
+            "AND event_type='workflow_run_reconciled'",
+            ("p",),
+        ).fetchone()[0] == 0
+    finally:
+        conn.close()
     assert core.workflow_requests.enqueue(
         "p", limits={"max_tasks": 100, "max_attempts": 2, "max_concurrency": 4},
     )["id"] == request["id"]

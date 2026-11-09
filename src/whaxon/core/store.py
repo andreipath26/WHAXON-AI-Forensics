@@ -2099,6 +2099,53 @@ class JobStore:
                 "SELECT attempt_id, task_ref, event_type, detail_json FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
+            has_run_request_queue = c.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' "
+                "AND name='workflow_run_requests'"
+            ).fetchone() is not None
+            run_requests = []
+            run_request_events = []
+            if has_run_request_queue:
+                run_requests = c.execute(
+                    "SELECT id, status FROM workflow_run_requests WHERE plan_id=?",
+                    (plan_id,),
+                ).fetchall()
+                run_request_events = c.execute(
+                    "SELECT detail_json FROM workflow_events WHERE plan_id=? "
+                    "AND event_type='workflow_run_reconciled'",
+                    (plan_id,),
+                ).fetchall()
+            run_request_by_id = {row["id"]: row["status"] for row in run_requests}
+            run_reconciliation_event_counts = {}
+            mismatched_run_reconciliations = set()
+            unknown_run_reconciliations = set()
+            for event in run_request_events:
+                try:
+                    detail = json.loads(event["detail_json"])
+                except (TypeError, ValueError):
+                    detail = None
+                request_id = detail.get("request_id") if isinstance(detail, dict) else None
+                if not isinstance(request_id, str) or request_id not in run_request_by_id:
+                    unknown_run_reconciliations.add(
+                        request_id if isinstance(request_id, str) else "<invalid>"
+                    )
+                    continue
+                run_reconciliation_event_counts[request_id] = (
+                    run_reconciliation_event_counts.get(request_id, 0) + 1
+                )
+                expected_detail = {
+                    "request_id": request_id,
+                    "from_status": "uncertain",
+                    "to_status": "incomplete",
+                    "reason": "provider_effect_reconciled",
+                    "automatic_replay": False,
+                }
+                if detail != expected_detail or run_request_by_id[request_id] != "incomplete":
+                    mismatched_run_reconciliations.add(request_id)
+            duplicate_run_reconciliations = sorted(
+                request_id for request_id, count in run_reconciliation_event_counts.items()
+                if count > 1
+            )
             attempt_by_id = {row["id"]: row["status"] for row in attempts}
             reconciliation_by_id = {
                 row["attempt_id"]: row for row in reconciliations
@@ -2180,12 +2227,21 @@ class JobStore:
                     sorted(mismatched_reconciliations),
                 "unknown_reconciliation_events":
                     sorted(unknown_reconciliations),
+                "duplicate_run_request_reconciliation_events":
+                    duplicate_run_reconciliations,
+                "mismatched_run_request_reconciliation_events":
+                    sorted(mismatched_run_reconciliations),
+                "unknown_run_request_reconciliation_events":
+                    sorted(unknown_run_reconciliations),
                 "consistent": not (
                     missing_claims or missing_terminal or mismatched
                     or duplicate_dispatch or unknown
                     or missing_or_duplicate_reconciliations
                     or mismatched_reconciliations
                     or unknown_reconciliations
+                    or duplicate_run_reconciliations
+                    or mismatched_run_reconciliations
+                    or unknown_run_reconciliations
                 ),
             }
         finally:
