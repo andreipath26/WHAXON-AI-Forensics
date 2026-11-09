@@ -800,6 +800,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             payload = {}
         if not isinstance(payload, dict):
             return jsonify({"error": "JSON object required"}), 400
+        if "attempt_id" in payload:
+            required = {"attempt_id", "disposition", "actor", "evidence_ref", "note"}
+            if set(payload) != required:
+                return jsonify({"error": "exact attempt reconciliation fields are required"}), 400
+            try:
+                result = core.reconcile_workflow_attempt(
+                    plan_id, payload["attempt_id"],
+                    disposition=payload["disposition"], actor=payload["actor"],
+                    evidence_ref=payload["evidence_ref"], note=payload["note"],
+                )
+                return jsonify(result)
+            except (ValueError, TypeError) as exc:
+                return jsonify({"error": str(exc)}), 400
         try:
             changed = core.reconcile_workflow_plan(
                 plan_id, stale_after_s=payload.get("stale_after_s", 60.0),

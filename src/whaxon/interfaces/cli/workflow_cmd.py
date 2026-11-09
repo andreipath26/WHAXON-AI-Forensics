@@ -197,6 +197,19 @@ def _parser() -> argparse.ArgumentParser:
     )
     recover.add_argument("--id", required=True)
     recover.add_argument("--stale-after-seconds", type=float, default=60.0)
+    resolve_attempt = plan_commands.add_parser(
+        "resolve-attempt",
+        help="record an operator outcome for an uncertain provider effect; never replay automatically",
+    )
+    resolve_attempt.add_argument("--id", required=True)
+    resolve_attempt.add_argument("--attempt-id", required=True)
+    resolve_attempt.add_argument(
+        "--disposition", required=True,
+        choices=("no_effect_verified", "effect_observed", "unresolved"),
+    )
+    resolve_attempt.add_argument("--actor", required=True)
+    resolve_attempt.add_argument("--evidence-ref", required=True)
+    resolve_attempt.add_argument("--note", required=True)
     rate = plan_commands.add_parser("rate-limit", help="set a durable minimum claim interval")
     rate.add_argument("--id", required=True)
     rate.add_argument("--min-spacing-seconds", type=float, required=True)
@@ -454,6 +467,14 @@ def main(args: list[str] | None = None) -> int:
             print(json.dumps({
                 "plan_id": options.id, "attempts_marked_uncertain": changed,
             }, sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "resolve-attempt":
+            result = core.reconcile_workflow_attempt(
+                options.id, options.attempt_id,
+                disposition=options.disposition, actor=options.actor,
+                evidence_ref=options.evidence_ref, note=options.note,
+            )
+            print(json.dumps(result, sort_keys=True))
             return 0
         if options.command == "plan" and options.plan_command == "rate-limit":
             core.configure_workflow_rate_limit(

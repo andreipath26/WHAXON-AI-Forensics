@@ -123,6 +123,18 @@ class _FakeCore:
     def reconcile_workflow_plan(self, plan_id, *, stale_after_s=60.0):
         self.reconciled = (plan_id, stale_after_s)
         return 2
+    def reconcile_workflow_attempt(
+        self, plan_id, attempt_id, *, disposition, actor, evidence_ref, note,
+    ):
+        self.reconciled_attempt = (
+            plan_id, attempt_id, disposition, actor, evidence_ref, note,
+        )
+        return {
+            "attempt_id": attempt_id, "disposition": disposition,
+            "task_retryable": disposition == "no_effect_verified",
+            "automatic_replay": False, "run_requests_closed": 1,
+        }
+
 
     def grant_workflow_approval(
         self, plan_id, task_key, approval_id, actor, *, expires_at, policy_version="policy.v1",
@@ -468,3 +480,17 @@ def test_e5_cli_cancel_request_uses_core_barrier(monkeypatch, capsys):
         "plan", "cancel-request", "--id", "missing",
     ]) == 1
     assert "unknown workflow run request" in capsys.readouterr().err
+
+
+
+def test_workflow_cli_records_manual_attempt_reconciliation(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "plan", "resolve-attempt", "--id", "p", "--attempt-id", "a",
+        "--disposition", "no_effect_verified", "--actor", "operator",
+        "--evidence-ref", "case://cli/17", "--note", "Checked target evidence.",
+    ]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["attempt_id"] == "a"
+    assert payload["task_retryable"] is True
+    assert payload["automatic_replay"] is False
