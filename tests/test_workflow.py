@@ -1781,3 +1781,39 @@ async def test_provider_exception_after_external_effect_is_not_automatically_ret
     assert again["attempts"] == 0
     assert len(external_effects) == 1
     assert reopened.list_workflow_attempts("plan")[0]["status"] == "uncertain"
+
+
+@_run_async_test
+async def test_scheduler_rejects_tampered_plan_after_all_tasks_succeed(tmp_path):
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "scheduler-terminal-integrity.db")
+    store.create_mission("m", "terminal plan integrity")
+    store.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("t", "cap", "192.0.2.10"),)),
+    )
+    dispatched = []
+    scheduler = WorkflowScheduler(
+        store, authorize=lambda task: True,
+        dispatch=lambda task: dispatched.append(task.id) or {"ok": True},
+    )
+
+    completed = await scheduler.run("p")
+    assert completed["complete"] is True
+    assert completed["tasks"] == [{"id": "t", "status": "succeeded"}]
+    assert dispatched == ["t"]
+
+    conn = store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET target=? WHERE plan_id=?",
+            ("192.0.2.99", "p"),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="integrity"):
+        await scheduler.run("p")
+    assert dispatched == ["t"]
