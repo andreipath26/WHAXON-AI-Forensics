@@ -127,6 +127,29 @@ def test_observed_effect_is_blocked_and_never_certified_as_success(tmp_path):
     assert seals == 0
 
 
+def test_missing_run_request_reconciliation_event_fails_audit(tmp_path):
+    core, request, attempt_id = _uncertain_plan(tmp_path)
+
+    result = _reconcile(core, attempt_id, "no_effect_verified")
+    assert result["run_requests_closed"] == 1
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "DELETE FROM workflow_events WHERE plan_id=? "
+            "AND event_type='workflow_run_reconciled'",
+            ("p",),
+        )
+    finally:
+        conn.close()
+
+    audit = core.store.get_workflow_audit_integrity("p")
+    assert audit["consistent"] is False
+    assert audit["missing_or_duplicate_run_request_reconciliation_events"] == [
+        request["id"]
+    ]
+
+
 def test_unresolved_effect_keeps_request_fenced_and_retry_disabled(tmp_path):
     core, request, attempt_id = _uncertain_plan(tmp_path)
 
