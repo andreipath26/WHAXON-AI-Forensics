@@ -1,1560 +1,1 @@
-# WHAXON â€” UI V2 DESIGN, INTERACTION AND ACCEPTANCE MASTER
-
-> **Current UI / delivery reconciliation â€” 2026-11-06.** The implementation baseline is main `0cef416155623199d8cb551b809dd469d62b4778`; its recorded exact-head CI run [42253317306](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42253317306) passed 20/20. All 22 production routes have page-level browser suites, but route coverage does not prove complete control behavior. UI implementation continues. Complete the agreed V2 UI and engine functionality, with internal browser/API tests throughout. Defer D1â€“D6 external/manual/deployment qualification until the agreed V2 scope is complete and internal checks pass. The supported UI scope is desktop.
-
-**Canonical UI implementation and post-completion qualification reference.** Use this crosswalk to complete the 22-page agreed UI scope. Source, tests, screenshots, and exact-head CI establish implementation behavior. Run internal browser/API checks throughout implementation. D1â€“D6 are final external/manual/deployment qualification criteria and are not prerequisites for implementing the UI. Start that qualification only after the agreed V2 engine and UI scope is complete and internal checks pass. Do not infer that one page's results establish another page's behavior.
-
-**Supported scope:** This product targets desktop. Continue UI implementation within the supplied design and service contracts. Historical mobile/responsive references below are not current scope. Manual visual and accessibility reviews remain deferred until post-implementation qualification.
-
-## Part I â€” Canonical UI V2 contract and page crosswalk
-
-# Mandatory WHAXON V2 UI crosswalk â€” all 22 pages
-
-**Scope:** All V2 UI designs, production pages, shared navigation, client APIs, desktop entry points, tests and reviews. This is the **single canonical UI-wide crosswalk**, not a Dashboard-only plan.
-**Authority:** root roadmap P4/P5 and Â§38 G01â€“G10, the [project governance master](PROJECT_GOVERNANCE_MASTER.md), [Engine V2 master](ENGINE_V2_MASTER.md), and the UI audit, inventory, and supplied-design text consolidated later in this master.
-**Implementation rule:** E6 UI integration is active work. Finish the agreed controls, workflows, and shared-service integration before external qualification. Do not redesign canonical supplied page variants. Internal tests and fixes proceed during implementation.
-
-## REQUIRED BEFORE EACH UI TASK (human or agent)
-
-1. **Locate page in matrix below**; inspect its supplied named source/PNG, variant, production template, tests, static control inventory, server route and exact source HEAD. Resolve ambiguous variants with the design owner; never silently replace a supplied design.
-2. **Propose a bounded change:** user-visible outcome; affected UI IDs/controls; ownership and dependencies; exact backend endpoints, authorization/scope/approval policy; loading, empty, unavailable, error, cancellation, reconnect and offline behavior.
-3. **Verify honest state:** API 200 is not proof of success; queued is not completed; completed is not verified; do not synthesize findings, active sessions, PTES coverage, audit cryptography, live workers or UI permissions. Unsupported actions must be labelled and disabled/hidden safely.
-4. **Keep one owner for a shared file.** Batch independent work using explicit interfaces and no conflicting concurrent writes, per the engineering execution model. No uncontrolled UI parallel rewrite.
-5. **Write internal regression tests with the change:** source/binding checks, Playwright interactions (including negative/malformed responses), client authorization and shared Core contracts where relevant; test supported desktop behavior, focus/keyboard, dark appearance and no overflow. Schedule manual assistive-technology review after the agreed UI and engine scope is complete.
-6. **Record implementation evidence as work proceeds:** code SHA, internal test command, CI outcomes/skips, control-to-service mapping, and known limits. After implementation is complete, record the deferred external visual, manual accessibility/security, and deployment outcomes against the exact release candidate.
-7. **Implementation review:** check all relevant control rows, service contracts, and internal browser/API tests; leave unimplemented or unsupported behavior explicitly identified. Do not block further implementation because D1â€“D6 post-completion qualification is pending.
-
-## All 22 required page crosswalk rows
-
-| ID | Page | Canonical route | Production template | Existing browser test coverage | Deployment acceptance |
-|---|---|---|---|---|---|
-| UI-01 | Dashboard | `/ui-v2` | `ui_v2_dashboard.html` | `test_web_ui_v2_dashboard.py` | OPEN |
-| UI-02 | Scope & Targets | `/ui-v2/scope` | `ui_v2_scope.html` | `test_web_ui_v2_scope.py`, `test_web_ui_v2_scope_interactions.py` | OPEN |
-| UI-03 | Run & Orchestration | `/ui-v2/run` | `ui_v2_run.html` | `test_web_ui_v2_run.py` | OPEN |
-| UI-04 | Findings | `/ui-v2/findings` | `ui_v2_findings.html` | `test_web_ui_v2_findings.py` | OPEN |
-| UI-05 | Report | `/ui-v2/report` | `ui_v2_report.html` | `test_web_ui_v2_report.py` | OPEN |
-| UI-06 | Reports | `/ui-v2/reports` | `ui_v2_reports.html` | `test_web_ui_v2_reports.py` | OPEN |
-| UI-07 | History | `/ui-v2/history` | `ui_v2_history.html` | `test_web_ui_v2_history.py` | OPEN |
-| UI-08 | Diagnostics | `/ui-v2/diagnostics` | `ui_v2_diagnostics.html` | `test_web_ui_v2_diagnostics.py` | OPEN |
-| UI-09 | Evidence | `/ui-v2/evidence` | `ui_v2_evidence.html` | `test_web_ui_v2_evidence.py` | OPEN |
-| UI-10 | AI Gate | `/ui-v2/ai` | `ui_v2_ai.html` | `test_web_ui_v2_ai.py` | OPEN |
-| UI-11 | Retest | `/ui-v2/retest` | `ui_v2_retest.html` | `test_web_ui_v2_retest.py` | OPEN |
-| UI-12 | Chains | `/ui-v2/chains` | `ui_v2_chains.html` | `test_web_ui_v2_chains.py` | OPEN |
-| UI-13 | Adapters | `/ui-v2/adapters` | `ui_v2_adapters.html` | `test_web_ui_v2_adapters.py` | OPEN |
-| UI-14 | Settings | `/ui-v2/settings` | `ui_v2_settings.html` | `test_web_ui_v2_settings.py` | OPEN |
-| UI-15 | Audit | `/ui-v2/audit` | `ui_v2_audit.html` | `test_web_ui_v2_audit.py` | OPEN |
-| UI-16 | Monitoring | `/ui-v2/monitoring` | `ui_v2_monitoring.html` | `test_web_ui_v2_monitoring.py` | OPEN |
-| UI-17 | BAS | `/ui-v2/bas` | `ui_v2_bas.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
-| UI-18 | Bug Bounty | `/ui-v2/bug-bounty` | `ui_v2_bug_bounty.html` | `test_web_ui_v2_bug_bounty.py`, `test_web_ui_v2_auxiliary_pages.py` | OPEN |
-| UI-19 | Compliance | `/ui-v2/compliance` | `ui_v2_compliance.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
-| UI-20 | PTaaS | `/ui-v2/ptaas` | `ui_v2_ptaas.html` | `test_web_ui_v2_ptaas.py`, `test_web_ui_v2_auxiliary_pages.py` | OPEN |
-| UI-21 | Threat Intel | `/ui-v2/threat-intel` | `ui_v2_threat_intel.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
-| UI-22 | Approvals | `/ui-v2/approvals` | `ui_v2_approvals.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
-
-All templates live under `src/whaxon/interfaces/web/templates/`; browser tests live under `tests/`. The dashboard alias `/ui-v2/dashboard` and root entry route `/` additionally require parity checks. Common tests: `test_web_ui_v2_route_matrix.py`, `test_web_ui_v2_navigation.py`, `test_web_ui_v2_control_inventory.py`; auxiliary pages share the listed suites. The inventory records **793 static controls**; script references do not establish live bindings.
-
-## Acceptance criteria for EVERY row
-
-| Gate | Required proof | Default |
-|---|---|---|
-| D1 Design | Exact approved supplied screen and variant; desktop screenshot comparisons and no accidental visual changes | OPEN |
-| D2 Controls | Every visible enabled control reachable, named, authorized and mapped to a real action; disabled/hidden ones documented with rationale | OPEN |
-| D3 Runtime truth | Live API data, empty/unavailable/error/unauthorized/blocked/race states and rollback truthful, no invented records | OPEN |
-| D4 Security | Scope/approval/consent on server; CSRF/Origin, XSS and secret redaction; no UI-only policy | OPEN |
-| D5 Accessibility | Keyboard-only navigation, focus return, semantic labels, contrast/non-color cues and assistive-tech manual review | OPEN |
-| D6 Deployment | Supported browser/desktop and platform checks, external asset/offline policy, versioned exact-SHA CI and release reviewer | OPEN |
-
-A page becomes `DEPLOYMENT_READY` **only when D1â€“D6 each have exact-source evidence and explicit approver sign-off**. No aggregate percentage or page route smoke closes any gate. UI readiness does **not** automatically approve E6 or full product deployment.
-
-## Work queue and Dashboard-first checkpoint
-
-**Priority UI-01 Dashboard:** current template `ui_v2_dashboard.html`, route `/ui-v2`, browser suite `test_web_ui_v2_dashboard.py`, and supplied `web ui files and rendering/dashboard_engagement_hub_zero_state/`. Existing live functionality includes history/filters/JSON export, scope routing, job halt, Burp XML import, health/readiness labels. Known blocker: full approved screenshot and accessibility verification, complete per-control permission/malformed-response mapping, packaging/network asset policy.
-
-Dashboard batch 1 hardens malformed-history export: a successful HTTP response with non-array payload must **fail visibly** rather than export a misleading empty archive; added browser regression. It does not alter visual design. **Dashboard remains NOT deployment-ready** until all D1â€“D6 complete.
-
-**Next after Dashboard and Scope & Targets:** UI-03 Run & Orchestration, then UI-04 Findings, then evidence/report workflows and the remaining pages; order follows critical dependencies and is adjustable without skipping gates. Scope PR #127 is merged, but UI-02 deployment acceptance remains OPEN.
-
-### Run & Orchestration (UI-03) â€” candidate hardening, 2026-11-05
-
-**Reference and scope:** `web ui files and rendering/run_tool_orchestration/screen.png`, route `/ui-v2/run`, template `src/whaxon/interfaces/web/templates/ui_v2_run.html`, and browser module `tests/test_web_ui_v2_run.py`. The supplied design source remains unchanged. The guarded Run action performs an asynchronous scope check before posting to `/api/run`; two rapid clicks could previously pass the active-job check before either response set the current job, causing duplicate dispatches. The candidate adds a single-flight guard, disables the action while the authorization and dispatch request is pending, and adds a regression that asserts one scope check and one run request for two immediate clicks.
-
-**Evidence and limits:** Local `ruff check tests/test_web_ui_v2_run.py` and `tests/test_v2_ui_mandatory_crosswalk.py` passed. The browser regression could not run locally because the Playwright Chromium download was truncated in this environment. Exact-head CI is required. This is one safety improvement; it does not establish complete control mapping, backend V2 parity or any D1â€“D6 acceptance. UI-03 remains **OPEN** pending the complete per-page evidence and approver sign-offs.
-
-**Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1â€“D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
-
-## Dashboard implementation checkpoint â€” 2026-11-05 (D1â€“D6)
-
-The Dashboard is the **first** page in this UI-wide crosswalk, not a separate crosswalk. Work is in [UI PR #126](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/126). Implemented safety hardening now includes:
-
-- Fail-closed malformed HTTP-success payloads for history export and import; null/invalid JSON shapes for history/jobs/report/tools/scope/status; boolean-only health, adapter and scope enforcement assertions.
-- No candidate-to-verified promotion from a generic finding `status`; use only explicit `verification_status`.
-- Invalid historical timestamps and negative findings counts remain unrecorded rather than being presented as real data.
-- Partial cancel failures report requested counts conservatively; history filtering has a visible no-match state and retains backend-unavailable messages.
-- No supplied design files modified; all changes in the production Dashboard template and existing browser test module.
-
-| Gate | Latest assessment | Evidence still required to close |
-|---|---|---|
-| D1 Design | OPEN | Approver-approved comparison to `web ui files and rendering/dashboard_engagement_hub_zero_state/screen.png` at representative supported desktop viewports |
-| D2 Controls | PARTIAL | Runtime inventory of every visible control with final expected action, loading/empty/error and authorization behavior, including generated elements |
-| D3 Runtime truth | CANDIDATE | New negative-case Playwright assertions, exact-head CI success, cross-client integration and monitored supported staging |
-| D4 Security | PARTIAL | Independent server-side authorization/CSRF review, malicious content escaping, permission-denied/timeout/cancel proofs |
-| D5 Accessibility | PARTIAL | Keyboard/focus, high zoom, non-color cues, contrast and assistive-technology manual sign-off |
-| D6 Deployment | OPEN | Exact candidate browser/desktop tests, packaged fonts/icons/CSS or explicitly approved connected-only asset policy and failover, target-environment rollout/rollback evidence |
-
-**Historical decision:** At the time, the Dashboard was recorded as not deployment-ready pending D1â€“D6 evidence. This dated checkpoint is not an active implementation freeze and does not establish that the operator approved each sign-off criterion. Current sequence: finish implementation and internal tests first; defer external qualification.
-
-### Dashboard action safety update â€” 2026-11-05
-
-- Emergency halt requests are single-flight within the dashboard session, to prevent duplicate submissions from repeated clicks. A malformed job identity is not sent to the cancellation endpoint; a partial cancel result remains an incomplete cancellation request, not proof of stopped effects.
-- Error outcomes use an assertive accessibility alert role. Non-error informational updates use a status region. Added browser negative tests for invalid job IDs and alert signaling.
-- Source changes are bounded to the production Dashboard template and browser tests; no design source was modified. **D1â€“D6 remain OPEN until evidence and sign-off are recorded**. Prior green CI is not exact-head acceptance.
-
-### Dashboard crosswalk evidence â€” untrusted content and access denial
-
-The Dashboard browser suite includes adversarial browser checks that scope and job-history text are not converted to executable markup, that all visible navigational links resolve to canonical UI routes, and that a 403 cancellation response never becomes a false stop-success claim. These are candidate proofs for D2â€“D4, not an independent security sign-off. Browser tests must pass for the exact candidate SHA, and deployment D1/D5/D6 remain unaccepted.
-
-### Dashboard bundled styling milestone
-
-The Dashboard now serves a build-time compiled, pinned Tailwind stylesheet from `/static/dashboard-v2.css`, with the build recipe `scripts/build_dashboard_css.cjs` and isolated branch-only vendor workflow. The runtime Tailwind CDN script is removed; its checked-in theme configuration remains non-executable for reproducible asset builds. Browser regression coverage blocks remote Tailwind and Google Fonts and verifies canonical background styling and live page operation using the bundled CSS. D6 **remains OPEN** because font/icon/image availability, final source-distribution install checks, approved network/offline support policy, target rollout and rollback, and operator acceptance require independent proof.
-
-### Dashboard WCAG audit remediation
-**Historical candidate result (mobile viewport scope superseded):** **Historical candidate result (mobile viewport scope superseded):** Automated axe-core WCAG 2 A/AA and 2.1 A/AA review on the integrated browser candidate found exactly one rule family failing at desktop and mobile: `document-title`. The production Dashboard now provides a descriptive HTML `<title>`, with a browser regression. The automated audit must be rerun on the exact post-fix SHA before its result is accepted. Automated success does not replace manual assistive-technology, contrast, zoom and keyboard review.
-
-### Dashboard independently hosted static assets
-
-The Dashboard production template no longer requests fonts, Material Symbols icons, logo, or avatar from Google hosts and no longer uses the runtime Tailwind CDN. The packaged local static assets include `dashboard-v2.css`, `dashboard-fonts.css`, 18 hashed font binaries, two supplied design images and license/source SHA-256 records. A browser regression blocks **all external HTTPS requests** and requires the Dashboard to function, render its canonical dark styling, and load both images using loopback-only static URLs. This addresses third-party page-view leakage and advances D6. Other supported environments, wheel/sdist inclusion, rollback, visual/manual accessibility and release approval remain independent requirements.
-
-### Distribution packaging acceptance automation
-The focused Dashboard workflow now builds both the `whaxon` wheel and source distribution, and invokes `scripts/check_dashboard_distribution.py`. The check requires the deployed template's CSS/fonts/images, fonts' license notices and manifest in **both** archives, and verifies SHA-256 for every bundled binary against the generated manifest. D6 packaging is accepted only once this exact-head step passes; supported-host deployment/rollback and explicit reviewer signoff remain separate.
-
-### Parallel wheel-install and HTTP asset deployment lane
-A second, independent GitHub Actions job builds the wheel+sdist, checks all packaged Dashboard resources/licenses against SHA-256 records, installs the built wheel into an isolated fresh virtual environment, starts `whaxon serve` on loopback and verifies live `/ui-v2` plus each local CSS/font/image URL via HTTP. It runs **in parallel** with visual, functional and automated WCAG browser checks. Full operator deployment authorization, actual host upgrade/rollback, manual screen-reader review and design signoff remain open.
-
-### Exact-head CI reconciliation â€” 2026-11-05
-
-At candidate `106c64f18e9762f4635043accee1338f513dd2f3`, [full CI run 42010899550](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42010899550) has now **completed SUCCESS**, including Python 3.11/3.12/3.13 test lanes and platform setup smoke. Python 3.11 and 3.13 source-distribution and clean-wheel smoke steps were **skipped**, while the Python 3.12 equivalents passed; do not count skips as passes. [Focused Dashboard run 42010899499](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42010899499) completed SUCCESS in both `dashboard` (browser, screenshot capture, automated axe) and `dashboard-install` (wheel/sdist manifest SHA and isolated loopback HTTP) jobs. These outcomes were verified against the exact PR head before this documentation update; **this documentation commit creates a new head requiring fresh exact-head CI**.
-
-**Post-implementation qualification checklist:** The repository's current D1â€“D6 checklist describes desktop visual comparison, per-control mapping, staging/client parity, security, manual accessibility, and deployment/rollback evidence. Perform any applicable external/manual checks only after the agreed V2 engine and UI scope is implemented and internal checks pass. This checklist is repository documentation; it does not claim an unverified personal approval from the operator.
-
-## Historical Dashboard UI-01 checkpoint â€” 2026-11-05
-
-PR [#126](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/126) merged at `c9dea5b40e5150a0fa02dbd313365af9edaaca7d`. The repository added a Dashboard change guard and described the page as frozen at that time. This is retained as historical repository state; it is not an active instruction to stop UI implementation. Current delivery order is to complete the agreed UI and engine implementation, continue internal testing, and defer D1â€“D6 qualification until implementation is complete. Any remaining source-control guard must be reconciled with that active sequence before it can block authorized implementation work.
-
-**Enforcement limitation:** the guard fails violating PR checks, but only repository branch protection or rulesets requiring that check (plus restricting direct pushes/admin bypass) can prevent an authorized maintainer from merging or pushing anyway. The active GitHub integration cannot administer those settings. Until repository administrators enable such controls, this is a documented contributor prohibition plus an automated PR check, not an absolute technical lock.
-
-
----
-
-## Part 2 â€” docs/NEW_UI_INTERACTION_AUDIT.md (source record)
-
-# New Default Web UI â€” Interaction and Acceptance Audit
-
-> **Integration update â€” 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](#part-4--docsui_control_inventorymd-source-record) for 793 source controls across 22 templates; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
-
-
-**Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, P4 and Â§38 G06; the previous section references are reconciled in its Â§50.
-
-**Repository:** `andreipath26/WHAXON-AI-Forensics`
-**Current source baseline:** `6fa1fa5f9bcff9b7afffb87ca908b0f78562fa3b`, reviewed 2026-11-02.
-**Historical integration baseline:** `aea6a2ff859301192b3133330a94ecc0e6a21cbf`; default-route change `8313b8af885d4c4f5711c4df0998f0e8523f9b33`; test assertion change `aa8fcd2b633b267e577ee32034e330bfb7bc9c71`.
-**Exact-baseline CI:** [#41488450899](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41488450899) passed all nine jobs. Python 3.11/3.12/3.13 each reported 1,408 passed, 14 skipped; browser tests are part of that matrix. The earlier approvals Refresh-queue failure on `e9b2f02` is historical, not the current red-CI state. This does not establish complete UI acceptance. No browser tests were rerun locally during this documentation review.
-
-This is a dated implementation and acceptance audit, not a declaration that the UI is fully accepted or deployment-ready. The roadmap Â§38 remains the controlling release gate; visual regression, complete visible-control inventory, accessibility, CLI/web parity and external-asset deployment checks remain open until evidence is recorded.
-
-## 1. Source-of-truth assets and preservation
-
-The checked-in design package contained 32 HTML files and 32 PNG files at the inspected baseline, plus `obsidian_kinetic/DESIGN.md`. The HTML/PNG set includes distinct versioned alternatives and ten byte-identical loose copies. Counts therefore do not mean 32 accepted workflows. The [due-diligence register](PROJECT_GOVERNANCE_MASTER.md) separates safe duplicate-removal candidates from distinct supplied designs requiring canonical mapping; the cleanup removes the ten exact loose copies while retaining named originals and distinct alternatives. The production implementation consists of 22 `ui_v2_*.html` templates and 22 corresponding web routes.
-
-The new templates use the supplied Obsidian Kinetic visual system. The original `base.html`, `index.html`, `app.js`, `style.css`, and historical `docs/WEB_UI_INTERACTION_AUDIT.md` remain the deprecated interface/reference. They must not be redesigned, repurposed as the new UI, or overwritten as part of this work.
-
-## 2. Entry points
-
-| URL | Purpose | State |
-|---|---|---|
-| `/` | Default web entry point | Redirects to `/ui-v2`; exact-baseline CI above passed; future candidates need their own CI evidence |
-| `/ui-v2` | Canonical Obsidian Kinetic dashboard | Implemented |
-| `/ui-v2/dashboard` | Dashboard alias | Implemented |
-| `/ui` | Previous web interface | Preserved compatibility/reference route; desktop `gui/embed.py` still points here |
-| Desktop launcher | `gui/app.py` â†’ `embed.URL` | Still opens `/ui`; migrate to accepted new default and test startup/navigation |
-
-## 3. Canonical screen-to-route map
-
-| Design screen | Production route | Template | Browser test coverage |
-|---|---|---|---|
-| Dashboard / engagement hub | `/ui-v2` | `ui_v2_dashboard.html` | `test_web_ui_v2_dashboard.py`, `test_web_ui_v2_navigation.py` |
-| Scope and targets | `/ui-v2/scope` | `ui_v2_scope.html` | `test_web_ui_v2_scope.py`, `test_web_ui_v2_scope_interactions.py` |
-| Run and orchestration | `/ui-v2/run` | `ui_v2_run.html` | `test_web_ui_v2_run.py` |
-| Verified findings / Trust Layer | `/ui-v2/findings` | `ui_v2_findings.html` | `test_web_ui_v2_findings.py` |
-| Report / PTES coverage | `/ui-v2/report` | `ui_v2_report.html` | `test_web_ui_v2_report.py` |
-| Reports and exports | `/ui-v2/reports` | `ui_v2_reports.html` | `test_web_ui_v2_reports.py` |
-| Job execution history | `/ui-v2/history` | `ui_v2_history.html` | `test_web_ui_v2_history.py` |
-| System diagnostics and health | `/ui-v2/diagnostics` | `ui_v2_diagnostics.html` | `test_web_ui_v2_diagnostics.py` |
-| Evidence file inspector | `/ui-v2/evidence` | `ui_v2_evidence.html` | `test_web_ui_v2_evidence.py` |
-| AI strategy / human gate | `/ui-v2/ai` | `ui_v2_ai.html` | `test_web_ui_v2_ai.py` |
-| Remediation and retest studio | `/ui-v2/retest` | `ui_v2_retest.html` | `test_web_ui_v2_retest.py` |
-| Correlated attack chains | `/ui-v2/chains` | `ui_v2_chains.html` | `test_web_ui_v2_chains.py` |
-| Adapter and plugin manager | `/ui-v2/adapters` | `ui_v2_adapters.html` | `test_web_ui_v2_adapters.py` |
-| Settings and secrets vault | `/ui-v2/settings` | `ui_v2_settings.html` | `test_web_ui_v2_settings.py` |
-| Cryptographic audit log | `/ui-v2/audit` | `ui_v2_audit.html` | `test_web_ui_v2_audit.py` |
-| Attack-surface monitoring | `/ui-v2/monitoring` | `ui_v2_monitoring.html` | `test_web_ui_v2_monitoring.py` |
-| BAS / detection validation | `/ui-v2/bas` | `ui_v2_bas.html` | `test_web_ui_v2_auxiliary_pages.py` |
-| Bug bounty / browser studio | `/ui-v2/bug-bounty` | `ui_v2_bug_bounty.html` | `test_web_ui_v2_bug_bounty.py`, auxiliary-page tests |
-| Compliance crosswalk | `/ui-v2/compliance` | `ui_v2_compliance.html` | `test_web_ui_v2_auxiliary_pages.py` |
-| PTaaS client portal | `/ui-v2/ptaas` | `ui_v2_ptaas.html` | `test_web_ui_v2_ptaas.py`, auxiliary-page tests |
-| Threat intelligence / exploit arsenal | `/ui-v2/threat-intel` | `ui_v2_threat_intel.html` | `test_web_ui_v2_auxiliary_pages.py` |
-| Trust Layer approvals queue | `/ui-v2/approvals` | `ui_v2_approvals.html` | `test_web_ui_v2_auxiliary_pages.py` |
-
-All 22 routes have a corresponding production template. The tracked baseline has 23 UI-v2 test modules; some related pages share the auxiliary-page module.
-
-## 4. Live workflows with browser coverage
-
-The repository contains Playwright coverage for the following live behaviors:
-
-- Dashboard: live job history, filtering, JSON history export, emergency halt reporting, CLI-help/credential guidance, and Burp XML import.
-- Scope: loading and persisting scope, malformed-rule rejection, explicit confirmation before disabling enforcement, and target checks.
-- Run: live tool catalog, guarded passive/active run paths, output/status handling, out-of-scope rejection, and cancellation/abort controls.
-- Findings: live findings, finding inspection, validation/retest requests, filtering, and scope-aware state.
-- Reports: live report API data, JSON/Markdown downloads, preview modal, and truthful unavailability of unsupported evidence/configuration.
-- History: live records, filters, and JSON export.
-- Diagnostics: live health/tool/dependency APIs, read-only diagnostics, remediation-plan review, and guarded installation workflows.
-- Evidence, AI, retest, attack chains, adapters, settings, audit, monitoring, BAS, bug bounty, PTaaS, compliance, threat intelligence and approvals: page-specific live data and interaction tests exist in their named test modules.
-
-Presence of a test module does not mean every control on that page has passed independent acceptance. The CI result for the candidate commit must be checked.
-
-## 5. Reference-only controls and simulated content
-
-The live UI intentionally disables or hides controls for which there is no safe implemented backend. Examples verified in the current tests/source include:
-
-- Adapter mock execution and manifest re-signing; adapter configuration mutation is disabled.
-- Diagnostics actions that would claim simulated subsystem restarts, probes or benchmarks.
-- Report configuration selectors that do not affect the live report API, sample proof/evidence, and unsupported gap filters.
-- Monitoring's simulated recon trigger and unimplemented asset mutations.
-- BAS, bug-bounty, PTaaS, compliance and threat-intelligence actions that imply exploit execution, deployment, client delivery or other unsupported operations.
-- Sample engagement, target, finding, telemetry and diagnostic data is removed or hidden in the live presentation.
-
-These controls must remain disabled/hidden until a real backend implementation, authorization boundary and test exist. A disabled visual reference control is not a delivered feature.
-
-## 6. Acceptance gaps â€” still open
-
-1. **Visual regression:** the current UI-v2 browser tests exercise rendering and interactions, but the test modules do not contain screenshot-baseline comparisons (no `to_have_screenshot`/equivalent snapshot assertions were found). The supplied PNGs are present, but automated pixel/perceptual comparison against approved baselines is not yet evidenced.
-2. **CLI/web service parity:** the roadmap requires CLI verbs to use shared service modules and a parity test for CLI/web surfaces (or documented deliberate differences). A dedicated parity test was not identified in the current test tree. Audit the actual CLI/web command surface before claiming this gate passed.
-3. **Accessibility:** browser tests exist, but a full keyboard/focus-management/screen-reader/WCAG 1.4.1 acceptance pass is not evidenced by the current test names or contents reviewed. Add automated checks where practical and record manual checks separately.
-4. **All-control inventory:** the 22 pages have dedicated or shared browser tests, but a complete per-control inventory proving every visible control is wired, disabled or hidden has not yet been recorded. Continue page-by-page and extend tests for any uncovered controls.
-5. **Deployment dependencies:** the supplied pages load Tailwind, fonts/icons and images from external hosts. Decide and test whether the supported deployment requires network-independent bundled assets; do not silently claim air-gapped readiness while external runtime assets remain.
-6. **Desktop/default entry points:** the web server redirects `/` to `/ui-v2`, but `src/whaxon/interfaces/gui/embed.py` still sets its URL to `/ui`. Correct the desktop entry point, test startup/navigation against the accepted supplied UI and preserve legacy design source unchanged. Web-route CI does not prove desktop parity.
-7. **Exact candidate:** the inspected baseline is CI-green. Repeat required browser/E2E and acceptance checks for the final release candidate rather than relying on earlier commits.
-
-## 7. Branch and PR reconciliation
-
-At the time of this audit there were no open pull requests; the repository was checked again on 2026-11-02 and still had none open. The canonical UI integration PRs #37, #41 and #42, and the subsequent UI wiring/truthfulness PRs #43â€“#73, were already merged into `main`. The old full-wiring PR #16 was closed unmerged as a draft; its own description explicitly said not to merge because wiring and browser acceptance were incomplete. PRs #33â€“#36 were superseded by the later integrated UI work. Their old branch tips must not be blindly merged over newer main code.
-
-No alternate UI or runtime implementation is created by this documentation refresh. Current branch comparison and retirement conditions are in the [due-diligence register](PROJECT_GOVERNANCE_MASTER.md). Stale historical branches are not merge candidates merely because they still exist.
-
-## 8. Release gate
-
-Do not mark the new UI DONE or deployment-ready until the acceptance gaps above are closed, browser and visual regression checks pass on the candidate commit, security regressions pass, and the roadmap's Â§38 release checklist is updated with observed evidence.
-
-
----
-
-## Part 3 â€” docs/WEB_UI_INTERACTION_AUDIT.md (source record)
-
-> **Historical audit â€” superseded (2026-11-02).** This file records an earlier UI generation and must not be used to assess the current Obsidian Kinetic UI. Its page inventory, PASS/WIRED/MOCKUP labels, endpoint wiring and test counts are historical. Use [New UI interaction audit](#part-2--docsnew_ui_interaction_auditmd-source-record) for the current 22-route implementation/acceptance record and master roadmap Â§38 for release acceptance. This historical file is retained for traceability only.
-
-# WHAXON Web UI Interaction Audit
-
-## Status legend
-- **PASS** â€” wired, verified in a browser, has a passing test
-- **WIRED** â€” wired to a real backend, not yet verified in a browser
-- **MOCKUP** â€” hardcoded data, no backend
-- **HIDDEN** â€” mockup, sidebar item hidden until backend exists
-- **BLOCKED** â€” no backend exists, cannot be wired in this session
-
-## Findings page
-| ID | Element | Expected | Actual | Backend | Status |
-|---|---|---|---|---|---|
-| F.01 | Findings list | Load and render validated live report records; show empty, unavailable, malformed-response, and retry states | Implemented | GET /api/report?format=json | TESTS ADDED; BROWSER RUN PENDING |
-| F.02 | Finding card | Select a finding and inspect only recorded fields | Implemented | none | EXISTING BROWSER TEST |
-| F.03 | Validate selected finding | Submit validation and report the returned result | Implemented | POST /api/validate/<job>/<seq> | EXISTING BROWSER TEST |
-| F.04 | Retest selected / verified findings | Submit retest; report each failed item in a verified batch | Implemented | POST /api/retest/<job>/<seq> | TEST ADDED; BROWSER RUN PENDING |
-| F.05 | Severity, status, and adapter filters | Filter the live list; each filter can be cleared | Implemented | none | WIRED |
-| F.06 | Finding search | Search finding and recorded evidence fields | Implemented | none | EXISTING BROWSER TEST |
-| F.07 | Copy Evidence | Copy the selected finding's recorded evidence | Implemented | Clipboard API | WIRED |
-| F.08 | Scope status | Display current scope summary and enforcement state | Implemented | GET /api/scope | EXISTING BROWSER TEST |
-| F.09 | Mark Fixed / Issue Tracker export / approvals | Unsupported controls are hidden; no state is claimed | Hidden at runtime | none | HIDDEN |
-
-The former F.05 â€œSort headersâ€ and F.06 â€œDensity toggleâ€ rows described controls absent from this card-list design and are retired. Bulk verify/delete and the AI banner are not controls in the current source; they are not counted as hidden controls. Mark Fixed, Issue Tracker export, and approvals remain source-visible placeholder buttons with inert handlers; current page JavaScript hides them at runtime until real actions exist.
-
-## Run page
-| R.01 | Catalog load | Fetch /api/tools | Works | GET /api/tools | PASS |
-| R.02 | Run button | POST /api/run | Works | POST /api/run | PASS |
-| R.03 | Cancel button | POST cancel | Works | POST /api/jobs/<id>/cancel | PASS |
-| R.04 | SSE stream | Live output | Works | GET /api/jobs/<id>/stream | PASS |
-
-## Scope page
-| S.01 | Scope list | Fetch /api/scope | Works | GET /api/scope | PASS |
-| S.02 | Check scope | POST /api/scope/check | Works | POST /api/scope/check | PASS |
-| S.03 | Import button | Import scope JSON | Hidden | none | HIDDEN |
-| S.04 | + Add rule | Add scope rule | Hidden | none | HIDDEN |
-| S.05 | Run anyway (modal) | POST /api/scope/override | Logs override | POST /api/scope/override | WIRED |
-
-## Report page
-| P.01 | Generate Markdown | Download md report | Downloads | GET /api/report?format=md | WIRED |
-| P.02 | Generate HTML | Download html report | Downloads | GET /api/report?format=html | WIRED |
-| P.03 | Generate PDF | Download pdf report | Downloads | GET /api/report?format=pdf | WIRED |
-| P.04 | Recent reports table | List generated | Hardcoded | none | MOCKUP |
-| P.05 | Known Vulns preview | Show CVE table | Hardcoded | none | MOCKUP |
-
-## Retest page
-| T.01 | Queue table | Show verified findings | Live queue | GET /api/report | WIRED |
-| T.02 | Retest button (row) | POST /api/retest | Wired | POST /api/retest/<job>/<seq> | WIRED |
-
-## Sessions page
-| X.01 | Sessions list | Fetch /api/msf/sessions | Live list | GET /api/msf/sessions | WIRED |
-| X.02 | Interact button | Open session | No handler | none | MOCKUP |
-
-## Attack Surface page
-| A.01 | Graph render | Fetch /api/pivot/graph | Hardcoded SVG | GET /api/pivot/graph | MOCKUP |
-
-## Catalog page
-| C.01 | Tool list | Fetch /api/tools | Live list | GET /api/tools | WIRED |
-| C.02 | Adapter column | Derive from adapters | Hardcoded | none | MOCKUP |
-
-## Threat Intel page
-| I.01 | Search button | Run cve or lookup | No handler | none | MOCKUP |
-| I.02 | CVE result card | Show CVE data | Hardcoded | none | MOCKUP |
-
-## Compliance page
-| M.01 | Framework progress | Real compliance mapping | Hardcoded | none | HIDDEN |
-
-## Settings page
-| G.01 | Theme selector | Persist theme | No handler | none | MOCKUP |
-| G.02 | Members list | Show real users | Hardcoded | none | HIDDEN |
-
-## Components page
-| D.01 | Design system demo | Not user-facing | Static | none | HIDDEN |
-
-## Cross-cutting
-| B.01 | Notifications | Read notification list | No handler | none | MOCKUP |
-| B.02 | Workspace switcher | Change workspace | No handler | none | MOCKUP |
-| B.03 | Command palette | Search + actions | Mock actions stripped | none | HIDDEN |
-| B.04 | Help / shortcuts | Show kbd legend | Works | none | PASS |
-| B.05 | Sidebar collapse | Toggle | Works | none | PASS |
-
-## Pass 1 targets (this session)
-- P.01, P.02, P.03 â†’ wire to /api/report downloads
-- T.01, T.02 â†’ replace with real retest queue
-- X.01 â†’ wire to /api/msf/sessions
-- C.01 â†’ wire to /api/tools
-- S.05 â†’ wire to /api/scope/override
-- F.09 â†’ hide AI banner (no backend)
-- F.07, F.08 â†’ hide bulk bar buttons (no backend)
-- B.03 â†’ strip palette mock actions, keep search
-
-## Pass 2 targets (next session)
-- A.01 â†’ wire to /api/pivot/graph
-- I.01, I.02 â†’ add CVE/lookup web routes, wire search
-
-## Pass 3 targets
-- M.01, G.01, G.02, D.01, B.01, B.02, S.03, S.04, P.04, P.05 â†’ hide or mark "coming soon"
-
-
----
-
-## Part 4 â€” docs/UI_CONTROL_INVENTORY.md (source record)
-
-# Supplied UI control inventory
-
-**Source baseline:** `7ae5aa1` plus the current integration batch. Generated from all 22 production `ui_v2_*.html` templates using the stdlib HTML parser in `tests/test_web_ui_v2_control_inventory.py`. Regenerate after template changes. No supplied design was changed.
-
-## Evidence boundary
-
-This is a complete **static source-control registry**, not a declaration that every control is live or accepted. It covers anchors, buttons, inputs, selects, textareas, summaries explicit button/link roles, inline event handlers, focusable tabindex and editable elements, including initially hidden controls. IDs are template plus one-based line:column; minified shell markup can share a line. Controls dynamically created by JavaScript, computed CSS visibility, event delegation and backend permissions require runtime inspection.
-
-`source-hidden` includes an explicit hidden ancestor/class/style and can be responsive; `disabled` is declared disabled; `declared-nav` has a canonical href; `inline-handler` declares JavaScript; `script-reference` only means an ID/data-path or explicit `data-filter-action`/`data-filter-value` is referenced in an inline script, **not** that an event handler or backend works; `unresolved-static` means no binding was established by this conservative inspection. Unresolved controls are review items, not automatically dead controls. Every source row retains its binding evidence for follow-up.
-
-## Acceptance still open
-
-- The cross-page browser contract checks all 22 rendered destinations and rejects visible placeholder/unknown sidebar links after page scripts run. Page-specific tests remain the behavioral evidence for other controls.
-- Complete runtime action/service/authorization mapping for every visible control, including loading/error/cancellation/reconnect states and generated controls.
-- Visual comparison against approved supplied reference choices; no screenshot baselines were fabricated or auto-approved.
-- Keyboard/focus/screen-reader/non-color/manual accessibility acceptance. Static labels and ordinary Playwright clicks do not close it.
-- Full CLI/API/UI operation parity and deliberate-difference register, plus deployment tests for external fonts/Tailwind/icons/images.
-
-## Page summary
-
-| Template | Controls | Source-hidden | Disabled | Declared nav | Inline handler | Script reference | Unresolved static |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| ui_v2_adapters.html | 48 | 0 | 1 | 0 | 0 | 21 | 26 |
-| ui_v2_ai.html | 21 | 0 | 0 | 0 | 0 | 16 | 5 |
-| ui_v2_approvals.html | 37 | 9 | 0 | 0 | 10 | 4 | 14 |
-| ui_v2_audit.html | 43 | 0 | 0 | 0 | 13 | 17 | 13 |
-| ui_v2_bas.html | 32 | 0 | 0 | 0 | 0 | 20 | 12 |
-| ui_v2_bug_bounty.html | 32 | 0 | 0 | 0 | 0 | 16 | 16 |
-| ui_v2_chains.html | 25 | 0 | 0 | 0 | 0 | 15 | 10 |
-| ui_v2_compliance.html | 40 | 0 | 0 | 0 | 0 | 20 | 20 |
-| ui_v2_dashboard.html | 35 | 2 | 0 | 0 | 0 | 21 | 12 |
-| ui_v2_diagnostics.html | 33 | 0 | 0 | 0 | 12 | 17 | 4 |
-| ui_v2_evidence.html | 35 | 0 | 0 | 0 | 0 | 14 | 21 |
-| ui_v2_findings.html | 26 | 1 | 0 | 1 | 4 | 20 | 0 |
-| ui_v2_history.html | 31 | 0 | 3 | 0 | 0 | 16 | 12 |
-| ui_v2_monitoring.html | 45 | 0 | 0 | 0 | 0 | 19 | 26 |
-| ui_v2_ptaas.html | 42 | 5 | 0 | 0 | 11 | 17 | 9 |
-| ui_v2_report.html | 22 | 1 | 0 | 1 | 0 | 5 | 15 |
-| ui_v2_reports.html | 21 | 1 | 0 | 0 | 0 | 5 | 15 |
-| ui_v2_retest.html | 36 | 0 | 0 | 0 | 0 | 14 | 22 |
-| ui_v2_run.html | 37 | 0 | 0 | 1 | 7 | 9 | 20 |
-| ui_v2_scope.html | 39 | 25 | 1 | 1 | 0 | 10 | 2 |
-| ui_v2_settings.html | 61 | 15 | 0 | 0 | 12 | 15 | 19 |
-| ui_v2_threat_intel.html | 53 | 0 | 0 | 0 | 13 | 20 | 20 |
-
-**Total:** 793 source controls across 22 templates.
-
-## Exact source registry
-
-Labels and binding excerpts are shortened for readability; line:column identifies the complete source. No truncation changes the count or classification.
-
-### ui_v2_adapters.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 7:4579 | a | Dashboard / Zero State | script-reference | # |
-| 7:4836 | a | Scope & Targets | script-reference | # |
-| 7:5087 | a | Run & Orchestration | script-reference | # |
-| 7:5346 | a | Trust Layer & Findings | script-reference | # |
-| 7:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 7:6086 | a | AI Strategy Gate | script-reference | # |
-| 7:6333 | a | Remediation Retest Studio | script-reference | # |
-| 7:6598 | a | Correlated Attack Chains | script-reference | # |
-| 7:7061 | a | Job Execution History | script-reference | # |
-| 7:7317 | a | Evidence File Inspector | script-reference | # |
-| 7:7578 | a | Cryptographic Audit Log | unresolved-static | # |
-| 7:8041 | a | System Diagnostics & Health | script-reference | # |
-| 7:8316 | a | Adapter & Plugin Manager | script-reference | # |
-| 7:8585 | a | Settings & API Explorer | unresolved-static | # |
-| 7:10949 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 7:11306 | button | add New | unresolved-static | â€” |
-| 7:13011 | button | terminal Terminal Log | unresolved-static | â€” |
-| 7:13350 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 18:1 | button | sync Sync whaxon.adapters | script-reference | btn-sync |
-| 22:1 | button | restart_alt Reload Entry Points | script-reference | btn-reload |
-| 26:1 | button | add_circle + Register New Adapter | script-reference | btn-register |
-| 116:1 | input | Search adapters by tool name, entrypoint, author, tags... | script-reference | adapter-search |
-| 121:1 | button | All (14) | unresolved-static | â€” |
-| 124:1 | button | Recon (5) | unresolved-static | â€” |
-| 127:1 | button | Vulnerability (4) | unresolved-static | â€” |
-| 130:1 | button | Exploitation (3) | unresolved-static | â€” |
-| 133:1 | button | Ingestion (2) | unresolved-static | â€” |
-| 140:1 | select | All States Binary Found (12) Missing Binary (2) Untrusted (0) | script-reference | status-select |
-| 188:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 232:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 276:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 320:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 363:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 407:1 | button | CONFIGURE CONNECTION settings | unresolved-static | â€” |
-| 451:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 495:1 | button | CONFIGURE tune | unresolved-static | â€” |
-| 545:1 | button | Close Panel | script-reference | close-drawer |
-| 583:1 | button | Remove flag | unresolved-static | â€” |
-| 587:1 | button | Remove flag | unresolved-static | â€” |
-| 591:1 | button | Remove flag | unresolved-static | â€” |
-| 595:1 | button | Remove flag | unresolved-static | â€” |
-| 597:1 | input | + Add CLI parameter... | unresolved-static | add-flag-input |
-| 631:1 | input | (unnamed) | unresolved-static | â€” |
-| 638:1 | input | (unnamed) | disabled | â€” |
-| 645:1 | input | (unnamed) | unresolved-static | â€” |
-| 661:1 | button | play_arrow Test Adapter Execution with Mock Output | script-reference | btn-mock-test |
-| 666:1 | button | Re-sign Manifest | script-reference | btn-resign |
-| 669:1 | button | Save Configuration | script-reference | btn-save-conf |
-
-### ui_v2_ai.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4579 | a | Dashboard / Zero State | script-reference | # |
-| 4:4836 | a | Scope & Targets | script-reference | # |
-| 4:5087 | a | Run & Orchestration | script-reference | # |
-| 4:5346 | a | Trust Layer & Findings | script-reference | # |
-| 4:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 4:6086 | a | AI Strategy Gate | script-reference | # |
-| 4:6332 | a | Remediation Retest Studio | script-reference | # |
-| 4:6597 | a | Correlated Attack Chains | script-reference | # |
-| 4:7060 | a | Job Execution History | script-reference | # |
-| 4:7317 | a | Evidence File Inspector | script-reference | # |
-| 4:7578 | a | Cryptographic Audit Log | script-reference | # |
-| 4:8041 | a | System Diagnostics & Health | script-reference | # |
-| 4:8316 | a | Adapter & Plugin Manager | script-reference | # |
-| 4:8585 | a | Settings & API Explorer | script-reference | # |
-| 4:10949 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 4:11306 | button | add New | unresolved-static | â€” |
-| 4:13011 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:13350 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 84:1 | button | close Reject & Re-plan [Esc] | script-reference | btn-reject |
-| 91:1 | button | bolt Authorize & Execute [Enter] | script-reference | btn-authorize |
-| 258:1 | button | content_copy Copy | unresolved-static | â€” |
-
-### ui_v2_approvals.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4475 | a | target Scope & Targets | script-reference | # |
-| 4:4807 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5149 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5502 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9037 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:9376 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
-| 126:1 | button | ALL | unresolved-static | â€” |
-| 127:1 | button | CRIT (1) | unresolved-static | â€” |
-| 128:1 | button | HIGH (2) | unresolved-static | â€” |
-| 129:1 | button | MED (1) | unresolved-static | â€” |
-| 130:1 | button | LOW (0) | unresolved-static | â€” |
-| 135:1 | button | VERIFIED (6) | unresolved-static | â€” |
-| 136:1 | button | CANDIDATE (11) | unresolved-static | â€” |
-| 137:1 | button | REVIEW NEEDED | unresolved-static | â€” |
-| 142:1 | button | Nuclei | unresolved-static | â€” |
-| 143:1 | button | sqlmap | unresolved-static | â€” |
-| 144:1 | button | Nikto | unresolved-static | â€” |
-| 149:1 | input | Filter proof pattern, URL, CVE... | unresolved-static | â€” |
-| 164:1 | div | CRITICAL SQLi: Time-based Blind VERIFIED /api/v1/catalog/items?id= C | inline-handler | selectFinding(1) |
-| 191:1 | div | HIGH Stored Cross-Site Scripting (XSS) VERIFIED /v1/reviews/post (co | inline-handler | selectFinding(2) |
-| 218:1 | div | HIGH BOLA Authorization Bypass CANDIDATE /api/v2/tenant/billing (ten | inline-handler | selectFinding(3) |
-| 245:1 | div | MEDIUM Exposed .env Backup Secret File VERIFIED /backup/.env.product | inline-handler | selectFinding(4) |
-| 332:1 | button | content_copy Copy Command | inline-handler | copyProofCurl() |
-| 407:1 | button | play_arrow Replay Test (Retest) | inline-handler | triggerReplayAction() |
-| 411:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
-| 417:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
-| 421:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
-| 521:1518 | button | close | source-hidden | document.getElementById('approvals-modal').remove() |
-| 529:600 | input | (unnamed) | source-hidden | â€” |
-| 529:1089 | input | (unnamed) | source-hidden | â€” |
-| 529:1561 | input | (unnamed) | source-hidden | â€” |
-| 529:2020 | textarea | Cross-tenant billing data was exposed in JSON response payload despi | source-hidden | â€” |
-| 529:2759 | button | redo Skip Item | source-hidden | â€” |
-| 529:3032 | button | Refute / False Positive | source-hidden | document.getElementById('approvals-modal').remove() |
-| 529:3289 | button | Hold for Retest | source-hidden | document.getElementById('approvals-modal').remove() |
-| 529:3573 | button | how_to_reg Approve as Verified (Sign Proof) | source-hidden | document.getElementById('approvals-modal').remove() |
-
-### ui_v2_audit.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4579 | a | Dashboard / Zero State | script-reference | # |
-| 4:4836 | a | Scope & Targets | script-reference | # |
-| 4:5087 | a | Run & Orchestration | script-reference | # |
-| 4:5346 | a | Trust Layer & Findings | script-reference | # |
-| 4:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 4:6086 | a | AI Strategy Gate | script-reference | # |
-| 4:6333 | a | Remediation Retest Studio | script-reference | # |
-| 4:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 4:6895 | a | Correlated Attack Chains | script-reference | # |
-| 4:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 4:7443 | a | PTaaS Client Portal | script-reference | # |
-| 4:7896 | a | Job Execution History | script-reference | # |
-| 4:8153 | a | Evidence File Inspector | script-reference | # |
-| 4:8414 | a | Cryptographic Audit Log | script-reference | # |
-| 4:8876 | a | System Diagnostics & Health | script-reference | # |
-| 4:9151 | a | Adapter & Plugin Manager | script-reference | # |
-| 4:9420 | a | Settings & Secrets Vault | script-reference | # |
-| 4:11786 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 4:12143 | button | add New | unresolved-static | â€” |
-| 4:13848 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:14187 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 38:1 | button | sync Verify Entire Merkle Root | inline-handler | triggerMerkleVerification() |
-| 42:1 | button | enhanced_encryption Export Attestation (.sig) | inline-handler | downloadSigAttestation() |
-| 157:1 | input | Search seq #, actor ID, SHA-256 digest, or payload target... | inline-handler | ledger-search |
-| 162:1 | select | ALL SIGNALS (6) SCOPE MODIFICATION FINDING VERIFICATION PAYLOAD DETO | inline-handler | category-filter |
-| 171:1 | button | shield SEALED ONLY | unresolved-static | â€” |
-| 178:1 | button | chevron_left | unresolved-static | â€” |
-| 181:1 | button | chevron_right | unresolved-static | â€” |
-| 203:1 | tr | 2026-03-30T14:22:08.892401Z #EVT-9941 Finding Verified person OP//77 | inline-handler | selectEvent('EVT-9941') |
-| 235:1 | button | Inspect Hash Tree | unresolved-static | â€” |
-| 241:1 | tr | 2026-03-30T14:18:41.119830Z #EVT-9940 Scope Change key OP//4108-BRAV | inline-handler | selectEvent('EVT-9940') |
-| 273:1 | button | Inspect Hash Tree | unresolved-static | â€” |
-| 279:1 | tr | 2026-03-30T14:05:12.601944Z #EVT-9939 Payload Detonation memory AUTO | inline-handler | selectEvent('EVT-9939') |
-| 311:1 | button | Inspect Hash Tree | unresolved-static | â€” |
-| 317:1 | tr | 2026-03-30T13:42:01.002195Z #EVT-9938 Emergency Halt gavel OP//7749- | inline-handler | selectEvent('EVT-9938') |
-| 349:1 | button | Inspect Hash Tree | unresolved-static | â€” |
-| 355:1 | tr | 2026-03-30T13:15:55.441920Z #EVT-9937 Tool Invocation terminal DAEMO | inline-handler | selectEvent('EVT-9937') |
-| 386:1 | button | Inspect Hash Tree | unresolved-static | â€” |
-| 392:1 | tr | 2026-03-30T12:59:10.104510Z #EVT-9936 Policy Override verified_user  | inline-handler | selectEvent('EVT-9936') |
-| 423:1 | button | Inspect Hash Tree | unresolved-static | â€” |
-| 446:1 | button | content_copy Copy Raw Hex | inline-handler | copyRawProof() |
-| 561:1 | button | gavel Court-Ready Forensic Bundle (.zip) | inline-handler | downloadCourtReadyPackage() |
-| 565:1 | button | Cryptographic QR Verification Slip | inline-handler | generateQrCert() |
-
-### ui_v2_bas.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 5:6895 | a | Correlated Attack Chains | script-reference | # |
-| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
-| 5:7724 | a | BAS & Detection Validation | script-reference | # |
-| 5:8209 | a | Job Execution History | script-reference | # |
-| 5:8466 | a | Evidence File Inspector | script-reference | # |
-| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 5:9473 | a | System Diagnostics & Health | script-reference | # |
-| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:10017 | a | PTaaS Client Portal | script-reference | # |
-| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
-| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 5:12993 | button | add New | unresolved-static | â€” |
-| 5:14698 | button | terminal Terminal Log | unresolved-static | â€” |
-| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 40:1 | button | play_circle Detonate Sequence | unresolved-static | â€” |
-| 44:1 | button | chevron_forward Query Blue Telemetry | unresolved-static | â€” |
-| 48:1 | button | assessment Gap Report | unresolved-static | â€” |
-| 443:1 | button | tune Configure Vector Filters | unresolved-static | â€” |
-| 495:1 | button | Push Rule to SIEM | unresolved-static | â€” |
-| 573:1 | button | download Export Validation Matrix (Navigator JSON + PDF) | unresolved-static | â€” |
-| 601:1 | button | rocket_launch Deploy to Sentinel | unresolved-static | â€” |
-| 628:1 | button | publish Deploy to Splunk | unresolved-static | â€” |
-
-### ui_v2_bug_bounty.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 206:1124 | a | terminal Dashboard / Zero State | script-reference | # |
-| 206:1479 | a | radar Scope & Targets | script-reference | # |
-| 206:1821 | a | play_circle Run & Orchestration | script-reference | # |
-| 206:2177 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 206:2541 | a | description PTES Coverage & Reports | script-reference | # |
-| 206:3082 | a | psychology AI Strategy Gate | script-reference | # |
-| 206:3429 | a | build_circle Remediation Retest Studio | script-reference | # |
-| 206:3796 | a | account_tree Correlated Attack Chains | script-reference | # |
-| 206:4161 | a | open_in_browser Bug Bounty & Live Browser | script-reference | # |
-| 206:4702 | a | history_toggle_off Job Execution History | script-reference | # |
-| 206:5067 | a | folder_zip Evidence File Inspector | script-reference | # |
-| 206:5428 | a | encrypted Cryptographic Audit Log | script-reference | # |
-| 206:5957 | a | monitor_heart System Diagnostics & Health | script-reference | # |
-| 206:6331 | a | extension Adapter & Plugin Manager | script-reference | # |
-| 206:6695 | a | shield_person PTaaS Client Portal | script-reference | # |
-| 206:7051 | a | key Settings & Secrets Vault | script-reference | # |
-| 206:8931 | button | terminal LOGS | unresolved-static | â€” |
-| 206:9234 | button | dangerous HALT SCAN | unresolved-static | â€” |
-| 305:1 | button | Go back | unresolved-static | â€” |
-| 306:1 | button | Go forward | unresolved-static | â€” |
-| 307:1 | button | Reload target view | unresolved-static | â€” |
-| 313:1 | input | (unnamed) | unresolved-static | â€” |
-| 320:1 | select | User_A (Attacker Context) User_B (Victim / Target #092) Unauthentica | unresolved-static | â€” |
-| 384:1 | input | (unnamed) | unresolved-static | â€” |
-| 389:1 | input | (unnamed) | unresolved-static | â€” |
-| 414:1 | button | send EXECUTE COMMIT (TAMPERED) | unresolved-static | â€” |
-| 439:1 | button | CLEAR CACHE | unresolved-static | â€” |
-| 440:1 | button | DUMP DOM SNAPSHOT | unresolved-static | â€” |
-| 555:1 | button | terminal INSPECTOR: POST /app/transfer/commit | unresolved-static | â€” |
-| 595:1 | button | cached SEND TO VALIDATOR | unresolved-static | â€” |
-| 599:1 | button | difference DIFF ANALYSIS | unresolved-static | â€” |
-| 603:1 | button | verified_user PROMOTE TO FINDING | unresolved-static | â€” |
-
-### ui_v2_chains.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Correlated Attack Chains | script-reference | # |
-| 5:7061 | a | Job Execution History | script-reference | # |
-| 5:7318 | a | Evidence File Inspector | script-reference | # |
-| 5:7579 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8042 | a | System Diagnostics & Health | script-reference | # |
-| 5:8317 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:8586 | a | Settings & API Explorer | script-reference | # |
-| 5:10950 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 5:11307 | button | add New | unresolved-static | â€” |
-| 5:13012 | button | terminal Terminal Log | unresolved-static | â€” |
-| 5:13351 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 29:1 | button | sync_saved_locally Re-compute Graph | script-reference | btn-recompute |
-| 35:1 | select | Severity: All Vectors Severity: Critical & Compound 10.0 Severity: H | unresolved-static | â€” |
-| 41:1 | button | download Export Graph SVG/JSON | unresolved-static | â€” |
-| 338:1 | button | play_arrow Simulate Controlled Replay | unresolved-static | â€” |
-| 342:1 | button | menu_book Export PTES Chapter | unresolved-static | â€” |
-| 429:1 | button | Add Custom Mitigation Rule (Envoy WAF) | unresolved-static | â€” |
-| 432:1 | button | Generate Red Team Retest Script | unresolved-static | â€” |
-
-### ui_v2_compliance.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 5:6895 | a | Correlated Attack Chains | script-reference | # |
-| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
-| 5:7724 | a | BAS & Detection Validation | script-reference | # |
-| 5:8209 | a | Job Execution History | script-reference | # |
-| 5:8466 | a | Evidence File Inspector | script-reference | # |
-| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 5:9473 | a | System Diagnostics & Health | script-reference | # |
-| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:10017 | a | PTaaS Client Portal | script-reference | # |
-| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
-| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 5:12993 | button | add New | unresolved-static | â€” |
-| 5:14698 | button | terminal Terminal Log | unresolved-static | â€” |
-| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 22:1 | button | tune Configure Scope | unresolved-static | â€” |
-| 26:1 | button | picture_as_pdf Auditor Crosswalk PDF | unresolved-static | â€” |
-| 30:1 | button | archive Export Package (.ZIP) | unresolved-static | â€” |
-| 201:1 | button | PCI-DSS v4.0 (5) | unresolved-static | â€” |
-| 204:1 | button | OWASP Top 10 (4) | unresolved-static | â€” |
-| 207:1 | button | SOC 2 Type II (8) | unresolved-static | â€” |
-| 210:1 | button | ISO 27001 (6) | unresolved-static | â€” |
-| 213:1 | button | NIST CSF (3) | unresolved-static | â€” |
-| 216:1 | button | MITRE ATT&CK | unresolved-static | â€” |
-| 423:1 | button | PREV | unresolved-static | â€” |
-| 425:1 | button | NEXT | unresolved-static | â€” |
-| 479:1 | input | (unnamed) | unresolved-static | â€” |
-| 486:1 | input | (unnamed) | unresolved-static | â€” |
-| 493:1 | input | (unnamed) | unresolved-static | â€” |
-| 500:1 | input | (unnamed) | unresolved-static | â€” |
-| 522:1 | button | lock_clock Compile Signed Matrix (.PDF / .JSON) | unresolved-static | â€” |
-
-### ui_v2_dashboard.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 17:4342 | a | Dashboard / Zero State | script-reference | # |
-| 17:4598 | a | Scope & Targets | script-reference | # |
-| 17:4849 | a | Run & Orchestration | script-reference | # |
-| 17:5108 | a | Trust Layer & Findings | script-reference | # |
-| 17:5373 | a | PTES Coverage & Reports | script-reference | # |
-| 17:5848 | a | AI Strategy Gate | script-reference | # |
-| 17:6095 | a | Remediation Retest Studio | script-reference | # |
-| 17:6360 | a | Correlated Attack Chains | script-reference | # |
-| 17:6823 | a | Job Execution History | script-reference | # |
-| 17:7080 | a | Evidence File Inspector | script-reference | # |
-| 17:7341 | a | Cryptographic Audit Log | script-reference | # |
-| 17:7804 | a | System Diagnostics & Health | script-reference | # |
-| 17:8079 | a | Adapter & Plugin Manager | script-reference | # |
-| 17:8348 | a | Settings & API Explorer | script-reference | # |
-| 17:8813 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 17:9110 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 17:9395 | a | PTaaS Client Portal | script-reference | # |
-| 17:9648 | a | Threat Intelligence | script-reference | # |
-| 17:9914 | a | BAS & Detection Validation | script-reference | # |
-| 17:10187 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 17:10472 | a | Trust Layer Approvals Queue | script-reference | # |
-| 17:12865 | button | No active engagement (No target selected) arrow_drop_down | unresolved-static | â€” |
-| 17:13230 | button | add New | unresolved-static | â€” |
-| 17:14943 | button | terminal Terminal Log | unresolved-static | â€” |
-| 17:15282 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 39:1 | button | terminal CLI Help | unresolved-static | â€” |
-| 43:1 | button | vpn_key Update Credentials Now | unresolved-static | â€” |
-| 84:1 | button | history Switch Target Session | unresolved-static | â€” |
-| 88:1 | button | rocket_launch Start New Engagement | unresolved-static | â€” |
-| 199:1 | button | Open Scope Setup arrow_forward | source-hidden | â€” |
-| 238:1 | button | upload Upload Artifact | unresolved-static | â€” |
-| 279:1 | button | play_arrow Deploy Mock | unresolved-static | â€” |
-| 304:1 | button | tune Configure Filters | source-hidden | â€” |
-| 397:1 | input | Filter recent job history by ID, target, or tool | unresolved-static | â€” |
-| 399:1 | button | download Export Archive | unresolved-static | â€” |
-
-### ui_v2_diagnostics.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 7:4579 | a | Dashboard / Zero State | script-reference | # |
-| 7:4836 | a | Scope & Targets | script-reference | # |
-| 7:5087 | a | Run & Orchestration | script-reference | # |
-| 7:5346 | a | Trust Layer & Findings | script-reference | # |
-| 7:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 7:6086 | a | AI Strategy Gate | script-reference | # |
-| 7:6333 | a | Remediation Retest Studio | script-reference | # |
-| 7:6598 | a | Correlated Attack Chains | script-reference | # |
-| 7:7061 | a | Job Execution History | script-reference | # |
-| 7:7317 | a | Evidence File Inspector | script-reference | # |
-| 7:7578 | a | Cryptographic Audit Log | script-reference | # |
-| 7:8041 | a | System Diagnostics & Health | script-reference | # |
-| 7:8316 | a | Adapter & Plugin Manager | script-reference | # |
-| 7:8585 | a | Settings & API Explorer | script-reference | # |
-| 7:10949 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 7:11306 | button | add New | unresolved-static | â€” |
-| 7:13011 | button | terminal Terminal Log | unresolved-static | â€” |
-| 7:13350 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 42:1 | button | restart_alt Restart Engine Daemons | script-reference | btn-restart-daemons |
-| 46:1 | button | file_download Export Health Report (.json) | script-reference | btn-export-json |
-| 50:1 | button | play_circle Run Full Diagnostic [F5] | script-reference | btn-run-diag |
-| 263:1 | button | Probe Socket | inline-handler | pingService('PostgreSQL') |
-| 290:1 | button | Benchmark Cache | inline-handler | pingService('SQLite Replay') |
-| 317:1 | button | Ping Handshake | inline-handler | pingService('Metasploit RPC') |
-| 344:1 | button | Probe RingBuffer | inline-handler | pingService('eBPF Kernel') |
-| 371:1 | button | Warmup Inference | inline-handler | pingService('AI Planner') |
-| 398:1 | button | Check Queue | inline-handler | pingService('Redis Broker') |
-| 425:1 | button | Verify Cgroup | inline-handler | pingService('Docker Sandbox') |
-| 682:1 | button | Test MSF RPC Handshake | inline-handler | triggerSelfCheck('msf') |
-| 685:1 | button | Benchmark SQLite Write Speed | inline-handler | triggerSelfCheck('sqlite') |
-| 688:1 | button | Probe Ollama LLM Socket | inline-handler | triggerSelfCheck('llm') |
-| 691:1 | button | Check eBPF Filter Integrity | inline-handler | triggerSelfCheck('ebpf') |
-| 694:1 | button | Clear Console | inline-handler | clearTerminalLogs() |
-
-### ui_v2_evidence.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 6:4579 | a | Dashboard / Zero State | script-reference | # |
-| 6:4836 | a | Scope & Targets | script-reference | # |
-| 6:5087 | a | Run & Orchestration | script-reference | # |
-| 6:5346 | a | Trust Layer & Findings | script-reference | # |
-| 6:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 6:6086 | a | AI Strategy Gate | script-reference | # |
-| 6:6333 | a | Remediation Retest Studio | script-reference | # |
-| 6:6598 | a | Correlated Attack Chains | script-reference | # |
-| 6:7060 | a | Job Execution History | script-reference | # |
-| 6:7317 | a | Evidence File Inspector | script-reference | # |
-| 6:7578 | a | Cryptographic Audit Log | script-reference | # |
-| 6:8041 | a | System Diagnostics & Health | script-reference | # |
-| 6:8316 | a | Adapter & Plugin Manager | script-reference | # |
-| 6:8585 | a | Settings & API Explorer | script-reference | # |
-| 6:10949 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 6:11306 | button | add New | unresolved-static | â€” |
-| 6:13011 | button | terminal Terminal Log | unresolved-static | â€” |
-| 6:13350 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 46:1 | button | cloud_sync Sync Merkle Tree | unresolved-static | â€” |
-| 50:1 | button | inventory_2 Export TAR.GZ | unresolved-static | â€” |
-| 145:1 | button | Collapse all | unresolved-static | â€” |
-| 148:1 | button | Refresh | unresolved-static | â€” |
-| 157:1 | input | Search filename, sha256, tool... | unresolved-static | â€” |
-| 319:1 | button | content_copy Copy | unresolved-static | â€” |
-| 361:1 | button | Formatted Tree View | unresolved-static | â€” |
-| 364:1 | button | Raw XML Source | unresolved-static | â€” |
-| 367:1 | button | Parsed Tables | unresolved-static | â€” |
-| 370:1 | button | Hex View | unresolved-static | â€” |
-| 387:1 | button | download Download Raw | unresolved-static | â€” |
-| 391:1 | button | fingerprint Verify SHA-256 Hash | unresolved-static | â€” |
-| 395:1 | button | auto_fix_high Re-parse into Finding Model | unresolved-static | â€” |
-| 399:1 | button | send_to_mobile Send to Issue Tracker | unresolved-static | â€” |
-| 600:1 | a | Entry #4409 | unresolved-static | # |
-| 642:1 | button | Trace Proof | unresolved-static | â€” |
-| 658:1 | button | Trace Proof | unresolved-static | â€” |
-
-### ui_v2_findings.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4470 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4816 | a | target Scope & Targets | script-reference | # |
-| 4:5148 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5490 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5843 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
-| 126:1 | button | ALL | script-reference | filter:severity:all |
-| 127:1 | button | CRIT (1) | script-reference | filter:severity:critical |
-| 128:1 | button | HIGH (2) | script-reference | filter:severity:high |
-| 129:1 | button | MED (1) | script-reference | filter:severity:medium |
-| 130:1 | button | LOW (0) | script-reference | filter:severity:low |
-| 135:1 | button | ALL | script-reference | filter:status:all |
-| 136:1 | button | VERIFIED (6) | script-reference | filter:status:verified |
-| 137:1 | button | CANDIDATE (11) | script-reference | filter:status:candidate |
-| 138:1 | button | REVIEW NEEDED | script-reference | filter:status:review_needed |
-| 143:1 | button | ALL | script-reference | filter:adapter:all |
-| 144:1 | button | Nuclei | script-reference | filter:adapter:nuclei |
-| 145:1 | button | sqlmap | script-reference | filter:adapter:sqlmap |
-| 146:1 | button | Nikto | script-reference | filter:adapter:nikto |
-| 151:1 | input | Filter findings by proof pattern, URL, or CVE | script-reference | whaxon-finding-filter |
-| 165:229 | button | Retry | source-hidden | whaxon-findings-retry |
-| 248:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
-| 310:1 | button | play_arrow Replay Test (Retest) | script-reference | replay-btn |
-| 314:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
-| 320:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
-| 324:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
-
-### ui_v2_history.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 6:4579 | a | Dashboard / Zero State | script-reference | # |
-| 6:4836 | a | Scope & Targets | script-reference | # |
-| 6:5087 | a | Run & Orchestration | script-reference | # |
-| 6:5346 | a | Trust Layer & Findings | script-reference | # |
-| 6:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 6:6086 | a | AI Strategy Gate | script-reference | # |
-| 6:6333 | a | Remediation Retest Studio | script-reference | # |
-| 6:6598 | a | Correlated Attack Chains | script-reference | # |
-| 6:7060 | a | Job Execution History | script-reference | # |
-| 6:7317 | a | Evidence File Inspector | script-reference | # |
-| 6:7578 | a | Cryptographic Audit Log | script-reference | # |
-| 6:8041 | a | System Diagnostics & Health | script-reference | # |
-| 6:8316 | a | Adapter & Plugin Manager | script-reference | # |
-| 6:8585 | a | Settings & API Explorer | script-reference | # |
-| 6:10949 | button | No engagement selected (No target selected) arrow_drop_down | unresolved-static | â€” |
-| 6:11316 | button | add New | unresolved-static | â€” |
-| 6:13022 | button | terminal Terminal Log | unresolved-static | â€” |
-| 6:13361 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 26:1 | button | file_download Export Ledger (.csv / .json) | unresolved-static | â€” |
-| 31:1 | button | verified_user Verify Integrity | unresolved-static | â€” |
-| 133:1 | input | Filter history by recorded job ID, tool, or target | script-reference | history-search |
-| 140:1 | select | Filter history by tool | script-reference | history-tool-filter |
-| 147:1 | select | Date filter unavailable because timestamps are not recorded | disabled | history-date-filter |
-| 154:1 | select | Runner filter unavailable because runner mode is not recorded | disabled | history-runner-filter |
-| 163:1 | button | All (42) | unresolved-static | â€” |
-| 167:1 | button | Success (38) | unresolved-static | â€” |
-| 172:1 | button | Failed (3) | unresolved-static | â€” |
-| 177:1 | button | Scope-Blocked (1) | unresolved-static | â€” |
-| 182:1 | button | Active / Queued (0) | unresolved-static | â€” |
-| 226:1 | button | chevron_left | disabled | â€” |
-| 229:1 | button | chevron_right | unresolved-static | â€” |
-
-### ui_v2_monitoring.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4579 | a | Dashboard / Zero State | script-reference | # |
-| 4:4836 | a | Scope & Targets | script-reference | # |
-| 4:5087 | a | Run & Orchestration | script-reference | # |
-| 4:5346 | a | Trust Layer & Findings | script-reference | # |
-| 4:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 4:6086 | a | AI Strategy Gate | script-reference | # |
-| 4:6333 | a | Remediation Retest Studio | script-reference | # |
-| 4:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 4:6895 | a | Correlated Attack Chains | script-reference | # |
-| 4:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 4:7443 | a | PTaaS Client Portal | script-reference | # |
-| 4:7896 | a | Job Execution History | script-reference | # |
-| 4:8153 | a | Evidence File Inspector | script-reference | # |
-| 4:8414 | a | Cryptographic Audit Log | script-reference | # |
-| 4:8877 | a | System Diagnostics & Health | script-reference | # |
-| 4:9152 | a | Adapter & Plugin Manager | script-reference | # |
-| 4:9421 | a | Settings & Secrets Vault | script-reference | # |
-| 4:11787 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 4:12144 | button | add New | unresolved-static | â€” |
-| 4:13849 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:14188 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 28:1 | button | dns Configure Cloud & DNS Probes | unresolved-static | â€” |
-| 32:1 | button | radar Trigger Delta Recon Now | script-reference | recon-trigger-btn |
-| 133:1 | input | Filter FQDN, IP, ASN (e.g. AS13335, 10.0.0.0/8), Cloud Provider... | script-reference | asset-search-input |
-| 138:1 | button | All Infra | unresolved-static | â€” |
-| 141:1 | button | AWS (84) | unresolved-static | â€” |
-| 145:1 | button | GCP (36) | unresolved-static | â€” |
-| 149:1 | button | CF (22) | unresolved-static | â€” |
-| 158:1 | button | ALL (142) | unresolved-static | â€” |
-| 161:1 | button | DRIFT DETECTED 7 | unresolved-static | â€” |
-| 165:1 | button | CLOUD EXPOSURES 4 | unresolved-static | â€” |
-| 169:1 | button | EXPIRED/WEAK TLS 3 | unresolved-static | â€” |
-| 176:1 | button | SEVERITY DESC arrow_downward | unresolved-static | â€” |
-| 217:1 | button | Lock Boundary | unresolved-static | â€” |
-| 221:1 | button | Direct Dynamic Inspection | unresolved-static | â€” |
-| 273:1 | button | Remediate S3 Bucket ACL | unresolved-static | â€” |
-| 277:1 | button | Inspect Bucket Contents | unresolved-static | â€” |
-| 323:1 | button | Order ACME Renewal | unresolved-static | â€” |
-| 327:1 | button | tune Harden Ciphers | unresolved-static | â€” |
-| 364:1 | button | terminal Session Shell | unresolved-static | â€” |
-| 368:1 | button | more_vert | unresolved-static | â€” |
-| 385:1 | button | PREV | unresolved-static | â€” |
-| 386:1 | button | NEXT | unresolved-static | â€” |
-| 475:1 | button | Expand Canvas open_in_full | unresolved-static | â€” |
-| 592:1 | button | Stream Full Cryptographic Audit Logs â†’ | unresolved-static | â€” |
-
-### ui_v2_ptaas.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 206:1124 | a | terminal Dashboard / Zero State | script-reference | # |
-| 206:1479 | a | radar Scope & Targets | script-reference | # |
-| 206:1821 | a | play_circle Run & Orchestration | script-reference | # |
-| 206:2177 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 206:2541 | a | description PTES Coverage & Reports | script-reference | # |
-| 206:3082 | a | psychology AI Strategy Gate | script-reference | # |
-| 206:3429 | a | build_circle Remediation Retest Studio | script-reference | # |
-| 206:3796 | a | account_tree Correlated Attack Chains | script-reference | # |
-| 206:4161 | a | open_in_browser Bug Bounty & Live Browser | script-reference | # |
-| 206:4702 | a | history_toggle_off Job Execution History | script-reference | # |
-| 206:5067 | a | folder_zip Evidence File Inspector | script-reference | # |
-| 206:5428 | a | encrypted Cryptographic Audit Log | script-reference | # |
-| 206:5957 | a | monitor_heart System Diagnostics & Health | script-reference | # |
-| 206:6331 | a | extension Adapter & Plugin Manager | script-reference | # |
-| 206:6695 | a | shield_person PTaaS Client Portal | script-reference | # |
-| 206:7052 | a | key Settings & Secrets Vault | script-reference | # |
-| 206:8932 | button | terminal LOGS | unresolved-static | â€” |
-| 206:9235 | button | dangerous HALT SCAN | unresolved-static | â€” |
-| 254:1 | button | add_moderator EXPAND SCOPE | inline-handler | openScopeModal() |
-| 258:1 | button | schedule SCHEDULE RETEST | inline-handler | scrollToRetestConsole() |
-| 262:1 | button | workspace_premium EXECUTIVE CERTIFICATE | inline-handler | triggerCertDownload() |
-| 377:1 | input | e.g. stage-auth.stripe-internal.dev | script-reference | targetInput |
-| 378:1 | button | RUN PRE-FLIGHT | inline-handler | runPreflightValidation() |
-| 397:1 | input | (unnamed) | unresolved-static | â€” |
-| 404:1 | input | (unnamed) | unresolved-static | â€” |
-| 411:1 | input | (unnamed) | unresolved-static | â€” |
-| 417:1 | button | rocket_launch DISPATCH ACCREDITED JOB | inline-handler | launchAssessment() |
-| 437:1 | button | ALL (18) | unresolved-static | â€” |
-| 438:1 | button | ACTION NEEDED (4) | unresolved-static | â€” |
-| 439:1 | button | RESOLVED (14) | unresolved-static | â€” |
-| 467:1 | button | VIEW RAW PACKET open_in_new | inline-handler | toggleProof('proof-1') |
-| 493:1 | button | refresh REQUEST VERIFICATION RETEST | inline-handler | requestRetest('BOLA / IDOR in Merchant Transfer Settlement Route') |
-| 523:1 | button | VIEW SCRIPT open_in_new | inline-handler | toggleProof('proof-2') |
-| 619:1 | div | picture_as_pdf Executive Brief (PDF) v2.1 â€¢ 14 Pages â€¢ Cryptographic | inline-handler | downloadArtifact('Executive_Brief_Q4.pdf') |
-| 632:1 | div | slideshow Board-Ready Deck (Slides) Keynote & PPTX â€¢ High-level KPIs | inline-handler | downloadArtifact('Board_Risk_Deck_2026.key') |
-| 645:1 | div | table_chart Remediation Matrix (Jira CSV) Atlassian Schema â€¢ CVSS v3 | inline-handler | downloadArtifact('Findings_Jira_Sync.csv') |
-| 683:1 | button | PING SEC-OPS | unresolved-static | â€” |
-| 698:1 | button | close | source-hidden | closeScopeModal() |
-| 705:1 | textarea | e.g. api-v3-staging.internal.stripe.com 192.168.12.0/24 (VPC Peered) | source-hidden | â€” |
-| 711:1 | select | Synchronized with Primary RoE (Now through Nov 02, 2026) Restricted  | source-hidden | â€” |
-| 722:1 | button | CANCEL | source-hidden | closeScopeModal() |
-| 725:1 | button | SIGN & SUBMIT ROE ADDENDUM | source-hidden | confirmScopeExpansion() |
-
-### ui_v2_report.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4475 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4821 | a | target Scope & Targets | script-reference | # |
-| 4:5153 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5495 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5848 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9396 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:9735 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 279:1 | button | All Gaps (3) | unresolved-static | â€” |
-| 280:1 | button | Policy (2) | unresolved-static | â€” |
-| 281:1 | button | Safety (1) | unresolved-static | â€” |
-| 363:1 | input | (unnamed) | unresolved-static | â€” |
-| 371:1 | input | (unnamed) | unresolved-static | â€” |
-| 379:1 | input | (unnamed) | unresolved-static | â€” |
-| 387:1 | input | (unnamed) | unresolved-static | â€” |
-| 428:1 | button | visibility Preview Markdown | script-reference | previewBtn |
-| 432:1 | button | data_object Export Findings (.json) | unresolved-static | â€” |
-| 436:1 | button | download Download Full Report (.pdf) | unresolved-static | â€” |
-| 489:1 | a | download Raw | unresolved-static | # |
-| 504:1 | a | download Raw | unresolved-static | # |
-| 519:1 | a | download Raw | unresolved-static | # |
-| 534:1 | a | download Raw | unresolved-static | # |
-| 555:1 | button | close | source-hidden | closePreviewBtn |
-
-### ui_v2_reports.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4475 | a | target Scope & Targets | script-reference | # |
-| 4:4807 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5149 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5502 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9037 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:9376 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 279:1 | button | All Gaps (3) | unresolved-static | â€” |
-| 280:1 | button | Policy (2) | unresolved-static | â€” |
-| 281:1 | button | Safety (1) | unresolved-static | â€” |
-| 363:1 | input | (unnamed) | unresolved-static | â€” |
-| 371:1 | input | (unnamed) | unresolved-static | â€” |
-| 379:1 | input | (unnamed) | unresolved-static | â€” |
-| 387:1 | input | (unnamed) | unresolved-static | â€” |
-| 428:1 | button | visibility Preview Markdown | script-reference | previewBtn |
-| 432:1 | button | data_object Export Findings (.json) | unresolved-static | â€” |
-| 436:1 | button | download Download Full Report (.pdf) | unresolved-static | â€” |
-| 489:1 | a | download Raw | unresolved-static | # |
-| 504:1 | a | download Raw | unresolved-static | # |
-| 519:1 | a | download Raw | unresolved-static | # |
-| 534:1 | a | download Raw | unresolved-static | # |
-| 555:1 | button | close | source-hidden | closePreviewBtn |
-
-### ui_v2_retest.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Correlated Attack Chains | script-reference | # |
-| 5:7061 | a | Job Execution History | script-reference | # |
-| 5:7318 | a | Evidence File Inspector | script-reference | # |
-| 5:7579 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8042 | a | System Diagnostics & Health | script-reference | # |
-| 5:8317 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:8586 | a | Settings & API Explorer | script-reference | # |
-| 5:10950 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 5:11307 | button | add New | unresolved-static | â€” |
-| 5:13012 | button | terminal Terminal Log | unresolved-static | â€” |
-| 5:13351 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 13:1400 | button | tune FILTER BY 3-WAY VERDICT | unresolved-static | â€” |
-| 13:1750 | button | play_arrow BATCH REPLAY (3x BASELINE + 3x INJECTED) | unresolved-static | â€” |
-| 15:972 | input | Filter Finding, URL, Verification Reason... | unresolved-static | â€” |
-| 15:1384 | button | ALL (5) | unresolved-static | â€” |
-| 15:1571 | button | STILL_VULNERABLE (2) | unresolved-static | â€” |
-| 15:1752 | button | FIXED (2) | unresolved-static | â€” |
-| 15:1928 | button | INCONCLUSIVE (1) | unresolved-static | â€” |
-| 15:12125 | button | Copy endpoint | unresolved-static | â€” |
-| 15:18949 | button | content_copy copy curl | unresolved-static | â€” |
-| 21:345 | button | refresh Re-Execute Replay (3x Baseline + 3x Injected) | unresolved-static | â€” |
-| 21:1679 | input | (unnamed) | unresolved-static | â€” |
-| 21:2308 | input | (unnamed) | unresolved-static | â€” |
-| 21:2943 | input | (unnamed) | unresolved-static | â€” |
-| 21:3692 | input | e.g., timing delta >3.0s (median of 3), xss marker present, candidat | unresolved-static | â€” |
-| 21:4285 | textarea | Enter proof delta justification... | unresolved-static | â€” |
-| 21:4959 | button | refresh RE-EXECUTE IMMEDIATE PROBE | unresolved-static | â€” |
-| 21:5315 | button | data_object EXPORT PROOF AUDIT JSON | unresolved-static | â€” |
-| 21:5679 | button | assignment_turned_in COMMIT 3-WAY VERDICT TO AUDIT LEDGER | unresolved-static | â€” |
-
-### ui_v2_run.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4475 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4821 | a | target Scope & Targets | script-reference | # |
-| 4:5153 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5495 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5848 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9381 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:9720 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 54:1 | button | tune Approval Gate: Active | unresolved-static | toggle-planner-gate |
-| 105:1 | input | (unnamed) | unresolved-static | â€” |
-| 109:1 | input | (unnamed) | unresolved-static | â€” |
-| 113:1 | input | (unnamed) | unresolved-static | â€” |
-| 117:1 | input | (unnamed) | unresolved-static | â€” |
-| 121:1 | input | (unnamed) | unresolved-static | â€” |
-| 125:1 | input | (unnamed) | unresolved-static | â€” |
-| 129:1 | input | (unnamed) | unresolved-static | â€” |
-| 133:1 | input | (unnamed) | unresolved-static | â€” |
-| 137:1 | input | (unnamed) | unresolved-static | â€” |
-| 141:1 | input | (unnamed) | unresolved-static | â€” |
-| 149:1 | select | WHAXON tool | script-reference | run-tool-select |
-| 150:1 | input | Authorized target host or URL | script-reference | run-target-input |
-| 151:1 | button | play_arrow Run Selected Tool | script-reference | run-active-btn |
-| 187:1 | input | ai-planner-toggle | script-reference | ai-planner-toggle |
-| 223:1 | button | View stdout open_in_new | inline-handler | showNmapStdout() |
-| 230:1 | button | Re-run | unresolved-static | â€” |
-| 278:1 | button | Pause | unresolved-static | â€” |
-| 281:1 | button | Abort | unresolved-static | â€” |
-| 335:1 | button | Engage Replay | unresolved-static | â€” |
-| 347:1 | button | explore WhatWeb | unresolved-static | â€” |
-| 351:1 | button | folder_zip Gobuster | unresolved-static | â€” |
-| 355:1 | button | security WPScan | unresolved-static | â€” |
-| 392:1 | button | Clear buffer | inline-handler | clearLog() |
-| 485:1 | input | Type command (e.g. validate --id=F-104, pause, resume, replay)... | script-reference | cli-input |
-| 486:1 | button | Execute | inline-handler | sendManualCommand() |
-| 494:1 | button | pause_circle Pause Pipeline | inline-handler | togglePipelinePause() |
-| 499:1 | button | input Inject Payload | inline-handler | injectPayloadPrompt() |
-| 504:1 | button | add_circle Spawn Sub-tool | inline-handler | spawnSubtoolModal() |
-| 509:1 | button | emergency_home Emergency Abort | inline-handler | emergencyAbort() |
-
-### ui_v2_scope.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4475 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4821 | a | target Scope & Targets | script-reference | # |
-| 4:5153 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5495 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5848 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9679 | button | terminal Terminal Log | unresolved-static | â€” |
-| 4:10018 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 28:1 | button | file_upload Quick Import | script-reference | openImportDrawerBtn |
-| 32:1 | button | add_circle Add In-Scope Target | script-reference | openTargetModalBtn |
-| 101:1 | button | Waiting for scope | disabled | toggleScopeEnforcementBtn |
-| 119:1 | input | Filter configured scope rules | script-reference | targetFilterInput |
-| 147:3069 | button | link View Certificate SAN Chain | source-hidden | â€” |
-| 147:3404 | button | block Mark Out-of-Scope Exclusion | source-hidden | â€” |
-| 147:3702 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | â€” |
-| 147:4827 | button | link View Certificate SAN Chain | source-hidden | â€” |
-| 147:5162 | button | block Mark Out-of-Scope Exclusion | source-hidden | â€” |
-| 147:5460 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | â€” |
-| 147:6577 | button | link View Certificate SAN Chain | source-hidden | â€” |
-| 147:6912 | button | block Mark Out-of-Scope Exclusion | source-hidden | â€” |
-| 147:7210 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | â€” |
-| 162:1 | input | hostname, IP, or URL | script-reference | scopeCheckTarget |
-| 163:1 | button | Check | script-reference | runScopeCheckBtn |
-| 164:1 | button | Copy CLI | script-reference | copyCliBtn |
-| 223:1 | button | add_moderator Add Boundary Exclusion | source-hidden | addDenyRuleBtn |
-| 266:1 | button | close | source-hidden | closeTargetModalBtn |
-| 274:1 | input | Authorized target hostname, IP address, or CIDR | source-hidden | modalTargetInput |
-| 279:1 | input | (unnamed) | source-hidden | â€” |
-| 283:1 | input | (unnamed) | source-hidden | â€” |
-| 288:1 | input | AUTHORIZATION-REFERENCE | source-hidden | â€” |
-| 291:1 | input | authConfirmCheckbox | source-hidden | authConfirmCheckbox |
-| 299:1 | button | Cancel | source-hidden | cancelTargetModalBtn |
-| 300:1 | button | Commit to Scope | source-hidden | saveTargetBtn |
-| 312:1 | button | close | source-hidden | closeImportDrawerBtn |
-| 320:1 | button | Burp XML/JSON | source-hidden | â€” |
-| 321:1 | button | scope.json | source-hidden | â€” |
-| 322:1 | button | CIDR List | source-hidden | â€” |
-| 327:1 | textarea | Paste scope JSON definition | source-hidden | â€” |
-| 331:1 | button | Cancel | source-hidden | cancelImportDrawerBtn |
-| 332:1 | button | Import & Parse Rules | source-hidden | executeImportBtn |
-
-### ui_v2_settings.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 206:1124 | a | terminal Dashboard / Zero State | script-reference | # |
-| 206:1479 | a | radar Scope & Targets | script-reference | # |
-| 206:1821 | a | play_circle Run & Orchestration | script-reference | # |
-| 206:2177 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 206:2541 | a | description PTES Coverage & Reports | script-reference | # |
-| 206:3082 | a | psychology AI Strategy Gate | script-reference | # |
-| 206:3429 | a | build_circle Remediation Retest Studio | script-reference | # |
-| 206:3796 | a | account_tree Correlated Attack Chains | script-reference | # |
-| 206:4161 | a | open_in_browser Bug Bounty & Live Browser | script-reference | # |
-| 206:4702 | a | history_toggle_off Job Execution History | script-reference | # |
-| 206:5067 | a | folder_zip Evidence File Inspector | script-reference | # |
-| 206:5428 | a | encrypted Cryptographic Audit Log | unresolved-static | # |
-| 206:5957 | a | monitor_heart System Diagnostics & Health | script-reference | # |
-| 206:6331 | a | extension Adapter & Plugin Manager | script-reference | # |
-| 206:6695 | a | shield_person PTaaS Client Portal | script-reference | # |
-| 206:7051 | a | key Settings & Secrets Vault | script-reference | # |
-| 206:8931 | button | terminal LOGS | unresolved-static | â€” |
-| 206:9234 | button | dangerous HALT SCAN | unresolved-static | â€” |
-| 224:1 | button | lock_reset SEAL VAULT | inline-handler | lockVaultMaster() |
-| 329:1 | input | (unnamed) | inline-handler | â€” |
-| 347:1 | input | (unnamed) | inline-handler | â€” |
-| 365:1 | input | (unnamed) | inline-handler | â€” |
-| 395:1 | input | budgetSlider | inline-handler | budgetSlider |
-| 413:1 | input | confSlider | inline-handler | confSlider |
-| 436:1 | input | Filter scope or host... | unresolved-static | â€” |
-| 439:1 | button | add ENCLAVE KEY | inline-handler | openCredentialModal() |
-| 479:1 | button | Test / Replay | unresolved-static | â€” |
-| 482:1 | button | Rotate Key | unresolved-static | â€” |
-| 485:1 | button | Revoke & Expunge | unresolved-static | â€” |
-| 511:1 | button | Test / Replay | unresolved-static | â€” |
-| 514:1 | button | Rotate Key | unresolved-static | â€” |
-| 517:1 | button | Revoke & Expunge | unresolved-static | â€” |
-| 543:1 | button | Test / Replay | unresolved-static | â€” |
-| 546:1 | button | Renew Ticket | unresolved-static | â€” |
-| 549:1 | button | Purge | unresolved-static | â€” |
-| 575:1 | button | Test / Replay | unresolved-static | â€” |
-| 578:1 | button | Rotate Key | unresolved-static | â€” |
-| 581:1 | button | Revoke & Expunge | unresolved-static | â€” |
-| 592:1 | a | VIEW COMPLETE REPOSITORY arrow_forward | unresolved-static | # |
-| 604:1 | button | download RESYNC CORPUS | unresolved-static | â€” |
-| 642:1 | button | + NEW KEY | inline-handler | triggerKeyGenModal() |
-| 717:1 | button | PING | inline-handler | sendTestPing('Slack SecOps') |
-| 732:1 | button | PING | inline-handler | sendTestPing('DefectDojo') |
-| 747:1 | button | PING | inline-handler | sendTestPing('Jira Engine') |
-| 762:1 | button | PING | inline-handler | sendTestPing('Discord Hook') |
-| 767:1 | button | add_link REGISTER ENDPOINT | unresolved-static | â€” |
-| 794:1 | button | close | source-hidden | closeKeyGenModal() |
-| 804:1 | input | e.g. CI_TEST_PIPELINE | source-hidden | newTokenName |
-| 808:1 | select | Operator (Execute scans, trigger payloads, write findings) Reviewer  | source-hidden | â€” |
-| 817:1 | button | 30 Days | source-hidden | â€” |
-| 818:1 | button | 90 Days | source-hidden | â€” |
-| 819:1 | button | 365 Days | source-hidden | â€” |
-| 824:1 | button | CANCEL | source-hidden | closeKeyGenModal() |
-| 827:1 | button | GENERATE TOKEN | source-hidden | executeTokenGeneration() |
-| 841:1 | button | close | source-hidden | closeCredentialModal() |
-| 851:1 | input | 10.0.0.0/8 or admin.internal.corp | source-hidden | â€” |
-| 856:1 | select | SSH Private Key (Ed25519) HTTP Bearer JWT Kerberos TGT Ticket AWS IA | source-hidden | â€” |
-| 866:1 | input | admin or svc_account | source-hidden | â€” |
-| 871:1 | textarea | -----BEGIN OPENSSH PRIVATE KEY-----... | source-hidden | â€” |
-| 875:1 | button | ABORT | source-hidden | closeCredentialModal() |
-| 878:1 | button | SEAL TO ENCLAVE | source-hidden | closeCredentialModal() |
-
-### ui_v2_threat_intel.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 5:6895 | a | Correlated Attack Chains | script-reference | # |
-| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
-| 5:7724 | a | BAS & Detection Validation | script-reference | # |
-| 5:8209 | a | Job Execution History | script-reference | # |
-| 5:8466 | a | Evidence File Inspector | script-reference | # |
-| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 5:9473 | a | System Diagnostics & Health | script-reference | # |
-| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:10017 | a | PTaaS Client Portal | script-reference | # |
-| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
-| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | â€” |
-| 5:12993 | button | add New | unresolved-static | â€” |
-| 5:14698 | button | terminal Terminal Log | unresolved-static | â€” |
-| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | â€” |
-| 104:1 | button | sync Sync Upstream Feeds | unresolved-static | â€” |
-| 108:1 | button | database Rebuild SQLite Vector DB | unresolved-static | â€” |
-| 112:1 | button | terminal Searchsploit Terminal | unresolved-static | â€” |
-| 203:1 | input | Filter by CVE-ID, service (OpenSSH, RDP, FortiOS), CVSS, EPSS... | unresolved-static | â€” |
-| 207:1 | select | Severity (CVSS DESC) EPSS Probability Weaponized First CISA KEV List | unresolved-static | â€” |
-| 217:1 | button | All (14) | inline-handler | toggleFilter('all', this) |
-| 220:1 | button | CISA KEV (5) | inline-handler | toggleFilter('cisa', this) |
-| 223:1 | button | Weaponized PoC (8) | inline-handler | toggleFilter('weaponized', this) |
-| 226:1 | button | Remote Code Execution (4) | inline-handler | toggleFilter('rce', this) |
-| 229:1 | button | PrivEsc (3) | inline-handler | toggleFilter('privesc', this) |
-| 236:1 | div | CVE-2024-6387 RegreSSHion (OpenSSH Race Condition) CVSS 9.8 EPSS 88. | inline-handler | selectCve('CVE-2024-6387', 'RegreSSHion â€” OpenSSH Signal Handler Race  |
-| 263:1 | button | code Inspect Exploit Code | unresolved-static | â€” |
-| 266:1 | button | sensors Queue Safe Probe | unresolved-static | â€” |
-| 269:1 | button | tune Simulate Dry-Run | unresolved-static | â€” |
-| 275:1 | div | CVE-2024-38077 MadLicense (Windows RDP Gateway) CVSS 9.8 EPSS 94.6%  | inline-handler | selectCve('CVE-2024-38077', 'MadLicense â€” Windows Remote Desktop Licen |
-| 301:1 | button | terminal Metasploit Harness | unresolved-static | â€” |
-| 304:1 | button | data_object Inspect MSF Options | unresolved-static | â€” |
-| 310:1 | div | CVE-2023-38606 BOLA in Internal Merchant API Endpoint CVSS 8.4 EPSS  | inline-handler | selectCve('CVE-2023-38606', 'Broken Object Level Authorization (BOLA)  |
-| 335:1 | button | play_arrow Execute Curl Replay Test | unresolved-static | â€” |
-| 341:1 | div | CVE-2024-21762 Fortinet FortiOS SSL-VPN OOB Write CVSS 9.6 EPSS 96.8 | inline-handler | selectCve('CVE-2024-21762', 'Fortinet FortiOS SSL-VPN Out-of-Bounds Wr |
-| 366:1 | button | assignment_turned_in View Nuclei Heuristics | unresolved-static | â€” |
-| 397:1 | button | Source Code | inline-handler | switchExploitTab('tab-source') |
-| 400:1 | button | Mechanics | inline-handler | switchExploitTab('tab-mechanics') |
-| 403:1 | button | Guardrails | inline-handler | switchExploitTab('tab-guardrails') |
-| 406:1 | button | Artifacts | inline-handler | switchExploitTab('tab-artifacts') |
-| 419:1 | button | content_copy Copy | unresolved-static | â€” |
-| 503:1 | input | (unnamed) | unresolved-static | â€” |
-| 510:1 | input | (unnamed) | unresolved-static | â€” |
-| 518:1 | button | gavel Arm & Queue for HITL Approval Gate | unresolved-static | â€” |
-
-
----
-
-## Part 5 â€” web ui files and rendering/obsidian_kinetic/DESIGN.md (historical embedded copy; original restored at supplied path)
-
----
-name: Obsidian Kinetic
-colors:
-  surface: '#0f131c'
-  surface-dim: '#0f131c'
-  surface-bright: '#353942'
-  surface-container-lowest: '#0a0e16'
-  surface-container-low: '#181c24'
-  surface-container: '#1c2028'
-  surface-container-high: '#262a33'
-  surface-container-highest: '#31353e'
-  on-surface: '#dfe2ee'
-  on-surface-variant: '#bbcabf'
-  inverse-surface: '#dfe2ee'
-  inverse-on-surface: '#2c3039'
-  outline: '#86948a'
-  outline-variant: '#3c4a42'
-  surface-tint: '#4edea3'
-  primary: '#4edea3'
-  on-primary: '#003824'
-  primary-container: '#10b981'
-  on-primary-container: '#00422b'
-  inverse-primary: '#006c49'
-  secondary: '#4cd7f6'
-  on-secondary: '#003640'
-  secondary-container: '#03b5d3'
-  on-secondary-container: '#00424e'
-  tertiary: '#ffb95f'
-  on-tertiary: '#472a00'
-  tertiary-container: '#e29100'
-  on-tertiary-container: '#523200'
-  error: '#ffb4ab'
-  on-error: '#690005'
-  error-container: '#93000a'
-  on-error-container: '#ffdad6'
-  primary-fixed: '#6ffbbe'
-  primary-fixed-dim: '#4edea3'
-  on-primary-fixed: '#002113'
-  on-primary-fixed-variant: '#005236'
-  secondary-fixed: '#acedff'
-  secondary-fixed-dim: '#4cd7f6'
-  on-secondary-fixed: '#001f26'
-  on-secondary-fixed-variant: '#004e5c'
-  tertiary-fixed: '#ffddb8'
-  tertiary-fixed-dim: '#ffb95f'
-  on-tertiary-fixed: '#2a1700'
-  on-tertiary-fixed-variant: '#653e00'
-  background: '#0f131c'
-  on-background: '#dfe2ee'
-  surface-variant: '#31353e'
-typography:
-  headline-xl:
-    fontFamily: Space Grotesk
-    fontSize: 32px
-    fontWeight: '700'
-    lineHeight: 38px
-    letterSpacing: -0.02em
-  headline-lg:
-    fontFamily: Space Grotesk
-    fontSize: 24px
-    fontWeight: '600'
-    lineHeight: 30px
-    letterSpacing: -0.015em
-  headline-md:
-    fontFamily: Space Grotesk
-    fontSize: 18px
-    fontWeight: '600'
-    lineHeight: 24px
-    letterSpacing: -0.01em
-  headline-sm:
-    fontFamily: Space Grotesk
-    fontSize: 15px
-    fontWeight: '600'
-    lineHeight: 20px
-  body-lg:
-    fontFamily: Inter
-    fontSize: 14px
-    fontWeight: '400'
-    lineHeight: 22px
-  body-md:
-    fontFamily: Inter
-    fontSize: 13px
-    fontWeight: '400'
-    lineHeight: 18px
-  body-sm:
-    fontFamily: Inter
-    fontSize: 12px
-    fontWeight: '400'
-    lineHeight: 16px
-  code-lg:
-    fontFamily: JetBrains Mono
-    fontSize: 13px
-    fontWeight: '500'
-    lineHeight: 18px
-  code-md:
-    fontFamily: JetBrains Mono
-    fontSize: 12px
-    fontWeight: '400'
-    lineHeight: 16px
-  code-sm:
-    fontFamily: JetBrains Mono
-    fontSize: 11px
-    fontWeight: '400'
-    lineHeight: 14px
-  label-md:
-    fontFamily: JetBrains Mono
-    fontSize: 11px
-    fontWeight: '600'
-    lineHeight: 14px
-    letterSpacing: 0.06em
-  label-sm:
-    fontFamily: JetBrains Mono
-    fontSize: 10px
-    fontWeight: '500'
-    lineHeight: 12px
-    letterSpacing: 0.08em
-rounded:
-  sm: 0.125rem
-  DEFAULT: 0.25rem
-  md: 0.375rem
-  lg: 0.5rem
-  xl: 0.75rem
-  full: 9999px
-spacing:
-  gutter: 0.75rem
-  gutter-lg: 1rem
-  margin: 1rem
-  margin-mobile: 0.75rem
-  space-xs: 0.25rem
-  space-sm: 0.375rem
-  space-md: 0.5rem
-  space-lg: 0.75rem
-  space-xl: 1rem
-  space-2xl: 1.5rem
----
-
-## Brand & Style
-
-This design system embodies high-stakes operational defense, cryptographic rigor, and deterministic precision. Built for elite offensive security engineers, Red Teams, and SecOps commanders executing synchronized operations, it trades decorative ornamentation for absolute signal-to-noise clarity, rapid cognitive processing, and mission certainty.
-
-The aesthetic fuses **Precision Engineering** with **Technical Minimalism**:
-- **Tactical Utility:** Dense, compact arrangements that optimize screen real estate for complex multi-pane workspaces, target trees, and continuous event telemetry.
-- **Controlled Luminescence:** A layered dark environment where color is strictly semanticâ€”reserved for validation tiers, severity states, telemetry rates, and lethal execution signals.
-- **Architectural Rigor:** Sharp delineation, structured 1px framing, low-contrast structural grids, and monospaced data anchors that invoke military-grade console hardware.
-- **Uncompromising Determinism:** State changes, terminal buffers, and inspection surfaces behave predictably with instant transitions, zero layout shifts, and absolute type hierarchy.
-
-## Colors
-
-The palette leverages a deep obsidian hierarchy to simulate physical command hardware, establishing a high-density backdrop where operational telemetry stands out with zero optical fatigue.
-
-### Color Hierarchy & Roles
-- **Primary (`#10B981` â€” Cyber Emerald):** Operational safety, verified targets within legal scope, authenticated nodes, passed exploits, and confirmed operational boundaries.
-- **Secondary (`#06B6D4` â€” Cyber Teal):** Active network scanners, data streams, dynamic telemetry, routing links, interactive utility triggers, and telemetry graphs.
-- **Tertiary (`#F59E0B` â€” Tactical Amber):** Candidate findings, unvalidated scope deviations, warnings, human-in-the-loop review queues, and unstable payloads.
-- **Critical Severity (`#EF4444` â€” Tactical Crimson):** Confirmed vulnerabilities (RCE, SQLi, SSRF), operational breaches, out-of-bounds alerts, and abort commands.
-- **Neutral Core (`#0B0F17` â€” Deep Obsidian):** Root canvas ground.
-  - Surface Tier 1 (`#111827` â€” Deep Charcoal): Structural sidebars, rail panels, and bottom dock drawers.
-  - Surface Tier 2 (`#1E293B` â€” Slate Matrix): Cards, modal layers, terminal envelopes, and inspection cells.
-  - Borders & Dividers (`#334155` / `rgba(255,255,255,0.08)`): Hairline structural separators.
-  - Text Primary (`#F8FAFC`): Absolute legibility for code payloads and telemetry parameters.
-  - Text Muted (`#94A3B8`): Contextual headers, metadata keys, and secondary descriptors.
-
-## Typography
-
-The typographic architecture balances technical authority, compact scanning, and zero character ambiguity:
-- **Headlines (Space Grotesk):** Provides structured geometric confidence for module titles, CVE matrices, and panel headers.
-- **Body & Controls (Inter):** High x-height and neutral geometry allow dense dashboard grids and nested tree nodes to remain readable under extreme density without distraction.
-- **Code, Data & Labels (JetBrains Mono):** Dedicated to technical artifacts: raw payloads, regex targets, cURL strings, IP/CIDR notations, hash digests, and status badges. Features distinctive glyph shaping to avoid confusion between `0` / `O` and `1` / `l` / `I`.
-- **All-Caps Metrics:** Small status tags and data labels (`label-md`, `label-sm`) default to uppercase with extended letter spacing (`0.06em` to `0.08em`) to establish visual contrast against prose.
-
-## Layout & Spacing
-
-The command center uses a strict, low-overhead fluid grid with fixed utility rails:
-- **Spatial Logic:** A base 4px spatial rhythm tuned down for maximum information density. Standard margins are compact (`1rem` / 16px), and panel gutters maintain tight adjacency (`0.75rem` / 12px) to maximize horizontal data span.
-- **Desktop Architecture (1440px+):** 
-  - Primary persistent left rail: 56px (collapsed) to 220px (expanded) for operational phase switching.
-  - Multi-pane workspace: 3-column split layout (Scope Tree: 280px fixed; Attack Surface / Finding Matrix: dynamic flex; Target Detail / Raw Inspector: 440px fixed or collapsible drawer).
-- **Reflow Rules:**
-  - **Tablet (768px - 1024px):** Target Detail moves to a floating bottom drawer; secondary panels stack into tabs.
-  - **Mobile (< 768px):** Collapses to single-pane task focus with bottom-docked command navigation. Grid margins drop to `0.75rem`.
-
-## Elevation & Depth
-
-This system intentionally eliminates soft, diffuse consumer dropshadows. Depth is articulated purely through tonal luminance tiers and precise 1px perimeter framing.
-
-- **Level 0 (Canvas Base â€” `#0B0F17`):** Non-interactive foundation and grid background.
-- **Level 1 (Docked Surfaces â€” `#111827`):** Structural sidebars, top status HUD, and terminal split panes. Separated by `1px solid rgba(255, 255, 255, 0.07)`.
-- **Level 2 (Containers & Cards â€” `#1E293B`):** Data tables, finding summaries, target nodes, and payload editors. Outlined with `1px solid rgba(255, 255, 255, 0.12)`.
-- **Level 3 (Interactive Hover & Flyouts â€” `#27354A`):** Popover inspectors, command palettes, and context menus. Paired with a concentrated tactical shadow: `0 4px 12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(6, 182, 212, 0.25)`.
-- **Semantic Backglow:** High-threat cards and critical alert states utilize subtle localized glow accents (`box-shadow: 0 0 12px rgba(239, 68, 68, 0.15)`) to direct immediate visual triage without obstructing neighboring data.
-
-## Shapes
-
-The design system enforces a sharp, engineered geometry (`roundedness: 1`):
-- **Base Elements (Buttons, Inputs, Badges, Tabs):** 4px (`0.25rem`) border radius, evoking precision-cut instrumentation panels.
-- **Card Containers & Panels (`rounded-lg`):** 8px (`0.5rem`) border radius for modular workspace units.
-- **Dialogs & Overlays (`rounded-xl`):** 12px (`0.75rem`) border radius maximum.
-- **Zero Pill Shapes:** Circular pills are prohibited; all tags, status flags, and metric badges maintain crisp 4px corners to avoid consumer-app associations and preserve tabular horizontal rhythm.
-
-## Components
-
-### Buttons
-- **Primary Tactical:** Solid Emerald background (`#10B981`), charcoal-black text (`#0B0F17`), weight 600, height 32px, padding 0 12px. Hover: `#059669`. Active: `#047857`. Focus: 2px offset ring in `#10B981`.
-- **Secondary / Ghost Utility:** Transparent background, 1px border `#334155`, text `#F8FAFC`. Hover: `#1E293B` background, border `#06B6D4`.
-- **Destructive / Abort Action:** High-saturation Crimson fill (`#EF4444`) or 1px Crimson border with semi-transparent tint (`rgba(239, 68, 68, 0.12)`). Used for attack cancel, payload detonate, or credential purge.
-
-### Chips & Badges
-- Strict monospaced typography (`label-sm`).
-- **In-Scope / Verified:** Tinted background `rgba(16, 185, 129, 0.12)`, border `1px solid rgba(16, 185, 129, 0.3)`, text `#10B981`.
-- **Review Needed / Ambiguous:** Background `rgba(245, 158, 11, 0.12)`, border `1px solid rgba(245, 158, 11, 0.3)`, text `#F59E0B`.
-- **Critical / Exploit Available:** Background `rgba(239, 68, 68, 0.14)`, border `1px solid rgba(239, 68, 68, 0.4)`, text `#F87171`. Includes a pulsing 4px indicator pip.
-
-### Inputs & Terminal Fields
-- Background `#0B0F17`, border `1px solid #334155`, text `#F8FAFC`, placeholder `#64748B`. Height 32px.
-- Focus: Border shifts instantly to Cyber Teal (`#06B6D4`) with zero transition lag; no blurry glow.
-- Monospace variant for payload inputs, target regex, CIDR filters, and auth tokens.
-
-### Data Tables & Tree Grids
-- Ultra-dense row height: 32px default, 28px condensed.
-- Row zebra striping omitted in favor of thin border separators (`1px solid rgba(255, 255, 255, 0.05)`). Hover state: row tint `#1E293B`.
-- Headers: JetBrains Mono `label-sm`, all-caps, text `#94A3B8`, background `#111827`.
-
-### Code Blocks & Raw Inspection Panes
-- Background `#080C14` with a persistent top metadata banner (displaying syntax mode, byte size, and copy button).
-- Monospace font (`code-sm` / 11px), 16px line height. Active execution lines highlighted with `rgba(6, 182, 212, 0.1)`.
-- Distinct syntax tokens: Methods (GET/POST) color-coded, query params in `#06B6D4`, injection payloads in `#F59E0B` or `#EF4444`.
-
-### Specialized Domain Components
-- **Scope Verification Banner:** Dual-state header lock indicating operational mandate, legal authorization timeframe, and IP range constraints.
-- **CVE / Finding Severity Pill:** Compact micro-indicator displaying CVSS base score alongside metric vectors (`AV:N/AC:L/PR:N`).
-- **Telemetry Pulse Indicator:** Constant 6px radar dot in teal/emerald indicating active agent heartbeat and live proxy socket health.
-
-### Scope & Targets â€” responsive and installed-wheel candidate evidence (2026-11-05)
-
-This historical Scope UI checkpoint records the 390px fix and automated candidate checks; its mobile details are outside current desktop scope, and the Dashboard-freeze reference is superseded. These automated checks remain implementation evidence. D1â€“D6 visual, manual accessibility/security, and rollout/rollback qualification is deferred until the full agreed V2 implementation and internal checks are complete.
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíßÏtõ:-jZ.¶›­–)Ş³R2t„„ôâ(	BT’c"DU4”tâÂ”åDU$5D”ôâäB44UDä4RÔ5DU  £â¢¤7W'&VçBT’òFVÆ—fW'’&V6öæ6–Æ–F–öâ(	B##bÓÓbâ¢¢F†R–×ÆVÖVçFF–öâ&6VÆ–æR—2Ö–â6VcCcSSc#3“–C†6#SS#ƒ–FCCc–Cc&#Css†²—G2&V6÷&FVBW†7BÖ†VB4’'Vâ³C##S33s3eÒ†‡GG3¢òöv—F‡V"æ6öÒöæG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–72ö7F–öç2÷'Vç2óC##S33s3b’76VB#ó#âÆÂ#"&öGV7F–öâ&÷WFW2†fRvRÖÆWfVÂ'&÷w6W"7V—FW2Â'WB&÷WFR6÷fW&vRFöW2æ÷B&÷fR6ö×ÆWFR6öçG&öÂ&V†f–÷"âT’–×ÆVÖVçFF–öâ6öçF–çVW2â6ö×ÆWFRF†Rw&VVBc"T’æBVæv–æRgVæ7F–öæÆ—G’Âv—F‚–çFW&æÂ'&÷w6W"ô’FW7G2F‡&÷Vv†÷WBâFVfW"C(	4CbW‡FW&æÂöÖçVÂöFWÆ÷–ÖVçBVÆ–f–6F–öâVçF–ÂF†Rw&VVBc"66÷R—26ö×ÆWFRæB–çFW&æÂ6†V6·272âF†R7W÷'FVBT’66÷R—2FW6·F÷à ¢¢¤6æöæ–6ÂT’–×ÆVÖVçFF–öâæB÷7BÖ6ö×ÆWF–öâVÆ–f–6F–öâ&VfW&Væ6Râ¢¢W6RF†—27&÷77vÆ²Fò6ö×ÆWFRF†R#"×vRw&VVBT’66÷Râ6÷W&6RÂFW7G2Â67&VVç6†÷G2ÂæBW†7BÖ†VB4’W7F&Æ—6‚–×ÆVÖVçFF–öâ&V†f–÷"â'Vâ–çFW&æÂ'&÷w6W"ô’6†V6·2F‡&÷Vv†÷WB–×ÆVÖVçFF–öââC(	4Cb&Rf–æÂW‡FW&æÂöÖçVÂöFWÆ÷–ÖVçBVÆ–f–6F–öâ7&—FW&–æB&Ræ÷B&W&WV—6—FW2f÷"–×ÆVÖVçF–ærF†RT’â7F'BF†BVÆ–f–6F–öâöæÇ’gFW"F†Rw&VVBc"Væv–æRæBT’66÷R—26ö×ÆWFRæB–çFW&æÂ6†V6·272âFòæ÷B–æfW"F†BöæRvRw2&W7VÇG2W7F&Æ—6‚æ÷F†W"vRw2&V†f–÷"à ¢¢¥7W÷'FVB66÷S¢¢¢F†—2&öGV7BF&vWG2FW6·F÷â6öçF–çVRT’–×ÆVÖVçFF–öâv—F†–âF†R7WÆ–VBFW6–vâæB6W'f–6R6öçG&7G2â†—7F÷&–6ÂÖö&–ÆR÷&W7öç6—fR&VfW&Væ6W2&VÆ÷r&Ræ÷B7W'&VçB66÷RâÖçVÂf—7VÂæB66W76–&–Æ—G’&Wf–Ww2&VÖ–âFVfW'&VBVçF–Â÷7BÖ–×ÆVÖVçFF–öâVÆ–f–6F–öâà ¢22'B’(	B6æöæ–6ÂT’c"6öçG&7BæBvR7&÷77vÆ° ¢2ÖæFF÷'’t„„ôâc"T’7&÷77vÆ²(	BÆÂ#"vW0 ¢¢¥66÷S¢¢¢ÆÂc"T’FW6–vç2Â&öGV7F–öâvW2Â6†&VBæf–vF–öâÂ6Æ–VçB—2ÂFW6·F÷VçG'’ö–çG2ÂFW7G2æB&Wf–Ww2âF†—2—2F†R¢§6–ævÆR6æöæ–6ÂT’×v–FR7&÷77vÆ²¢¢Âæ÷BF6†&ö&BÖöæÇ’Æâà¢¢¤WF†÷&—G“¢¢¢&ö÷B&öFÖBõRæB*s3‚s(	4sÂF†R·&ö¦V7Bv÷fW&ææ6RÖ7FW%Ò…$ô¤T5EôtõdU$ää4UôÔ5DU"æÖB’Â´Væv–æRc"Ö7FW%Ò„Tät”äUõc%ôÔ5DU"æÖB’ÂæBF†RT’VF—BÂ–çfVçF÷'’ÂæB7WÆ–VBÖFW6–vâFW‡B6öç6öÆ–FFVBÆFW"–âF†—2Ö7FW"à¢¢¤–×ÆVÖVçFF–öâ'VÆS¢¢¢SbT’–çFVw&F–öâ—27F—fRv÷&²âf–æ—6‚F†Rw&VVB6öçG&öÇ2Âv÷&¶fÆ÷w2ÂæB6†&VB×6W'f–6R–çFVw&F–öâ&Vf÷&RW‡FW&æÂVÆ–f–6F–öââFòæ÷B&VFW6–vâ6æöæ–6Â7WÆ–VBvRf&–çG2â–çFW&æÂFW7G2æBf—†W2&ö6VVBGW&–ær–×ÆVÖVçFF–öâà ¢22$UT•$TB$Tdõ$RT4‚T’D4²†‡VÖâ÷"vVçB £â¢¤Æö6FRvR–âÖG&—‚&VÆ÷r¢£²–ç7V7B—G27WÆ–VBæÖVB6÷W&6RõärÂf&–çBÂ&öGV7F–öâFV×ÆFRÂFW7G2Â7FF–26öçG&öÂ–çfVçF÷'’Â6W'fW"&÷WFRæBW†7B6÷W&6R„TBâ&W6öÇfRÖ&–wV÷W2f&–çG2v—F‚F†RFW6–vâ÷væW#²æWfW"6–ÆVçFÇ’&WÆ6R7WÆ–VBFW6–vâà£"â¢¥&÷÷6R&÷VæFVB6†ævS¢¢¢W6W"×f—6–&ÆR÷WF6öÖS²ffV7FVBT’”G2ö6öçG&öÇ3²÷væW'6†—æBFWVæFVæ6–W3²W†7B&6¶VæBVæGö–çG2ÂWF†÷&—¦F–öâ÷66÷Rö&÷fÂöÆ–7“²ÆöF–ærÂV×G’ÂVæf–Æ&ÆRÂW'&÷"Â6æ6VÆÆF–öâÂ&V6öææV7BæBöffÆ–æR&V†f–÷"à£2â¢¥fW&–g’†öæW7B7FFS¢¢¢’#—2æ÷B&ööböb7V66W73²VWVVB—2æ÷B6ö×ÆWFVC²6ö×ÆWFVB—2æ÷BfW&–f–VC²Fòæ÷B7–çF†W6—¦Rf–æF–æw2Â7F—fR6W76–öç2ÂDU26÷fW&vRÂVF—B7'—Föw&‡’ÂÆ—fRv÷&¶W'2÷"T’W&Ö—76–öç2âVç7W÷'FVB7F–öç2×W7B&RÆ&VÆÆVBæBF—6&ÆVBö†–FFVâ6fVÇ’à£Bâ¢¤¶VWöæR÷væW"f÷"6†&VBf–ÆRâ¢¢&F6‚–æFWVæFVçBv÷&²W6–ærW‡Æ–6—B–çFW&f6W2æBæò6öæfÆ–7F–ær6öæ7W'&VçBw&—FW2ÂW"F†RVæv–æVW&–ærW†V7WF–öâÖöFVÂâæòVæ6öçG&öÆÆVBT’&ÆÆVÂ&Ww&—FRà£Râ¢¥w&—FR–çFW&æÂ&Vw&W76–öâFW7G2v—F‚F†R6†ævS¢¢¢6÷W&6Rö&–æF–ær6†V6·2ÂÆ—w&–v‡B–çFW&7F–öç2†–æ6ÇVF–æræVvF—fRöÖÆf÷&ÖVB&W7öç6W2’Â6Æ–VçBWF†÷&—¦F–öâæB6†&VB6÷&R6öçG&7G2v†W&R&VÆWfçC²FW7B7W÷'FVBFW6·F÷&V†f–÷"Âfö7W2ö¶W–&ö&BÂF&²V&æ6RæBæò÷fW&fÆ÷râ66†VGVÆRÖçVÂ76—7F—fR×FV6†æöÆöw’&Wf–WrgFW"F†Rw&VVBT’æBVæv–æR66÷R—26ö×ÆWFRà£bâ¢¥&V6÷&B–×ÆVÖVçFF–öâWf–FVæ6R2v÷&²&ö6VVG3¢¢¢6öFR4„Â–çFW&æÂFW7B6öÖÖæBÂ4’÷WF6öÖW2÷6¶—2Â6öçG&öÂ×Fò×6W'f–6RÖ–ærÂæB¶æ÷vâÆ–Ö—G2âgFW"–×ÆVÖVçFF–öâ—26ö×ÆWFRÂ&V6÷&BF†RFVfW'&VBW‡FW&æÂf—7VÂÂÖçVÂ66W76–&–Æ—G’÷6V7W&—G’ÂæBFWÆ÷–ÖVçB÷WF6öÖW2v–ç7BF†RW†7B&VÆV6R6æF–FFRà£râ¢¤–×ÆVÖVçFF–öâ&Wf–Ws¢¢¢6†V6²ÆÂ&VÆWfçB6öçG&öÂ&÷w2Â6W'f–6R6öçG&7G2ÂæB–çFW&æÂ'&÷w6W"ô’FW7G3²ÆVfRVæ–×ÆVÖVçFVB÷"Vç7W÷'FVB&V†f–÷"W‡Æ–6—FÇ’–FVçF–f–VBâFòæ÷B&Æö6²gW'F†W"–×ÆVÖVçFF–öâ&V6W6RC(	4Cb÷7BÖ6ö×ÆWF–öâVÆ–f–6F–öâ—2VæF–ærà ¢22ÆÂ#"&WV—&VBvR7&÷77vÆ²&÷w0 §Â”BÂvRÂ6æöæ–6Â&÷WFRÂ&öGV7F–öâFV×ÆFRÂW†—7F–ær'&÷w6W"FW7B6÷fW&vRÂFWÆ÷–ÖVçB66WFæ6RÀ§ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×À§ÂT’ÓÂF6†&ö&BÂ÷V’×c&ÂV•÷c%öF6†&ö&Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%öF6†&ö&Bç–ÂõTâÀ§ÂT’Ó"Â66÷RbF&vWG2Â÷V’×c"÷66÷VÂV•÷c%÷66÷Ræ‡FÖÆÂFW7E÷vV%÷V•÷c%÷66÷Rç–ÂFW7E÷vV%÷V•÷c%÷66÷Uö–çFW&7F–öç2ç–ÂõTâÀ§ÂT’Ó2Â'Vâb÷&6†W7G&F–öâÂ÷V’×c"÷'VæÂV•÷c%÷'Vâæ‡FÖÆÂFW7E÷vV%÷V•÷c%÷'Vâç–ÂõTâÀ§ÂT’ÓBÂf–æF–æw2Â÷V’×c"öf–æF–æw6ÂV•÷c%öf–æF–æw2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öf–æF–æw2ç–ÂõTâÀ§ÂT’ÓRÂ&W÷'BÂ÷V’×c"÷&W÷'FÂV•÷c%÷&W÷'Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%÷&W÷'Bç–ÂõTâÀ§ÂT’ÓbÂ&W÷'G2Â÷V’×c"÷&W÷'G6ÂV•÷c%÷&W÷'G2æ‡FÖÆÂFW7E÷vV%÷V•÷c%÷&W÷'G2ç–ÂõTâÀ§ÂT’ÓrÂ†—7F÷'’Â÷V’×c"ö†—7F÷'–ÂV•÷c%ö†—7F÷'’æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö†—7F÷'’ç–ÂõTâÀ§ÂT’Ó‚ÂF–væ÷7F–72Â÷V’×c"öF–væ÷7F–76ÂV•÷c%öF–væ÷7F–72æ‡FÖÆÂFW7E÷vV%÷V•÷c%öF–væ÷7F–72ç–ÂõTâÀ§ÂT’Ó’ÂWf–FVæ6RÂ÷V’×c"öWf–FVæ6VÂV•÷c%öWf–FVæ6Ræ‡FÖÆÂFW7E÷vV%÷V•÷c%öWf–FVæ6Rç–ÂõTâÀ§ÂT’ÓÂ’vFRÂ÷V’×c"ö–ÂV•÷c%ö’æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö’ç–ÂõTâÀ§ÂT’ÓÂ&WFW7BÂ÷V’×c"÷&WFW7FÂV•÷c%÷&WFW7Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%÷&WFW7Bç–ÂõTâÀ§ÂT’Ó"Â6†–ç2Â÷V’×c"ö6†–ç6ÂV•÷c%ö6†–ç2æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö6†–ç2ç–ÂõTâÀ§ÂT’Ó2ÂFFW'2Â÷V’×c"öFFW'6ÂV•÷c%öFFW'2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öFFW'2ç–ÂõTâÀ§ÂT’ÓBÂ6WGF–æw2Â÷V’×c"÷6WGF–æw6ÂV•÷c%÷6WGF–æw2æ‡FÖÆÂFW7E÷vV%÷V•÷c%÷6WGF–æw2ç–ÂõTâÀ§ÂT’ÓRÂVF—BÂ÷V’×c"öVF—FÂV•÷c%öVF—Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%öVF—Bç–ÂõTâÀ§ÂT’ÓbÂÖöæ—F÷&–ærÂ÷V’×c"öÖöæ—F÷&–ævÂV•÷c%öÖöæ—F÷&–æræ‡FÖÆÂFW7E÷vV%÷V•÷c%öÖöæ—F÷&–ærç–ÂõTâÀ§ÂT’ÓrÂ$2Â÷V’×c"ö&6ÂV•÷c%ö&2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–ÂFW7E÷vV%÷V•÷c%öGfæ6VE÷G'WF†gVÆæW72ç–ÂõTâÀ§ÂT’Ó‚Â'Vr&÷VçG’Â÷V’×c"ö'VrÖ&÷VçG–ÂV•÷c%ö'Vuö&÷VçG’æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö'Vuö&÷VçG’ç–ÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–ÂõTâÀ§ÂT’Ó’Â6ö×Æ–æ6RÂ÷V’×c"ö6ö×Æ–æ6VÂV•÷c%ö6ö×Æ–æ6Ræ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–ÂFW7E÷vV%÷V•÷c%öGfæ6VE÷G'WF†gVÆæW72ç–ÂõTâÀ§ÂT’Ó#ÂF2Â÷V’×c"÷F6ÂV•÷c%÷F2æ‡FÖÆÂFW7E÷vV%÷V•÷c%÷F2ç–ÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–ÂõTâÀ§ÂT’Ó#ÂF‡&VB–çFVÂÂ÷V’×c"÷F‡&VBÖ–çFVÆÂV•÷c%÷F‡&VEö–çFVÂæ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–ÂFW7E÷vV%÷V•÷c%öGfæ6VE÷G'WF†gVÆæW72ç–ÂõTâÀ§ÂT’Ó#"Â&÷fÇ2Â÷V’×c"ö&÷fÇ6ÂV•÷c%ö&÷fÇ2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–ÂFW7E÷vV%÷V•÷c%öGfæ6VE÷G'WF†gVÆæW72ç–ÂõTâÀ ¤ÆÂFV×ÆFW2Æ—fRVæFW"7&2÷v††öâö–çFW&f6W2÷vV"÷FV×ÆFW2ö²'&÷w6W"FW7G2Æ—fRVæFW"FW7G2öâF†RF6†&ö&BÆ–2÷V’×c"öF6†&ö&FæB&ö÷BVçG'’&÷WFRöFF—F–öæÆÇ’&WV—&R&—G’6†V6·2â6öÖÖöâFW7G3¢FW7E÷vV%÷V•÷c%÷&÷WFUöÖG&—‚ç–ÂFW7E÷vV%÷V•÷c%öæf–vF–öâç–ÂFW7E÷vV%÷V•÷c%ö6öçG&öÅö–çfVçF÷'’ç–²W†–Æ–'’vW26†&RF†RÆ—7FVB7V—FW2âF†R–çfVçF÷'’&V6÷&G2¢£s“27FF–26öçG&öÇ2¢£²67&—B&VfW&Væ6W2Fòæ÷BW7F&Æ—6‚Æ—fR&–æF–æw2à ¢2266WFæ6R7&—FW&–f÷"UdU%’&÷p §ÂvFRÂ&WV—&VB&ööbÂFVfVÇBÀ§ÂÒÒ×ÂÒÒ×ÂÒÒ×À§ÂCFW6–vâÂW†7B&÷fVB7WÆ–VB67&VVâæBf&–çC²FW6·F÷67&VVç6†÷B6ö×&—6öç2æBæò66–FVçFÂf—7VÂ6†ævW2ÂõTâÀ§ÂC"6öçG&öÇ2ÂWfW'’f—6–&ÆRVæ&ÆVB6öçG&öÂ&V6†&ÆRÂæÖVBÂWF†÷&—¦VBæBÖVBFò&VÂ7F–öã²F—6&ÆVBö†–FFVâöæW2Fö7VÖVçFVBv—F‚&F–öæÆRÂõTâÀ§ÂC2'VçF–ÖRG'WF‚ÂÆ—fR’FFÂV×G’÷Væf–Æ&ÆRöW'&÷"÷VæWF†÷&—¦VBö&Æö6¶VB÷&6R7FFW2æB&öÆÆ&6²G'WF†gVÂÂæò–çfVçFVB&V6÷&G2ÂõTâÀ§ÂCB6V7W&—G’Â66÷Rö&÷fÂö6öç6VçBöâ6W'fW#²55$bô÷&–v–âÂ…52æB6V7&WB&VF7F–öã²æòT’ÖöæÇ’öÆ–7’ÂõTâÀ§ÂCR66W76–&–Æ—G’Â¶W–&ö&BÖöæÇ’æf–vF–öâÂfö7W2&WGW&âÂ6VÖçF–2Æ&VÇ2Â6öçG&7BöæöâÖ6öÆ÷"7VW2æB76—7F—fR×FV6‚ÖçVÂ&Wf–WrÂõTâÀ§ÂCbFWÆ÷–ÖVçBÂ7W÷'FVB'&÷w6W"öFW6·F÷æBÆFf÷&Ò6†V6·2ÂW‡FW&æÂ76WBööffÆ–æRöÆ–7’ÂfW'6–öæVBW†7BÕ4„4’æB&VÆV6R&Wf–WvW"ÂõTâÀ ¤vR&V6öÖW2DUÄõ”ÔTåEõ$TE–¢¦öæÇ’v†VâC(	4CbV6‚†fRW†7B×6÷W&6RWf–FVæ6RæBW‡Æ–6—B&÷fW"6–vâÖöfb¢¢âæòvw&VvFRW&6VçFvR÷"vR&÷WFR6Öö¶R6Æ÷6W2ç’vFRâT’&VF–æW72FöW2¢¦æ÷B¢¢WFöÖF–6ÆÇ’&÷fRSb÷"gVÆÂ&öGV7BFWÆ÷–ÖVçBà ¢22v÷&²VWVRæBF6†&ö&BÖf—'7B6†V6·ö–ç@ ¢¢¥&–÷&—G’T’ÓF6†&ö&C¢¢¢7W'&VçBFV×ÆFRV•÷c%öF6†&ö&Bæ‡FÖÆÂ&÷WFR÷V’×c&Â'&÷w6W"7V—FRFW7E÷vV%÷V•÷c%öF6†&ö&Bç–ÂæB7WÆ–VBvV"V’f–ÆW2æB&VæFW&–æröF6†&ö&EöVævvVÖVçEö‡V%÷¦W&õ÷7FFRöâW†—7F–ærÆ—fRgVæ7F–öæÆ—G’–æ6ÇVFW2†—7F÷'’öf–ÇFW'2ô¥4ôâW‡÷'BÂ66÷R&÷WF–ærÂ¦ö"†ÇBÂ'W'„ÔÂ–×÷'BÂ†VÇF‚÷&VF–æW72Æ&VÇ2â¶æ÷vâ&Æö6¶W#¢gVÆÂ&÷fVB67&VVç6†÷BæB66W76–&–Æ—G’fW&–f–6F–öâÂ6ö×ÆWFRW"Ö6öçG&öÂW&Ö—76–öâöÖÆf÷&ÖVB×&W7öç6RÖ–ærÂ6¶v–æröæWGv÷&²76WBöÆ–7’à ¤F6†&ö&B&F6‚†&FVç2ÖÆf÷&ÖVBÖ†—7F÷'’W‡÷'C¢7V66W76gVÂ…EE&W7öç6Rv—F‚æöâÖ'&’–ÆöB×W7B¢¦f–Âf—6–&Ç’¢¢&F†W"F†âW‡÷'BÖ—6ÆVF–ærV×G’&6†—fS²FFVB'&÷w6W"&Vw&W76–öââ—BFöW2æ÷BÇFW"f—7VÂFW6–vââ¢¤F6†&ö&B&VÖ–ç2äõBFWÆ÷–ÖVçB×&VG’¢¢VçF–ÂÆÂC(	4Cb6ö×ÆWFRà ¢¢¤æW‡BgFW"F6†&ö&BæB66÷RbF&vWG3¢¢¢T’Ó2'Vâb÷&6†W7G&F–öâÂF†VâT’ÓBf–æF–æw2ÂF†VâWf–FVæ6R÷&W÷'Bv÷&¶fÆ÷w2æBF†R&VÖ–æ–ærvW3²÷&FW"föÆÆ÷w27&—F–6ÂFWVæFVæ6–W2æB—2F§W7F&ÆRv—F†÷WB6¶—–ærvFW2â66÷R"3#r—2ÖW&vVBÂ'WBT’Ó"FWÆ÷–ÖVçB66WFæ6R&VÖ–ç2õTâà ¢222'Vâb÷&6†W7G&F–öâ…T’Ó2’(	B6æF–FFR†&FVæ–ærÂ##bÓÓP ¢¢¥&VfW&Væ6RæB66÷S¢¢¢vV"V’f–ÆW2æB&VæFW&–ær÷'Vå÷FööÅö÷&6†W7G&F–öâ÷67&VVâçævÂ&÷WFR÷V’×c"÷'VæÂFV×ÆFR7&2÷v††öâö–çFW&f6W2÷vV"÷FV×ÆFW2÷V•÷c%÷'Vâæ‡FÖÆÂæB'&÷w6W"ÖöGVÆRFW7G2÷FW7E÷vV%÷V•÷c%÷'Vâç–âF†R7WÆ–VBFW6–vâ6÷W&6R&VÖ–ç2Væ6†ævVBâF†RwV&FVB'Vâ7F–öâW&f÷&×2â7–æ6‡&öæ÷W266÷R6†V6²&Vf÷&R÷7F–ærFòö’÷'Væ²Gvò&–B6Æ–6·26÷VÆB&Wf–÷W6Ç’72F†R7F—fRÖ¦ö"6†V6²&Vf÷&RV—F†W"&W7öç6R6WBF†R7W'&VçB¦ö"Â6W6–ærGWÆ–6FRF—7F6†W2âF†R6æF–FFRFG26–ævÆRÖfÆ–v‡BwV&BÂF—6&ÆW2F†R7F–öâv†–ÆRF†RWF†÷&—¦F–öâæBF—7F6‚&WVW7B—2VæF–ærÂæBFG2&Vw&W76–öâF†B76W'G2öæR66÷R6†V6²æBöæR'Vâ&WVW7Bf÷"Gvò–ÖÖVF–FR6Æ–6·2à ¢¢¤Wf–FVæ6RæBÆ–Ö—G3¢¢¢Æö6Â'Vfb6†V6²FW7G2÷FW7E÷vV%÷V•÷c%÷'Vâç–æBFW7G2÷FW7E÷c%÷V•öÖæFF÷'•ö7&÷77vÆ²ç–76VBâF†R'&÷w6W"&Vw&W76–öâ6÷VÆBæ÷B'VâÆö6ÆÇ’&V6W6RF†RÆ—w&–v‡B6‡&öÖ—VÒF÷væÆöBv2G'Væ6FVB–âF†—2Vçf—&öæÖVçBâW†7BÖ†VB4’—2&WV—&VBâF†—2—2öæR6fWG’–×&÷fVÖVçC²—BFöW2æ÷BW7F&Æ—6‚6ö×ÆWFR6öçG&öÂÖ–ærÂ&6¶VæBc"&—G’÷"ç’C(	4Cb66WFæ6RâT’Ó2&VÖ–ç2¢¤õTâ¢¢VæF–ærF†R6ö×ÆWFRW"×vRWf–FVæ6RæB&÷fW"6–vâÖöfg2à ¢¢¤Væv–æRc"GW&&ÆR'Vâ†æFöfb(	B##bÓÓ“¢¢¢F†R'VâvRæ÷r†26W&FR6öçG&öÂf÷"&Wf–Wv–ærâÇ&VG’×W'6—7FVBc"ÆâÂF—7Æ––ær—G2F6²6&–Æ—G’÷F&vWBö–×7B&–æF–æw2Â6†V6¶–ærÆ—7FVB&÷fÇ2f÷"V6‚ÖöFW&FRÖ÷"Ö†–v†W"F6²Â7V&Ö—GF–ærF‡&÷Vv‚õ5Bö’÷c"÷v÷&¶fÆ÷w2óÇÆåö–Câ÷'VæÂ&V6öææV7F–ærF‡&÷Vv‚GW&&ÆR6æ6†÷G2ÂæB&WVW7F–ær6æ6VÆÆF–öâF‡&÷Vv‚F†RGW&&ÆR'Vâ×&WVW7BVæGö–çBâ—BFöW2æ÷Bw&çB&÷fÂÂ6Æ–ÒF†BVWVVB&WVW7B6ö×ÆWFVBÂ÷"6Æ–ÒF†B6æ6VÆÆF–öâ7F÷VBâW‡FW&æÂVffV7BâF†R7F—fRc"&WVW7B”B—2&WF–æVB–â6W76–öâ7F÷&vRf÷"6ÖR×F"&V6öææV7BâF†RW†—7F–ærwV&FVBö’÷'VæF‚&VÖ–ç26W&FRÆVv7’6öçG&öÂv†–ÆR6&–Æ—G’Ö–ær÷&—G’—2Væf–æ—6†VBâF†—2—2öæRc"–çFVw&F–öâ6Æ–6S²gVÆÂT’Ó2Ö–w&F–öâÂ'&÷w6W"66WFæ6RæBC(	4Cb&VÖ–â¢¤õTâ¢¢à ¢¢¥&Wf–WvW"&V6÷&BFV×ÆFS¢¢¢T’Ô”BÂ&6Rö†VB4„Â&÷fVBäröFW6–vâf&–çBÂffV7FVB6öçG&öÂ”G2Â&6¶VæB&÷WFW2æBöÆ–7’ÂC(	4CbWf–FVæ6RÆ–æ·2ÂW‡V7FVBöö'6W'fVB7FFW2ÂÆ–Ö—FF–öç2Â–æFWVæFVçB&Wf–WvW"ÂW‡Æ–6—BFV6—6–öâà ¢22F6†&ö&B–×ÆVÖVçFF–öâ6†V6·ö–çB(	B##bÓÓR„C(	4Cb ¥F†RF6†&ö&B—2F†R¢¦f—'7B¢¢vR–âF†—2T’×v–FR7&÷77vÆ²Âæ÷B6W&FR7&÷77vÆ²âv÷&²—2–âµT’"3#eÒ†‡GG3¢òöv—F‡V"æ6öÒöæG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–72÷VÆÂó#b’â–×ÆVÖVçFVB6fWG’†&FVæ–æræ÷r–æ6ÇVFW3  ¢Òf–ÂÖ6Æ÷6VBÖÆf÷&ÖVB…EE×7V66W72–ÆöG2f÷"†—7F÷'’W‡÷'BæB–×÷'C²çVÆÂö–çfÆ–B¥4ôâ6†W2f÷"†—7F÷'’ö¦ö'2÷&W÷'B÷FööÇ2÷66÷R÷7FGW3²&ööÆVâÖöæÇ’†VÇF‚ÂFFW"æB66÷RVæf÷&6VÖVçB76W'F–öç2à¢Òæò6æF–FFR×Fò×fW&–f–VB&öÖ÷F–öâg&öÒvVæW&–2f–æF–ær7FGW6²W6RöæÇ’W‡Æ–6—BfW&–f–6F–öå÷7FGW6à¢Ò–çfÆ–B†—7F÷&–6ÂF–ÖW7F×2æBæVvF—fRf–æF–æw26÷VçG2&VÖ–âVç&V6÷&FVB&F†W"F†â&V–ær&W6VçFVB2&VÂFFà¢Ò'F–Â6æ6VÂf–ÇW&W2&W÷'B&WVW7FVB6÷VçG26öç6W'fF—fVÇ“²†—7F÷'’f–ÇFW&–ær†2f—6–&ÆRæòÖÖF6‚7FFRæB&WF–ç2&6¶VæB×Væf–Æ&ÆRÖW76vW2à¢Òæò7WÆ–VBFW6–vâf–ÆW2ÖöF–f–VC²ÆÂ6†ævW2–âF†R&öGV7F–öâF6†&ö&BFV×ÆFRæBW†—7F–ær'&÷w6W"FW7BÖöGVÆRà §ÂvFRÂÆFW7B76W76ÖVçBÂWf–FVæ6R7F–ÆÂ&WV—&VBFò6Æ÷6RÀ§ÂÒÒ×ÂÒÒ×ÂÒÒ×À§ÂCFW6–vâÂõTâÂ&÷fW"Ö&÷fVB6ö×&—6öâFòvV"V’f–ÆW2æB&VæFW&–æröF6†&ö&EöVævvVÖVçEö‡V%÷¦W&õ÷7FFR÷67&VVâçævB&W&W6VçFF—fR7W÷'FVBFW6·F÷f–Ww÷'G2À§ÂC"6öçG&öÇ2Â%D”ÂÂ'VçF–ÖR–çfVçF÷'’öbWfW'’f—6–&ÆR6öçG&öÂv—F‚f–æÂW‡V7FVB7F–öâÂÆöF–æröV×G’öW'&÷"æBWF†÷&—¦F–öâ&V†f–÷"Â–æ6ÇVF–ærvVæW&FVBVÆVÖVçG2À§ÂC2'VçF–ÖRG'WF‚Â4äD”DDRÂæWræVvF—fRÖ66RÆ—w&–v‡B76W'F–öç2ÂW†7BÖ†VB4’7V66W72Â7&÷72Ö6Æ–VçB–çFVw&F–öâæBÖöæ—F÷&VB7W÷'FVB7Fv–ærÀ§ÂCB6V7W&—G’Â%D”ÂÂ–æFWVæFVçB6W'fW"×6–FRWF†÷&—¦F–öâô55$b&Wf–WrÂÖÆ–6–÷W26öçFVçBW66–ærÂW&Ö—76–öâÖFVæ–VB÷F–ÖV÷WBö6æ6VÂ&öög2À§ÂCR66W76–&–Æ—G’Â%D”ÂÂ¶W–&ö&Böfö7W2Â†–v‚¦ööÒÂæöâÖ6öÆ÷"7VW2Â6öçG&7BæB76—7F—fR×FV6†æöÆöw’ÖçVÂ6–vâÖöfbÀ§ÂCbFWÆ÷–ÖVçBÂõTâÂW†7B6æF–FFR'&÷w6W"öFW6·F÷FW7G2Â6¶vVBföçG2ö–6öç2ô552÷"W‡Æ–6—FÇ’&÷fVB6öææV7FVBÖöæÇ’76WBöÆ–7’æBf–Æ÷fW"ÂF&vWBÖVçf—&öæÖVçB&öÆÆ÷WB÷&öÆÆ&6²Wf–FVæ6RÀ ¢¢¤†—7F÷&–6ÂFV6—6–öã¢¢¢BF†RF–ÖRÂF†RF6†&ö&Bv2&V6÷&FVB2æ÷BFWÆ÷–ÖVçB×&VG’VæF–ærC(	4CbWf–FVæ6RâF†—2FFVB6†V6·ö–çB—2æ÷Bâ7F—fR–×ÆVÖVçFF–öâg&VW¦RæBFöW2æ÷BW7F&Æ—6‚F†BF†R÷W&F÷"&÷fVBV6‚6–vâÖöfb7&—FW&–öââ7W'&VçB6WVVæ6S¢f–æ—6‚–×ÆVÖVçFF–öâæB–çFW&æÂFW7G2f—'7C²FVfW"W‡FW&æÂVÆ–f–6F–öâà ¢222F6†&ö&B7F–öâ6fWG’WFFR(	B##bÓÓP ¢ÒVÖW&vVæ7’†ÇB&WVW7G2&R6–ævÆRÖfÆ–v‡Bv—F†–âF†RF6†&ö&B6W76–öâÂFò&WfVçBGWÆ–6FR7V&Ö—76–öç2g&öÒ&WVFVB6Æ–6·2âÖÆf÷&ÖVB¦ö"–FVçF—G’—2æ÷B6VçBFòF†R6æ6VÆÆF–öâVæGö–çC²'F–Â6æ6VÂ&W7VÇB&VÖ–ç2â–æ6ö×ÆWFR6æ6VÆÆF–öâ&WVW7BÂæ÷B&ööböb7F÷VBVffV7G2à¢ÒW'&÷"÷WF6öÖW2W6Râ76W'F—fR66W76–&–Æ—G’ÆW'B&öÆRâæöâÖW'&÷"–æf÷&ÖF–öæÂWFFW2W6R7FGW2&Vv–öââFFVB'&÷w6W"æVvF—fRFW7G2f÷"–çfÆ–B¦ö"”G2æBÆW'B6–væÆ–ærà¢Ò6÷W&6R6†ævW2&R&÷VæFVBFòF†R&öGV7F–öâF6†&ö&BFV×ÆFRæB'&÷w6W"FW7G3²æòFW6–vâ6÷W&6Rv2ÖöF–f–VBâ¢¤C(	4Cb&VÖ–âõTâVçF–ÂWf–FVæ6RæB6–vâÖöfb&R&V6÷&FVB¢¢â&–÷"w&VVâ4’—2æ÷BW†7BÖ†VB66WFæ6Rà ¢222F6†&ö&B7&÷77vÆ²Wf–FVæ6R(	BVçG'W7FVB6öçFVçBæB66W72FVæ–À ¥F†RF6†&ö&B'&÷w6W"7V—FR–æ6ÇVFW2GfW'6&–Â'&÷w6W"6†V6·2F†B66÷RæB¦ö"Ö†—7F÷'’FW‡B&Ræ÷B6öçfW'FVBFòW†V7WF&ÆRÖ&·WÂF†BÆÂf—6–&ÆRæf–vF–öæÂÆ–æ·2&W6öÇfRFò6æöæ–6ÂT’&÷WFW2ÂæBF†BC26æ6VÆÆF–öâ&W7öç6RæWfW"&V6öÖW2fÇ6R7F÷×7V66W726Æ–ÒâF†W6R&R6æF–FFR&öög2f÷"C.(	4CBÂæ÷Bâ–æFWVæFVçB6V7W&—G’6–vâÖöfbâ'&÷w6W"FW7G2×W7B72f÷"F†RW†7B6æF–FFR4„ÂæBFWÆ÷–ÖVçBCôCRôCb&VÖ–âVæ66WFVBà ¢222F6†&ö&B'VæFÆVB7G–Æ–ærÖ–ÆW7FöæP ¥F†RF6†&ö&Bæ÷r6W'fW2'V–ÆB×F–ÖR6ö×–ÆVBÂ–ææVBF–Çv–æB7G–ÆW6†VWBg&öÒ÷7FF–2öF6†&ö&B×c"æ776Âv—F‚F†R'V–ÆB&V6—R67&—G2ö'V–ÆEöF6†&ö&Eö772æ6§6æB—6öÆFVB'&æ6‚ÖöæÇ’fVæF÷"v÷&¶fÆ÷râF†R'VçF–ÖRF–Çv–æB4Dâ67&—B—2&VÖ÷fVC²—G26†V6¶VBÖ–âF†VÖR6öæf–wW&F–öâ&VÖ–ç2æöâÖW†V7WF&ÆRf÷"&W&öGV6–&ÆR76WB'V–ÆG2â'&÷w6W"&Vw&W76–öâ6÷fW&vR&Æö6·2&VÖ÷FRF–Çv–æBæBvöövÆRföçG2æBfW&–f–W26æöæ–6Â&6¶w&÷VæB7G–Æ–æræBÆ—fRvR÷W&F–öâW6–ærF†R'VæFÆVB552âCb¢§&VÖ–ç2õTâ¢¢&V6W6RföçBö–6öâö–ÖvRf–Æ&–Æ—G’Âf–æÂ6÷W&6RÖF—7G&–'WF–öâ–ç7FÆÂ6†V6·2Â&÷fVBæWGv÷&²ööffÆ–æR7W÷'BöÆ–7’ÂF&vWB&öÆÆ÷WBæB&öÆÆ&6²ÂæB÷W&F÷"66WFæ6R&WV—&R–æFWVæFVçB&ööbà ¢222F6†&ö&Bt4rVF—B&VÖVF–F–öà¢¢¤†—7F÷&–6Â6æF–FFR&W7VÇB†Öö&–ÆRf–Ww÷'B66÷R7WW'6VFVB“¢¢¢¢¤†—7F÷&–6Â6æF–FFR&W7VÇB†Öö&–ÆRf–Ww÷'B66÷R7WW'6VFVB“¢¢¢WFöÖFVB†RÖ6÷&Rt4r"ôæB"ãô&Wf–WröâF†R–çFVw&FVB'&÷w6W"6æF–FFRf÷VæBW†7FÇ’öæR'VÆRfÖ–Ç’f–Æ–ærBFW6·F÷æBÖö&–ÆS¢Fö7VÖVçB×F—FÆVâF†R&öGV7F–öâF6†&ö&Bæ÷r&÷f–FW2FW67&—F—fR…DÔÂÇF—FÆSæÂv—F‚'&÷w6W"&Vw&W76–öââF†RWFöÖFVBVF—B×W7B&R&W'VâöâF†RW†7B÷7BÖf—‚4„&Vf÷&R—G2&W7VÇB—266WFVBâWFöÖFVB7V66W72FöW2æ÷B&WÆ6RÖçVÂ76—7F—fR×FV6†æöÆöw’Â6öçG&7BÂ¦ööÒæB¶W–&ö&B&Wf–Wrà ¢222F6†&ö&B–æFWVæFVçFÇ’†÷7FVB7FF–276WG0 ¥F†RF6†&ö&B&öGV7F–öâFV×ÆFRæòÆöævW"&WVW7G2föçG2ÂÖFW&–Â7–Ö&öÇ2–6öç2ÂÆövòÂ÷"fF"g&öÒvöövÆR†÷7G2æBæòÆöævW"W6W2F†R'VçF–ÖRF–Çv–æB4DââF†R6¶vVBÆö6Â7FF–276WG2–æ6ÇVFRF6†&ö&B×c"æ776ÂF6†&ö&BÖföçG2æ776Â‚†6†VBföçB&–æ&–W2ÂGvò7WÆ–VBFW6–vâ–ÖvW2æBÆ–6Vç6R÷6÷W&6R4„Ó#Sb&V6÷&G2â'&÷w6W"&Vw&W76–öâ&Æö6·2¢¦ÆÂW‡FW&æÂ…EE2&WVW7G2¢¢æB&WV—&W2F†RF6†&ö&BFògVæ7F–öâÂ&VæFW"—G26æöæ–6ÂF&²7G–Æ–ærÂæBÆöB&÷F‚–ÖvW2W6–ærÆö÷&6²ÖöæÇ’7FF–2U$Ç2âF†—2FG&W76W2F†—&B×'G’vR×f–WrÆV¶vRæBGfæ6W2Cbâ÷F†W"7W÷'FVBVçf—&öæÖVçG2Âv†VVÂ÷6F—7B–æ6ÇW6–öâÂ&öÆÆ&6²Âf—7VÂöÖçVÂ66W76–&–Æ—G’æB&VÆV6R&÷fÂ&VÖ–â–æFWVæFVçB&WV—&VÖVçG2à ¢222F—7G&–'WF–öâ6¶v–ær66WFæ6RWFöÖF–öà¥F†Rfö7W6VBF6†&ö&Bv÷&¶fÆ÷ræ÷r'V–ÆG2&÷F‚F†Rv††öæv†VVÂæB6÷W&6RF—7G&–'WF–öâÂæB–çfö¶W267&—G2ö6†V6µöF6†&ö&EöF—7G&–'WF–öâç–âF†R6†V6²&WV—&W2F†RFWÆ÷–VBFV×ÆFRw2552öföçG2ö–ÖvW2ÂföçG2rÆ–6Vç6Ræ÷F–6W2æBÖæ–fW7B–â¢¦&÷F‚¢¢&6†—fW2ÂæBfW&–f–W24„Ó#Sbf÷"WfW'’'VæFÆVB&–æ'’v–ç7BF†RvVæW&FVBÖæ–fW7BâCb6¶v–ær—266WFVBöæÇ’öæ6RF†—2W†7BÖ†VB7FW76W3²7W÷'FVBÖ†÷7BFWÆ÷–ÖVçB÷&öÆÆ&6²æBW‡Æ–6—B&Wf–WvW"6–væöfb&VÖ–â6W&FRà ¢222&ÆÆVÂv†VVÂÖ–ç7FÆÂæB…EE76WBFWÆ÷–ÖVçBÆæP¤6V6öæBÂ–æFWVæFVçBv—D‡V"7F–öç2¦ö"'V–ÆG2F†Rv†VVÂ·6F—7BÂ6†V6·2ÆÂ6¶vVBF6†&ö&B&W6÷W&6W2öÆ–6Vç6W2v–ç7B4„Ó#Sb&V6÷&G2Â–ç7FÆÇ2F†R'V–ÇBv†VVÂ–çFòâ—6öÆFVBg&W6‚f—'GVÂVçf—&öæÖVçBÂ7F'G2v††öâ6W'fVöâÆö÷&6²æBfW&–f–W2Æ—fR÷V’×c&ÇW2V6‚Æö6Â552öföçBö–ÖvRU$Âf–…EEâ—B'Vç2¢¦–â&ÆÆVÂ¢¢v—F‚f—7VÂÂgVæ7F–öæÂæBWFöÖFVBt4r'&÷w6W"6†V6·2âgVÆÂ÷W&F÷"FWÆ÷–ÖVçBWF†÷&—¦F–öâÂ7GVÂ†÷7BWw&FR÷&öÆÆ&6²ÂÖçVÂ67&VVâ×&VFW"&Wf–WræBFW6–vâ6–væöfb&VÖ–â÷Vâà ¢222W†7BÖ†VB4’&V6öæ6–Æ–F–öâ(	B##bÓÓP ¤B6æF–FFRf3cFc†S“sc&cCc3SC666VS33†cS6FC&c6Â¶gVÆÂ4’'VâC#ƒ““SSÒ†‡GG3¢òöv—F‡V"æ6öÒöæG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–72ö7F–öç2÷'Vç2óC#ƒ““SS’†2æ÷r¢¦6ö×ÆWFVB5T44U52¢¢Â–æ6ÇVF–ær—F†öâ2ãó2ã"ó2ã2FW7BÆæW2æBÆFf÷&Ò6WGW6Öö¶Râ—F†öâ2ãæB2ã26÷W&6RÖF—7G&–'WF–öâæB6ÆVâ×v†VVÂ6Öö¶R7FW2vW&R¢§6¶—VB¢¢Âv†–ÆRF†R—F†öâ2ã"WV—fÆVçG276VC²Fòæ÷B6÷VçB6¶—2276W2â´fö7W6VBF6†&ö&B'VâC#ƒ““C“•Ò†‡GG3¢òöv—F‡V"æ6öÒöæG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–72ö7F–öç2÷'Vç2óC#ƒ““C“’’6ö×ÆWFVB5T44U52–â&÷F‚F6†&ö&F†'&÷w6W"Â67&VVç6†÷B6GW&RÂWFöÖFVB†R’æBF6†&ö&BÖ–ç7FÆÆ‡v†VVÂ÷6F—7BÖæ–fW7B4„æB—6öÆFVBÆö÷&6²…EE’¦ö'2âF†W6R÷WF6öÖW2vW&RfW&–f–VBv–ç7BF†RW†7B"†VB&Vf÷&RF†—2Fö7VÖVçFF–öâWFFS²¢§F†—2Fö7VÖVçFF–öâ6öÖÖ—B7&VFW2æWr†VB&WV—&–ærg&W6‚W†7BÖ†VB4’¢¢à ¢¢¥÷7BÖ–×ÆVÖVçFF–öâVÆ–f–6F–öâ6†V6¶Æ—7C¢¢¢F†R&W÷6—F÷'’w27W'&VçBC(	4Cb6†V6¶Æ—7BFW67&–&W2FW6·F÷f—7VÂ6ö×&—6öâÂW"Ö6öçG&öÂÖ–ærÂ7Fv–ærö6Æ–VçB&—G’Â6V7W&—G’ÂÖçVÂ66W76–&–Æ—G’ÂæBFWÆ÷–ÖVçB÷&öÆÆ&6²Wf–FVæ6RâW&f÷&Òç’Æ–6&ÆRW‡FW&æÂöÖçVÂ6†V6·2öæÇ’gFW"F†Rw&VVBc"Væv–æRæBT’66÷R—2–×ÆVÖVçFVBæB–çFW&æÂ6†V6·272âF†—26†V6¶Æ—7B—2&W÷6—F÷'’Fö7VÖVçFF–öã²—BFöW2æ÷B6Æ–ÒâVçfW&–f–VBW'6öæÂ&÷fÂg&öÒF†R÷W&F÷"à ¢22†—7F÷&–6ÂF6†&ö&BT’Ó6†V6·ö–çB(	B##bÓÓP ¥"²3#eÒ†‡GG3¢òöv—F‡V"æ6öÒöæG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–72÷VÆÂó#b’ÖW&vVBB3–FVV#CSSSf&F&C333cVc–VF6vFâF†R&W÷6—F÷'’FFVBF6†&ö&B6†ævRwV&BæBFW67&–&VBF†RvR2g&÷¦VâBF†BF–ÖRâF†—2—2&WF–æVB2†—7F÷&–6Â&W÷6—F÷'’7FFS²—B—2æ÷Bâ7F—fR–ç7G'V7F–öâFò7F÷T’–×ÆVÖVçFF–öââ7W'&VçBFVÆ—fW'’÷&FW"—2Fò6ö×ÆWFRF†Rw&VVBT’æBVæv–æR–×ÆVÖVçFF–öâÂ6öçF–çVR–çFW&æÂFW7F–ærÂæBFVfW"C(	4CbVÆ–f–6F–öâVçF–Â–×ÆVÖVçFF–öâ—26ö×ÆWFRâç’&VÖ–æ–ær6÷W&6RÖ6öçG&öÂwV&B×W7B&R&V6öæ6–ÆVBv—F‚F†B7F—fR6WVVæ6R&Vf÷&R—B6â&Æö6²WF†÷&—¦VB–×ÆVÖVçFF–öâv÷&²à ¢¢¤Væf÷&6VÖVçBÆ–Ö—FF–öã¢¢¢F†RwV&Bf–Ç2f–öÆF–ær"6†V6·2Â'WBöæÇ’&W÷6—F÷'’'&æ6‚&÷FV7F–öâ÷"'VÆW6WG2&WV—&–ærF†B6†V6²‡ÇW2&W7G&–7F–ærF—&V7BW6†W2öFÖ–â'—72’6â&WfVçBâWF†÷&—¦VBÖ–çF–æW"g&öÒÖW&v–ær÷"W6†–ærç—v’âF†R7F—fRv—D‡V"–çFVw&F–öâ6ææ÷BFÖ–æ—7FW"F†÷6R6WGF–æw2âVçF–Â&W÷6—F÷'’FÖ–æ—7G&F÷'2Væ&ÆR7V6‚6öçG&öÇ2ÂF†—2—2Fö7VÖVçFVB6öçG&–'WF÷"&ö†–&—F–öâÇW2âWFöÖFVB"6†V6²Âæ÷Bâ'6öÇWFRFV6†æ–6ÂÆö6²à  ¢ÒÒĞ ¢22'B"(	BFö72ôäUuõT•ô”åDU$5D”ôåôTD•BæÖB‡6÷W&6R&V6÷&B ¢2æWrFVfVÇBvV"T’(	B–çFW&7F–öâæB66WFæ6RVF—@ £â¢¤–çFVw&F–öâWFFR(	B##bÓÓ"Â7WW'6VFW2ffV7FVB&6VÆ–æR7FFVÖVçG2&VÆ÷s¢¢¢f÷W"öæR×6†÷B4Ä’6öÖÖæG2æ÷rW6R–æ—F–Æ—¦R†G&–ãÔfÇ6R–v—F‚&Vw&W76–öâ6÷fW&vRâFW6·F÷7F'GWF&vWG2÷V’×c&âFW7B6FÆör6öç7VÖW'2W6RF†R6¶vVB6VVC²F†RGWÆ–6FRG&6¶VB&ö÷B6FÆöræBVçW6VB7–æ2&WV—&VÖVçBöÖæ–fW7BVçG'’&R&VÖ÷fVBÂv†–ÆR÷W&F÷"6FÆöw2æB&÷FV7FVBÆVv7’FW6–vç2&VÖ–â&W6W'fVBâ6VRµT’6öçG&öÂ–çfVçF÷'•Ò‚7'BÓBÒÖFö77V•ö6öçG&öÅö–çfVçF÷'–ÖB×6÷W&6R×&V6÷&B’f÷"s“26÷W&6R6öçG&öÇ27&÷72#"FV×ÆFW3²7FF–26÷fW&vRFöW2æ÷BW7F&Æ—6‚6ö×ÆWFR'VçF–ÖRv—&–ærÂf—7VÂf–FVÆ—G’Â66W76–&–Æ—G’÷"6W'f–6R&—G’âÆö6Â'&÷w6W"W†V7WF–öâ—2&Æö6¶VB'’Væf–Æ&ÆR6‡&öÖ—VÒF÷væÆöG2âF†RV&Æ–W"4’÷6÷W&6R&V6÷&G2&VÆ÷rFW67&–&RF†V—"7FFVB&6VÆ–æRÂæ÷B66WFæ6RöbF†—2–çFVw&F–öâà  ¢¢¤WF†÷&—G“¢¢¢t„„ôâ$ôBÔÒt„E2äU…BÒeTÄÂ44õRæÖFÂBæB*s3‚sc²F†R&Wf–÷W26V7F–öâ&VfW&Væ6W2&R&V6öæ6–ÆVB–â—G2*sSà ¢¢¥&W÷6—F÷'“¢¢¢æG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–76 ¢¢¤7W'&VçB6÷W&6R&6VÆ–æS¢¢¢fffVc–&6fc–#vfff#ƒv6“†#csƒSc&f6&Â&Wf–WvVB##bÓÓ"à¢¢¤†—7F÷&–6Â–çFVw&F–öâ&6VÆ–æS¢¢¢Vf&fcƒS“3“&#33333“FV63Sf#6&f²FVfVÇB×&÷WFR6†ævRƒ36#†cƒƒVCF3FcSs3FFc““†cSƒS#6c–#36²FW7B76W'F–öâ6†ævR†f6C&#c36##cvSSsvVS3#3FS33&f#v&3–3sà¢¢¤W†7BÖ&6VÆ–æR4“¢¢¢²3CCƒƒCSƒ“•Ò†‡GG3¢òöv—F‡V"æ6öÒöæG&V—Fƒ#bõt„„ôâÔ’Ôf÷&Vç6–72ö7F–öç2÷'Vç2óCCƒƒCSƒ“’’76VBÆÂæ–æR¦ö'2â—F†öâ2ãó2ã"ó2ã2V6‚&W÷'FVBÃC‚76VBÂB6¶—VC²'&÷w6W"FW7G2&R'BöbF†BÖG&—‚âF†RV&Æ–W"&÷fÇ2&Vg&W6‚×VWVRf–ÇW&RöâS–#&c&—2†—7F÷&–6ÂÂæ÷BF†R7W'&VçB&VBÔ4’7FFRâF†—2FöW2æ÷BW7F&Æ—6‚6ö×ÆWFRT’66WFæ6Râæò'&÷w6W"FW7G2vW&R&W'VâÆö6ÆÇ’GW&–ærF†—2Fö7VÖVçFF–öâ&Wf–Wrà ¥F†—2—2FFVB–×ÆVÖVçFF–öâæB66WFæ6RVF—BÂæ÷BFV6Æ&F–öâF†BF†RT’—2gVÆÇ’66WFVB÷"FWÆ÷–ÖVçB×&VG’âF†R&öFÖ*s3‚&VÖ–ç2F†R6öçG&öÆÆ–ær&VÆV6RvFS²f—7VÂ&Vw&W76–öâÂ6ö×ÆWFRf—6–&ÆRÖ6öçG&öÂ–çfVçF÷'’Â66W76–&–Æ—G’Â4Ä’÷vV"&—G’æBW‡FW&æÂÖ76WBFWÆ÷–ÖVçB6†V6·2&VÖ–â÷VâVçF–ÂWf–FVæ6R—2&V6÷&FVBà ¢22â6÷W&6RÖöb×G'WF‚76WG2æB&W6W'fF–öà ¥F†R6†V6¶VBÖ–âFW6–vâ6¶vR6öçF–æVB3"…DÔÂf–ÆW2æB3"ärf–ÆW2BF†R–ç7V7FVB&6VÆ–æRÂÇW2ö'6–F–åö¶–æWF–2ôDU4”tâæÖFâF†R…DÔÂõär6WB–æ6ÇVFW2F—7F–æ7BfW'6–öæVBÇFW&æF—fW2æBFVâ'—FRÖ–FVçF–6ÂÆö÷6R6÷–W2â6÷VçG2F†W&Vf÷&RFòæ÷BÖVâ3"66WFVBv÷&¶fÆ÷w2âF†R¶GVRÖF–Æ–vVæ6R&Vv—7FW%Ò…$ô¤T5EôtõdU$ää4UôÔ5DU"æÖB’6W&FW26fRGWÆ–6FR×&VÖ÷fÂ6æF–FFW2g&öÒF—7F–æ7B7WÆ–VBFW6–vç2&WV—&–ær6æöæ–6ÂÖ–æs²F†R6ÆVçW&VÖ÷fW2F†RFVâW†7BÆö÷6R6÷–W2v†–ÆR&WF–æ–æræÖVB÷&–v–æÇ2æBF—7F–æ7BÇFW&æF—fW2âF†R&öGV7F–öâ–×ÆVÖVçFF–öâ6öç6—7G2öb#"V•÷c%ò¢æ‡FÖÆFV×ÆFW2æB#"6÷'&W7öæF–ærvV"&÷WFW2à ¥F†RæWrFV×ÆFW2W6RF†R7WÆ–VBö'6–F–â¶–æWF–2f—7VÂ7—7FVÒâF†R÷&–v–æÂ&6Ræ‡FÖÆÂ–æFW‚æ‡FÖÆÂæ§6Â7G–ÆRæ776ÂæB†—7F÷&–6ÂFö72õtT%õT•ô”åDU$5D”ôåôTD•BæÖF&VÖ–âF†RFW&V6FVB–çFW&f6R÷&VfW&Væ6RâF†W’×W7Bæ÷B&R&VFW6–væVBÂ&WW'÷6VB2F†RæWrT’Â÷"÷fW'w&—GFVâ2'BöbF†—2v÷&²à ¢22"âVçG'’ö–çG0 §ÂU$ÂÂW'÷6RÂ7FFRÀ§ÂÒÒ×ÂÒÒ×ÂÒÒ×À§ÂöÂFVfVÇBvV"VçG'’ö–çBÂ&VF—&V7G2Fò÷V’×c&²W†7BÖ&6VÆ–æR4’&÷fR76VC²gWGW&R6æF–FFW2æVVBF†V—"÷vâ4’Wf–FVæ6RÀ§Â÷V’×c&Â6æöæ–6Âö'6–F–â¶–æWF–2F6†&ö&BÂ–×ÆVÖVçFVBÀ§Â÷V’×c"öF6†&ö&FÂF6†&ö&BÆ–2Â–×ÆVÖVçFVBÀ§Â÷V–Â&Wf–÷W2vV"–çFW&f6RÂ&W6W'fVB6ö×F–&–Æ—G’÷&VfW&Væ6R&÷WFS²FW6·F÷wV’öVÖ&VBç–7F–ÆÂö–çG2†W&RÀ§ÂFW6·F÷ÆVæ6†W"ÂwV’öç–(i"VÖ&VBåU$ÆÂ7F–ÆÂ÷Vç2÷V–²Ö–w&FRFò66WFVBæWrFVfVÇBæBFW7B7F'GWöæf–vF–öâÀ ¢222â6æöæ–6Â67&VVâ×Fò×&÷WFRÖ  §ÂFW6–vâ67&VVâÂ&öGV7F–öâ&÷WFRÂFV×ÆFRÂ'&÷w6W"FW7B6÷fW&vRÀ§ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×À§ÂF6†&ö&BòVævvVÖVçB‡V"Â÷V’×c&ÂV•÷c%öF6†&ö&Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%öF6†&ö&Bç–ÂFW7E÷vV%÷V•÷c%öæf–vF–öâç–À§Â66÷RæBF&vWG2Â÷V’×c"÷66÷VÂV•÷c%÷66÷Ræ‡FÖÆÂFW7E÷vV%÷V•÷c%÷66÷Rç–ÂFW7E÷vV%÷V•÷c%÷66÷Uö–çFW&7F–öç2ç–À§Â'VâæB÷&6†W7G&F–öâÂ÷V’×c"÷'VæÂV•÷c%÷'Vâæ‡FÖÆÂFW7E÷vV%÷V•÷c%÷'Vâç–À§ÂfW&–f–VBf–æF–æw2òG'W7BÆ–W"Â÷V’×c"öf–æF–æw6ÂV•÷c%öf–æF–æw2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öf–æF–æw2ç–À§Â&W÷'BòDU26÷fW&vRÂ÷V’×c"÷&W÷'FÂV•÷c%÷&W÷'Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%÷&W÷'Bç–À§Â&W÷'G2æBW‡÷'G2Â÷V’×c"÷&W÷'G6ÂV•÷c%÷&W÷'G2æ‡FÖÆÂFW7E÷vV%÷V•÷c%÷&W÷'G2ç–À§Â¦ö"W†V7WF–öâ†—7F÷'’Â÷V’×c"ö†—7F÷'–ÂV•÷c%ö†—7F÷'’æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö†—7F÷'’ç–À§Â7—7FVÒF–væ÷7F–72æB†VÇF‚Â÷V’×c"öF–væ÷7F–76ÂV•÷c%öF–væ÷7F–72æ‡FÖÆÂFW7E÷vV%÷V•÷c%öF–væ÷7F–72ç–À§ÂWf–FVæ6Rf–ÆR–ç7V7F÷"Â÷V’×c"öWf–FVæ6VÂV•÷c%öWf–FVæ6Ræ‡FÖÆÂFW7E÷vV%÷V•÷c%öWf–FVæ6Rç–À§Â’7G&FVw’ò‡VÖâvFRÂ÷V’×c"ö–ÂV•÷c%ö’æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö’ç–À§Â&VÖVF–F–öâæB&WFW7B7GVF–òÂ÷V’×c"÷&WFW7FÂV•÷c%÷&WFW7Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%÷&WFW7Bç–À§Â6÷'&VÆFVBGF6²6†–ç2Â÷V’×c"ö6†–ç6ÂV•÷c%ö6†–ç2æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö6†–ç2ç–À§ÂFFW"æBÇVv–âÖævW"Â÷V’×c"öFFW'6ÂV•÷c%öFFW'2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öFFW'2ç–À§Â6WGF–æw2æB6V7&WG2fVÇBÂ÷V’×c"÷6WGF–æw6ÂV•÷c%÷6WGF–æw2æ‡FÖÆÂFW7E÷vV%÷V•÷c%÷6WGF–æw2ç–À§Â7'—Föw&†–2VF—BÆörÂ÷V’×c"öVF—FÂV•÷c%öVF—Bæ‡FÖÆÂFW7E÷vV%÷V•÷c%öVF—Bç–À§ÂGF6²×7W&f6RÖöæ—F÷&–ærÂ÷V’×c"öÖöæ—F÷&–ævÂV•÷c%öÖöæ—F÷&–æræ‡FÖÆÂFW7E÷vV%÷V•÷c%öÖöæ—F÷&–ærç–À§Â$2òFWFV7F–öâfÆ–FF–öâÂ÷V’×c"ö&6ÂV•÷c%ö&2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–À§Â'Vr&÷VçG’ò'&÷w6W"7GVF–òÂ÷V’×c"ö'VrÖ&÷VçG–ÂV•÷c%ö'Vuö&÷VçG’æ‡FÖÆÂFW7E÷vV%÷V•÷c%ö'Vuö&÷VçG’ç–ÂW†–Æ–'’×vRFW7G2À§Â6ö×Æ–æ6R7&÷77vÆ²Â÷V’×c"ö6ö×Æ–æ6VÂV•÷c%ö6ö×Æ–æ6Ræ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–À§ÂF26Æ–VçB÷'FÂÂ÷V’×c"÷F6ÂV•÷c%÷F2æ‡FÖÆÂFW7E÷vV%÷V•÷c%÷F2ç–ÂW†–Æ–'’×vRFW7G2À§ÂF‡&VB–çFVÆÆ–vVæ6RòW‡Æö—B'6VæÂÂ÷V’×c"÷F‡&VBÖ–çFVÆÂV•÷c%÷F‡&VEö–çFVÂæ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–À§ÂG'W7BÆ–W"&÷fÇ2VWVRÂ÷V’×c"ö&÷fÇ6ÂV•÷c%ö&÷fÇ2æ‡FÖÆÂFW7E÷vV%÷V•÷c%öW†–Æ–'•÷vW2ç–À ¤ÆÂ#"&÷WFW2†fR6÷'&W7öæF–ær&öGV7F–öâFV×ÆFRâF†RG&6¶VB&6VÆ–æR†2#2T’×c"FW7BÖöGVÆW3²6öÖR&VÆFVBvW26†&RF†RW†–Æ–'’×vRÖöGVÆRà ¢22BâÆ—fRv÷&¶fÆ÷w2v—F‚'&÷w6W"6÷fW&vP ¥F†R&W÷6—F÷'’6öçF–ç2Æ—w&–v‡B6÷fW&vRf÷"F†RföÆÆ÷v–ærÆ—fR&V†f–÷'3  ¢ÒF6†&ö&C¢Æ—fR¦ö"†—7F÷'’Âf–ÇFW&–ærÂ¥4ôâ†—7F÷'’W‡÷'BÂVÖW&vVæ7’†ÇB&W÷'F–ærÂ4Ä’Ö†VÇö7&VFVçF–ÂwV–Fæ6RÂæB'W'„ÔÂ–×÷'Bà¢Ò66÷S¢ÆöF–æræBW'6—7F–ær66÷RÂÖÆf÷&ÖVB×'VÆR&V¦V7F–öâÂW‡Æ–6—B6öæf—&ÖF–öâ&Vf÷&RF—6&Æ–ærVæf÷&6VÖVçBÂæBF&vWB6†V6·2à¢Ò'Vã¢Æ—fRFööÂ6FÆörÂwV&FVB76—fRö7F—fR'VâF‡2Â÷WGWB÷7FGW2†æFÆ–ærÂ÷WBÖöb×66÷R&V¦V7F–öâÂæB6æ6VÆÆF–öâö&÷'B6öçG&öÇ2à¢Òf–æF–æw3¢Æ—fRf–æF–æw2Âf–æF–ær–ç7V7F–öâÂfÆ–FF–öâ÷&WFW7B&WVW7G2Âf–ÇFW&–ærÂæB66÷RÖv&R7FFRà¢Ò&W÷'G3¢Æ—fR&W÷'B’FFÂ¥4ôâôÖ&¶F÷vâF÷væÆöG2Â&Wf–WrÖöFÂÂæBG'WF†gVÂVæf–Æ&–Æ—G’öbVç7W÷'FVBWf–FVæ6Rö6öæf–wW&F–öâà¢Ò†—7F÷'“¢Æ—fR&V6÷&G2Âf–ÇFW'2ÂæB¥4ôâW‡÷'Bà¢ÒF–væ÷7F–73¢Æ—fR†VÇF‚÷FööÂöFWVæFVæ7’—2Â&VBÖöæÇ’F–væ÷7F–72Â&VÖVF–F–öâ×Æâ&Wf–WrÂæBwV&FVB–ç7FÆÆF–öâv÷&¶fÆ÷w2à¢ÒWf–FVæ6RÂ’Â&WFW7BÂGF6²6†–ç2ÂFFW'2Â6WGF–æw2ÂVF—BÂÖöæ—F÷&–ærÂ$2Â'Vr&÷VçG’ÂF2Â6ö×Æ–æ6RÂF‡&VB–çFVÆÆ–vVæ6RæB&÷fÇ3¢vR×7V6–f–2Æ—fRFFæB–çFW&7F–öâFW7G2W†—7B–âF†V—"æÖVBFW7BÖöGVÆW2à ¥&W6Væ6RöbFW7BÖöGVÆRFöW2æ÷BÖVâWfW'’6öçG&öÂöâF†BvR†276VB–æFWVæFVçB66WFæ6RâF†R4’&W7VÇBf÷"F†R6æF–FFR6öÖÖ—B×W7B&R6†V6¶VBà ¢22Râ&VfW&Væ6RÖöæÇ’6öçG&öÇ2æB6–×VÆFVB6öçFVç@ ¥F†RÆ—fRT’–çFVçF–öæÆÇ’F—6&ÆW2÷"†–FW26öçG&öÇ2f÷"v†–6‚F†W&R—2æò6fR–×ÆVÖVçFVB&6¶VæBâW†×ÆW2fW&–f–VB–âF†R7W'&VçBFW7G2÷6÷W&6R–æ6ÇVFS  ¢ÒFFW"Öö6²W†V7WF–öâæBÖæ–fW7B&R×6–væ–æs²FFW"6öæf–wW&F–öâ×WFF–öâ—2F—6&ÆVBà¢ÒF–væ÷7F–727F–öç2F†Bv÷VÆB6Æ–Ò6–×VÆFVB7V'7—7FVÒ&W7F'G2Â&ö&W2÷"&Væ6†Ö&·2à¢Ò&W÷'B6öæf–wW&F–öâ6VÆV7F÷'2F†BFòæ÷BffV7BF†RÆ—fR&W÷'B’Â6×ÆR&ööböWf–FVæ6RÂæBVç7W÷'FVBvf–ÇFW'2à¢ÒÖöæ—F÷&–ærw26–×VÆFVB&V6öâG&–vvW"æBVæ–×ÆVÖVçFVB76WB×WFF–öç2à¢Ò$2Â'VrÖ&÷VçG’ÂF2Â6ö×Æ–æ6RæBF‡&VBÖ–çFVÆÆ–vVæ6R7F–öç2F†B–×Ç’W‡Æö—BW†V7WF–öâÂFWÆ÷–ÖVçBÂ6Æ–VçBFVÆ—fW'’÷"÷F†W"Vç7W÷'FVB÷W&F–öç2à¢Ò6×ÆRVævvVÖVçBÂF&vWBÂf–æF–ærÂFVÆVÖWG'’æBF–væ÷7F–2FF—2&VÖ÷fVB÷"†–FFVâ–âF†RÆ—fR&W6VçFF–öâà ¥F†W6R6öçG&öÇ2×W7B&VÖ–âF—6&ÆVBö†–FFVâVçF–Â&VÂ&6¶VæB–×ÆVÖVçFF–öâÂWF†÷&—¦F–öâ&÷VæF'’æBFW7BW†—7BâF—6&ÆVBf—7VÂ&VfW&Væ6R6öçG&öÂ—2æ÷BFVÆ—fW&VBfVGW&Rà ¢22bâ66WFæ6Rv2(	B7F–ÆÂ÷Và £â¢¥f—7VÂ&Vw&W76–öã¢¢¢F†R7W'&VçBT’×c"'&÷w6W"FW7G2W†W&6—6R&VæFW&–æræB–çFW&7F–öç2Â'WBF†RFW7BÖöGVÆW2Fòæ÷B6öçF–â67&VVç6†÷BÖ&6VÆ–æR6ö×&—6öç2†æòFõö†fU÷67&VVç6†÷FöWV—fÆVçB6æ6†÷B76W'F–öç2vW&Rf÷VæB’âF†R7WÆ–VBäw2&R&W6VçBÂ'WBWFöÖFVB—†VÂ÷W&6WGVÂ6ö×&—6öâv–ç7B&÷fVB&6VÆ–æW2—2æ÷B–WBWf–FVæ6VBà£"â¢¤4Ä’÷vV"6W'f–6R&—G“¢¢¢F†R&öFÖ&WV—&W24Ä’fW&'2FòW6R6†&VB6W'f–6RÖöGVÆW2æB&—G’FW7Bf÷"4Ä’÷vV"7W&f6W2†÷"Fö7VÖVçFVBFVÆ–&W&FRF–ffW&Væ6W2’âFVF–6FVB&—G’FW7Bv2æ÷B–FVçF–f–VB–âF†R7W'&VçBFW7BG&VRâVF—BF†R7GVÂ4Ä’÷vV"6öÖÖæB7W&f6R&Vf÷&R6Æ–Ö–ærF†—2vFR76VBà£2â¢¤66W76–&–Æ—G“¢¢¢'&÷w6W"FW7G2W†—7BÂ'WBgVÆÂ¶W–&ö&Böfö7W2ÖÖævVÖVçB÷67&VVâ×&VFW"õt4rãBã66WFæ6R72—2æ÷BWf–FVæ6VB'’F†R7W'&VçBFW7BæÖW2÷"6öçFVçG2&Wf–WvVBâFBWFöÖFVB6†V6·2v†W&R&7F–6ÂæB&V6÷&BÖçVÂ6†V6·26W&FVÇ’à£Bâ¢¤ÆÂÖ6öçG&öÂ–çfVçF÷'“¢¢¢F†R#"vW2†fRFVF–6FVB÷"6†&VB'&÷w6W"FW7G2Â'WB6ö×ÆWFRW"Ö6öçG&öÂ–çfVçF÷'’&÷f–ærWfW'’f—6–&ÆR6öçG&öÂ—2v—&VBÂF—6&ÆVB÷"†–FFVâ†2æ÷B–WB&VVâ&V6÷&FVBâ6öçF–çVRvRÖ'’×vRæBW‡FVæBFW7G2f÷"ç’Væ6÷fW&VB6öçG&öÇ2à£Râ¢¤FWÆ÷–ÖVçBFWVæFVæ6–W3¢¢¢F†R7WÆ–VBvW2ÆöBF–Çv–æBÂföçG2ö–6öç2æB–ÖvW2g&öÒW‡FW&æÂ†÷7G2âFV6–FRæBFW7Bv†WF†W"F†R7W÷'FVBFWÆ÷–ÖVçB&WV—&W2æWGv÷&²Ö–æFWVæFVçB'VæFÆVB76WG3²Fòæ÷B6–ÆVçFÇ’6Æ–Ò—"ÖvVB&VF–æW72v†–ÆRW‡FW&æÂ'VçF–ÖR76WG2&VÖ–âà£bâ¢¤FW6·F÷öFVfVÇBVçG'’ö–çG3¢¢¢F†RvV"6W'fW"&VF—&V7G2öFò÷V’×c&Â'WB7&2÷v††öâö–çFW&f6W2öwV’öVÖ&VBç–7F–ÆÂ6WG2—G2U$ÂFò÷V–â6÷'&V7BF†RFW6·F÷VçG'’ö–çBÂFW7B7F'GWöæf–vF–öâv–ç7BF†R66WFVB7WÆ–VBT’æB&W6W'fRÆVv7’FW6–vâ6÷W&6RVæ6†ævVBâvV"×&÷WFR4’FöW2æ÷B&÷fRFW6·F÷&—G’à£râ¢¤W†7B6æF–FFS¢¢¢F†R–ç7V7FVB&6VÆ–æR—24’Öw&VVââ&WVB&WV—&VB'&÷w6W"ôS$RæB66WFæ6R6†V6·2f÷"F†Rf–æÂ&VÆV6R6æF–FFR&F†W"F†â&VÇ––æröâV&Æ–W"6öÖÖ—G2à ¢22râ'&æ6‚æB"&V6öæ6–Æ–F–öà ¤BF†RF–ÖRöbF†—2VF—BF†W&RvW&Ræò÷VâVÆÂ&WVW7G3²F†R&W÷6—F÷'’v26†V6¶VBv–âöâ##bÓÓ"æB7F–ÆÂ†BæöæR÷VââF†R6æöæ–6ÂT’–çFVw&F–öâ'233rÂ3CæB3C"ÂæBF†R7V'6WVVçBT’v—&–ær÷G'WF†gVÆæW72'23C>(	23s2ÂvW&RÇ&VG’ÖW&vVB–çFòÖ–æâF†RöÆBgVÆÂ×v—&–ær"3bv26Æ÷6VBVæÖW&vVB2G&gC²—G2÷vâFW67&—F–öâW‡Æ–6—FÇ’6–Bæ÷BFòÖW&vR&V6W6Rv—&–æræB'&÷w6W"66WFæ6RvW&R–æ6ö×ÆWFRâ'233>(	233bvW&R7WW'6VFVB'’F†RÆFW"–çFVw&FVBT’v÷&²âF†V—"öÆB'&æ6‚F—2×W7Bæ÷B&R&Æ–æFÇ’ÖW&vVB÷fW"æWvW"Ö–â6öFRà ¤æòÇFW&æFRT’÷"'VçF–ÖR–×ÆVÖVçFF–öâ—27&VFVB'’F†—2Fö7VÖVçFF–öâ&Vg&W6‚â7W'&VçB'&æ6‚6ö×&—6öâæB&WF—&VÖVçB6öæF—F–öç2&R–âF†R¶GVRÖF–Æ–vVæ6R&Vv—7FW%Ò…$ô¤T5EôtõdU$ää4UôÔ5DU"æÖB’â7FÆR†—7F÷&–6Â'&æ6†W2&Ræ÷BÖW&vR6æF–FFW2ÖW&VÇ’&V6W6RF†W’7F–ÆÂW†—7Bà ¢22‚â&VÆV6RvFP ¤Fòæ÷BÖ&²F†RæWrT’DôäR÷"FWÆ÷–ÖVçB×&VG’VçF–ÂF†R66WFæ6Rv2&÷fR&R6Æ÷6VBÂ'&÷w6W"æBf—7VÂ&Vw&W76–öâ6†V6·272öâF†R6æF–FFR6öÖÖ—BÂ6V7W&—G’&Vw&W76–öç272ÂæBF†R&öFÖw2*s3‚&VÆV6R6†V6¶Æ—7B—2WFFVBv—F‚ö'6W'fVBWf–FVæ6Rà  ¢ÒÒĞ ¢22'B2(	BFö72õtT%õT•ô”åDU$5D”ôåôTD•BæÖB‡6÷W&6R&V6÷&B £â¢¤†—7F÷&–6ÂVF—B(	B7WW'6VFVBƒ##bÓÓ"’â¢¢F†—2f–ÆR&V6÷&G2âV&Æ–W"T’vVæW&F–öâæB×W7Bæ÷B&RW6VBFò76W72F†R7W'&VçBö'6–F–â¶–æWF–2T’â—G2vR–çfVçF÷'’Â52õt•$TBôÔô4µUÆ&VÇ2ÂVæGö–çBv—&–æræBFW7B6÷VçG2&R†—7F÷&–6ÂâW6R´æWrT’–çFW&7F–öâVF—EÒ‚7'BÓ"ÒÖFö76æWu÷V•ö–çFW&7F–öåöVF—FÖB×6÷W&6R×&V6÷&B’f÷"F†R7W'&VçB#"×&÷WFR–×ÆVÖVçFF–öâö66WFæ6R&V6÷&BæBÖ7FW"&öFÖ*s3‚f÷"&VÆV6R66WFæ6RâF†—2†—7F÷&–6Âf–ÆR—2&WF–æVBf÷"G&6V&–Æ—G’öæÇ’à ¢2t„„ôâvV"T’–çFW&7F–öâVF—@ ¢227FGW2ÆVvVæ@¢Ò¢¥52¢¢(	Bv—&VBÂfW&–f–VB–â'&÷w6W"Â†276–ærFW7@¢Ò¢¥t•$TB¢¢(	Bv—&VBFò&VÂ&6¶VæBÂæ÷B–WBfW&–f–VB–â'&÷w6W ¢Ò¢¤Ôô4µU¢¢(	B†&F6öFVBFFÂæò&6¶Væ@¢Ò¢¤„”DDTâ¢¢(	BÖö6·WÂ6–FV&"—FVÒ†–FFVâVçF–Â&6¶VæBW†—7G0¢Ò¢¤$Äô4´TB¢¢(	Bæò&6¶VæBW†—7G2Â6ææ÷B&Rv—&VB–âF†—26W76–öà ¢22f–æF–æw2vP§Â”BÂVÆVÖVçBÂW‡V7FVBÂ7GVÂÂ&6¶VæBÂ7FGW2À§ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×À§ÂbãÂf–æF–æw2Æ—7BÂÆöBæB&VæFW"fÆ–FFVBÆ—fR&W÷'B&V6÷&G3²6†÷rV×G’ÂVæf–Æ&ÆRÂÖÆf÷&ÖVB×&W7öç6RÂæB&WG'’7FFW2Â–×ÆVÖVçFVBÂtUBö’÷&W÷'Cöf÷&ÖCÖ§6öâÂDU5E2DDTC²%$õu4U"%TâTäD”ärÀ§Âbã"Âf–æF–ær6&BÂ6VÆV7Bf–æF–æræB–ç7V7BöæÇ’&V6÷&FVBf–VÆG2Â–×ÆVÖVçFVBÂæöæRÂU„•5D”är%$õu4U"DU5BÀ§Âbã2ÂfÆ–FFR6VÆV7FVBf–æF–ærÂ7V&Ö—BfÆ–FF–öâæB&W÷'BF†R&WGW&æVB&W7VÇBÂ–×ÆVÖVçFVBÂõ5Bö’÷fÆ–FFRóÆ¦ö#âóÇ6WâÂU„•5D”är%$õu4U"DU5BÀ§ÂbãBÂ&WFW7B6VÆV7FVBòfW&–f–VBf–æF–æw2Â7V&Ö—B&WFW7C²&W÷'BV6‚f–ÆVB—FVÒ–âfW&–f–VB&F6‚Â–×ÆVÖVçFVBÂõ5Bö’÷&WFW7BóÆ¦ö#âóÇ6WâÂDU5BDDTC²%$õu4U"%TâTäD”ärÀ§ÂbãRÂ6WfW&—G’Â7FGW2ÂæBFFW"f–ÇFW'2Âf–ÇFW"F†RÆ—fRÆ—7C²V6‚f–ÇFW"6â&R6ÆV&VBÂ–×ÆVÖVçFVBÂæöæRÂt•$TBÀ§ÂbãbÂf–æF–ær6V&6‚Â6V&6‚f–æF–æræB&V6÷&FVBWf–FVæ6Rf–VÆG2Â–×ÆVÖVçFVBÂæöæRÂU„•5D”är%$õu4U"DU5BÀ§ÂbãrÂ6÷’Wf–FVæ6RÂ6÷’F†R6VÆV7FVBf–æF–ærw2&V6÷&FVBWf–FVæ6RÂ–×ÆVÖVçFVBÂ6Æ—&ö&B’Ât•$TBÀ§Âbã‚Â66÷R7FGW2ÂF—7Æ’7W'&VçB66÷R7VÖÖ'’æBVæf÷&6VÖVçB7FFRÂ–×ÆVÖVçFVBÂtUBö’÷66÷RÂU„•5D”är%$õu4U"DU5BÀ§Âbã’ÂÖ&²f—†VBò—77VRG&6¶W"W‡÷'Bò&÷fÇ2ÂVç7W÷'FVB6öçG&öÇ2&R†–FFVã²æò7FFR—26Æ–ÖVBÂ†–FFVâB'VçF–ÖRÂæöæRÂ„”DDTâÀ ¥F†Rf÷&ÖW"bãR(	Å6÷'B†VFW'>(	ÒæBbãb(	ÄFVç6—G’FövvÆ^(	Ò&÷w2FW67&–&VB6öçG&öÇ2'6VçBg&öÒF†—26&BÖÆ—7BFW6–vâæB&R&WF—&VBâ'VÆ²fW&–g’öFVÆWFRæBF†R’&ææW"&Ræ÷B6öçG&öÇ2–âF†R7W'&VçB6÷W&6S²F†W’&Ræ÷B6÷VçFVB2†–FFVâ6öçG&öÇ2âÖ&²f—†VBÂ—77VRG&6¶W"W‡÷'BÂæB&÷fÇ2&VÖ–â6÷W&6R×f—6–&ÆRÆ6V†öÆFW"'WGFöç2v—F‚–æW'B†æFÆW'3²7W'&VçBvR¦f67&—B†–FW2F†VÒB'VçF–ÖRVçF–Â&VÂ7F–öç2W†—7Bà ¢22'VâvP§Â"ãÂ6FÆörÆöBÂfWF6‚ö’÷FööÇ2Âv÷&·2ÂtUBö’÷FööÇ2Â52À§Â"ã"Â'Vâ'WGFöâÂõ5Bö’÷'VâÂv÷&·2Âõ5Bö’÷'VâÂ52À§Â"ã2Â6æ6VÂ'WGFöâÂõ5B6æ6VÂÂv÷&·2Âõ5Bö’ö¦ö'2óÆ–Câö6æ6VÂÂ52À§Â"ãBÂ54R7G&VÒÂÆ—fR÷WGWBÂv÷&·2ÂtUBö’ö¦ö'2óÆ–Câ÷7G&VÒÂ52À ¢2266÷RvP§Â2ãÂ66÷RÆ—7BÂfWF6‚ö’÷66÷RÂv÷&·2ÂtUBö’÷66÷RÂ52À§Â2ã"Â6†V6²66÷RÂõ5Bö’÷66÷Rö6†V6²Âv÷&·2Âõ5Bö’÷66÷Rö6†V6²Â52À§Â2ã2Â–×÷'B'WGFöâÂ–×÷'B66÷R¥4ôâÂ†–FFVâÂæöæRÂ„”DDTâÀ§Â2ãBÂ²FB'VÆRÂFB66÷R'VÆRÂ†–FFVâÂæöæRÂ„”DDTâÀ§Â2ãRÂ'Vâç—v’†ÖöFÂ’Âõ5Bö’÷66÷Rö÷fW'&–FRÂÆöw2÷fW'&–FRÂõ5Bö’÷66÷Rö÷fW'&–FRÂt•$TBÀ ¢22&W÷'BvP§ÂãÂvVæW&FRÖ&¶F÷vâÂF÷væÆöBÖB&W÷'BÂF÷væÆöG2ÂtUBö’÷&W÷'Cöf÷&ÖCÖÖBÂt•$TBÀ§Âã"ÂvVæW&FR…DÔÂÂF÷væÆöB‡FÖÂ&W÷'BÂF÷væÆöG2ÂtUBö’÷&W÷'Cöf÷&ÖCÖ‡FÖÂÂt•$TBÀ§Âã2ÂvVæW&FRDbÂF÷væÆöBFb&W÷'BÂF÷væÆöG2ÂtUBö’÷&W÷'Cöf÷&ÖC×FbÂt•$TBÀ§ÂãBÂ&V6VçB&W÷'G2F&ÆRÂÆ—7BvVæW&FVBÂ†&F6öFVBÂæöæRÂÔô4µUÀ§ÂãRÂ¶æ÷vâgVÆç2&Wf–WrÂ6†÷r5dRF&ÆRÂ†&F6öFVBÂæöæRÂÔô4µUÀ ¢22&WFW7BvP§ÂBãÂVWVRF&ÆRÂ6†÷rfW&–f–VBf–æF–æw2ÂÆ—fRVWVRÂtUBö’÷&W÷'BÂt•$TBÀ§ÂBã"Â&WFW7B'WGFöâ‡&÷r’Âõ5Bö’÷&WFW7BÂv—&VBÂõ5Bö’÷&WFW7BóÆ¦ö#âóÇ6WâÂt•$TBÀ ¢226W76–öç2vP§Â‚ãÂ6W76–öç2Æ—7BÂfWF6‚ö’ö×6b÷6W76–öç2ÂÆ—fRÆ—7BÂtUBö’ö×6b÷6W76–öç2Ât•$TBÀ§Â‚ã"Â–çFW&7B'WGFöâÂ÷Vâ6W76–öâÂæò†æFÆW"ÂæöæRÂÔô4µUÀ ¢22GF6²7W&f6RvP§ÂãÂw&‚&VæFW"ÂfWF6‚ö’÷—f÷Böw&‚Â†&F6öFVB5drÂtUBö’÷—f÷Böw&‚ÂÔô4µUÀ ¢226FÆörvP§Â2ãÂFööÂÆ—7BÂfWF6‚ö’÷FööÇ2ÂÆ—fRÆ—7BÂtUBö’÷FööÇ2Ât•$TBÀ§Â2ã"ÂFFW"6öÇVÖâÂFW&—fRg&öÒFFW'2Â†&F6öFVBÂæöæRÂÔô4µUÀ ¢22F‡&VB–çFVÂvP§Â’ãÂ6V&6‚'WGFöâÂ'Vâ7fR÷"Æöö·WÂæò†æFÆW"ÂæöæRÂÔô4µUÀ§Â’ã"Â5dR&W7VÇB6&BÂ6†÷r5dRFFÂ†&F6öFVBÂæöæRÂÔô4µUÀ ¢226ö×Æ–æ6RvP§ÂÒãÂg&ÖWv÷&²&öw&W72Â&VÂ6ö×Æ–æ6RÖ–ærÂ†&F6öFVBÂæöæRÂ„”DDTâÀ ¢226WGF–æw2vP§ÂrãÂF†VÖR6VÆV7F÷"ÂW'6—7BF†VÖRÂæò†æFÆW"ÂæöæRÂÔô4µUÀ§Ârã"ÂÖVÖ&W'2Æ—7BÂ6†÷r&VÂW6W'2Â†&F6öFVBÂæöæRÂ„”DDTâÀ ¢226ö×öæVçG2vP§ÂBãÂFW6–vâ7—7FVÒFVÖòÂæ÷BW6W"Öf6–ærÂ7FF–2ÂæöæRÂ„”DDTâÀ ¢227&÷72Ö7WGF–æp§Â"ãÂæ÷F–f–6F–öç2Â&VBæ÷F–f–6F–öâÆ—7BÂæò†æFÆW"ÂæöæRÂÔô4µUÀ§Â"ã"Âv÷&·76R7v—F6†W"Â6†ævRv÷&·76RÂæò†æFÆW"ÂæöæRÂÔô4µUÀ§Â"ã2Â6öÖÖæBÆWGFRÂ6V&6‚²7F–öç2ÂÖö6²7F–öç27G&—VBÂæöæRÂ„”DDTâÀ§Â"ãBÂ†VÇò6†÷'F7WG2Â6†÷r¶&BÆVvVæBÂv÷&·2ÂæöæRÂ52À§Â"ãRÂ6–FV&"6öÆÆ6RÂFövvÆRÂv÷&·2ÂæöæRÂ52À ¢2272F&vWG2‡F†—26W76–öâ¢ÒãÂã"Âã2(i"v—&RFòö’÷&W÷'BF÷væÆöG0¢ÒBãÂBã"(i"&WÆ6Rv—F‚&VÂ&WFW7BVWVP¢Ò‚ã(i"v—&RFòö’ö×6b÷6W76–öç0¢Ò2ã(i"v—&RFòö’÷FööÇ0¢Ò2ãR(i"v—&RFòö’÷66÷Rö÷fW'&–FP¢Òbã’(i"†–FR’&ææW"†æò&6¶VæB¢ÒbãrÂbã‚(i"†–FR'VÆ²&"'WGFöç2†æò&6¶VæB¢Ò"ã2(i"7G&—ÆWGFRÖö6²7F–öç2Â¶VW6V&6€ ¢2272"F&vWG2†æW‡B6W76–öâ¢Òã(i"v—&RFòö’÷—f÷Böw&€¢Ò’ãÂ’ã"(i"FB5dRöÆöö·WvV"&÷WFW2Âv—&R6V&6€ ¢22722F&vWG0¢ÒÒãÂrãÂrã"ÂBãÂ"ãÂ"ã"Â2ã2Â2ãBÂãBÂãR(i"†–FR÷"Ö&²&6öÖ–ær6ööâ   ¢ÒÒĞ ¢22'BB(	BFö72õT•ô4ôåE$ôÅô”ådTåDõ%’æÖB‡6÷W&6R&V6÷&B ¢27WÆ–VBT’6öçG&öÂ–çfVçF÷' ¢¢¥6÷W&6R&6VÆ–æS¢¢¢vSVÇW2F†R7W'&VçB–çFVw&F–öâ&F6‚âvVæW&FVBg&öÒÆÂ#"&öGV7F–öâV•÷c%ò¢æ‡FÖÆFV×ÆFW2W6–ærF†R7FFÆ–"…DÔÂ'6W"–âFW7G2÷FW7E÷vV%÷V•÷c%ö6öçG&öÅö–çfVçF÷'’ç–â&VvVæW&FRgFW"FV×ÆFR6†ævW2âæò7WÆ–VBFW6–vâv26†ævVBà ¢22Wf–FVæ6R&÷VæF' ¥F†—2—26ö×ÆWFR¢§7FF–26÷W&6RÖ6öçG&öÂ&Vv—7G'’¢¢Âæ÷BFV6Æ&F–öâF†BWfW'’6öçG&öÂ—2Æ—fR÷"66WFVBâ—B6÷fW'2æ6†÷'2Â'WGFöç2Â–çWG2Â6VÆV7G2ÂFW‡F&V2Â7VÖÖ&–W2W‡Æ–6—B'WGFöâöÆ–æ²&öÆW2Â–æÆ–æRWfVçB†æFÆW'2Âfö7W6&ÆRF&–æFW‚æBVF—F&ÆRVÆVÖVçG2Â–æ6ÇVF–ær–æ—F–ÆÇ’†–FFVâ6öçG&öÇ2â”G2&RFV×ÆFRÇW2öæRÖ&6VBÆ–æS¦6öÇVÖã²Ö–æ–f–VB6†VÆÂÖ&·W6â6†&RÆ–æRâ6öçG&öÇ2G–æÖ–6ÆÇ’7&VFVB'’¦f67&—BÂ6ö×WFVB552f—6–&–Æ—G’ÂWfVçBFVÆVvF–öâæB&6¶VæBW&Ö—76–öç2&WV—&R'VçF–ÖR–ç7V7F–öâà ¦6÷W&6RÖ†–FFVæ–æ6ÇVFW2âW‡Æ–6—B†–FFVâæ6W7F÷"ö6Æ72÷7G–ÆRæB6â&R&W7öç6—fS²F—6&ÆVF—2FV6Æ&VBF—6&ÆVC²FV6Æ&VBÖæf†26æöæ–6Â‡&Vc²–æÆ–æRÖ†æFÆW&FV6Æ&W2¦f67&—C²67&—B×&VfW&Væ6VöæÇ’ÖVç2â”BöFF×F‚÷"W‡Æ–6—BFFÖf–ÇFW"Ö7F–öæöFFÖf–ÇFW"×fÇVV—2&VfW&Væ6VB–ââ–æÆ–æR67&—BÂ¢¦æ÷B¢¢F†BâWfVçB†æFÆW"÷"&6¶VæBv÷&·3²Vç&W6öÇfVB×7FF–6ÖVç2æò&–æF–ærv2W7F&Æ—6†VB'’F†—26öç6W'fF—fR–ç7V7F–öââVç&W6öÇfVB6öçG&öÇ2&R&Wf–Wr—FV×2Âæ÷BWFöÖF–6ÆÇ’FVB6öçG&öÇ2âWfW'’6÷W&6R&÷r&WF–ç2—G2&–æF–ærWf–FVæ6Rf÷"föÆÆ÷r×Wà ¢2266WFæ6R7F–ÆÂ÷Và ¢ÒF†R7&÷72×vR'&÷w6W"6öçG&7B6†V6·2ÆÂ#"&VæFW&VBFW7F–æF–öç2æB&V¦V7G2f—6–&ÆRÆ6V†öÆFW"÷Væ¶æ÷vâ6–FV&"Æ–æ·2gFW"vR67&—G2'VââvR×7V6–f–2FW7G2&VÖ–âF†R&V†f–÷&ÂWf–FVæ6Rf÷"÷F†W"6öçG&öÇ2à¢Ò6ö×ÆWFR'VçF–ÖR7F–öâ÷6W'f–6RöWF†÷&—¦F–öâÖ–ærf÷"WfW'’f—6–&ÆR6öçG&öÂÂ–æ6ÇVF–ærÆöF–æröW'&÷"ö6æ6VÆÆF–öâ÷&V6öææV7B7FFW2æBvVæW&FVB6öçG&öÇ2à¢Òf—7VÂ6ö×&—6öâv–ç7B&÷fVB7WÆ–VB&VfW&Væ6R6†ö–6W3²æò67&VVç6†÷B&6VÆ–æW2vW&Rf'&–6FVB÷"WFòÖ&÷fVBà¢Ò¶W–&ö&Böfö7W2÷67&VVâ×&VFW"öæöâÖ6öÆ÷"öÖçVÂ66W76–&–Æ—G’66WFæ6Râ7FF–2Æ&VÇ2æB÷&F–æ'’Æ—w&–v‡B6Æ–6·2Fòæ÷B6Æ÷6R—Bà¢ÒgVÆÂ4Ä’ô’õT’÷W&F–öâ&—G’æBFVÆ–&W&FRÖF–ffW&Væ6R&Vv—7FW"ÂÇW2FWÆ÷–ÖVçBFW7G2f÷"W‡FW&æÂföçG2õF–Çv–æBö–6öç2ö–ÖvW2à ¢22vR7VÖÖ' §ÂFV×ÆFRÂ6öçG&öÇ2Â6÷W&6RÖ†–FFVâÂF—6&ÆVBÂFV6Æ&VBæbÂ–æÆ–æR†æFÆW"Â67&—B&VfW&Væ6RÂVç&W6öÇfVB7FF–2À§ÂÒÒ×ÂÒÒÓ§ÂÒÒÓ§ÂÒÒÓ§ÂÒÒÓ§ÂÒÒÓ§ÂÒÒÓ§ÂÒÒÓ§À§ÂV•÷c%öFFW'2æ‡FÖÂÂC‚ÂÂÂÂÂ#Â#bÀ§ÂV•÷c%ö’æ‡FÖÂÂ#ÂÂÂÂÂbÂRÀ§ÂV•÷c%ö&÷fÇ2æ‡FÖÂÂ3rÂ’ÂÂÂÂBÂBÀ§ÂV•÷c%öVF—Bæ‡FÖÂÂC2ÂÂÂÂ2ÂrÂ2À§ÂV•÷c%ö&2æ‡FÖÂÂ3"ÂÂÂÂÂ#Â"À§ÂV•÷c%ö'Vuö&÷VçG’æ‡FÖÂÂ3"ÂÂÂÂÂbÂbÀ§ÂV•÷c%ö6†–ç2æ‡FÖÂÂ#RÂÂÂÂÂRÂÀ§ÂV•÷c%ö6ö×Æ–æ6Ræ‡FÖÂÂCÂÂÂÂÂ#Â#À§ÂV•÷c%öF6†&ö&Bæ‡FÖÂÂ3RÂ"ÂÂÂÂ#Â"À§ÂV•÷c%öF–væ÷7F–72æ‡FÖÂÂ32ÂÂÂÂ"ÂrÂBÀ§ÂV•÷c%öWf–FVæ6Ræ‡FÖÂÂ3RÂÂÂÂÂBÂ#À§ÂV•÷c%öf–æF–æw2æ‡FÖÂÂ#bÂÂÂÂBÂ#ÂÀ§ÂV•÷c%ö†—7F÷'’æ‡FÖÂÂ3ÂÂ2ÂÂÂbÂ"À§ÂV•÷c%öÖöæ—F÷&–æræ‡FÖÂÂCRÂÂÂÂÂ’Â#bÀ§ÂV•÷c%÷F2æ‡FÖÂÂC"ÂRÂÂÂÂrÂ’À§ÂV•÷c%÷&W÷'Bæ‡FÖÂÂ#"ÂÂÂÂÂRÂRÀ§ÂV•÷c%÷&W÷'G2æ‡FÖÂÂ#ÂÂÂÂÂRÂRÀ§ÂV•÷c%÷&WFW7Bæ‡FÖÂÂ3bÂÂÂÂÂBÂ#"À§ÂV•÷c%÷'Vâæ‡FÖÂÂ3rÂÂÂÂrÂ’Â#À§ÂV•÷c%÷66÷Ræ‡FÖÂÂ3’Â#RÂÂÂÂÂ"À§ÂV•÷c%÷6WGF–æw2æ‡FÖÂÂcÂRÂÂÂ"ÂRÂ’À§ÂV•÷c%÷F‡&VEö–çFVÂæ‡FÖÂÂS2ÂÂÂÂ2Â#Â#À ¢¢¥F÷FÃ¢¢¢s“26÷W&6R6öçG&öÇ27&÷72#"FV×ÆFW2à ¢22W†7B6÷W&6R&Vv—7G' ¤Æ&VÇ2æB&–æF–ærW†6W'G2&R6†÷'FVæVBf÷"&VF&–Æ—G“²Æ–æS¦6öÇVÖâ–FVçF–f–W2F†R6ö×ÆWFR6÷W&6RâæòG'Væ6F–öâ6†ævW2F†R6÷VçB÷"6Æ76–f–6F–öâà ¢222V•÷c%öFFW'2æ‡FÖÀ §ÂÆ–æS¦6öÇVÖâÂFrÂÆ&VÂÂ7FF–27FFRÂ&–æF–ærWf–FVæ6RÀ§ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×ÂÒÒ×À§Âs£CSs’ÂÂF6†&ö&Bò¦W&ò7FFRÂ67&—B×&VfW&Væ6RÂ2À§Âs£Cƒ3bÂÂ66÷RbF&vWG2Â67&—B×&VfW&Væ6RÂ2À§Âs£SƒrÂÂ'Vâb÷&6†W7G&F–öâÂ67&—B×&VfW&Væ6RÂ2À§Âs£S3CbÂÂG'W7BÆ–W"bf–æF–æw2Â67&—B×&VfW&Væ6RÂ2À§Âs£ScÂÂDU26÷fW&vRb&W÷'G2Â67&—B×&VfW&Væ6RÂ2À§Âs£cƒbÂÂ’7G&FVw’vFRÂ67&—B×&VfW&Væ6RÂ2À§Âs£c332ÂÂ&VÖVF–F–öâ&WFW7B7GVF–òÂ67&—B×&VfW&Væ6RÂ2À§Âs£cS“‚ÂÂ6÷'&VÆFVBGF6²6†–ç2Â67&—B×&VfW&Væ6RÂ2À§Âs£scÂÂ¦ö"W†V7WF–öâ†—7F÷'’Â67&—B×&VfW&Væ6RÂ2À§Âs£s3rÂÂWf–FVæ6Rf–ÆR–ç7V7F÷"Â67&—B×&VfW&Væ6RÂ2À§Âs£sSs‚ÂÂ7'—Föw&†–2VF—BÆörÂVç&W6öÇfVB×7FF–2Â2À§Âs£ƒCÂÂ7—7FVÒF–væ÷7F–72b†VÇF‚Â=ÓÛh‘éì¶»§q«^uĞQH¹hğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞÔèÄğ‰ÕÑÑ½¸ğ½±±…ÁÍ”…±°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞàèÄğ‰ÕÑÑ½¸ğI•™É•Í ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔÜèÄğ¥¹ÁÕĞğM•…É ™¥±•¹…µ”°Í¡„ÈÔØ°Ñ½½°¸¸¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÄäèÄğ‰ÕÑÑ½¸ğ½¹Ñ•¹Ñ}½Áä½ÁäğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØÄèÄğ‰ÕÑÑ½¸ğ½Éµ…ÑÑ•QÉ•”Y¥•ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØĞèÄğ‰ÕÑÑ½¸ğI…Üa50M½ÕÉ”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØÜèÄğ‰ÕÑÑ½¸ğA…ÉÍ•Q…‰±•ÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÜÀèÄğ‰ÕÑÑ½¸ğ!•àY¥•ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌàÜèÄğ‰ÕÑÑ½¸ğ‘½İ¹±½…½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌäÄèÄğ‰ÕÑÑ½¸ğ™¥¹•ÉÁÉ¥¹ĞY•É¥™äM!´ÈÔØ!…Í ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌäÔèÄğ‰ÕÑÑ½¸ğ…ÕÑ½}™¥á}¡¥ I”µÁ…ÉÍ”¥¹Ñ¼¥¹‘¥¹œ5½‘•°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌääèÄğ‰ÕÑÑ½¸ğÍ•¹‘}Ñ½}µ½‰¥±”M•¹Ñ¼%ÍÍÕ”QÉ…­•ÈğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØÀÀèÄğ„ğ¹ÑÉä€ŒĞĞÀäğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ØĞÈèÄğ‰ÕÑÑ½¸ğQÉ…”AÉ½½˜ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØÔàèÄğ‰ÕÑÑ½¸ğQÉ…”AÉ½½˜ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ((ŒŒŒÕ¥}ØÉ}™¥¹‘¥¹Ì¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ĞèĞĞÜÀğ„ğ‘…Í¡‰½…É…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğ‘•±…É•µ¹…Øğ€½Õ¤µØÈğ)ğ€ĞèĞàÄØğ„ğÑ…É•ĞM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÄĞàğ„ğÑ•Éµ¥¹…°IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔĞäÀğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔàĞÌğ„ğ…¹…±åÑ¥ÌAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÌÀèÄğ‰ÕÑÑ½¸ğÉ•Á±…äI•Ñ•ÍĞY•É¥™¥•M½Á”ğ¥¹±¥¹”µ¡…¹‘±•ÈğÉÕ¹I•Ñ•ÍÑ±° ¤ğ)ğ€ÄÈØèÄğ‰ÕÑÑ½¸ğ10ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍ•Ù•É¥Ñäé…±°ğ)ğ€ÄÈÜèÄğ‰ÕÑÑ½¸ğI%P€ Ä¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍ•Ù•É¥ÑäéÉ¥Ñ¥…°ğ)ğ€ÄÈàèÄğ‰ÕÑÑ½¸ğ!% € È¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍ•Ù•É¥Ñäé¡¥ ğ)ğ€ÄÈäèÄğ‰ÕÑÑ½¸ğ5€ Ä¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍ•Ù•É¥Ñäéµ•‘¥Õ´ğ)ğ€ÄÌÀèÄğ‰ÕÑÑ½¸ğ1=\€ À¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍ•Ù•É¥Ñäé±½Üğ)ğ€ÄÌÔèÄğ‰ÕÑÑ½¸ğ10ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍÑ…ÑÕÌé…±°ğ)ğ€ÄÌØèÄğ‰ÕÑÑ½¸ğYI%%€ Ø¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍÑ…ÑÕÌéÙ•É¥™¥•ğ)ğ€ÄÌÜèÄğ‰ÕÑÑ½¸ğ9%Q€ ÄÄ¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍÑ…ÑÕÌé…¹‘¥‘…Ñ”ğ)ğ€ÄÌàèÄğ‰ÕÑÑ½¸ğIY%\9ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•ÈéÍÑ…ÑÕÌéÉ•Ù¥•İ}¹••‘•ğ)ğ€ÄĞÌèÄğ‰ÕÑÑ½¸ğ10ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•Èé…‘…ÁÑ•Èé…±°ğ)ğ€ÄĞĞèÄğ‰ÕÑÑ½¸ğ9Õ±•¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•Èé…‘…ÁÑ•Èé¹Õ±•¤ğ)ğ€ÄĞÔèÄğ‰ÕÑÑ½¸ğÍÅ±µ…ÀğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•Èé…‘…ÁÑ•ÈéÍÅ±µ…Àğ)ğ€ÄĞØèÄğ‰ÕÑÑ½¸ğ9¥­Ñ¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ™¥±Ñ•Èé…‘…ÁÑ•Èé¹¥­Ñ¼ğ)ğ€ÄÔÄèÄğ¥¹ÁÕĞğ¥±Ñ•È™¥¹‘¥¹Ì‰äÁÉ½½˜Á…ÑÑ•É¸°UI0°½ÈYğÍÉ¥ÁĞµÉ•™•É•¹”ğİ¡…á½¸µ™¥¹‘¥¹œµ™¥±Ñ•Èğ)ğ€ÄØÔèÈÈäğ‰ÕÑÑ½¸ğI•ÑÉäğÍ½ÕÉ”µ¡¥‘‘•¸ğİ¡…á½¸µ™¥¹‘¥¹ÌµÉ•ÑÉäğ)ğ€ÈĞàèÄğ‰ÕÑÑ½¸ğ½¹Ñ•¹Ñ}½Áä½ÁäÙ¥‘•¹”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ½Áäµ‰Ñ¸ğ)ğ€ÌÄÀèÄğ‰ÕÑÑ½¸ğÁ±…å}…ÉÉ½ÜI•Á±…äQ•ÍĞ€¡I•Ñ•ÍĞ¤ğÍÉ¥ÁĞµÉ•™•É•¹”ğÉ•Á±…äµ‰Ñ¸ğ)ğ€ÌÄĞèÄğ‰ÕÑÑ½¸ğ¡•¬5…É¬¥á•ğ¥¹±¥¹”µ¡…¹‘±•Èğµ…É­¥á•‘Ñ¥½¸ ¤ğ)ğ€ÌÈÀèÄğ‰ÕÑÑ½¸ğ™¥±•}•áÁ½ÉĞáÁ½ÉĞAÉ½½˜Ñ¼%ÍÍÕ”QÉ…­•Èğ¥¹±¥¹”µ¡…¹‘±•Èğ•áÁ½ÉÑAÉ½½™Ñ¥½¸ ¤ğ)ğ€ÌÈĞèÄğ‰ÕÑÑ½¸ğ¡½İ}Ñ½}É•œM•¹Ñ¼ÁÁÉ½Ù…±Ìğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•¹‘Q½ÁÁÉ½Ù…±ÍÑ¥½¸ ¤ğ((ŒŒŒÕ¥}ØÉ}¡¥ÍÑ½Éä¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ØèĞÔÜäğ„ğ…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèĞàÌØğ„ğM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÔÀàÜğ„ğIÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÔÌĞØğ„ğQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÔØÄÄğ„ğAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèØÀàØğ„ğ$MÑÉ…Ñ•ä…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèØÌÌÌğ„ğI•µ•‘¥…Ñ¥½¸I•Ñ•ÍĞMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèØÔäàğ„ğ½ÉÉ•±…Ñ•ÑÑ…¬¡…¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÜÀØÀğ„ğ)½ˆá•ÕÑ¥½¸!¥ÍÑ½ÉäğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÜÌÄÜğ„ğÙ¥‘•¹”¥±”%¹ÍÁ•Ñ½ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÜÔÜàğ„ğÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèàÀĞÄğ„ğMåÍÑ•´¥…¹½ÍÑ¥Ì€˜!•…±Ñ ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèàÌÄØğ„ğ‘…ÁÑ•È€˜A±Õ¥¸5…¹…•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèàÔàÔğ„ğM•ÑÑ¥¹Ì€˜A$áÁ±½É•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ØèÄÀäĞäğ‰ÕÑÑ½¸ğ9¼•¹…•µ•¹ĞÍ•±•Ñ•€¡9¼Ñ…É•ĞÍ•±•Ñ•¤…ÉÉ½İ}‘É½Á}‘½İ¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØèÄÄÌÄØğ‰ÕÑÑ½¸ğ…‘9•ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØèÄÌÀÈÈğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØèÄÌÌØÄğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈØèÄğ‰ÕÑÑ½¸ğ™¥±•}‘½İ¹±½…áÁ½ÉĞ1•‘•È€ ¹ÍØ€¼€¹©Í½¸¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÄèÄğ‰ÕÑÑ½¸ğÙ•É¥™¥•‘}ÕÍ•ÈY•É¥™ä%¹Ñ•É¥ÑäğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÌÌèÄğ¥¹ÁÕĞğ¥±Ñ•È¡¥ÍÑ½Éä‰äÉ•½É‘•©½ˆ%°Ñ½½°°½ÈÑ…É•ĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ¡¥ÍÑ½ÉäµÍ•…É ğ)ğ€ÄĞÀèÄğÍ•±•Ğğ¥±Ñ•È¡¥ÍÑ½Éä‰äÑ½½°ğÍÉ¥ÁĞµÉ•™•É•¹”ğ¡¥ÍÑ½ÉäµÑ½½°µ™¥±Ñ•Èğ)ğ€ÄĞÜèÄğÍ•±•Ğğ…Ñ”™¥±Ñ•ÈÕ¹…Ù…¥±…‰±”‰•…ÕÍ”Ñ¥µ•ÍÑ…µÁÌ…É”¹½ĞÉ•½É‘•ğ‘¥Í…‰±•ğ¡¥ÍÑ½Éäµ‘…Ñ”µ™¥±Ñ•Èğ)ğ€ÄÔĞèÄğÍ•±•ĞğIÕ¹¹•È™¥±Ñ•ÈÕ¹…Ù…¥±…‰±”‰•…ÕÍ”ÉÕ¹¹•Èµ½‘”¥Ì¹½ĞÉ•½É‘•ğ‘¥Í…‰±•ğ¡¥ÍÑ½ÉäµÉÕ¹¹•Èµ™¥±Ñ•Èğ)ğ€ÄØÌèÄğ‰ÕÑÑ½¸ğ±°€ ĞÈ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄØÜèÄğ‰ÕÑÑ½¸ğMÕ•ÍÌ€ Ìà¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÜÈèÄğ‰ÕÑÑ½¸ğ…¥±•€ Ì¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÜÜèÄğ‰ÕÑÑ½¸ğM½Á”µ	±½­•€ Ä¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄàÈèÄğ‰ÕÑÑ½¸ğÑ¥Ù”€¼EÕ•Õ•€ À¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÈØèÄğ‰ÕÑÑ½¸ğ¡•ÙÉ½¹}±•™Ğğ‘¥Í…‰±•ğƒŠPğ)ğ€ÈÈäèÄğ‰ÕÑÑ½¸ğ¡•ÙÉ½¹}É¥¡ĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ((ŒŒŒÕ¥}ØÉ}µ½¹¥Ñ½É¥¹œ¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ĞèĞÔÜäğ„ğ…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèĞàÌØğ„ğM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÀàÜğ„ğIÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÌĞØğ„ğQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔØÄÄğ„ğAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèØÀàØğ„ğ$MÑÉ…Ñ•ä…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèØÌÌÌğ„ğI•µ•‘¥…Ñ¥½¸I•Ñ•ÍĞMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèØÔäàğ„ğÑÑ…¬MÕÉ™…”€˜½¹Ñ¥¹Õ½ÕÌ5½¹¥Ñ½É¥¹œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèØàäÔğ„ğ½ÉÉ•±…Ñ•ÑÑ…¬¡…¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÜÄÔàğ„ğ	Õœ	½Õ¹Ñä€˜1¥Ù”	É½İÍ•ÈMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÜĞĞÌğ„ğAQ……L±¥•¹ĞA½ÉÑ…°ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÜàäØğ„ğ)½ˆá•ÕÑ¥½¸!¥ÍÑ½ÉäğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèàÄÔÌğ„ğÙ¥‘•¹”¥±”%¹ÍÁ•Ñ½ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèàĞÄĞğ„ğÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèààÜÜğ„ğMåÍÑ•´¥…¹½ÍÑ¥Ì€˜!•…±Ñ ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèäÄÔÈğ„ğ‘…ÁÑ•È€˜A±Õ¥¸5…¹…•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèäĞÈÄğ„ğM•ÑÑ¥¹Ì€˜M•É•ÑÌY…Õ±ĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÄÄÜàÜğ‰ÕÑÑ½¸ğ9´ÈÀÈØµ`àäÈ€¡…Á¤¹¥¹Ñ•É¹…°¹½ÉÀ¤…ÉÉ½İ}‘É½Á}‘½İ¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèÄÈÄĞĞğ‰ÕÑÑ½¸ğ…‘9•ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèÄÌàĞäğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèÄĞÄààğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàèÄğ‰ÕÑÑ½¸ğ‘¹Ì½¹™¥ÕÉ”±½Õ€˜9LAÉ½‰•ÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÈèÄğ‰ÕÑÑ½¸ğÉ…‘…ÈQÉ¥•È•±Ñ„I•½¸9½ÜğÍÉ¥ÁĞµÉ•™•É•¹”ğÉ•½¸µÑÉ¥•Èµ‰Ñ¸ğ)ğ€ÄÌÌèÄğ¥¹ÁÕĞğ¥±Ñ•ÈE8°%@°M8€¡”¹œ¸LÄÌÌÌÔ°€ÄÀ¸À¸À¸À¼à¤°±½ÕAÉ½Ù¥‘•È¸¸¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ…ÍÍ•ĞµÍ•…É µ¥¹ÁÕĞğ)ğ€ÄÌàèÄğ‰ÕÑÑ½¸ğ±°%¹™É„ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞÄèÄğ‰ÕÑÑ½¸ğ]L€ àĞ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞÔèÄğ‰ÕÑÑ½¸ğ@€ ÌØ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞäèÄğ‰ÕÑÑ½¸ğ€ ÈÈ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔàèÄğ‰ÕÑÑ½¸ğ10€ ÄĞÈ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄØÄèÄğ‰ÕÑÑ½¸ğI%PQQ€ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄØÔèÄğ‰ÕÑÑ½¸ğ1=UaA=MUIL€ĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄØäèÄğ‰ÕÑÑ½¸ğaA%I½],Q1L€ÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÜØèÄğ‰ÕÑÑ½¸ğMYI%QdM…ÉÉ½İ}‘½İ¹İ…ÉğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄÜèÄğ‰ÕÑÑ½¸ğ1½¬	½Õ¹‘…ÉäğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÈÄèÄğ‰ÕÑÑ½¸ğ¥É•Ğå¹…µ¥Œ%¹ÍÁ•Ñ¥½¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÜÌèÄğ‰ÕÑÑ½¸ğI•µ•‘¥…Ñ”LÌ	Õ­•Ğ0ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÜÜèÄğ‰ÕÑÑ½¸ğ%¹ÍÁ•Ğ	Õ­•Ğ½¹Ñ•¹ÑÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÈÌèÄğ‰ÕÑÑ½¸ğ=É‘•È5I•¹•İ…°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÈÜèÄğ‰ÕÑÑ½¸ğÑÕ¹”!…É‘•¸¥Á¡•ÉÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØĞèÄğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°M•ÍÍ¥½¸M¡•±°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØàèÄğ‰ÕÑÑ½¸ğµ½É•}Ù•ÉĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌàÔèÄğ‰ÕÑÑ½¸ğAIXğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌàØèÄğ‰ÕÑÑ½¸ğ9aPğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÜÔèÄğ‰ÕÑÑ½¸ğáÁ…¹…¹Ù…Ì½Á•¹}¥¹}™Õ±°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔäÈèÄğ‰ÕÑÑ½¸ğMÑÉ•…´Õ±°ÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½ÌƒŠHğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ((ŒŒŒÕ¥}ØÉ}ÁÑ……Ì¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ÈÀØèÄÄÈĞğ„ğÑ•Éµ¥¹…°…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÄĞÜäğ„ğÉ…‘…ÈM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÄàÈÄğ„ğÁ±…å}¥É±”IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÈÄÜÜğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÈÔĞÄğ„ğ‘•ÍÉ¥ÁÑ¥½¸AQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÌÀàÈğ„ğÁÍå¡½±½ä$MÑÉ…Ñ•ä…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÌĞÈäğ„ğ‰Õ¥±‘}¥É±”I•µ•‘¥…Ñ¥½¸I•Ñ•ÍĞMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÌÜäØğ„ğ…½Õ¹Ñ}ÑÉ•”½ÉÉ•±…Ñ•ÑÑ…¬¡…¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèĞÄØÄğ„ğ½Á•¹}¥¹}‰É½İÍ•È	Õœ	½Õ¹Ñä€˜1¥Ù”	É½İÍ•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèĞÜÀÈğ„ğ¡¥ÍÑ½Éå}Ñ½±•}½™˜)½ˆá•ÕÑ¥½¸!¥ÍÑ½ÉäğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÔÀØÜğ„ğ™½±‘•É}é¥ÀÙ¥‘•¹”¥±”%¹ÍÁ•Ñ½ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÔĞÈàğ„ğ•¹ÉåÁÑ•ÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÔäÔÜğ„ğµ½¹¥Ñ½É}¡•…ÉĞMåÍÑ•´¥…¹½ÍÑ¥Ì€˜!•…±Ñ ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèØÌÌÄğ„ğ•áÑ•¹Í¥½¸‘…ÁÑ•È€˜A±Õ¥¸5…¹…•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèØØäÔğ„ğÍ¡¥•±‘}Á•ÉÍ½¸AQ……L±¥•¹ĞA½ÉÑ…°ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÜÀÔÈğ„ğ­•äM•ÑÑ¥¹Ì€˜M•É•ÑÌY…Õ±ĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèàäÌÈğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°1=LğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÀØèäÈÌÔğ‰ÕÑÑ½¸ğ‘…¹•É½ÕÌ!1PM8ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÔĞèÄğ‰ÕÑÑ½¸ğ…‘‘}µ½‘•É…Ñ½ÈaA9M=Ağ¥¹±¥¹”µ¡…¹‘±•Èğ½Á•¹M½Á•5½‘…° ¤ğ)ğ€ÈÔàèÄğ‰ÕÑÑ½¸ğÍ¡•‘Õ±”M!U1IQMPğ¥¹±¥¹”µ¡…¹‘±•ÈğÍÉ½±±Q½I•Ñ•ÍÑ½¹Í½±” ¤ğ)ğ€ÈØÈèÄğ‰ÕÑÑ½¸ğİ½É­ÍÁ…•}ÁÉ•µ¥Õ´aUQ%YIQ%%Qğ¥¹±¥¹”µ¡…¹‘±•ÈğÑÉ¥•É•ÉÑ½İ¹±½… ¤ğ)ğ€ÌÜÜèÄğ¥¹ÁÕĞğ”¹œ¸ÍÑ…”µ…ÕÑ ¹ÍÑÉ¥Á”µ¥¹Ñ•É¹…°¹‘•ØğÍÉ¥ÁĞµÉ•™•É•¹”ğÑ…É•Ñ%¹ÁÕĞğ)ğ€ÌÜàèÄğ‰ÕÑÑ½¸ğIU8AIµ1%!Pğ¥¹±¥¹”µ¡…¹‘±•ÈğÉÕ¹AÉ•™±¥¡ÑY…±¥‘…Ñ¥½¸ ¤ğ)ğ€ÌäÜèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÀĞèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÄÄèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÄÜèÄğ‰ÕÑÑ½¸ğÉ½­•Ñ}±…Õ¹ %MAQ I%Q)=ğ¥¹±¥¹”µ¡…¹‘±•Èğ±…Õ¹¡ÍÍ•ÍÍµ•¹Ğ ¤ğ)ğ€ĞÌÜèÄğ‰ÕÑÑ½¸ğ10€ Äà¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÌàèÄğ‰ÕÑÑ½¸ğQ%=89€ Ğ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÌäèÄğ‰ÕÑÑ½¸ğIM=1Y€ ÄĞ¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞØÜèÄğ‰ÕÑÑ½¸ğY%\I\A-P½Á•¹}¥¹}¹•Üğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•AÉ½½˜ ÁÉ½½˜´Äœ¤ğ)ğ€ĞäÌèÄğ‰ÕÑÑ½¸ğÉ•™É•Í IEUMPYI%%Q%=8IQMPğ¥¹±¥¹”µ¡…¹‘±•ÈğÉ•ÅÕ•ÍÑI•Ñ•ÍĞ 	=1€¼%=H¥¸5•É¡…¹ĞQÉ…¹Í™•ÈM•ÑÑ±•µ•¹ĞI½ÕÑ”œ¤ğ)ğ€ÔÈÌèÄğ‰ÕÑÑ½¸ğY%\MI%AP½Á•¹}¥¹}¹•Üğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•AÉ½½˜ ÁÉ½½˜´Èœ¤ğ)ğ€ØÄäèÄğ‘¥ØğÁ¥ÑÕÉ•}…Í}Á‘˜á•ÕÑ¥Ù”	É¥•˜€¡A¤ØÈ¸ÄƒŠˆ€ÄĞA…•ÌƒŠˆÉåÁÑ½É…Á¡¥Œğ¥¹±¥¹”µ¡…¹‘±•Èğ‘½İ¹±½…‘ÉÑ¥™…Ğ á•ÕÑ¥Ù•}	É¥•™}DĞ¹Á‘˜œ¤ğ)ğ€ØÌÈèÄğ‘¥ØğÍ±¥‘•Í¡½Ü	½…ÉµI•…‘ä•¬€¡M±¥‘•Ì¤-•å¹½Ñ”€˜AAQ`ƒŠˆ!¥ µ±•Ù•°-A%Ìğ¥¹±¥¹”µ¡…¹‘±•Èğ‘½İ¹±½…‘ÉÑ¥™…Ğ 	½…É‘}I¥Í­}•­|ÈÀÈØ¹­•äœ¤ğ)ğ€ØĞÔèÄğ‘¥ØğÑ…‰±•}¡…ÉĞI•µ•‘¥…Ñ¥½¸5…ÑÉ¥à€¡)¥É„MX¤Ñ±…ÍÍ¥…¸M¡•µ„ƒŠˆYMLØÌğ¥¹±¥¹”µ¡…¹‘±•Èğ‘½İ¹±½…‘ÉÑ¥™…Ğ ¥¹‘¥¹Í})¥É…}Må¹Œ¹ÍØœ¤ğ)ğ€ØàÌèÄğ‰ÕÑÑ½¸ğA%9Mµ=ALğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØäàèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•M½Á•5½‘…° ¤ğ)ğ€ÜÀÔèÄğÑ•áÑ…É•„ğ”¹œ¸…Á¤µØÌµÍÑ…¥¹œ¹¥¹Ñ•É¹…°¹ÍÑÉ¥Á”¹½´€ÄäÈ¸ÄØà¸ÄÈ¸À¼ÈĞ€¡YAA••É•¤ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÜÄÄèÄğÍ•±•ĞğMå¹¡É½¹¥é•İ¥Ñ AÉ¥µ…ÉäI½€¡9½ÜÑ¡É½Õ 9½Ø€ÀÈ°€ÈÀÈØ¤I•ÍÑÉ¥Ñ•€ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÜÈÈèÄğ‰ÕÑÑ½¸ğ90ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•M½Á•5½‘…° ¤ğ)ğ€ÜÈÔèÄğ‰ÕÑÑ½¸ğM%8€˜MU	5%PI=9U4ğÍ½ÕÉ”µ¡¥‘‘•¸ğ½¹™¥ÉµM½Á•áÁ…¹Í¥½¸ ¤ğ((ŒŒŒÕ¥}ØÉ}É•Á½ÉĞ¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ĞèĞĞÜÔğ„ğ‘…Í¡‰½…É…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğ‘•±…É•µ¹…Øğ€½Õ¤µØÈğ)ğ€ĞèĞàÈÄğ„ğÑ…É•ĞM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÄÔÌğ„ğÑ•Éµ¥¹…°IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔĞäÔğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔàĞàğ„ğ…¹…±åÑ¥ÌAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèäÌäØğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèäÜÌÔğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÜäèÄğ‰ÕÑÑ½¸ğ±°…ÁÌ€ Ì¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàÀèÄğ‰ÕÑÑ½¸ğA½±¥ä€ È¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàÄèÄğ‰ÕÑÑ½¸ğM…™•Ñä€ Ä¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØÌèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÜÄèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÜäèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌàÜèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÈàèÄğ‰ÕÑÑ½¸ğÙ¥Í¥‰¥±¥ÑäAÉ•Ù¥•Ü5…É­‘½İ¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğÁÉ•Ù¥•İ	Ñ¸ğ)ğ€ĞÌÈèÄğ‰ÕÑÑ½¸ğ‘…Ñ…}½‰©•ĞáÁ½ÉĞ¥¹‘¥¹Ì€ ¹©Í½¸¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÌØèÄğ‰ÕÑÑ½¸ğ‘½İ¹±½…½İ¹±½…Õ±°I•Á½ÉĞ€ ¹Á‘˜¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞàäèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÀĞèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÄäèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÌĞèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÔÔèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•AÉ•Ù¥•İ	Ñ¸ğ((ŒŒŒÕ¥}ØÉ}É•Á½ÉÑÌ¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ĞèĞĞÜÔğ„ğÑ…É•ĞM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèĞàÀÜğ„ğÑ•Éµ¥¹…°IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÄĞäğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÔÀÈğ„ğ…¹…±åÑ¥ÌAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèäÀÌÜğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèäÌÜØğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÜäèÄğ‰ÕÑÑ½¸ğ±°…ÁÌ€ Ì¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàÀèÄğ‰ÕÑÑ½¸ğA½±¥ä€ È¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàÄèÄğ‰ÕÑÑ½¸ğM…™•Ñä€ Ä¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌØÌèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÜÄèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÜäèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌàÜèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÈàèÄğ‰ÕÑÑ½¸ğÙ¥Í¥‰¥±¥ÑäAÉ•Ù¥•Ü5…É­‘½İ¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğÁÉ•Ù¥•İ	Ñ¸ğ)ğ€ĞÌÈèÄğ‰ÕÑÑ½¸ğ‘…Ñ…}½‰©•ĞáÁ½ÉĞ¥¹‘¥¹Ì€ ¹©Í½¸¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÌØèÄğ‰ÕÑÑ½¸ğ‘½İ¹±½…½İ¹±½…Õ±°I•Á½ÉĞ€ ¹Á‘˜¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞàäèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÀĞèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÄäèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÌĞèÄğ„ğ‘½İ¹±½…I…ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÔÔÔèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•AÉ•Ù¥•İ	Ñ¸ğ((ŒŒŒÕ¥}ØÉ}É•Ñ•ÍĞ¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ÔèĞÔÜäğ„ğ…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèĞàÌØğ„ğM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÔÀàÜğ„ğIÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÔÌĞØğ„ğQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÔØÄÄğ„ğAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØÀàØğ„ğ$MÑÉ…Ñ•ä…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØÌÌÌğ„ğI•µ•‘¥…Ñ¥½¸I•Ñ•ÍĞMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØÔäàğ„ğ½ÉÉ•±…Ñ•ÑÑ…¬¡…¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÜÀØÄğ„ğ)½ˆá•ÕÑ¥½¸!¥ÍÑ½ÉäğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÜÌÄàğ„ğÙ¥‘•¹”¥±”%¹ÍÁ•Ñ½ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÜÔÜäğ„ğÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèàÀĞÈğ„ğMåÍÑ•´¥…¹½ÍÑ¥Ì€˜!•…±Ñ ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèàÌÄÜğ„ğ‘…ÁÑ•È€˜A±Õ¥¸5…¹…•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèàÔàØğ„ğM•ÑÑ¥¹Ì€˜A$áÁ±½É•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÄÀäÔÀğ‰ÕÑÑ½¸ğ9´ÈÀÈØµ`àäÈ€¡…Á¤¹¥¹Ñ•É¹…°¹½ÉÀ¤…ÉÉ½İ}‘É½Á}‘½İ¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔèÄÄÌÀÜğ‰ÕÑÑ½¸ğ…‘9•ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔèÄÌÀÄÈğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔèÄÌÌÔÄğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÌèÄĞÀÀğ‰ÕÑÑ½¸ğÑÕ¹”%1QH	d€Ìµ]dYI%PğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÌèÄÜÔÀğ‰ÕÑÑ½¸ğÁ±…å}…ÉÉ½Ü	Q IA1d€ Íà	M1%9€¬€Íà%9)Q¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèäÜÈğ¥¹ÁÕĞğ¥±Ñ•È¥¹‘¥¹œ°UI0°Y•É¥™¥…Ñ¥½¸I•…Í½¸¸¸¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèÄÌàĞğ‰ÕÑÑ½¸ğ10€ Ô¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèÄÔÜÄğ‰ÕÑÑ½¸ğMQ%11}YU19I	1€ È¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèÄÜÔÈğ‰ÕÑÑ½¸ğ%a€ È¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèÄäÈàğ‰ÕÑÑ½¸ğ%9=91UM%Y€ Ä¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèÄÈÄÈÔğ‰ÕÑÑ½¸ğ½Áä•¹‘Á½¥¹ĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÔèÄàäĞäğ‰ÕÑÑ½¸ğ½¹Ñ•¹Ñ}½Áä½ÁäÕÉ°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÌĞÔğ‰ÕÑÑ½¸ğÉ•™É•Í I”µá•ÕÑ”I•Á±…ä€ Íà	…Í•±¥¹”€¬€Íà%¹©•Ñ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÄØÜäğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÈÌÀàğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÈäĞÌğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÌØäÈğ¥¹ÁÕĞğ”¹œ¸°Ñ¥µ¥¹œ‘•±Ñ„€øÌ¸ÁÌ€¡µ•‘¥…¸½˜€Ì¤°áÍÌµ…É­•ÈÁÉ•Í•¹Ğ°…¹‘¥‘…ĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèĞÈàÔğÑ•áÑ…É•„ğ¹Ñ•ÈÁÉ½½˜‘•±Ñ„©ÕÍÑ¥™¥…Ñ¥½¸¸¸¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèĞäÔäğ‰ÕÑÑ½¸ğÉ•™É•Í IµaUQ%55%QAI=	ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÔÌÄÔğ‰ÕÑÑ½¸ğ‘…Ñ…}½‰©•ĞaA=IPAI==U%P)M=8ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄèÔØÜäğ‰ÕÑÑ½¸ğ…ÍÍ¥¹µ•¹Ñ}ÑÕÉ¹•‘}¥¸=55%P€Ìµ]dYI%PQ<U%P1HğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ((ŒŒŒÕ¥}ØÉ}ÉÕ¸¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ĞèĞĞÜÔğ„ğ‘…Í¡‰½…É…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğ‘•±…É•µ¹…Øğ€½Õ¤µØÈğ)ğ€ĞèĞàÈÄğ„ğÑ…É•ĞM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÄÔÌğ„ğÑ•Éµ¥¹…°IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔĞäÔğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔàĞàğ„ğ…¹…±åÑ¥ÌAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèäÌàÄğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèäÜÈÀğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔĞèÄğ‰ÕÑÑ½¸ğÑÕ¹”ÁÁÉ½Ù…°…Ñ”èÑ¥Ù”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğÑ½±”µÁ±…¹¹•Èµ…Ñ”ğ)ğ€ÄÀÔèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÀäèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÄÌèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÄÜèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÈÄèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÈÔèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÈäèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÌÌèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÌÜèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞÄèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄĞäèÄğÍ•±•Ğğ]!a=8Ñ½½°ğÍÉ¥ÁĞµÉ•™•É•¹”ğÉÕ¸µÑ½½°µÍ•±•Ğğ)ğ€ÄÔÀèÄğ¥¹ÁÕĞğÕÑ¡½É¥é•Ñ…É•Ğ¡½ÍĞ½ÈUI0ğÍÉ¥ÁĞµÉ•™•É•¹”ğÉÕ¸µÑ…É•Ğµ¥¹ÁÕĞğ)ğ€ÄÔÄèÄğ‰ÕÑÑ½¸ğÁ±…å}…ÉÉ½ÜIÕ¸M•±•Ñ•Q½½°ğÍÉ¥ÁĞµÉ•™•É•¹”ğÉÕ¸µ…Ñ¥Ù”µ‰Ñ¸ğ)ğ€ÄàÜèÄğ¥¹ÁÕĞğ…¤µÁ±…¹¹•ÈµÑ½±”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ…¤µÁ±…¹¹•ÈµÑ½±”ğ)ğ€ÈÈÌèÄğ‰ÕÑÑ½¸ğY¥•ÜÍÑ‘½ÕĞ½Á•¹}¥¹}¹•Üğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ¡½İ9µ…ÁMÑ‘½ÕĞ ¤ğ)ğ€ÈÌÀèÄğ‰ÕÑÑ½¸ğI”µÉÕ¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÜàèÄğ‰ÕÑÑ½¸ğA…ÕÍ”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàÄèÄğ‰ÕÑÑ½¸ğ‰½ÉĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÌÔèÄğ‰ÕÑÑ½¸ğ¹…”I•Á±…äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌĞÜèÄğ‰ÕÑÑ½¸ğ•áÁ±½É”]¡…Ñ]•ˆğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÔÄèÄğ‰ÕÑÑ½¸ğ™½±‘•É}é¥À½‰ÕÍÑ•ÈğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÔÔèÄğ‰ÕÑÑ½¸ğÍ•ÕÉ¥Ñä]AM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌäÈèÄğ‰ÕÑÑ½¸ğ±•…È‰Õ™™•Èğ¥¹±¥¹”µ¡…¹‘±•Èğ±•…É1½œ ¤ğ)ğ€ĞàÔèÄğ¥¹ÁÕĞğQåÁ”½µµ…¹€¡”¹œ¸Ù…±¥‘…Ñ”€´µ¥õ´ÄÀĞ°Á…ÕÍ”°É•ÍÕµ”°É•Á±…ä¤¸¸¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ±¤µ¥¹ÁÕĞğ)ğ€ĞàØèÄğ‰ÕÑÑ½¸ğá•ÕÑ”ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•¹‘5…¹Õ…±½µµ…¹ ¤ğ)ğ€ĞäĞèÄğ‰ÕÑÑ½¸ğÁ…ÕÍ•}¥É±”A…ÕÍ”A¥Á•±¥¹”ğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•A¥Á•±¥¹•A…ÕÍ” ¤ğ)ğ€ĞääèÄğ‰ÕÑÑ½¸ğ¥¹ÁÕĞ%¹©•ĞA…å±½…ğ¥¹±¥¹”µ¡…¹‘±•Èğ¥¹©•ÑA…å±½…‘AÉ½µÁĞ ¤ğ)ğ€ÔÀĞèÄğ‰ÕÑÑ½¸ğ…‘‘}¥É±”MÁ…İ¸MÕˆµÑ½½°ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍÁ…İ¹MÕ‰Ñ½½±5½‘…° ¤ğ)ğ€ÔÀäèÄğ‰ÕÑÑ½¸ğ•µ•É•¹å}¡½µ”µ•É•¹ä‰½ÉĞğ¥¹±¥¹”µ¡…¹‘±•Èğ•µ•É•¹å‰½ÉĞ ¤ğ((ŒŒŒÕ¥}ØÉ}Í½Á”¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ĞèĞĞÜÔğ„ğ‘…Í¡‰½…É…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğ‘•±…É•µ¹…Øğ€½Õ¤µØÈğ)ğ€ĞèĞàÈÄğ„ğÑ…É•ĞM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔÄÔÌğ„ğÑ•Éµ¥¹…°IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔĞäÔğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèÔàĞàğ„ğ…¹…±åÑ¥ÌAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ĞèäØÜäğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞèÄÀÀÄàğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈàèÄğ‰ÕÑÑ½¸ğ™¥±•}ÕÁ±½…EÕ¥¬%µÁ½ÉĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ½Á•¹%µÁ½ÉÑÉ…İ•É	Ñ¸ğ)ğ€ÌÈèÄğ‰ÕÑÑ½¸ğ…‘‘}¥É±”‘%¸µM½Á”Q…É•ĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ½Á•¹Q…É•Ñ5½‘…±	Ñ¸ğ)ğ€ÄÀÄèÄğ‰ÕÑÑ½¸ğ]…¥Ñ¥¹œ™½ÈÍ½Á”ğ‘¥Í…‰±•ğÑ½±•M½Á•¹™½É•µ•¹Ñ	Ñ¸ğ)ğ€ÄÄäèÄğ¥¹ÁÕĞğ¥±Ñ•È½¹™¥ÕÉ•Í½Á”ÉÕ±•ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğÑ…É•Ñ¥±Ñ•É%¹ÁÕĞğ)ğ€ÄĞÜèÌÀØäğ‰ÕÑÑ½¸ğ±¥¹¬Y¥•Ü•ÉÑ¥™¥…Ñ”M8¡…¥¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèÌĞÀĞğ‰ÕÑÑ½¸ğ‰±½¬5…É¬=ÕĞµ½˜µM½Á”á±ÕÍ¥½¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèÌÜÀÈğ‰ÕÑÑ½¸ğ…ÍÍ¥¹µ•¹Ñ}ÑÕÉ¹•‘}¥¸AÉ½µ½Ñ”Ñ¼M½Á”€ ¬M¥¹•=Ù•ÉÉ¥‘”1½œ¤ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèĞàÈÜğ‰ÕÑÑ½¸ğ±¥¹¬Y¥•Ü•ÉÑ¥™¥…Ñ”M8¡…¥¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèÔÄØÈğ‰ÕÑÑ½¸ğ‰±½¬5…É¬=ÕĞµ½˜µM½Á”á±ÕÍ¥½¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèÔĞØÀğ‰ÕÑÑ½¸ğ…ÍÍ¥¹µ•¹Ñ}ÑÕÉ¹•‘}¥¸AÉ½µ½Ñ”Ñ¼M½Á”€ ¬M¥¹•=Ù•ÉÉ¥‘”1½œ¤ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèØÔÜÜğ‰ÕÑÑ½¸ğ±¥¹¬Y¥•Ü•ÉÑ¥™¥…Ñ”M8¡…¥¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèØäÄÈğ‰ÕÑÑ½¸ğ‰±½¬5…É¬=ÕĞµ½˜µM½Á”á±ÕÍ¥½¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄĞÜèÜÈÄÀğ‰ÕÑÑ½¸ğ…ÍÍ¥¹µ•¹Ñ}ÑÕÉ¹•‘}¥¸AÉ½µ½Ñ”Ñ¼M½Á”€ ¬M¥¹•=Ù•ÉÉ¥‘”1½œ¤ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÄØÈèÄğ¥¹ÁÕĞğ¡½ÍÑ¹…µ”°%@°½ÈUI0ğÍÉ¥ÁĞµÉ•™•É•¹”ğÍ½Á•¡•­Q…É•Ğğ)ğ€ÄØÌèÄğ‰ÕÑÑ½¸ğ¡•¬ğÍÉ¥ÁĞµÉ•™•É•¹”ğÉÕ¹M½Á•¡•­	Ñ¸ğ)ğ€ÄØĞèÄğ‰ÕÑÑ½¸ğ½Áä1$ğÍÉ¥ÁĞµÉ•™•É•¹”ğ½Áå±¥	Ñ¸ğ)ğ€ÈÈÌèÄğ‰ÕÑÑ½¸ğ…‘‘}µ½‘•É…Ñ½È‘	½Õ¹‘…Éäá±ÕÍ¥½¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğ…‘‘•¹åIÕ±•	Ñ¸ğ)ğ€ÈØØèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•Q…É•Ñ5½‘…±	Ñ¸ğ)ğ€ÈÜĞèÄğ¥¹ÁÕĞğÕÑ¡½É¥é•Ñ…É•Ğ¡½ÍÑ¹…µ”°%@…‘‘É•ÍÌ°½È%HğÍ½ÕÉ”µ¡¥‘‘•¸ğµ½‘…±Q…É•Ñ%¹ÁÕĞğ)ğ€ÈÜäèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÈàÌèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÈààèÄğ¥¹ÁÕĞğUQ!=I%iQ%=8µII9ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÈäÄèÄğ¥¹ÁÕĞğ…ÕÑ¡½¹™¥Éµ¡•­‰½àğÍ½ÕÉ”µ¡¥‘‘•¸ğ…ÕÑ¡½¹™¥Éµ¡•­‰½àğ)ğ€ÈääèÄğ‰ÕÑÑ½¸ğ…¹•°ğÍ½ÕÉ”µ¡¥‘‘•¸ğ…¹•±Q…É•Ñ5½‘…±	Ñ¸ğ)ğ€ÌÀÀèÄğ‰ÕÑÑ½¸ğ½µµ¥ĞÑ¼M½Á”ğÍ½ÕÉ”µ¡¥‘‘•¸ğÍ…Ù•Q…É•Ñ	Ñ¸ğ)ğ€ÌÄÈèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•%µÁ½ÉÑÉ…İ•É	Ñ¸ğ)ğ€ÌÈÀèÄğ‰ÕÑÑ½¸ğ	ÕÉÀa50½)M=8ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÌÈÄèÄğ‰ÕÑÑ½¸ğÍ½Á”¹©Í½¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÌÈÈèÄğ‰ÕÑÑ½¸ğ%H1¥ÍĞğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÌÈÜèÄğÑ•áÑ…É•„ğA…ÍÑ”Í½Á”)M=8‘•™¥¹¥Ñ¥½¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€ÌÌÄèÄğ‰ÕÑÑ½¸ğ…¹•°ğÍ½ÕÉ”µ¡¥‘‘•¸ğ…¹•±%µÁ½ÉÑÉ…İ•É	Ñ¸ğ)ğ€ÌÌÈèÄğ‰ÕÑÑ½¸ğ%µÁ½ÉĞ€˜A…ÉÍ”IÕ±•ÌğÍ½ÕÉ”µ¡¥‘‘•¸ğ•á•ÕÑ•%µÁ½ÉÑ	Ñ¸ğ((ŒŒŒÕ¥}ØÉ}Í•ÑÑ¥¹Ì¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ÈÀØèÄÄÈĞğ„ğÑ•Éµ¥¹…°…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÄĞÜäğ„ğÉ…‘…ÈM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÄàÈÄğ„ğÁ±…å}¥É±”IÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÈÄÜÜğ„ğÙ•É¥™¥•‘}ÕÍ•ÈQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÈÔĞÄğ„ğ‘•ÍÉ¥ÁÑ¥½¸AQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÌÀàÈğ„ğÁÍå¡½±½ä$MÑÉ…Ñ•ä…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÌĞÈäğ„ğ‰Õ¥±‘}¥É±”I•µ•‘¥…Ñ¥½¸I•Ñ•ÍĞMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÌÜäØğ„ğ…½Õ¹Ñ}ÑÉ•”½ÉÉ•±…Ñ•ÑÑ…¬¡…¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèĞÄØÄğ„ğ½Á•¹}¥¹}‰É½İÍ•È	Õœ	½Õ¹Ñä€˜1¥Ù”	É½İÍ•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèĞÜÀÈğ„ğ¡¥ÍÑ½Éå}Ñ½±•}½™˜)½ˆá•ÕÑ¥½¸!¥ÍÑ½ÉäğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÔÀØÜğ„ğ™½±‘•É}é¥ÀÙ¥‘•¹”¥±”%¹ÍÁ•Ñ½ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÔĞÈàğ„ğ•¹ÉåÁÑ•ÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ÈÀØèÔäÔÜğ„ğµ½¹¥Ñ½É}¡•…ÉĞMåÍÑ•´¥…¹½ÍÑ¥Ì€˜!•…±Ñ ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèØÌÌÄğ„ğ•áÑ•¹Í¥½¸‘…ÁÑ•È€˜A±Õ¥¸5…¹…•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèØØäÔğ„ğÍ¡¥•±‘}Á•ÉÍ½¸AQ……L±¥•¹ĞA½ÉÑ…°ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèÜÀÔÄğ„ğ­•äM•ÑÑ¥¹Ì€˜M•É•ÑÌY…Õ±ĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÈÀØèàäÌÄğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°1=LğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÀØèäÈÌĞğ‰ÕÑÑ½¸ğ‘…¹•É½ÕÌ!1PM8ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÈĞèÄğ‰ÕÑÑ½¸ğ±½­}É•Í•ĞM0YU1Pğ¥¹±¥¹”µ¡…¹‘±•Èğ±½­Y…Õ±Ñ5…ÍÑ•È ¤ğ)ğ€ÌÈäèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğƒŠPğ)ğ€ÌĞÜèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğƒŠPğ)ğ€ÌØÔèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğƒŠPğ)ğ€ÌäÔèÄğ¥¹ÁÕĞğ‰Õ‘•ÑM±¥‘•Èğ¥¹±¥¹”µ¡…¹‘±•Èğ‰Õ‘•ÑM±¥‘•Èğ)ğ€ĞÄÌèÄğ¥¹ÁÕĞğ½¹™M±¥‘•Èğ¥¹±¥¹”µ¡…¹‘±•Èğ½¹™M±¥‘•Èğ)ğ€ĞÌØèÄğ¥¹ÁÕĞğ¥±Ñ•ÈÍ½Á”½È¡½ÍĞ¸¸¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞÌäèÄğ‰ÕÑÑ½¸ğ…‘91Y-dğ¥¹±¥¹”µ¡…¹‘±•Èğ½Á•¹É•‘•¹Ñ¥…±5½‘…° ¤ğ)ğ€ĞÜäèÄğ‰ÕÑÑ½¸ğQ•ÍĞ€¼I•Á±…äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞàÈèÄğ‰ÕÑÑ½¸ğI½Ñ…Ñ”-•äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ĞàÔèÄğ‰ÕÑÑ½¸ğI•Ù½­”€˜áÁÕ¹”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÄÄèÄğ‰ÕÑÑ½¸ğQ•ÍĞ€¼I•Á±…äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÄĞèÄğ‰ÕÑÑ½¸ğI½Ñ…Ñ”-•äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÄÜèÄğ‰ÕÑÑ½¸ğI•Ù½­”€˜áÁÕ¹”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔĞÌèÄğ‰ÕÑÑ½¸ğQ•ÍĞ€¼I•Á±…äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔĞØèÄğ‰ÕÑÑ½¸ğI•¹•ÜQ¥­•ĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔĞäèÄğ‰ÕÑÑ½¸ğAÕÉ”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÜÔèÄğ‰ÕÑÑ½¸ğQ•ÍĞ€¼I•Á±…äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÜàèÄğ‰ÕÑÑ½¸ğI½Ñ…Ñ”-•äğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔàÄèÄğ‰ÕÑÑ½¸ğI•Ù½­”€˜áÁÕ¹”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔäÈèÄğ„ğY%\=5A1QIA=M%Q=Id…ÉÉ½İ}™½Éİ…ÉğÕ¹É•Í½±Ù•µÍÑ…Ñ¥Œğ€Œğ)ğ€ØÀĞèÄğ‰ÕÑÑ½¸ğ‘½İ¹±½…IMe9=IAULğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ØĞÈèÄğ‰ÕÑÑ½¸ğ€¬9\-dğ¥¹±¥¹”µ¡…¹‘±•ÈğÑÉ¥•É-•å•¹5½‘…° ¤ğ)ğ€ÜÄÜèÄğ‰ÕÑÑ½¸ğA%9ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•¹‘Q•ÍÑA¥¹œ M±…¬M•=ÁÌœ¤ğ)ğ€ÜÌÈèÄğ‰ÕÑÑ½¸ğA%9ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•¹‘Q•ÍÑA¥¹œ •™•Ñ½©¼œ¤ğ)ğ€ÜĞÜèÄğ‰ÕÑÑ½¸ğA%9ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•¹‘Q•ÍÑA¥¹œ )¥É„¹¥¹”œ¤ğ)ğ€ÜØÈèÄğ‰ÕÑÑ½¸ğA%9ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•¹‘Q•ÍÑA¥¹œ ¥Í½É!½½¬œ¤ğ)ğ€ÜØÜèÄğ‰ÕÑÑ½¸ğ…‘‘}±¥¹¬I%MQH9A=%9PğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÜäĞèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•-•å•¹5½‘…° ¤ğ)ğ€àÀĞèÄğ¥¹ÁÕĞğ”¹œ¸%}QMQ}A%A1%9ğÍ½ÕÉ”µ¡¥‘‘•¸ğ¹•İQ½­•¹9…µ”ğ)ğ€àÀàèÄğÍ•±•Ğğ=Á•É…Ñ½È€¡á•ÕÑ”Í…¹Ì°ÑÉ¥•ÈÁ…å±½…‘Ì°İÉ¥Ñ”™¥¹‘¥¹Ì¤I•Ù¥•İ•È€ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÄÜèÄğ‰ÕÑÑ½¸ğ€ÌÀ…åÌğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÄàèÄğ‰ÕÑÑ½¸ğ€äÀ…åÌğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÄäèÄğ‰ÕÑÑ½¸ğ€ÌØÔ…åÌğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÈĞèÄğ‰ÕÑÑ½¸ğ90ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•-•å•¹5½‘…° ¤ğ)ğ€àÈÜèÄğ‰ÕÑÑ½¸ğ9IQQ=-8ğÍ½ÕÉ”µ¡¥‘‘•¸ğ•á•ÕÑ•Q½­•¹•¹•É…Ñ¥½¸ ¤ğ)ğ€àĞÄèÄğ‰ÕÑÑ½¸ğ±½Í”ğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•É•‘•¹Ñ¥…±5½‘…° ¤ğ)ğ€àÔÄèÄğ¥¹ÁÕĞğ€ÄÀ¸À¸À¸À¼à½È…‘µ¥¸¹¥¹Ñ•É¹…°¹½ÉÀğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÔØèÄğÍ•±•ĞğMM AÉ¥Ù…Ñ”-•ä€¡ÈÔÔÄä¤!QQ@	•…É•È)]P-•É‰•É½ÌQPQ¥­•Ğ]L%ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àØØèÄğ¥¹ÁÕĞğ…‘µ¥¸½ÈÍÙ}…½Õ¹ĞğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÜÄèÄğÑ•áÑ…É•„ğ€´´´´µ	%8=A9MM AI%YQ-d´´´´´¸¸¸ğÍ½ÕÉ”µ¡¥‘‘•¸ğƒŠPğ)ğ€àÜÔèÄğ‰ÕÑÑ½¸ğ	=IPğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•É•‘•¹Ñ¥…±5½‘…° ¤ğ)ğ€àÜàèÄğ‰ÕÑÑ½¸ğM0Q<91YğÍ½ÕÉ”µ¡¥‘‘•¸ğ±½Í•É•‘•¹Ñ¥…±5½‘…° ¤ğ((ŒŒŒÕ¥}ØÉ}Ñ¡É•…Ñ}¥¹Ñ•°¹¡Ñµ°()ğ1¥¹”é½±Õµ¸ğQ…œğ1…‰•°ğMÑ…Ñ¥ŒÍÑ…Ñ”ğ	¥¹‘¥¹œ•Ù¥‘•¹”ğ)ğ´´µğ´´µğ´´µğ´´µğ´´µğ)ğ€ÔèĞÔÜäğ„ğ…Í¡‰½…É€¼i•É¼MÑ…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèĞàÌØğ„ğM½Á”€˜Q…É•ÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÔÀàÜğ„ğIÕ¸€˜=É¡•ÍÑÉ…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÔÌĞØğ„ğQÉÕÍĞ1…å•È€˜¥¹‘¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÔØÄÄğ„ğAQL½Ù•É…”€˜I•Á½ÉÑÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØÀàØğ„ğ$MÑÉ…Ñ•ä…Ñ”ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØÌÌÌğ„ğI•µ•‘¥…Ñ¥½¸I•Ñ•ÍĞMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØÔäàğ„ğÑÑ…¬MÕÉ™…”€˜½¹Ñ¥¹Õ½ÕÌ5½¹¥Ñ½É¥¹œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèØàäÔğ„ğ½ÉÉ•±…Ñ•ÑÑ…¬¡…¥¹ÌğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÜÄÔàğ„ğ	Õœ	½Õ¹Ñä€˜1¥Ù”	É½İÍ•ÈMÑÕ‘¥¼ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÜĞĞÌğ„ğQ¡É•…Ğ%¹Ñ•°€˜áÁ±½¥ĞÉÍ•¹…°ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÜÜÈĞğ„ğ	L€˜•Ñ•Ñ¥½¸Y…±¥‘…Ñ¥½¸ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèàÈÀäğ„ğ)½ˆá•ÕÑ¥½¸!¥ÍÑ½ÉäğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèàĞØØğ„ğÙ¥‘•¹”¥±”%¹ÍÁ•Ñ½ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèàÜÈÜğ„ğÉåÁÑ½É…Á¡¥ŒÕ‘¥Ğ1½œğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€Ôèàäààğ„ğ½µÁ±¥…¹”€˜É…µ•İ½É¬É½ÍÍİ…±¬ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèäĞÜÌğ„ğMåÍÑ•´¥…¹½ÍÑ¥Ì€˜!•…±Ñ ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèäÜĞàğ„ğ‘…ÁÑ•È€˜A±Õ¥¸5…¹…•ÈğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÄÀÀÄÜğ„ğAQ……L±¥•¹ĞA½ÉÑ…°ğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÄÀÈÜÀğ„ğM•ÑÑ¥¹Ì€˜M•É•ÑÌY…Õ±ĞğÍÉ¥ÁĞµÉ•™•É•¹”ğ€Œğ)ğ€ÔèÄÈØÌØğ‰ÕÑÑ½¸ğ9´ÈÀÈØµ`àäÈ€¡…Á¤¹¥¹Ñ•É¹…°¹½ÉÀ¤…ÉÉ½İ}‘É½Á}‘½İ¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔèÄÈääÌğ‰ÕÑÑ½¸ğ…‘9•ÜğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔèÄĞØäàğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°Q•Éµ¥¹…°1½œğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔèÄÔÀÌÜğ‰ÕÑÑ½¸ğ…Ù•°µ•É•¹ä!…±ĞM…¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÀĞèÄğ‰ÕÑÑ½¸ğÍå¹ŒMå¹ŒUÁÍÑÉ•…´••‘ÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÀàèÄğ‰ÕÑÑ½¸ğ‘…Ñ…‰…Í”I•‰Õ¥±ME1¥Ñ”Y•Ñ½ÈğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÄÄÈèÄğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°M•…É¡ÍÁ±½¥ĞQ•Éµ¥¹…°ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÀÌèÄğ¥¹ÁÕĞğ¥±Ñ•È‰äYµ%°Í•ÉÙ¥”€¡=Á•¹MM °I@°½ÉÑ¥=L¤°YML°AML¸¸¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÀÜèÄğÍ•±•ĞğM•Ù•É¥Ñä€¡YMLM¤AMLAÉ½‰…‰¥±¥Ñä]•…Á½¹¥é•¥ÉÍĞ%M-X1¥ÍĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÄÜèÄğ‰ÕÑÑ½¸ğ±°€ ÄĞ¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•¥±Ñ•È …±°œ°Ñ¡¥Ì¤ğ)ğ€ÈÈÀèÄğ‰ÕÑÑ½¸ğ%M-X€ Ô¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•¥±Ñ•È ¥Í„œ°Ñ¡¥Ì¤ğ)ğ€ÈÈÌèÄğ‰ÕÑÑ½¸ğ]•…Á½¹¥é•A½€ à¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•¥±Ñ•È İ•…Á½¹¥é•œ°Ñ¡¥Ì¤ğ)ğ€ÈÈØèÄğ‰ÕÑÑ½¸ğI•µ½Ñ”½‘”á•ÕÑ¥½¸€ Ğ¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•¥±Ñ•È É”œ°Ñ¡¥Ì¤ğ)ğ€ÈÈäèÄğ‰ÕÑÑ½¸ğAÉ¥ÙÍŒ€ Ì¤ğ¥¹±¥¹”µ¡…¹‘±•ÈğÑ½±•¥±Ñ•È ÁÉ¥Ù•ÍŒœ°Ñ¡¥Ì¤ğ)ğ€ÈÌØèÄğ‘¥ØğY´ÈÀÈĞ´ØÌàÜI•É•MM!¥½¸€¡=Á•¹MM I…”½¹‘¥Ñ¥½¸¤YML€ä¸àAML€àà¸ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•±•ÑÙ” Y´ÈÀÈĞ´ØÌàÜœ°€I•É•MM!¥½¸ƒŠP=Á•¹MM M¥¹…°!…¹‘±•ÈI…”€ğ)ğ€ÈØÌèÄğ‰ÕÑÑ½¸ğ½‘”%¹ÍÁ•ĞáÁ±½¥Ğ½‘”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈØØèÄğ‰ÕÑÑ½¸ğÍ•¹Í½ÉÌEÕ•Õ”M…™”AÉ½‰”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈØäèÄğ‰ÕÑÑ½¸ğÑÕ¹”M¥µÕ±…Ñ”ÉäµIÕ¸ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÈÜÔèÄğ‘¥ØğY´ÈÀÈĞ´ÌàÀÜÜ5…‘1¥•¹Í”€¡]¥¹‘½İÌI@…Ñ•İ…ä¤YML€ä¸àAML€äĞ¸Ø”€ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•±•ÑÙ” Y´ÈÀÈĞ´ÌàÀÜÜœ°€5…‘1¥•¹Í”ƒŠP]¥¹‘½İÌI•µ½Ñ”•Í­Ñ½À1¥•¸ğ)ğ€ÌÀÄèÄğ‰ÕÑÑ½¸ğÑ•Éµ¥¹…°5•Ñ…ÍÁ±½¥Ğ!…É¹•ÍÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÀĞèÄğ‰ÕÑÑ½¸ğ‘…Ñ…}½‰©•Ğ%¹ÍÁ•Ğ5M=ÁÑ¥½¹ÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌÄÀèÄğ‘¥ØğY´ÈÀÈÌ´ÌàØÀØ	=1¥¸%¹Ñ•É¹…°5•É¡…¹ĞA$¹‘Á½¥¹ĞYML€à¸ĞAML€ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•±•ÑÙ” Y´ÈÀÈÌ´ÌàØÀØœ°€	É½­•¸=‰©•Ğ1•Ù•°ÕÑ¡½É¥é…Ñ¥½¸€¡	=1¤€ğ)ğ€ÌÌÔèÄğ‰ÕÑÑ½¸ğÁ±…å}…ÉÉ½Üá•ÕÑ”ÕÉ°I•Á±…äQ•ÍĞğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌĞÄèÄğ‘¥ØğY´ÈÀÈĞ´ÈÄÜØÈ½ÉÑ¥¹•Ğ½ÉÑ¥=LMM0µYA8==]É¥Ñ”YML€ä¸ØAML€äØ¸àğ¥¹±¥¹”µ¡…¹‘±•ÈğÍ•±•ÑÙ” Y´ÈÀÈĞ´ÈÄÜØÈœ°€½ÉÑ¥¹•Ğ½ÉÑ¥=LMM0µYA8=ÕĞµ½˜µ	½Õ¹‘Ì]Èğ)ğ€ÌØØèÄğ‰ÕÑÑ½¸ğ…ÍÍ¥¹µ•¹Ñ}ÑÕÉ¹•‘}¥¸Y¥•Ü9Õ±•¤!•ÕÉ¥ÍÑ¥ÌğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÌäÜèÄğ‰ÕÑÑ½¸ğM½ÕÉ”½‘”ğ¥¹±¥¹”µ¡…¹‘±•ÈğÍİ¥Ñ¡áÁ±½¥ÑQ…ˆ Ñ…ˆµÍ½ÕÉ”œ¤ğ)ğ€ĞÀÀèÄğ‰ÕÑÑ½¸ğ5•¡…¹¥Ìğ¥¹±¥¹”µ¡…¹‘±•ÈğÍİ¥Ñ¡áÁ±½¥ÑQ…ˆ Ñ…ˆµµ•¡…¹¥Ìœ¤ğ)ğ€ĞÀÌèÄğ‰ÕÑÑ½¸ğÕ…É‘É…¥±Ìğ¥¹±¥¹”µ¡…¹‘±•ÈğÍİ¥Ñ¡áÁ±½¥ÑQ…ˆ Ñ…ˆµÕ…É‘É…¥±Ìœ¤ğ)ğ€ĞÀØèÄğ‰ÕÑÑ½¸ğÉÑ¥™…ÑÌğ¥¹±¥¹”µ¡…¹‘±•ÈğÍİ¥Ñ¡áÁ±½¥ÑQ…ˆ Ñ…ˆµ…ÉÑ¥™…ÑÌœ¤ğ)ğ€ĞÄäèÄğ‰ÕÑÑ½¸ğ½¹Ñ•¹Ñ}½Áä½ÁäğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÀÌèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÄÀèÄğ¥¹ÁÕĞğ€¡Õ¹¹…µ•¤ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ)ğ€ÔÄàèÄğ‰ÕÑÑ½¸ğ…Ù•°É´€˜EÕ•Õ”™½È!%Q0ÁÁÉ½Ù…°…Ñ”ğÕ¹É•Í½±Ù•µÍÑ…Ñ¥ŒğƒŠPğ(((´´´((ŒŒA…ÉĞ€ÔƒŠPİ•ˆÕ¤™¥±•Ì…¹É•¹‘•É¥¹œ½½‰Í¥‘¥…¹}­¥¹•Ñ¥Œ½M%8¹µ€¡¡¥ÍÑ½É¥…°•µ‰•‘‘•½Áäì½É¥¥¹…°É•ÍÑ½É•…ĞÍÕÁÁ±¥•Á…Ñ ¤((´´´)¹…µ”è=‰Í¥‘¥…¸-¥¹•Ñ¥Œ)½±½ÉÌè(€ÍÕÉ™…”è€œŒÁ˜ÄÌÅŒœ(€ÍÕÉ™…”µ‘¥´è€œŒÁ˜ÄÌÅŒœ(€ÍÕÉ™…”µ‰É¥¡Ğè€œŒÌÔÌäĞÈœ(€ÍÕÉ™…”µ½¹Ñ…¥¹•Èµ±½İ•ÍĞè€œŒÁ„Á”ÄØœ(€ÍÕÉ™…”µ½¹Ñ…¥¹•Èµ±½Üè€œŒÄàÅŒÈĞœ(€ÍÕÉ™…”µ½¹Ñ…¥¹•Èè€œŒÅŒÈÀÈàœ(€ÍÕÉ™…”µ½¹Ñ…¥¹•Èµ¡¥ è€œŒÈØÉ„ÌÌœ(€ÍÕÉ™…”µ½¹Ñ…¥¹•Èµ¡¥¡•ÍĞè€œŒÌÄÌÔÍ”œ(€½¸µÍÕÉ™…”è€œ‘™”É•”œ(€½¸µÍÕÉ™…”µÙ…É¥…¹Ğè€œ‰‰…‰˜œ(€¥¹Ù•ÉÍ”µÍÕÉ™…”è€œ‘™”É•”œ(€¥¹Ù•ÉÍ”µ½¸µÍÕÉ™…”è€œŒÉŒÌÀÌäœ(€½ÕÑ±¥¹”è€œŒàØäĞá„œ(€½ÕÑ±¥¹”µÙ…É¥…¹Ğè€œŒÍŒÑ„ĞÈœ(€ÍÕÉ™…”µÑ¥¹Ğè€œŒÑ•‘•„Ìœ(€ÁÉ¥µ…Éäè€œŒÑ•‘•„Ìœ(€½¸µÁÉ¥µ…Éäè€œŒÀÀÌàÈĞœ(€ÁÉ¥µ…Éäµ½¹Ñ…¥¹•Èè€œŒÄÁˆäàÄœ(€½¸µÁÉ¥µ…Éäµ½¹Ñ…¥¹•Èè€œŒÀÀĞÈÉˆœ(€¥¹Ù•ÉÍ”µÁÉ¥µ…Éäè€œŒÀÀÙŒĞäœ(€Í•½¹‘…Éäè€œŒÑİ˜Øœ(€½¸µÍ•½¹‘…Éäè€œŒÀÀÌØĞÀœ(€Í•½¹‘…Éäµ½¹Ñ…¥¹•Èè€œŒÀÍˆÕÌœ(€½¸µÍ•½¹‘…Éäµ½¹Ñ…¥¹•Èè€œŒÀÀĞÈÑ”œ(€Ñ•ÉÑ¥…Éäè€œ™™ˆäÕ˜œ(€½¸µÑ•ÉÑ¥…Éäè€œŒĞÜÉ„ÀÀœ(€Ñ•ÉÑ¥…Éäµ½¹Ñ…¥¹•Èè€œ”ÈäÄÀÀœ(€½¸µÑ•ÉÑ¥…Éäµ½¹Ñ…¥¹•Èè€œŒÔÈÌÈÀÀœ(€•ÉÉ½Èè€œ™™ˆÑ…ˆœ(€½¸µ•ÉÉ½Èè€œŒØäÀÀÀÔœ(€•ÉÉ½Èµ½¹Ñ…¥¹•Èè€œŒäÌÀÀÁ„œ(€½¸µ•ÉÉ½Èµ½¹Ñ…¥¹•Èè€œ™™‘…Øœ(€ÁÉ¥µ…Éäµ™¥á•è€œŒÙ™™‰‰”œ(€ÁÉ¥µ…Éäµ™¥á•µ‘¥´è€œŒÑ•‘•„Ìœ(€½¸µÁÉ¥µ…Éäµ™¥á•è€œŒÀÀÈÄÄÌœ(€½¸µÁÉ¥µ…Éäµ™¥á•µÙ…É¥…¹Ğè€œŒÀÀÔÈÌØœ(€Í•½¹‘…Éäµ™¥á•è€œ…•‘™˜œ(€Í•½¹‘…Éäµ™¥á•µ‘¥´è€œŒÑİ˜Øœ(€½¸µÍ•½¹‘…Éäµ™¥á•è€œŒÀÀÅ˜ÈØœ(€½¸µÍ•½¹‘…Éäµ™¥á•µÙ…É¥…¹Ğè€œŒÀÀÑ”ÕŒœ(€Ñ•ÉÑ¥…Éäµ™¥á•è€œ™™‘‘ˆàœ(€Ñ•ÉÑ¥…Éäµ™¥á•µ‘¥´è€œ™™ˆäÕ˜œ(€½¸µÑ•ÉÑ¥…Éäµ™¥á•è€œŒÉ„ÄÜÀÀœ(€½¸µÑ•ÉÑ¥…Éäµ™¥á•µÙ…É¥…¹Ğè€œŒØÔÍ”ÀÀœ(€‰…­É½Õ¹è€œŒÁ˜ÄÌÅŒœ(€½¸µ‰…­É½Õ¹è€œ‘™”É•”œ(€ÍÕÉ™…”µÙ…É¥…¹Ğè€œŒÌÄÌÔÍ”œ)ÑåÁ½É…Á¡äè(€¡•…‘±¥¹”µá°è(€€€™½¹Ñ…µ¥±äèMÁ…”É½Ñ•Í¬(€€€™½¹ÑM¥é”è€ÌÉÁà(€€€™½¹Ñ]•¥¡Ğè€œÜÀÀœ(€€€±¥¹•!•¥¡Ğè€ÌáÁà(€€€±•ÑÑ•ÉMÁ…¥¹œè€´À¸ÀÉ•´(€¡•…‘±¥¹”µ±œè(€€€™½¹Ñ…µ¥±äèMÁ…”É½Ñ•Í¬(€€€™½¹ÑM¥é”è€ÈÑÁà(€€€™½¹Ñ]•¥¡Ğè€œØÀÀœ(€€€±¥¹•!•¥¡Ğè€ÌÁÁà(€€€±•ÑÑ•ÉMÁ…¥¹œè€´À¸ÀÄÕ•´(€¡•…‘±¥¹”µµè(€€€™½¹Ñ…µ¥±äèMÁ…”É½Ñ•Í¬(€€€™½¹ÑM¥é”è€ÄáÁà(€€€™½¹Ñ]•¥¡Ğè€œØÀÀœ(€€€±¥¹•!•¥¡Ğè€ÈÑÁà(€€€±•ÑÑ•ÉMÁ…¥¹œè€´À¸ÀÅ•´(€¡•…‘±¥¹”µÍ´è(€€€™½¹Ñ…µ¥±äèMÁ…”É½Ñ•Í¬(€€€™½¹ÑM¥é”è€ÄÕÁà(€€€™½¹Ñ]•¥¡Ğè€œØÀÀœ(€€€±¥¹•!•¥¡Ğè€ÈÁÁà(€‰½‘äµ±œè(€€€™½¹Ñ…µ¥±äè%¹Ñ•È(€€€™½¹ÑM¥é”è€ÄÑÁà(€€€™½¹Ñ]•¥¡Ğè€œĞÀÀœ(€€€±¥¹•!•¥¡Ğè€ÈÉÁà(€‰½‘äµµè(€€€™½¹Ñ…µ¥±äè%¹Ñ•È(€€€™½¹ÑM¥é”è€ÄÍÁà(€€€™½¹Ñ]•¥¡Ğè€œĞÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄáÁà(€‰½‘äµÍ´è(€€€™½¹Ñ…µ¥±äè%¹Ñ•È(€€€™½¹ÑM¥é”è€ÄÉÁà(€€€™½¹Ñ]•¥¡Ğè€œĞÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄÙÁà(€½‘”µ±œè(€€€™½¹Ñ…µ¥±äè)•Ñ	É…¥¹Ì5½¹¼(€€€™½¹ÑM¥é”è€ÄÍÁà(€€€™½¹Ñ]•¥¡Ğè€œÔÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄáÁà(€½‘”µµè(€€€™½¹Ñ…µ¥±äè)•Ñ	É…¥¹Ì5½¹¼(€€€™½¹ÑM¥é”è€ÄÉÁà(€€€™½¹Ñ]•¥¡Ğè€œĞÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄÙÁà(€½‘”µÍ´è(€€€™½¹Ñ…µ¥±äè)•Ñ	É…¥¹Ì5½¹¼(€€€™½¹ÑM¥é”è€ÄÅÁà(€€€™½¹Ñ]•¥¡Ğè€œĞÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄÑÁà(€±…‰•°µµè(€€€™½¹Ñ…µ¥±äè)•Ñ	É…¥¹Ì5½¹¼(€€€™½¹ÑM¥é”è€ÄÅÁà(€€€™½¹Ñ]•¥¡Ğè€œØÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄÑÁà(€€€±•ÑÑ•ÉMÁ…¥¹œè€À¸ÀÙ•´(€±…‰•°µÍ´è(€€€™½¹Ñ…µ¥±äè)•Ñ	É…¥¹Ì5½¹¼(€€€™½¹ÑM¥é”è€ÄÁÁà(€€€™½¹Ñ]•¥¡Ğè€œÔÀÀœ(€€€±¥¹•!•¥¡Ğè€ÄÉÁà(€€€±•ÑÑ•ÉMÁ…¥¹œè€À¸Àá•´)É½Õ¹‘•è(€Í´è€À¸ÄÈÕÉ•´(€U1Pè€À¸ÈÕÉ•´(€µè€À¸ÌÜÕÉ•´(€±œè€À¸ÕÉ•´(€á°è€À¸ÜÕÉ•´(€™Õ±°è€äääåÁà)ÍÁ…¥¹œè(€ÕÑÑ•Èè€À¸ÜÕÉ•´(€ÕÑÑ•Èµ±œè€ÅÉ•´(€µ…É¥¸è€ÅÉ•´(€µ…É¥¸µµ½‰¥±”è€À¸ÜÕÉ•´(€ÍÁ…”µáÌè€À¸ÈÕÉ•´(€ÍÁ…”µÍ´è€À¸ÌÜÕÉ•´(€ÍÁ…”µµè€À¸ÕÉ•´(€ÍÁ…”µ±œè€À¸ÜÕÉ•´(€ÍÁ…”µá°è€ÅÉ•´(€ÍÁ…”´Éá°è€Ä¸ÕÉ•´(´´´((ŒŒ	É…¹€˜MÑå±”()Q¡¥Ì‘•Í¥¸ÍåÍÑ•´•µ‰½‘¥•Ì¡¥ µÍÑ…­•Ì½Á•É…Ñ¥½¹…°‘•™•¹Í”°ÉåÁÑ½É…Á¡¥ŒÉ¥½È°…¹‘•Ñ•Éµ¥¹¥ÍÑ¥ŒÁÉ•¥Í¥½¸¸	Õ¥±Ğ™½È•±¥Ñ”½™™•¹Í¥Ù”Í•ÕÉ¥Ñä•¹¥¹••ÉÌ°I•Q•…µÌ°…¹M•=ÁÌ½µµ…¹‘•ÉÌ•á•ÕÑ¥¹œÍå¹¡É½¹¥é•½Á•É…Ñ¥½¹Ì°¥ĞÑÉ…‘•Ì‘•½É…Ñ¥Ù”½É¹…µ•¹Ñ…Ñ¥½¸™½È…‰Í½±ÕÑ”Í¥¹…°µÑ¼µ¹½¥Í”±…É¥Ñä°É…Á¥½¹¥Ñ¥Ù”ÁÉ½•ÍÍ¥¹œ°…¹µ¥ÍÍ¥½¸•ÉÑ…¥¹Ñä¸()Q¡”…•ÍÑ¡•Ñ¥Œ™ÕÍ•Ì€¨©AÉ•¥Í¥½¸¹¥¹••É¥¹œ¨¨İ¥Ñ €¨©Q•¡¹¥…°5¥¹¥µ…±¥Í´¨¨è(´€¨©Q…Ñ¥…°UÑ¥±¥Ñäè¨¨•¹Í”°½µÁ…Ğ…ÉÉ…¹•µ•¹ÑÌÑ¡…Ğ½ÁÑ¥µ¥é”ÍÉ••¸É•…°•ÍÑ…Ñ”™½È½µÁ±•àµÕ±Ñ¤µÁ…¹”İ½É­ÍÁ…•Ì°Ñ…É•ĞÑÉ••Ì°…¹½¹Ñ¥¹Õ½ÕÌ•Ù•¹ĞÑ•±•µ•ÑÉä¸(´€¨©½¹ÑÉ½±±•1Õµ¥¹•Í•¹”è¨¨±…å•É•‘…É¬•¹Ù¥É½¹µ•¹Ğİ¡•É”½±½È¥ÌÍÑÉ¥Ñ±äÍ•µ…¹Ñ¥ŠQÉ•Í•ÉÙ•™½ÈÙ…±¥‘…Ñ¥½¸Ñ¥•ÉÌ°Í•Ù•É¥ÑäÍÑ…Ñ•Ì°Ñ•±•µ•ÑÉäÉ…Ñ•Ì°…¹±•Ñ¡…°•á•ÕÑ¥½¸Í¥¹…±Ì¸(´€¨©É¡¥Ñ•ÑÕÉ…°I¥½Èè¨¨M¡…ÉÀ‘•±¥¹•…Ñ¥½¸°ÍÑÉÕÑÕÉ•€ÅÁà™É…µ¥¹œ°±½Üµ½¹ÑÉ…ÍĞÍÑÉÕÑÕÉ…°É¥‘Ì°…¹µ½¹½ÍÁ…•‘…Ñ„…¹¡½ÉÌÑ¡…Ğ¥¹Ù½­”µ¥±¥Ñ…ÉäµÉ…‘”½¹Í½±”¡…É‘İ…É”¸(´€¨©U¹½µÁÉ½µ¥Í¥¹œ•Ñ•Éµ¥¹¥Í´è¨¨MÑ…Ñ”¡…¹•Ì°Ñ•Éµ¥¹…°‰Õ™™•ÉÌ°…¹¥¹ÍÁ•Ñ¥½¸ÍÕÉ™…•Ì‰•¡…Ù”ÁÉ•‘¥Ñ…‰±äİ¥Ñ ¥¹ÍÑ…¹ĞÑÉ…¹Í¥Ñ¥½¹Ì°é•É¼±…å½ÕĞÍ¡¥™ÑÌ°…¹…‰Í½±ÕÑ”ÑåÁ”¡¥•É…É¡ä¸((ŒŒ½±½ÉÌ()Q¡”Á…±•ÑÑ”±•Ù•É…•Ì„‘••À½‰Í¥‘¥…¸¡¥•É…É¡äÑ¼Í¥µÕ±…Ñ”Á¡åÍ¥…°½µµ…¹¡…É‘İ…É”°•ÍÑ…‰±¥Í¡¥¹œ„¡¥ µ‘•¹Í¥Ñä‰…­‘É½Àİ¡•É”½Á•É…Ñ¥½¹…°Ñ•±•µ•ÑÉäÍÑ…¹‘Ì½ÕĞİ¥Ñ é•É¼½ÁÑ¥…°™…Ñ¥Õ”¸((ŒŒŒ½±½È!¥•É…É¡ä€˜I½±•Ì(´€¨©AÉ¥µ…Éä€¡€ŒÄÁäàÅ€ƒŠPå‰•Èµ•É…±¤è¨¨=Á•É…Ñ¥½¹…°Í…™•Ñä°Ù•É¥™¥•Ñ…É•ÑÌİ¥Ñ¡¥¸±•…°Í½Á”°…ÕÑ¡•¹Ñ¥…Ñ•¹½‘•Ì°Á…ÍÍ••áÁ±½¥ÑÌ°…¹½¹™¥Éµ•½Á•É…Ñ¥½¹…°‰½Õ¹‘…É¥•Ì¸(´€¨©M•½¹‘…Éä€¡€ŒÀÙÙÑ€ƒŠPå‰•ÈQ•…°¤è¨¨Ñ¥Ù”¹•Ñİ½É¬Í…¹¹•ÉÌ°‘…Ñ„ÍÑÉ•…µÌ°‘å¹…µ¥ŒÑ•±•µ•ÑÉä°É½ÕÑ¥¹œ±¥¹­Ì°¥¹Ñ•É…Ñ¥Ù”ÕÑ¥±¥ÑäÑÉ¥•ÉÌ°…¹Ñ•±•µ•ÑÉäÉ…Á¡Ì¸(´€¨©Q•ÉÑ¥…Éä€¡€ÔåÁ	€ƒŠPQ…Ñ¥…°µ‰•È¤è¨¨…¹‘¥‘…Ñ”™¥¹‘¥¹Ì°Õ¹Ù…±¥‘…Ñ•Í½Á”‘•Ù¥…Ñ¥½¹Ì°İ…É¹¥¹Ì°¡Õµ…¸µ¥¸µÑ¡”µ±½½ÀÉ•Ù¥•ÜÅÕ•Õ•Ì°…¹Õ¹ÍÑ…‰±”Á…å±½…‘Ì¸(´€¨©É¥Ñ¥…°M•Ù•É¥Ñä€¡€ĞĞĞÑ€ƒŠPQ…Ñ¥…°É¥µÍ½¸¤è¨¨½¹™¥Éµ•ÙÕ±¹•É…‰¥±¥Ñ¥•Ì€¡I°ME1¤°MMI¤°½Á•É…Ñ¥½¹…°‰É•…¡•Ì°½ÕĞµ½˜µ‰½Õ¹‘Ì…±•ÉÑÌ°…¹…‰½ÉĞ½µµ…¹‘Ì¸(´€¨©9•ÕÑÉ…°½É”€¡€ŒÁÁÄİ€ƒŠP••À=‰Í¥‘¥…¸¤è¨¨I½½Ğ…¹Ù…ÌÉ½Õ¹¸(€€´MÕÉ™…”Q¥•È€Ä€¡€ŒÄÄÄàÈİ€ƒŠP••À¡…É½…°¤èMÑÉÕÑÕÉ…°Í¥‘•‰…ÉÌ°É…¥°Á…¹•±Ì°…¹‰½ÑÑ½´‘½¬‘É…İ•ÉÌ¸(€€´MÕÉ™…”Q¥•È€È€¡€ŒÅÈäÍ	€ƒŠPM±…Ñ”5…ÑÉ¥à¤è…É‘Ì°µ½‘…°±…å•ÉÌ°Ñ•Éµ¥¹…°•¹Ù•±½Á•Ì°…¹¥¹ÍÁ•Ñ¥½¸•±±Ì¸(€€´	½É‘•ÉÌ€˜¥Ù¥‘•ÉÌ€¡€ŒÌÌĞÄÔÕ€€¼É‰„ ÈÔÔ°ÈÔÔ°ÈÔÔ°À¸Àà¥€¤è!…¥É±¥¹”ÍÑÉÕÑÕÉ…°Í•Á…É…Ñ½ÉÌ¸(€€´Q•áĞAÉ¥µ…Éä€¡€á€¤è‰Í½±ÕÑ”±•¥‰¥±¥Ñä™½È½‘”Á…å±½…‘Ì…¹Ñ•±•µ•ÑÉäÁ…É…µ•Ñ•ÉÌ¸(€€´Q•áĞ5ÕÑ•€¡€ŒäÑÍá€¤è½¹Ñ•áÑÕ…°¡•…‘•ÉÌ°µ•Ñ…‘…Ñ„­•åÌ°…¹Í•½¹‘…Éä‘•ÍÉ¥ÁÑ½ÉÌ¸((ŒŒQåÁ½É…Á¡ä()Q¡”ÑåÁ½É…Á¡¥Œ…É¡¥Ñ•ÑÕÉ”‰…±…¹•ÌÑ•¡¹¥…°…ÕÑ¡½É¥Ñä°½µÁ…ĞÍ…¹¹¥¹œ°…¹é•É¼¡…É…Ñ•È…µ‰¥Õ¥Ñäè(´€¨©!•…‘±¥¹•Ì€¡MÁ…”É½Ñ•Í¬¤è¨¨AÉ½Ù¥‘•ÌÍÑÉÕÑÕÉ••½µ•ÑÉ¥Œ½¹™¥‘•¹”™½Èµ½‘Õ±”Ñ¥Ñ±•Ì°Yµ…ÑÉ¥•Ì°…¹Á…¹•°¡•…‘•ÉÌ¸(´€¨©	½‘ä€˜½¹ÑÉ½±Ì€¡%¹Ñ•È¤è¨¨!¥ àµ¡•¥¡Ğ…¹¹•ÕÑÉ…°•½µ•ÑÉä…±±½Ü‘•¹Í”‘…Í¡‰½…ÉÉ¥‘Ì…¹¹•ÍÑ•ÑÉ•”¹½‘•ÌÑ¼É•µ…¥¸É•…‘…‰±”Õ¹‘•È•áÑÉ•µ”‘•¹Í¥Ñäİ¥Ñ¡½ÕĞ‘¥ÍÑÉ…Ñ¥½¸¸(´€¨©½‘”°…Ñ„€˜1…‰•±Ì€¡)•Ñ	É…¥¹Ì5½¹¼¤è¨¨•‘¥…Ñ•Ñ¼Ñ•¡¹¥…°…ÉÑ¥™…ÑÌèÉ…ÜÁ…å±½…‘Ì°É••àÑ…É•ÑÌ°UI0ÍÑÉ¥¹Ì°%@½%H¹½Ñ…Ñ¥½¹Ì°¡…Í ‘¥•ÍÑÌ°…¹ÍÑ…ÑÕÌ‰…‘•Ì¸•…ÑÕÉ•Ì‘¥ÍÑ¥¹Ñ¥Ù”±åÁ Í¡…Á¥¹œÑ¼…Ù½¥½¹™ÕÍ¥½¸‰•Ñİ••¸€Á€€¼=€…¹€Å€€¼±€€¼%€¸(´€¨©±°µ…ÁÌ5•ÑÉ¥Ìè¨¨Mµ…±°ÍÑ…ÑÕÌÑ…Ì…¹‘…Ñ„±…‰•±Ì€¡±…‰•°µµ‘€°±…‰•°µÍµ€¤‘•™…Õ±ĞÑ¼ÕÁÁ•É…Í”İ¥Ñ •áÑ•¹‘•±•ÑÑ•ÈÍÁ…¥¹œ€¡€À¸ÀÙ•µ€Ñ¼€À¸Àá•µ€¤Ñ¼•ÍÑ…‰±¥Í Ù¥ÍÕ…°½¹ÑÉ…ÍĞ……¥¹ÍĞÁÉ½Í”¸((ŒŒ1…å½ÕĞ€˜MÁ…¥¹œ()Q¡”½µµ…¹•¹Ñ•ÈÕÍ•Ì„ÍÑÉ¥Ğ°±½Üµ½Ù•É¡•…™±Õ¥É¥İ¥Ñ ™¥á•ÕÑ¥±¥ÑäÉ…¥±Ìè(´€¨©MÁ…Ñ¥…°1½¥Œè¨¨‰…Í”€ÑÁàÍÁ…Ñ¥…°É¡åÑ¡´ÑÕ¹•‘½İ¸™½Èµ…á¥µÕ´¥¹™½Éµ…Ñ¥½¸‘•¹Í¥Ñä¸MÑ…¹‘…Éµ…É¥¹Ì…É”½µÁ…Ğ€¡€ÅÉ•µ€€¼€ÄÙÁà¤°…¹Á…¹•°ÕÑÑ•ÉÌµ…¥¹Ñ…¥¸Ñ¥¡Ğ…‘©…•¹ä€¡€À¸ÜÕÉ•µ€€¼€ÄÉÁà¤Ñ¼µ…á¥µ¥é”¡½É¥é½¹Ñ…°‘…Ñ„ÍÁ…¸¸(´€¨©•Í­Ñ½ÀÉ¡¥Ñ•ÑÕÉ”€ ÄĞĞÁÁà¬¤è¨¨€(€€´AÉ¥µ…ÉäÁ•ÉÍ¥ÍÑ•¹Ğ±•™ĞÉ…¥°è€ÔÙÁà€¡½±±…ÁÍ•¤Ñ¼€ÈÈÁÁà€¡•áÁ…¹‘•¤™½È½Á•É…Ñ¥½¹…°Á¡…Í”Íİ¥Ñ¡¥¹œ¸(€€´5Õ±Ñ¤µÁ…¹”İ½É­ÍÁ…”è€Ìµ½±Õµ¸ÍÁ±¥Ğ±…å½ÕĞ€¡M½Á”QÉ•”è€ÈàÁÁà™¥á•ìÑÑ…¬MÕÉ™…”€¼¥¹‘¥¹œ5…ÑÉ¥àè‘å¹…µ¥Œ™±•àìQ…É•Ğ•Ñ…¥°€¼I…Ü%¹ÍÁ•Ñ½Èè€ĞĞÁÁà™¥á•½È½±±…ÁÍ¥‰±”‘É…İ•È¤¸(´€¨©I•™±½ÜIÕ±•Ìè¨¨(€€´€¨©Q…‰±•Ğ€ ÜØáÁà€´€ÄÀÈÑÁà¤è¨¨Q…É•Ğ•Ñ…¥°µ½Ù•ÌÑ¼„™±½…Ñ¥¹œ‰½ÑÑ½´‘É…İ•ÈìÍ•½¹‘…ÉäÁ…¹•±ÌÍÑ…¬¥¹Ñ¼Ñ…‰Ì¸(€€´€¨©5½‰¥±”€ ğ€ÜØáÁà¤è¨¨½±±…ÁÍ•ÌÑ¼Í¥¹±”µÁ…¹”Ñ…Í¬™½ÕÌİ¥Ñ ‰½ÑÑ½´µ‘½­•½µµ…¹¹…Ù¥…Ñ¥½¸¸É¥µ…É¥¹Ì‘É½ÀÑ¼€À¸ÜÕÉ•µ€¸((ŒŒ±•Ù…Ñ¥½¸€˜•ÁÑ ()Q¡¥ÌÍåÍÑ•´¥¹Ñ•¹Ñ¥½¹…±±ä•±¥µ¥¹…Ñ•ÌÍ½™Ğ°‘¥™™ÕÍ”½¹ÍÕµ•È‘É½ÁÍ¡…‘½İÌ¸•ÁÑ ¥Ì…ÉÑ¥Õ±…Ñ•ÁÕÉ•±äÑ¡É½Õ Ñ½¹…°±Õµ¥¹…¹”Ñ¥•ÉÌ…¹ÁÉ•¥Í”€ÅÁàÁ•É¥µ•Ñ•È™É…µ¥¹œ¸((´€¨©1•Ù•°€À€¡…¹Ù…Ì	…Í”ƒŠP€ŒÁÁÄİ€¤è¨¨9½¸µ¥¹Ñ•É…Ñ¥Ù”™½Õ¹‘…Ñ¥½¸…¹É¥‰…­É½Õ¹¸(´€¨©1•Ù•°€Ä€¡½­•MÕÉ™…•ÌƒŠP€ŒÄÄÄàÈİ€¤è¨¨MÑÉÕÑÕÉ…°Í¥‘•‰…ÉÌ°Ñ½ÀÍÑ…ÑÕÌ!U°…¹Ñ•Éµ¥¹…°ÍÁ±¥ĞÁ…¹•Ì¸M•Á…É…Ñ•‰ä€ÅÁàÍ½±¥É‰„ ÈÔÔ°€ÈÔÔ°€ÈÔÔ°€À¸ÀÜ¥€¸(´€¨©1•Ù•°€È€¡½¹Ñ…¥¹•ÉÌ€˜…É‘ÌƒŠP€ŒÅÈäÍ	€¤è¨¨…Ñ„Ñ…‰±•Ì°™¥¹‘¥¹œÍÕµµ…É¥•Ì°Ñ…É•Ğ¹½‘•Ì°…¹Á…å±½…•‘¥Ñ½ÉÌ¸=ÕÑ±¥¹•İ¥Ñ €ÅÁàÍ½±¥É‰„ ÈÔÔ°€ÈÔÔ°€ÈÔÔ°€À¸ÄÈ¥€¸(´€¨©1•Ù•°€Ì€¡%¹Ñ•É…Ñ¥Ù”!½Ù•È€˜±å½ÕÑÌƒŠP€ŒÈÜÌÔÑ€¤è¨¨A½Á½Ù•È¥¹ÍÁ•Ñ½ÉÌ°½µµ…¹Á…±•ÑÑ•Ì°…¹½¹Ñ•áĞµ•¹ÕÌ¸A…¥É•İ¥Ñ „½¹•¹ÑÉ…Ñ•Ñ…Ñ¥…°Í¡…‘½Üè€À€ÑÁà€ÄÉÁàÉ‰„ À°€À°€À°€À¸ØÔ¤°€À€À€À€ÅÁàÉ‰„ Ø°€ÄàÈ°€ÈÄÈ°€À¸ÈÔ¥€¸(´€¨©M•µ…¹Ñ¥Œ	…­±½Üè¨¨!¥ µÑ¡É•…Ğ…É‘Ì…¹É¥Ñ¥…°…±•ÉĞÍÑ…Ñ•ÌÕÑ¥±¥é”ÍÕ‰Ñ±”±½…±¥é•±½Ü…•¹ÑÌ€¡‰½àµÍ¡…‘½Üè€À€À€ÄÉÁàÉ‰„ ÈÌä°€Øà°€Øà°€À¸ÄÔ¥€¤Ñ¼‘¥É•Ğ¥µµ•‘¥…Ñ”Ù¥ÍÕ…°ÑÉ¥…”İ¥Ñ¡½ÕĞ½‰ÍÑÉÕÑ¥¹œ¹•¥¡‰½É¥¹œ‘…Ñ„¸((ŒŒM¡…Á•Ì()Q¡”‘•Í¥¸ÍåÍÑ•´•¹™½É•Ì„Í¡…ÉÀ°•¹¥¹••É••½µ•ÑÉä€¡É½Õ¹‘•‘¹•ÍÌè€Å€¤è(´€¨©	…Í”±•µ•¹ÑÌ€¡	ÕÑÑ½¹Ì°%¹ÁÕÑÌ°	…‘•Ì°Q…‰Ì¤è¨¨€ÑÁà€¡€À¸ÈÕÉ•µ€¤‰½É‘•ÈÉ…‘¥ÕÌ°•Ù½­¥¹œÁÉ•¥Í¥½¸µÕĞ¥¹ÍÑÉÕµ•¹Ñ…Ñ¥½¸Á…¹•±Ì¸(´€¨©…É½¹Ñ…¥¹•ÉÌ€˜A…¹•±Ì€¡É½Õ¹‘•µ±€¤è¨¨€áÁà€¡€À¸ÕÉ•µ€¤‰½É‘•ÈÉ…‘¥ÕÌ™½Èµ½‘Õ±…Èİ½É­ÍÁ…”Õ¹¥ÑÌ¸(´€¨©¥…±½Ì€˜=Ù•É±…åÌ€¡É½Õ¹‘•µá±€¤è¨¨€ÄÉÁà€¡€À¸ÜÕÉ•µ€¤‰½É‘•ÈÉ…‘¥ÕÌµ…á¥µÕ´¸(´€¨©i•É¼A¥±°M¡…Á•Ìè¨¨¥ÉÕ±…ÈÁ¥±±Ì…É”ÁÉ½¡¥‰¥Ñ•ì…±°Ñ…Ì°ÍÑ…ÑÕÌ™±…Ì°…¹µ•ÑÉ¥Œ‰…‘•Ìµ…¥¹Ñ…¥¸É¥ÍÀ€ÑÁà½É¹•ÉÌÑ¼…Ù½¥½¹ÍÕµ•Èµ…ÁÀ…ÍÍ½¥…Ñ¥½¹Ì…¹ÁÉ•Í•ÉÙ”Ñ…‰Õ±…È¡½É¥é½¹Ñ…°É¡åÑ¡´¸((ŒŒ½µÁ½¹•¹ÑÌ((ŒŒŒ	ÕÑÑ½¹Ì(´€¨©AÉ¥µ…ÉäQ…Ñ¥…°è¨¨M½±¥µ•É…±‰…­É½Õ¹€¡€ŒÄÁäàÅ€¤°¡…É½…°µ‰±…¬Ñ•áĞ€¡€ŒÁÁÄİ€¤°İ•¥¡Ğ€ØÀÀ°¡•¥¡Ğ€ÌÉÁà°Á…‘‘¥¹œ€À€ÄÉÁà¸!½Ù•Èè€ŒÀÔäØØå€¸Ñ¥Ù”è€ŒÀĞÜàÔİ€¸½ÕÌè€ÉÁà½™™Í•ĞÉ¥¹œ¥¸€ŒÄÁäàÅ€¸(´€¨©M•½¹‘…Éä€¼¡½ÍĞUÑ¥±¥Ñäè¨¨QÉ…¹ÍÁ…É•¹Ğ‰…­É½Õ¹°€ÅÁà‰½É‘•È€ŒÌÌĞÄÔÕ€°Ñ•áĞ€á€¸!½Ù•Èè€ŒÅÈäÍ	€‰…­É½Õ¹°‰½É‘•È€ŒÀÙÙÑ€¸(´€¨©•ÍÑÉÕÑ¥Ù”€¼‰½ÉĞÑ¥½¸è¨¨!¥ µÍ…ÑÕÉ…Ñ¥½¸É¥µÍ½¸™¥±°€¡€ĞĞĞÑ€¤½È€ÅÁàÉ¥µÍ½¸‰½É‘•Èİ¥Ñ Í•µ¤µÑÉ…¹ÍÁ…É•¹ĞÑ¥¹Ğ€¡É‰„ ÈÌä°€Øà°€Øà°€À¸ÄÈ¥€¤¸UÍ•™½È…ÑÑ…¬…¹•°°Á…å±½…‘•Ñ½¹…Ñ”°½ÈÉ•‘•¹Ñ¥…°ÁÕÉ”¸((ŒŒŒ¡¥ÁÌ€˜	…‘•Ì(´MÑÉ¥Ğµ½¹½ÍÁ…•ÑåÁ½É…Á¡ä€¡±…‰•°µÍµ€¤¸(´€¨©%¸µM½Á”€¼Y•É¥™¥•è¨¨Q¥¹Ñ•‰…­É½Õ¹É‰„ ÄØ°€ÄàÔ°€ÄÈä°€À¸ÄÈ¥€°‰½É‘•È€ÅÁàÍ½±¥É‰„ ÄØ°€ÄàÔ°€ÄÈä°€À¸Ì¥€°Ñ•áĞ€ŒÄÁäàÅ€¸(´€¨©I•Ù¥•Ü9••‘•€¼µ‰¥Õ½ÕÌè¨¨	…­É½Õ¹É‰„ ÈĞÔ°€ÄÔà°€ÄÄ°€À¸ÄÈ¥€°‰½É‘•È€ÅÁàÍ½±¥É‰„ ÈĞÔ°€ÄÔà°€ÄÄ°€À¸Ì¥€°Ñ•áĞ€ÔåÁ	€¸(´€¨©É¥Ñ¥…°€¼áÁ±½¥ĞÙ…¥±…‰±”è¨¨	…­É½Õ¹É‰„ ÈÌä°€Øà°€Øà°€À¸ÄĞ¥€°‰½É‘•È€ÅÁàÍ½±¥É‰„ ÈÌä°€Øà°€Øà°€À¸Ğ¥€°Ñ•áĞ€àÜÄÜÅ€¸%¹±Õ‘•Ì„ÁÕ±Í¥¹œ€ÑÁà¥¹‘¥…Ñ½ÈÁ¥À¸((ŒŒŒ%¹ÁÕÑÌ€˜Q•Éµ¥¹…°¥•±‘Ì(´	…­É½Õ¹€ŒÁÁÄİ€°‰½É‘•È€ÅÁàÍ½±¥€ŒÌÌĞÄÔÕ€°Ñ•áĞ€á€°Á±…•¡½±‘•È€ŒØĞÜĞá	€¸!•¥¡Ğ€ÌÉÁà¸(´½ÕÌè	½É‘•ÈÍ¡¥™ÑÌ¥¹ÍÑ…¹Ñ±äÑ¼å‰•ÈQ•…°€¡€ŒÀÙÙÑ€¤İ¥Ñ é•É¼ÑÉ…¹Í¥Ñ¥½¸±…œì¹¼‰±ÕÉÉä±½Ü¸(´5½¹½ÍÁ…”Ù…É¥…¹Ğ™½ÈÁ…å±½…¥¹ÁÕÑÌ°Ñ…É•ĞÉ••à°%H™¥±Ñ•ÉÌ°…¹…ÕÑ Ñ½­•¹Ì¸((ŒŒŒ…Ñ„Q…‰±•Ì€˜QÉ•”É¥‘Ì(´U±ÑÉ„µ‘•¹Í”É½Ü¡•¥¡Ğè€ÌÉÁà‘•™…Õ±Ğ°€ÈáÁà½¹‘•¹Í•¸(´I½Üé•‰É„ÍÑÉ¥Á¥¹œ½µ¥ÑÑ•¥¸™…Ù½È½˜Ñ¡¥¸‰½É‘•ÈÍ•Á…É…Ñ½ÉÌ€¡€ÅÁàÍ½±¥É‰„ ÈÔÔ°€ÈÔÔ°€ÈÔÔ°€À¸ÀÔ¥€¤¸!½Ù•ÈÍÑ…Ñ”èÉ½ÜÑ¥¹Ğ€ŒÅÈäÍ	€¸(´!•…‘•ÉÌè)•Ñ	É…¥¹Ì5½¹¼±…‰•°µÍµ€°…±°µ…ÁÌ°Ñ•áĞ€ŒäÑÍá€°‰…­É½Õ¹€ŒÄÄÄàÈİ€¸((ŒŒŒ½‘”	±½­Ì€˜I…Ü%¹ÍÁ•Ñ¥½¸A…¹•Ì(´	…­É½Õ¹€ŒÀàÁÄÑ€İ¥Ñ „Á•ÉÍ¥ÍÑ•¹ĞÑ½Àµ•Ñ…‘…Ñ„‰…¹¹•È€¡‘¥ÍÁ±…å¥¹œÍå¹Ñ…àµ½‘”°‰åÑ”Í¥é”°…¹½Áä‰ÕÑÑ½¸¤¸(´5½¹½ÍÁ…”™½¹Ğ€¡½‘”µÍµ€€¼€ÄÅÁà¤°€ÄÙÁà±¥¹”¡•¥¡Ğ¸Ñ¥Ù”•á•ÕÑ¥½¸±¥¹•Ì¡¥¡±¥¡Ñ•İ¥Ñ É‰„ Ø°€ÄàÈ°€ÈÄÈ°€À¸Ä¥€¸(´¥ÍÑ¥¹ĞÍå¹Ñ…àÑ½­•¹Ìè5•Ñ¡½‘Ì€¡P½A=MP¤½±½Èµ½‘•°ÅÕ•ÉäÁ…É…µÌ¥¸€ŒÀÙÙÑ€°¥¹©•Ñ¥½¸Á…å±½…‘Ì¥¸€ÔåÁ	€½È€ĞĞĞÑ€¸((ŒŒŒMÁ•¥…±¥é•½µ…¥¸½µÁ½¹•¹ÑÌ(´€¨©M½Á”Y•É¥™¥…Ñ¥½¸	…¹¹•Èè¨¨Õ…°µÍÑ…Ñ”¡•…‘•È±½¬¥¹‘¥…Ñ¥¹œ½Á•É…Ñ¥½¹…°µ…¹‘…Ñ”°±•…°…ÕÑ¡½É¥é…Ñ¥½¸Ñ¥µ•™É…µ”°…¹%@É…¹”½¹ÍÑÉ…¥¹ÑÌ¸(´€¨©Y€¼¥¹‘¥¹œM•Ù•É¥ÑäA¥±°è¨¨½µÁ…Ğµ¥É¼µ¥¹‘¥…Ñ½È‘¥ÍÁ±…å¥¹œYML‰…Í”Í½É”…±½¹Í¥‘”µ•ÑÉ¥ŒÙ•Ñ½ÉÌ€¡Xé8½é0½AHé9€¤¸(´€¨©Q•±•µ•ÑÉäAÕ±Í”%¹‘¥…Ñ½Èè¨¨½¹ÍÑ…¹Ğ€ÙÁàÉ…‘…È‘½Ğ¥¸Ñ•…°½•µ•É…±¥¹‘¥…Ñ¥¹œ…Ñ¥Ù”…•¹Ğ¡•…ÉÑ‰•…Ğ…¹±¥Ù”ÁÉ½áäÍ½­•Ğ¡•…±Ñ ¸((ŒŒŒM½Á”€˜Q…É•ÑÌƒŠPÉ•ÍÁ½¹Í¥Ù”…¹¥¹ÍÑ…±±•µİ¡••°…¹‘¥‘…Ñ”•Ù¥‘•¹”€ ÈÀÈØ´ÄÄ´ÀÔ¤()Q¡¥Ì¡¥ÍÑ½É¥…°M½Á”U$¡•­Á½¥¹ĞÉ•½É‘ÌÑ¡”€ÌäÁÁà™¥à…¹…ÕÑ½µ…Ñ•…¹‘¥‘…Ñ”¡•­Ìì¥ÑÌµ½‰¥±”‘•Ñ…¥±Ì…É”½ÕÑÍ¥‘”ÕÉÉ•¹Ğ‘•Í­Ñ½ÀÍ½Á”°…¹Ñ¡”…Í¡‰½…Éµ™É••é”É•™•É•¹”¥ÌÍÕÁ•ÉÍ•‘•¸Q¡•Í”…ÕÑ½µ…Ñ•¡•­ÌÉ•µ…¥¸¥µÁ±•µ•¹Ñ…Ñ¥½¸•Ù¥‘•¹”¸ÇŠMØÙ¥ÍÕ…°°µ…¹Õ…°…•ÍÍ¥‰¥±¥Ñä½Í•ÕÉ¥Ñä°…¹É½±±½ÕĞ½É½±±‰…¬ÅÕ…±¥™¥…Ñ¥½¸¥Ì‘•™•ÉÉ•Õ¹Ñ¥°Ñ¡”™Õ±°…É••XÈ¥µÁ±•µ•¹Ñ…Ñ¥½¸…¹¥¹Ñ•É¹…°¡•­Ì…É”½µÁ±•Ñ”¸
