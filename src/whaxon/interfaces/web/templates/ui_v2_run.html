@@ -144,6 +144,25 @@
 </label>
 </div>
 </div>
+<section id="v2-run-control" class="mx-margin mt-space-md rounded-lg border border-outline-variant/40 bg-surface-container-low p-space-md" aria-labelledby="v2-run-title">
+  <div class="flex flex-wrap items-center justify-between gap-space-sm">
+    <div>
+      <h2 id="v2-run-title" class="font-headline-sm text-headline-sm text-on-surface">Engine V2 Durable Workflow</h2>
+      <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Submit an existing immutable plan, reconnect to its persisted progress, or request cancellation.</p>
+    </div>
+    <span class="font-label-sm text-label-sm text-secondary">PLAN-BOUND APPROVAL REQUIRED BY SERVER</span>
+  </div>
+  <div class="mt-space-sm flex flex-wrap gap-space-sm">
+    <label class="sr-only" for="v2-plan-id">Workflow plan ID</label>
+    <input id="v2-plan-id" class="min-w-48 flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40" placeholder="Existing workflow plan ID" autocomplete="off" />
+    <button id="v2-load-plan" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button">Review Plan</button>
+    <button id="v2-submit-run" class="px-space-sm py-1 rounded bg-primary-container text-on-primary font-code-sm text-code-sm font-semibold" type="button" disabled>Submit V2 Run</button>
+    <button id="v2-cancel-run" class="px-space-sm py-1 rounded bg-error-container/40 text-error font-code-sm text-code-sm" type="button" disabled>Request Cancel</button>
+  </div>
+  <p id="v2-run-message" class="mt-space-sm font-code-sm text-code-sm text-on-surface-variant" role="status" aria-live="polite">No V2 workflow selected.</p>
+  <div id="v2-plan-tasks" class="mt-space-xs space-y-1 font-code-sm text-code-sm text-on-surface-variant" aria-live="polite"></div>
+  <p class="mt-space-xs font-body-sm text-body-sm text-outline">Submission persists a run request; it does not mean execution completed. The worker rechecks scope, provider binding and exact-task approval. Approval must be granted separately.</p>
+</section>
 <!-- Dispatch Controls & Target Input -->
 <div class="flex flex-col gap-1.5 pt-1 border-t border-outline-variant/30">
 <div class="flex items-center gap-space-xs">
@@ -562,6 +581,126 @@
   let startInProgress = false;
   let startedAt = null;
   let timerId = null;
+  const v2PlanInput = $("v2-plan-id");
+  const v2Message = $("v2-run-message");
+  const v2Tasks = $("v2-plan-tasks");
+  const v2Submit = $("v2-submit-run");
+  const v2Cancel = $("v2-cancel-run");
+  let v2Plan = null;
+  let v2RequestId = null;
+  let v2PollTimer = null;
+  const v2Say = (message, error=false) => {
+    if (!v2Message) return;
+    v2Message.textContent = message;
+    v2Message.className = "mt-space-sm font-code-sm text-code-sm " + (error ? "text-error" : "text-on-surface-variant");
+  };
+  const v2SetControls = () => {
+    if (v2Submit) v2Submit.disabled = !v2Plan || Boolean(v2RequestId);
+    if (v2Cancel) v2Cancel.disabled = !v2RequestId;
+  };
+  async function v2LoadPlan() {
+    const planId = v2PlanInput?.value.trim();
+    if (!planId) { v2Say("Enter an existing Engine V2 workflow plan ID.", true); return; }
+    try {
+      v2Say("Loading immutable plan and task details…");
+      const details = await api("/api/v2/workflows/" + encodeURIComponent(planId));
+      if (!details.plan || !Array.isArray(details.tasks)) throw new Error("The server returned an incomplete workflow plan.");
+      v2Plan = {id: planId, details};
+      if (sessionStorage.getItem("whaxon.v2.plan_id") !== planId) {
+        v2RequestId = null;
+        sessionStorage.removeItem("whaxon.v2.run_request_id");
+      }
+      if (v2PollTimer) { clearTimeout(v2PollTimer); v2PollTimer = null; }
+      if (v2Tasks) {
+        v2Tasks.replaceChildren();
+        for (const task of details.tasks) {
+          const row = document.createElement("div");
+          row.className = "rounded bg-surface-container-lowest px-space-sm py-1";
+          row.textContent = `${task.task_key || task.id || "Task"} · ${task.capability_id || "unknown capability"} · ${task.target || "target unavailable"} · ${task.impact || "impact unavailable"}`;
+          v2Tasks.append(row);
+        }
+      }
+      const approvals = await api("/api/v2/workflows/" + encodeURIComponent(planId) + "/approvals");
+      const tasks = details.tasks;
+      const needingApproval = tasks.filter(task => ["moderate", "high", "critical"].includes(task.impact));
+      const now = Date.now() / 1000;
+      const missing = needingApproval.filter(task => !approvals.some(item =>
+        (item.task_key === task.task_key || item.task_key === task.id) &&
+        !item.revoked_at && Number(item.expires_at) > now && item.policy_version === "policy.v1"
+      ));
+      const approvalNote = missing.length ? ` No listed unrevoked, unexpired approval exists for ${missing.length} task(s); dispatch requires separate exact-plan approval.` : " Listed approvals are unrevoked and unexpired; the server still checks their exact task binding at dispatch.";
+      v2Say(`Plan ${planId} reviewed (${tasks.length} task${tasks.length === 1 ? "" : "s"}).${approvalNote}`);
+      v2SetControls();
+    } catch (error) {
+      v2Plan = null;
+      v2Tasks?.replaceChildren();
+      v2SetControls();
+      v2Say("Could not review plan: " + error.message, true);
+    }
+  }
+  async function v2Poll() {
+    if (!v2RequestId) return;
+    try {
+      const snapshot = await api("/api/v2/workflow-runs/" + encodeURIComponent(v2RequestId) + "/snapshot");
+      const request = snapshot.request || {};
+      const progress = snapshot.progress || {};
+      const counts = progress.counts || {};
+      v2Say(`Run ${request.id}: ${request.status || "unknown"}. Persisted tasks: ${JSON.stringify(counts)}. Worker liveness is not verified by this snapshot.`);
+      const terminal = ["completed", "failed", "cancelled", "incomplete", "uncertain"].includes(request.status);
+      if (terminal) {
+        if (request.status !== "uncertain") {
+          v2RequestId = null;
+          sessionStorage.removeItem("whaxon.v2.run_request_id");
+        } else {
+          v2Say(`Run ${request.id} is uncertain and requires operator reconciliation. Automatic replay is disabled; polling has paused.`);
+        }
+        v2SetControls();
+        return;
+      }
+    } catch (error) {
+      v2Say("Reconnect check failed: " + error.message, true);
+    }
+    v2PollTimer = setTimeout(v2Poll, 2000);
+  }
+  async function v2SubmitRun() {
+    if (!v2Plan || v2RequestId) return;
+    const plan = v2Plan;
+    try {
+      v2Submit.disabled = true;
+      v2Say("Persisting Engine V2 run request…");
+      const result = await api("/api/v2/workflows/" + encodeURIComponent(plan.id) + "/run", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+      v2RequestId = result.run_request_id;
+      if (!v2RequestId) throw new Error("The server accepted no durable run request ID.");
+      sessionStorage.setItem("whaxon.v2.run_request_id", v2RequestId);
+      sessionStorage.setItem("whaxon.v2.plan_id", plan.id);
+      v2Say(`Run request ${v2RequestId} persisted with status ${result.request_status || "unknown"}.`);
+      v2SetControls();
+      v2Poll();
+    } catch (error) {
+      v2Say("V2 run submission failed: " + error.message, true);
+      v2SetControls();
+    }
+  }
+  async function v2CancelRun() {
+    if (!v2RequestId) return;
+    if (!window.confirm("Request cancellation for Engine V2 run " + v2RequestId + "? A running external effect may continue.")) return;
+    try {
+      const result = await api("/api/v2/workflow-runs/" + encodeURIComponent(v2RequestId) + "/cancel", {method:"POST"});
+      v2Say(`Cancellation requested for ${v2RequestId}. External effects stopped: ${result.external_effects_stopped === true ? "reported" : "not confirmed"}.`);
+      v2Poll();
+    } catch (error) { v2Say("V2 cancellation request failed: " + error.message, true); }
+  }
+  $("v2-load-plan")?.addEventListener("click", v2LoadPlan);
+  v2Submit?.addEventListener("click", v2SubmitRun);
+  v2Cancel?.addEventListener("click", v2CancelRun);
+  const savedRequest = sessionStorage.getItem("whaxon.v2.run_request_id");
+  const savedPlan = sessionStorage.getItem("whaxon.v2.plan_id");
+  if (savedPlan && savedRequest && v2PlanInput) {
+    v2PlanInput.value = savedPlan;
+    v2RequestId = savedRequest;
+    v2SetControls();
+    v2LoadPlan().then(() => { if (v2RequestId) v2Poll(); });
+  }
   const notice = document.createElement("div");
   notice.id = "run-ui-notice";
   notice.className = "mx-margin mt-space-md p-space-sm rounded font-code-sm text-code-sm";

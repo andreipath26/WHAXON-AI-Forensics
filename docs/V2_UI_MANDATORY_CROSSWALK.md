@@ -80,6 +80,8 @@ Dashboard batch 1 hardens malformed-history export: a successful HTTP response w
 
 **Evidence and limits:** Local `ruff check tests/test_web_ui_v2_run.py` and `tests/test_v2_ui_mandatory_crosswalk.py` passed. The browser regression could not run locally because the Playwright Chromium download was truncated in this environment. Exact-head CI is required. This is one safety improvement; it does not establish complete control mapping, backend V2 parity or any D1–D6 acceptance. UI-03 remains **OPEN** pending the complete per-page evidence and approver sign-offs.
 
+**Engine V2 durable run handoff — 2026-11-09:** The Run page now has a separate control for reviewing an already-persisted V2 plan, displaying its task capability/target/impact bindings, checking listed approvals for each moderate-or-higher task, submitting through `POST /api/v2/workflows/<plan_id>/run`, reconnecting through durable snapshots, and requesting cancellation through the durable run-request endpoint. It does not grant approval, claim that a queued request completed, or claim that cancellation stopped an external effect. The active V2 request ID is retained in session storage for same-tab reconnect. The existing guarded `/api/run` path remains a separate legacy control while capability mapping/parity is unfinished. This is one V2 integration slice; full UI-03 migration, browser acceptance and D1–D6 remain **OPEN**.
+
 **Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1–D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
 
 ## Dashboard implementation checkpoint — 2026-11-05 (D1–D6)
