@@ -84,6 +84,8 @@ Dashboard batch 1 hardens malformed-history export: a successful HTTP response w
 
 **Saved plan discovery — 2026-11-09:** The V2 handoff now lists persisted missions and their plans through the bounded mission/plan read APIs. Operators can select a plan and review its immutable tasks before submitting. A plan ID can still be entered directly when working from a CLI/API-created plan. No mission or plan is created by this selector, and all authorization remains in the V2 execution path. Full UI-03 acceptance remains **OPEN**.
 
+**Constrained plan authoring and consent — 2026-11-09:** The Run page can create a mission and one-task immutable plan only from an installed, selected, moderate-impact V2 capability whose declared inputs require no caller-supplied fields. The plan records the provider ID and inventory manifest fingerprint for execution-time pinning. Creation performs a scope preview and creates no execution request. A separate explicit confirmation records one-hour exact-task approval through the V2 approval endpoint. The actor is server-derived (`local` for loopback, verified username for remote Basic-auth requests); the endpoint does not provide role separation or an independent-approver guarantee. The scheduler still rechecks scope, provider binding, plan integrity and approval binding. Multi-step plans and capabilities requiring inputs remain CLI/API authored. UI-03 and D1–D6 remain **OPEN**.
+
 **Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1–D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
 
 ## Dashboard implementation checkpoint — 2026-11-05 (D1–D6)
