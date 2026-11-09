@@ -30,6 +30,13 @@ class Store:
     def get_workflow_plan(self, plan_id):
         return self.row if plan_id == "source" else None
 
+    def verify_workflow_plan_integrity(self, plan_id):
+        if plan_id != "source":
+            raise ValueError("unknown plan")
+        return {
+            "plan_id": plan_id, "valid": True, "digest": self.row["digest"],
+        }
+
     def get_workflow_evidence(self, plan_id, *, limit):
         return {
             "plan_id": plan_id, "mission_id": self.row["mission_id"],
@@ -105,6 +112,53 @@ def test_e4_unverified_source_does_not_create_plan(change):
     else:
         store.job["target"] = "203.0.113.8"
     assert planner(store=store).propose("source").plan is None
+
+
+@pytest.mark.parametrize(
+    ("integrity", "reason"),
+    [
+        (None, "source_plan_integrity_verifier_unavailable"),
+        ({"plan_id": "source", "valid": False, "digest": "source-digest"},
+         "source_plan_integrity_mismatch"),
+        ({"plan_id": "source", "valid": True, "digest": "different-digest"},
+         "source_plan_integrity_mismatch"),
+    ],
+)
+def test_e4_followup_requires_matching_source_plan_integrity(integrity, reason):
+    store = Store()
+    if integrity is None:
+        store.verify_workflow_plan_integrity = None
+    else:
+        store.verify_workflow_plan_integrity = lambda _plan_id: integrity
+    proposal = planner(store=store).propose("source")
+    assert proposal.plan is None
+    assert proposal.blocked[0]["reason"] == reason
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("plan_id", "other-plan"),
+        ("mission_id", "other-mission"),
+        ("plan_digest", "other-digest"),
+    ],
+)
+def test_e4_followup_requires_evidence_snapshot_for_exact_source(field, value):
+    store = Store()
+    evidence = store.get_workflow_evidence("source", limit=1000)
+    evidence[field] = value
+    store.get_workflow_evidence = lambda _plan_id, *, limit: evidence
+    proposal = planner(store=store).propose("source")
+    assert proposal.plan is None
+    assert proposal.blocked[0]["reason"] == "evidence_snapshot_mismatch"
+
+
+def test_e4_followup_requires_finding_sequence_for_provenance():
+    store = Store()
+    store.findings = [dict(store.findings[0], seq=True)]
+    proposal = planner(store=store).propose("source")
+    assert proposal.plan is None
+    assert proposal.blocked[0]["reason"] == "finding_provenance_missing"
 
 
 def test_e4_scope_blocks_followups_and_invalid_limits():
