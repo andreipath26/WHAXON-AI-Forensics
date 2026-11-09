@@ -1840,9 +1840,10 @@ class JobStore:
     def record_workflow_attempt_reconciliation(
         self, plan_id, attempt_id, *, disposition, actor, evidence_ref, note,
     ):
-        """Record an operator's evidence-backed outcome without replaying effects.
+        """Record an operator-reported outcome and reference; never replay.
 
-        Actor is a caller-supplied label, not an authenticated-principal claim.
+        The reference is not independently verified. Actor is a caller-supplied
+        label, not an authenticated-principal claim.
         no_effect_verified makes the task retryable only after a separate run
         request; effect_observed blocks it because observation is not a WHAXON
         verification result. unresolved leaves the task uncertain.
