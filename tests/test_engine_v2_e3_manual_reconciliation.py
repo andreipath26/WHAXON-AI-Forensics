@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
@@ -148,6 +149,48 @@ def test_missing_run_request_reconciliation_event_fails_audit(tmp_path):
     assert audit["missing_or_duplicate_run_request_reconciliation_events"] == [
         request["id"]
     ]
+
+
+def test_attempt_reconciliation_and_run_request_closure_are_atomic(tmp_path):
+    core, request, attempt_id = _uncertain_plan(tmp_path)
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "CREATE TRIGGER reject_run_reconciliation_event "
+            "BEFORE INSERT ON workflow_events "
+            "WHEN NEW.event_type='workflow_run_reconciled' "
+            "BEGIN SELECT RAISE(ABORT, 'injected audit write failure'); END",
+        )
+    finally:
+        conn.close()
+
+    try:
+        _reconcile(core, attempt_id, "no_effect_verified")
+    except sqlite3.IntegrityError as exc:
+        assert "injected audit write failure" in str(exc)
+    else:
+        raise AssertionError("run reconciliation event failure was ignored")
+
+    assert core.workflow_run_request(request["id"])["status"] == "uncertain"
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.list_workflow_tasks("p")[0]["status"] == "uncertain"
+    conn = core.store._conn()
+    try:
+        assert conn.execute(
+            "SELECT COUNT(*) FROM workflow_attempt_reconciliations "
+            "WHERE attempt_id=?", (attempt_id,),
+        ).fetchone()[0] == 0
+        assert conn.execute(
+            "SELECT COUNT(*) FROM workflow_events WHERE plan_id=? "
+            "AND event_type='workflow_attempt_reconciled'", ("p",),
+        ).fetchone()[0] == 0
+        conn.execute("DROP TRIGGER reject_run_reconciliation_event")
+    finally:
+        conn.close()
+
+    result = _reconcile(core, attempt_id, "no_effect_verified")
+    assert result["run_requests_closed"] == 1
+    assert core.workflow_run_request(request["id"])["status"] == "incomplete"
 
 
 def test_unresolved_effect_keeps_request_fenced_and_retry_disabled(tmp_path):

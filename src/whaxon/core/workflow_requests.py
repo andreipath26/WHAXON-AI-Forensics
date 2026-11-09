@@ -352,53 +352,9 @@ class WorkflowRunQueue:
             conn = self.store._conn()
             try:
                 conn.execute("BEGIN IMMEDIATE")
-                plan = conn.execute(
-                    "SELECT digest FROM workflow_plans WHERE id=?", (plan_id,),
-                ).fetchone()
-                if plan is None:
-                    raise ValueError(f"unknown workflow plan: {plan_id}")
-                unresolved = conn.execute(
-                    "SELECT COUNT(*) FROM task_attempts a "
-                    "JOIN workflow_tasks t ON t.id=a.task_id "
-                    "LEFT JOIN workflow_attempt_reconciliations r ON r.attempt_id=a.id "
-                    "WHERE t.plan_id=? AND (a.status='running' OR "
-                    "(a.status='uncertain' AND "
-                    "(r.attempt_id IS NULL OR r.disposition='unresolved')))",
-                    (plan_id,),
-                ).fetchone()[0]
-                if unresolved:
-                    conn.execute("COMMIT")
-                    return 0
-                pending = conn.execute(
-                    "SELECT id FROM workflow_run_requests "
-                    "WHERE plan_id=? AND plan_digest=? AND status='uncertain' "
-                    "ORDER BY submitted_at, id",
-                    (plan_id, plan["digest"]),
-                ).fetchall()
-                now = time.time()
-                closed = 0
-                for row in pending:
-                    cursor = conn.execute(
-                        "UPDATE workflow_run_requests SET status='incomplete',"
-                        "completed_at=?,owner=NULL,lease_token=NULL,"
-                        "error='operator reconciliation recorded; no automatic replay' "
-                        "WHERE id=? AND status='uncertain'",
-                        (now, row["id"]),
-                    )
-                    if cursor.rowcount != 1:
-                        continue
-                    conn.execute(
-                        "INSERT INTO workflow_events "
-                        "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
-                        (plan_id, "workflow_run_reconciled", json.dumps({
-                            "request_id": row["id"],
-                            "from_status": "uncertain",
-                            "to_status": "incomplete",
-                            "reason": "provider_effect_reconciled",
-                            "automatic_replay": False,
-                        }, sort_keys=True), now),
-                    )
-                    closed += 1
+                closed = self.store._close_reconciled_workflow_requests_tx(
+                    conn, plan_id,
+                )
                 conn.execute("COMMIT")
                 return closed
             except Exception:
