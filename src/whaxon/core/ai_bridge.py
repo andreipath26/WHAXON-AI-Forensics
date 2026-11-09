@@ -141,8 +141,8 @@ def propose_v2_workflow_plan(
             "status": "needs_human" if action.kind == "ask_human" else "stopped",
             "action": action.to_dict(),
         }
-    manifest = candidates.get(action.tool_id or "")
-    if manifest is None:
+    selected_manifest = candidates.get(action.tool_id or "")
+    if selected_manifest is None:
         return {"status": "blocked", "action": action.to_dict(),
                 "reason": "AI action is not an installed, selected V2 capability"}
     if action.session_id or not isinstance(action.extra_args, str) or action.extra_args.strip():
@@ -159,12 +159,12 @@ def propose_v2_workflow_plan(
     task_id = "task-1"
     task = WorkflowTask(
         id=task_id,
-        capability_id=manifest.capability_id,
+        capability_id=selected_manifest.capability_id,
         target=target,
         inputs={},
-        permissions=manifest.permissions,
-        impact=manifest.impact,
-        timeout_s=manifest.timeout_s,
+        permissions=selected_manifest.permissions,
+        impact=selected_manifest.impact,
+        timeout_s=selected_manifest.timeout_s,
         idempotency_key=uuid.uuid5(
             uuid.NAMESPACE_URL, f"whaxon:ai-proposal:{mission_id}:{plan_id}",
         ).hex,
@@ -177,8 +177,8 @@ def propose_v2_workflow_plan(
     plan = WorkflowPlan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
-            "provider_id": manifest.provider_id,
-            "manifest_fingerprint": manifest.fingerprint,
+            "provider_id": selected_manifest.provider_id,
+            "manifest_fingerprint": selected_manifest.fingerprint,
         }}},
         tasks=(task,),
     )
@@ -188,8 +188,8 @@ def propose_v2_workflow_plan(
         "plan_id": plan_id,
         "plan": plan.to_dict(),
         "digest": plan.digest,
-        "provider_id": manifest.provider_id,
-        "manifest_fingerprint": manifest.fingerprint,
+        "provider_id": selected_manifest.provider_id,
+        "manifest_fingerprint": selected_manifest.fingerprint,
         "execution_submitted": False,
         "approval_granted": False,
     }
