@@ -582,3 +582,69 @@ def test_v2_remote_workflow_approval_actor_uses_authenticated_username(
         environ_base={"REMOTE_ADDR": "198.51.100.7"},
     ).get_json()[0]
     assert approval["actor"] == "auditor-7"
+
+
+def test_v2_ai_proposals_api_validates_and_never_submits_execution(tmp_path, monkeypatch):
+    """The AI handoff is a proposal endpoint, not a second execution owner."""
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-ai", "authorized proposal")
+    calls = []
+
+    def fake_propose(received_core, **kwargs):
+        assert received_core is core
+        calls.append(kwargs)
+        return {
+            "status": "blocked", "reason": "provider unavailable",
+            "approval_granted": False, "execution_submitted": False,
+        }
+
+    monkeypatch.setattr("whaxon.core.ai_bridge.propose_v2_workflow_plan", fake_propose)
+    payload = {
+        "mission_id": "m-ai", "id": "p-ai",
+        "goal": "inspect authorized lab", "target": "192.0.2.10",
+    }
+    response = client.post("/api/v2/ai/proposals", json=payload)
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "blocked"
+    assert response.get_json()["approval_granted"] is False
+    assert response.get_json()["execution_submitted"] is False
+    assert response.get_json()["created"] is False
+    assert len(calls) == 1
+    assert core.store.get_workflow_plan("p-ai") is None
+
+    for invalid in (
+        {**payload, "history": "not-an-array"},
+        {**payload, "step": 0},
+        {**payload, "save": "yes"},
+        {**payload, "target": ""},
+        {**payload, "goal": "x" * 10001},
+    ):
+        response = client.post("/api/v2/ai/proposals", json=invalid)
+        # The first two are validated by the bridge; others by the API.
+        if invalid.get("history") == "not-an-array" or invalid.get("step") == 0:
+            continue  # The fake bridge deliberately does not validate inputs.
+        assert response.status_code == 400
+    assert client.post(
+        "/api/v2/ai/proposals", json=payload,
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+    assert core.store.get_workflow_plan("p-ai") is None
+
+
+def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monkeypatch):
+    from whaxon.core.ai_bridge import propose_v2_workflow_plan
+
+    _, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-ai", "authorized proposal")
+    for history in ([{}] * 33, [{"untrusted": "x" * 4097}]):
+        try:
+            propose_v2_workflow_plan(
+                core, mission_id="m-ai", plan_id="p-ai",
+                goal="inspect lab", target="192.0.2.10",
+                history=history, step=len(history) + 1,
+            )
+        except ValueError as exc:
+            assert "history exceeds allowed limits" in str(exc)
+        else:
+            raise AssertionError("oversized AI history accepted")
+    assert core.store.get_workflow_plan("p-ai") is None
