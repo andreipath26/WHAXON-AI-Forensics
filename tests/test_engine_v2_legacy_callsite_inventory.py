@@ -151,6 +151,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('GET', '/api/tree'): 'get_tree',
     ('GET', '/api/ui-v2/findings'): 'api_ui_v2_findings',
     ('GET', '/api/v2/capabilities'): 'workflow_v2_capabilities',
+    ('POST', '/api/v2/ai/proposals'): 'workflow_v2_ai_proposal',
     ('GET', '/api/v2/missions'): 'workflow_v2_missions',
     ('GET', '/api/v2/missions/<mission_id>/budget'): 'workflow_v2_mission_budget',
     ('GET', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',

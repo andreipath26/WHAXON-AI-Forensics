@@ -56,6 +56,22 @@ def propose_v2_workflow_plan(
         raise ValueError("AI proposal step must follow the supplied history")
     if core.store.get_mission(mission_id) is None:
         raise ValueError(f"unknown mission: {mission_id}")
+    try:
+        initial_scope = core.scope.check(target)
+    except Exception:
+        return {
+            "status": "blocked",
+            "reason": "scope evaluation failed; no AI proposal was created",
+            "execution_submitted": False,
+            "approval_granted": False,
+        }
+    if not getattr(initial_scope, "allowed", False):
+        return {
+            "status": "blocked",
+            "reason": f"target is outside current scope: {getattr(initial_scope, 'reason', '')}",
+            "execution_submitted": False,
+            "approval_granted": False,
+        }
 
     if provider is None:
         import os
