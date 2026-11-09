@@ -131,3 +131,47 @@ def test_reconciliation_requires_source_evidence_and_valid_outcome(tmp_path):
             pass
         else:
             raise AssertionError("invalid reconciliation was accepted")
+
+
+
+def test_reconciliation_record_and_audit_event_must_match(tmp_path):
+    core, _, attempt_id = _uncertain_plan(tmp_path)
+    _reconcile(core, attempt_id, "no_effect_verified")
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_events SET detail_json=? "
+            "WHERE plan_id=? AND attempt_id=? "
+            "AND event_type='workflow_attempt_reconciled'",
+            ('{"actor_claimed":"operator","disposition":"effect_observed",'
+             '"evidence_ref":"case://reconciliation/17",'
+             '"note":"Checked provider and target logs; recorded source evidence."}',
+             "p", attempt_id),
+        )
+    finally:
+        conn.close()
+
+    audit = core.store.get_workflow_audit_integrity("p")
+    assert audit["consistent"] is False
+    assert audit["mismatched_reconciliation_events"] == [attempt_id]
+
+
+def test_reconciliation_without_audit_event_is_reported(tmp_path):
+    core, _, attempt_id = _uncertain_plan(tmp_path)
+    _reconcile(core, attempt_id, "effect_observed")
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "DELETE FROM workflow_events WHERE plan_id=? AND attempt_id=? "
+            "AND event_type='workflow_attempt_reconciled'",
+            ("p", attempt_id),
+        )
+    finally:
+        conn.close()
+
+    audit = core.store.get_workflow_audit_integrity("p")
+    assert audit["consistent"] is False
+    assert audit["missing_or_duplicate_reconciliation_events"] == [attempt_id]

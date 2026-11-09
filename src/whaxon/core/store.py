@@ -2083,16 +2083,27 @@ class JobStore:
                 "JOIN workflow_tasks t ON t.id=a.task_id WHERE t.plan_id=?",
                 (plan_id,),
             ).fetchall()
+            reconciliations = c.execute(
+                "SELECT attempt_id, disposition, actor, evidence_ref, note "
+                "FROM workflow_attempt_reconciliations WHERE plan_id=?",
+                (plan_id,),
+            ).fetchall()
             events = c.execute(
-                "SELECT attempt_id, event_type FROM workflow_events "
+                "SELECT attempt_id, event_type, detail_json FROM workflow_events "
                 "WHERE plan_id=? AND attempt_id IS NOT NULL", (plan_id,),
             ).fetchall()
             attempt_by_id = {row["id"]: row["status"] for row in attempts}
+            reconciliation_by_id = {
+                row["attempt_id"]: row for row in reconciliations
+            }
             claims = {}
             terminal = {}
             dispatch = {}
+            reconciliation_events = {}
             mismatched = set()
+            mismatched_reconciliations = set()
             unknown = set()
+            unknown_reconciliations = set()
             for event in events:
                 attempt_id = event["attempt_id"]
                 kind = event["event_type"]
@@ -2103,6 +2114,26 @@ class JobStore:
                     claims[attempt_id] = claims.get(attempt_id, 0) + 1
                 if kind == "dispatch_started":
                     dispatch[attempt_id] = dispatch.get(attempt_id, 0) + 1
+                if kind == "workflow_attempt_reconciled":
+                    reconciliation_events[attempt_id] = (
+                        reconciliation_events.get(attempt_id, 0) + 1
+                    )
+                    expected = reconciliation_by_id.get(attempt_id)
+                    if expected is None:
+                        unknown_reconciliations.add(attempt_id)
+                    else:
+                        try:
+                            detail = json.loads(event["detail_json"])
+                        except (TypeError, ValueError):
+                            detail = None
+                        expected_detail = {
+                            "disposition": expected["disposition"],
+                            "actor_claimed": expected["actor"],
+                            "evidence_ref": expected["evidence_ref"],
+                            "note": expected["note"],
+                        }
+                        if detail != expected_detail:
+                            mismatched_reconciliations.add(attempt_id)
                 if kind in (
                     "task_succeeded", "task_failed", "task_cancelled",
                     "task_blocked", "task_uncertain",
@@ -2122,6 +2153,10 @@ class JobStore:
             duplicate_dispatch = sorted(
                 attempt_id for attempt_id, count in dispatch.items() if count > 1
             )
+            missing_or_duplicate_reconciliations = sorted(
+                attempt_id for attempt_id in reconciliation_by_id
+                if reconciliation_events.get(attempt_id, 0) != 1
+            )
             return {
                 "plan_id": plan_id, "attempts": len(attempts),
                 "missing_or_duplicate_claims": missing_claims,
@@ -2129,9 +2164,18 @@ class JobStore:
                 "mismatched_terminal_events": sorted(mismatched),
                 "duplicate_dispatch_events": duplicate_dispatch,
                 "unknown_attempt_events": sorted(unknown),
+                "missing_or_duplicate_reconciliation_events":
+                    missing_or_duplicate_reconciliations,
+                "mismatched_reconciliation_events":
+                    sorted(mismatched_reconciliations),
+                "unknown_reconciliation_events":
+                    sorted(unknown_reconciliations),
                 "consistent": not (
                     missing_claims or missing_terminal or mismatched
                     or duplicate_dispatch or unknown
+                    or missing_or_duplicate_reconciliations
+                    or mismatched_reconciliations
+                    or unknown_reconciliations
                 ),
             }
         finally:
