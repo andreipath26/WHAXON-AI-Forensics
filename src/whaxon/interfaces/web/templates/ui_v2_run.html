@@ -153,6 +153,14 @@
     <span class="font-label-sm text-label-sm text-secondary">PLAN-BOUND APPROVAL REQUIRED BY SERVER</span>
   </div>
   <div class="mt-space-sm flex flex-wrap gap-space-sm">
+    <label class="sr-only" for="v2-mission-select">Engine V2 mission</label>
+    <select id="v2-mission-select" class="min-w-48 flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40" aria-label="Engine V2 mission"><option value="">Loading missions…</option></select>
+    <label class="sr-only" for="v2-plan-select">Engine V2 workflow plan</label>
+    <select id="v2-plan-select" class="min-w-48 flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40" aria-label="Engine V2 workflow plan" disabled><option value="">Choose a mission first</option></select>
+    <button id="v2-refresh-missions" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button">Refresh List</button>
+    <button id="v2-use-plan" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled>Review Selected</button>
+  </div>
+  <div class="mt-space-xs flex flex-wrap gap-space-sm">
     <label class="sr-only" for="v2-plan-id">Workflow plan ID</label>
     <input id="v2-plan-id" class="min-w-48 flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40" placeholder="Existing workflow plan ID" autocomplete="off" />
     <button id="v2-load-plan" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button">Review Plan</button>
@@ -582,6 +590,9 @@
   let startedAt = null;
   let timerId = null;
   const v2PlanInput = $("v2-plan-id");
+  const v2MissionSelect = $("v2-mission-select");
+  const v2PlanSelect = $("v2-plan-select");
+  const v2UsePlan = $("v2-use-plan");
   const v2Message = $("v2-run-message");
   const v2Tasks = $("v2-plan-tasks");
   const v2Submit = $("v2-submit-run");
@@ -597,7 +608,57 @@
   const v2SetControls = () => {
     if (v2Submit) v2Submit.disabled = !v2Plan || Boolean(v2RequestId);
     if (v2Cancel) v2Cancel.disabled = !v2RequestId;
+    if (v2UsePlan) v2UsePlan.disabled = !v2PlanSelect?.value;
   };
+  async function v2LoadMissions() {
+    try {
+      const missions = await api("/api/v2/missions?limit=100");
+      if (!Array.isArray(missions)) throw new Error("The server returned an invalid mission list.");
+      const selected = v2MissionSelect?.value;
+      v2MissionSelect?.replaceChildren(new Option(missions.length ? "Choose a mission…" : "No V2 missions found", ""));
+      for (const mission of missions) {
+        const label = `${mission.id} · ${mission.objective || "mission"} · ${mission.status || "unknown"}`;
+        v2MissionSelect?.add(new Option(label, mission.id));
+      }
+      if (selected && missions.some(item => item.id === selected)) v2MissionSelect.value = selected;
+      if (v2MissionSelect?.value) await v2LoadMissionPlans();
+      else {
+        v2PlanSelect?.replaceChildren(new Option("Choose a mission first", ""));
+        if (v2PlanSelect) v2PlanSelect.disabled = true;
+        v2SetControls();
+      }
+    } catch (error) {
+      if (v2MissionSelect) v2MissionSelect.replaceChildren(new Option("Mission list unavailable", ""));
+      if (v2PlanSelect) { v2PlanSelect.replaceChildren(new Option("Choose a mission first", "")); v2PlanSelect.disabled = true; }
+      v2Say("Could not load V2 missions: " + error.message, true);
+    }
+  }
+  async function v2LoadMissionPlans() {
+    const missionId = v2MissionSelect?.value;
+    if (!missionId) return;
+    try {
+      const plans = await api("/api/v2/missions/" + encodeURIComponent(missionId) + "/plans");
+      if (!Array.isArray(plans)) throw new Error("The server returned an invalid plan list.");
+      const selected = v2PlanSelect?.value;
+      v2PlanSelect?.replaceChildren(new Option(plans.length ? "Choose a workflow plan…" : "No plans for this mission", ""));
+      for (const plan of plans) {
+        const label = `${plan.id} · ${plan.status || "unknown"} · ${String(plan.digest || "").slice(0, 12)}`;
+        v2PlanSelect?.add(new Option(label, plan.id));
+      }
+      if (selected && plans.some(item => item.id === selected)) v2PlanSelect.value = selected;
+      if (v2PlanSelect) v2PlanSelect.disabled = plans.length === 0;
+      v2SetControls();
+    } catch (error) {
+      if (v2PlanSelect) { v2PlanSelect.replaceChildren(new Option("Plan list unavailable", "")); v2PlanSelect.disabled = true; }
+      v2SetControls();
+      v2Say("Could not load plans: " + error.message, true);
+    }
+  }
+  async function v2ReviewSelectedPlan() {
+    if (!v2PlanSelect?.value) { v2Say("Choose an existing Engine V2 workflow plan.", true); return; }
+    if (v2PlanInput) v2PlanInput.value = v2PlanSelect.value;
+    await v2LoadPlan();
+  }
   async function v2LoadPlan() {
     const planId = v2PlanInput?.value.trim();
     if (!planId) { v2Say("Enter an existing Engine V2 workflow plan ID.", true); return; }
@@ -691,6 +752,10 @@
     } catch (error) { v2Say("V2 cancellation request failed: " + error.message, true); }
   }
   $("v2-load-plan")?.addEventListener("click", v2LoadPlan);
+  $("v2-refresh-missions")?.addEventListener("click", v2LoadMissions);
+  v2MissionSelect?.addEventListener("change", v2LoadMissionPlans);
+  v2PlanSelect?.addEventListener("change", v2SetControls);
+  v2UsePlan?.addEventListener("click", v2ReviewSelectedPlan);
   v2Submit?.addEventListener("click", v2SubmitRun);
   v2Cancel?.addEventListener("click", v2CancelRun);
   const savedRequest = sessionStorage.getItem("whaxon.v2.run_request_id");
@@ -701,6 +766,7 @@
     v2SetControls();
     v2LoadPlan().then(() => { if (v2RequestId) v2Poll(); });
   }
+  v2LoadMissions();
   const notice = document.createElement("div");
   notice.id = "run-ui-notice";
   notice.className = "mx-margin mt-space-md p-space-sm rounded font-code-sm text-code-sm";
