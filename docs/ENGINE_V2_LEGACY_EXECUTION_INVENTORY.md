@@ -159,7 +159,7 @@ execution evidence; deployment-host readiness remains unverified.
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
 | CLI workflow | `whaxon workflow` → shared `Core` workflow/approval/provider services | `whaxon run`, `ai`, `recon`, `validate`, and `retest` retain direct legacy execution; `whaxon msf` only inspects status/sessions/modules | V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
-| HTTP API | `/api/v2/capabilities`, `/providers`, `/workflows`, `/workflow-runs` and related lifecycle routes call shared Core services | `/api/run`, `/api/ai/run`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths | V2 route evidence: `test_server_workflow_v2.py`; legacy paths retain legacy job/AI state and are not all V2 request/task-owned. |
+| HTTP API | `/api/v2/capabilities`, `/api/v2/ai/proposals`, `/providers`, `/workflows`, `/workflow-runs` and related lifecycle routes call shared Core services | `/api/run`, `/api/ai/run`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths | V2 route evidence: `test_server_workflow_v2.py`; legacy paths retain legacy job/AI state and are not all V2 request/task-owned. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | None of their direct execution actions are V2 workflow dispatches | GUI/TUI call `Core.runner` directly | Legacy `JobStore`/event path; see `test_gui_entrypoint.py`, `test_tui_main.py`, and runner tests. |
 
@@ -279,6 +279,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/tree` | `get_tree` | Legacy report, finding or loot view |
 | `GET` | `/api/ui-v2/findings` | `api_ui_v2_findings` | Legacy finding/evidence API adapter |
 | `GET` | `/api/v2/capabilities` | `workflow_v2_capabilities` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/ai/proposals` | `workflow_v2_ai_proposal` | AI Action to V2 workflow proposal; optional immutable plan persistence; no approval or execution |
 | `GET` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/missions/<mission_id>/budget` | `workflow_v2_mission_budget` | Core workflow registry, stores and lifecycle services |
@@ -488,15 +489,17 @@ the legacy caller. E6 remains frozen until the operator declares the UI ready.
 
 ## AI-to-V2 proposal boundary
 
-`whaxon workflow plan ai-propose` converts one legacy AI `Action` into a
-reviewable, single-task V2 plan. It exposes only installed and selected
-moderate-impact catalog providers, pins the current manifest fingerprint,
-requires the AI target to exactly match the operator-supplied target, and
-rejects session actions or dynamic arguments. `--save` persists the immutable
-plan; it never grants approval, submits a run request, or dispatches work.
-Operators use the existing plan approval and run-request commands separately.
+`whaxon workflow plan ai-propose` and `POST /api/v2/ai/proposals` convert one
+legacy AI `Action` into a reviewable, single-task V2 plan. They reject
+out-of-scope targets before invoking the provider and expose only installed
+and selected moderate-impact catalog providers, and pin the current manifest
+fingerprint. The proposal requires the AI target to exactly match the
+operator-supplied target and rejects session actions or dynamic arguments.
+`--save` or API `save: true` persists the immutable plan; neither grants
+approval, submits a run request, or dispatches work. Operators use the existing
+plan approval and run-request commands separately.
 
-This is an AI-to-V2 handoff, not a migration of `whaxon ai`, `/api/ai/run`, or
-the legacy Executor loop. Those callers still dispatch through the legacy AI
+This adds the V2 proposal API but does not migrate `whaxon ai`, `/api/ai/run`,
+or the legacy Executor loop. Those callers still dispatch through the legacy AI
 bridge and remain in the inventory above until their lifecycle and client
 parity work is completed.

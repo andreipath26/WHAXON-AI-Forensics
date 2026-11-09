@@ -551,6 +551,60 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def workflow_v2_portfolio_audit():
         return jsonify(core.capability_portfolio_audit())
 
+    @app.post("/api/v2/ai/proposals")
+    @limiter.limit("10 per minute")
+    def workflow_v2_ai_proposal():
+        """Compile one bounded AI action into a reviewable V2 workflow plan."""
+        from whaxon.core.ai_bridge import propose_v2_workflow_plan
+        from whaxon.core.workflow import WorkflowPlan
+
+        payload = request.get_json(silent=True)
+        required = ("mission_id", "id", "goal", "target")
+        if not isinstance(payload, dict) or any(
+            not isinstance(payload.get(key), str) or not payload[key].strip()
+            for key in required
+        ):
+            return jsonify({
+                "error": "mission_id, id, goal and target strings are required",
+                "execution_submitted": False,
+            }), 400
+        if len(payload["goal"]) > 10000 or len(payload["target"]) > 2048:
+            return jsonify({
+                "error": "goal or target exceeds allowed limits",
+                "execution_submitted": False,
+            }), 400
+        save = payload.get("save", False)
+        if type(save) is not bool:
+            return jsonify({"error": "save must be a boolean"}), 400
+        history = payload.get("history", [])
+        step = payload.get("step", 1)
+        try:
+            proposal = propose_v2_workflow_plan(
+                core,
+                mission_id=payload["mission_id"],
+                plan_id=payload["id"],
+                goal=payload["goal"],
+                target=payload["target"],
+                history=history,
+                step=step,
+            )
+            created = False
+            if save and proposal.get("status") == "proposed":
+                created = core.save_workflow_plan(
+                    payload["id"], WorkflowPlan.from_dict(proposal["plan"]),
+                )
+            return jsonify({
+                **proposal,
+                "execution_submitted": bool(proposal.get("execution_submitted", False)),
+                "approval_granted": bool(proposal.get("approval_granted", False)),
+                "created": bool(created),
+            }), 200
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            message = str(exc)
+            return jsonify({"error": message}), (
+                404 if message.startswith("unknown mission:") else 400
+            )
+
     @app.route("/api/v2/missions", methods=["GET", "POST"])
     def workflow_v2_missions():
         if request.method == "POST":
