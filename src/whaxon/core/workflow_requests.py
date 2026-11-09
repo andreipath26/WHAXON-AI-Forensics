@@ -91,10 +91,6 @@ class WorkflowRunQueue:
                     raise ValueError("unknown workflow plan")
                 if plan["status"] == "cancel_requested":
                     raise ValueError("cannot enqueue cancelled workflow")
-                # Bind acceptance to the full immutable DAG, not only the
-                # digest header. The immediate transaction prevents a writer
-                # from changing plan rows between verification and enqueue.
-                self.store._verify_workflow_plan_integrity_tx(conn, plan_id)
                 existing = conn.execute(
                     "SELECT * FROM workflow_run_requests WHERE plan_id=? "
                     "AND status IN ('queued','running','uncertain')",
@@ -109,6 +105,9 @@ class WorkflowRunQueue:
                         raise ValueError(
                             "active workflow request has a different plan digest"
                         )
+                    # Preserve the established digest-mismatch contract above,
+                    # then verify task rows before adopting the active request.
+                    self.store._verify_workflow_plan_integrity_tx(conn, plan_id)
                     try:
                         persisted_limits = json.loads(existing["limits_json"])
                         self._check_limits(persisted_limits)
@@ -120,6 +119,9 @@ class WorkflowRunQueue:
                         raise ValueError("active workflow request has different limits")
                     conn.execute("COMMIT")
                     return self._public_record(existing)
+                # The immediate transaction prevents a writer from changing
+                # the plan/task rows between this verification and enqueue.
+                self.store._verify_workflow_plan_integrity_tx(conn, plan_id)
                 conn.execute(
                     "INSERT INTO workflow_run_requests "
                     "(id,plan_id,plan_digest,limits_json,submitted_at) "
