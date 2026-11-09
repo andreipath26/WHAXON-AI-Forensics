@@ -36,6 +36,14 @@ def _check_execution_scope(scope, target):
     return checker(target) if callable(checker) else scope.check(target)
 
 
+def _request_actor() -> str:
+    """Resolve audit identity from the authenticated request, never its body."""
+    if request.remote_addr in ("127.0.0.1", "::1"):
+        return "local"
+    auth = request.authorization
+    return auth.username if auth and auth.username else "authenticated-operator"
+
+
 def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
     if isinstance(value, dict):
@@ -764,13 +772,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             payload = request.get_json(silent=True)
             if not isinstance(payload, dict) or any(
                 name not in payload
-                for name in ("task_key", "approval_id", "actor", "expires_at")
+                for name in ("task_key", "approval_id", "expires_at")
             ):
-                return jsonify({"error": "task_key, approval_id, actor and expires_at required"}), 400
+                return jsonify({"error": "task_key, approval_id and expires_at required"}), 400
             try:
                 granted = core.grant_workflow_approval(
                     plan_id, payload["task_key"], payload["approval_id"],
-                    payload["actor"], expires_at=payload["expires_at"],
+                    _request_actor(), expires_at=payload["expires_at"],
                 )
                 return jsonify({"plan_id": plan_id, "granted": bool(granted)}), 200
             except (ValueError, TypeError, KeyError) as exc:
@@ -783,11 +791,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke")
     def workflow_v2_revoke_approval(plan_id, approval_id):
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not isinstance(payload.get("actor"), str):
-            return jsonify({"error": "actor required"}), 400
+        if payload is not None and (
+            not isinstance(payload, dict) or set(payload) - {"actor"}
+        ):
+            return jsonify({"error": "only legacy actor metadata is accepted"}), 400
         try:
             revoked = core.revoke_workflow_approval(
-                plan_id, approval_id, actor=payload["actor"],
+                plan_id, approval_id, actor=_request_actor(),
             )
             return jsonify({"plan_id": plan_id, "approval_id": approval_id, "revoked": bool(revoked)})
         except (ValueError, TypeError) as exc:
@@ -801,13 +811,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not isinstance(payload, dict):
             return jsonify({"error": "JSON object required"}), 400
         if "attempt_id" in payload:
-            required = {"attempt_id", "disposition", "actor", "evidence_ref", "note"}
-            if set(payload) != required:
+            required = {"attempt_id", "disposition", "evidence_ref", "note"}
+            if not required.issubset(payload) or set(payload) - required - {"actor"}:
                 return jsonify({"error": "exact attempt reconciliation fields are required"}), 400
             try:
                 result = core.reconcile_workflow_attempt(
                     plan_id, payload["attempt_id"],
-                    disposition=payload["disposition"], actor=payload["actor"],
+                    disposition=payload["disposition"], actor=_request_actor(),
                     evidence_ref=payload["evidence_ref"], note=payload["note"],
                 )
                 return jsonify(result)
@@ -1157,11 +1167,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         # Never trust an operator identity supplied in the JSON body or
         # an unvalidated Basic header on the loopback bypass path. Remote
         # requests have passed _auth_gate before this handler runs.
-        if request.remote_addr in ("127.0.0.1", "::1"):
-            user = "local"
-        else:
-            auth = request.authorization
-            user = auth.username if auth and auth.username else "authenticated-operator"
+        user = _request_actor()
         note = (data.get("note") or "")
         run = core.store.get_ai_run(run_id)
         if run is None:

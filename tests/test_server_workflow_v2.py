@@ -260,13 +260,21 @@ def test_v2_api_approval_and_reconciliation_parity(tmp_path, monkeypatch):
     )))
     assert client.post("/api/v2/workflows/p/approvals", json={
         "task_key": "scan", "approval_id": "approval-1",
-        "actor": "operator", "expires_at": time.time() + 300,
+        "actor": "forged-operator", "expires_at": time.time() + 300,
     }).status_code == 200
+    approval = client.get("/api/v2/workflows/p/approvals").get_json()[0]
     assert len(client.get("/api/v2/workflows/p/approvals").get_json()) == 1
+    assert approval["actor"] == "local"
     assert client.post(
         "/api/v2/workflows/p/approvals/approval-1/revoke",
-        json={"actor": "operator"},
+        json={"actor": "forged-revoker"},
     ).status_code == 200
+    revoked = [
+        event for event in core.workflow_events("p")
+        if event["event_type"] == "approval_revoked"
+    ]
+    assert len(revoked) == 1
+    assert revoked[0]["detail"]["actor"] == "local"
     assert client.post(
         "/api/v2/workflows/p/reconcile", json={"stale_after_s": 60},
     ).status_code == 200
@@ -515,7 +523,7 @@ def test_workflow_v2_api_records_manual_provider_effect_reconciliation(
     response = client.post("/api/v2/workflows/p/reconcile", json={
         "attempt_id": attempt_id,
         "disposition": "no_effect_verified",
-        "actor": "operator",
+        "actor": "forged-operator",
         "evidence_ref": "case://api/17",
         "note": "Compared provider audit log to target capture.",
     })
@@ -524,8 +532,53 @@ def test_workflow_v2_api_records_manual_provider_effect_reconciliation(
     assert result["task_retryable"] is True
     assert result["automatic_replay"] is False
     assert result["run_requests_closed"] == 1
+    assert result["actor_claimed"] == "local"
+    conn = core.store._conn()
+    try:
+        assert conn.execute(
+            "SELECT actor FROM workflow_attempt_reconciliations WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()["actor"] == "local"
+    finally:
+        conn.close()
 
     malformed = client.post("/api/v2/workflows/p/reconcile", json={
         "attempt_id": attempt_id, "disposition": "success",
     })
     assert malformed.status_code == 400
+
+
+def test_v2_remote_workflow_approval_actor_uses_authenticated_username(
+    tmp_path, monkeypatch,
+):
+    import base64
+    import time
+
+    from whaxon.interfaces.web.server import _hash_pw
+
+    monkeypatch.setenv("WHAXON_AUTH_USER", "auditor-7")
+    monkeypatch.setenv("WHAXON_AUTH_PASS_HASH", _hash_pw("correct-horse"))
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10", impact="moderate"),
+    )))
+    authorization = "Basic " + base64.b64encode(
+        b"auditor-7:correct-horse",
+    ).decode("ascii")
+    response = client.post(
+        "/api/v2/workflows/p/approvals",
+        json={
+            "task_key": "scan", "approval_id": "remote-approval",
+            "actor": "forged-admin", "expires_at": time.time() + 300,
+        },
+        headers={"Authorization": authorization},
+        environ_base={"REMOTE_ADDR": "198.51.100.7"},
+    )
+    assert response.status_code == 200
+    approval = client.get(
+        "/api/v2/workflows/p/approvals",
+        headers={"Authorization": authorization},
+        environ_base={"REMOTE_ADDR": "198.51.100.7"},
+    ).get_json()[0]
+    assert approval["actor"] == "auditor-7"
