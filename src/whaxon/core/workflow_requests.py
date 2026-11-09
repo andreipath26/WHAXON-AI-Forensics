@@ -91,6 +91,10 @@ class WorkflowRunQueue:
                     raise ValueError("unknown workflow plan")
                 if plan["status"] == "cancel_requested":
                     raise ValueError("cannot enqueue cancelled workflow")
+                # Bind acceptance to the full immutable DAG, not only the
+                # digest header. The immediate transaction prevents a writer
+                # from changing plan rows between verification and enqueue.
+                self.store._verify_workflow_plan_integrity_tx(conn, plan_id)
                 existing = conn.execute(
                     "SELECT * FROM workflow_run_requests WHERE plan_id=? "
                     "AND status IN ('queued','running','uncertain')",
@@ -203,6 +207,30 @@ class WorkflowRunQueue:
                                              "reason": "plan_digest_changed"},
                                             sort_keys=True), now),
                             )
+                        continue
+                    try:
+                        # Recheck the complete DAG under the same write
+                        # transaction as the claim. Tampering after enqueue
+                        # quarantines the intent before any worker can run it.
+                        self.store._verify_workflow_plan_integrity_tx(
+                            conn, row["plan_id"],
+                        )
+                    except (ValueError, TypeError, KeyError, OverflowError):
+                        now = time.time()
+                        conn.execute(
+                            "UPDATE workflow_run_requests SET status='uncertain', "
+                            "completed_at=?,error='plan integrity failed before run claim' "
+                            "WHERE id=? AND status='queued'",
+                            (now, row["id"]),
+                        )
+                        conn.execute(
+                            "INSERT INTO workflow_events "
+                            "(plan_id,event_type,detail_json,at) VALUES (?,?,?,?)",
+                            (row["plan_id"], "workflow_run_uncertain",
+                             json.dumps({"request_id": row["id"],
+                                         "reason": "plan_integrity_failed"},
+                                        sort_keys=True), now),
+                        )
                         continue
                     if plan["status"] == "cancel_requested":
                         conn.execute(
