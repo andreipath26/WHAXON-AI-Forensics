@@ -680,3 +680,57 @@ def test_e5_concurrent_cancel_and_claim_never_replays_queued_intent(tmp_path):
         assert Core(tmp_path).workflow_requests.claim("late-worker") is None
         assert "lease_token" not in state
     assert Core(tmp_path).workflow_requests.claim("another-worker") is None
+
+
+
+def test_run_request_rejects_plan_task_tampering_before_enqueue(tmp_path):
+    core = _core(tmp_path)
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET target=? WHERE plan_id=?",
+            ("192.0.2.99", "p"),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="integrity"):
+        core.enqueue_workflow_run("p")
+    conn = core.store._conn()
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM workflow_run_requests WHERE plan_id=?", ("p",),
+        ).fetchone()[0]
+    finally:
+        conn.close()
+    assert count == 0
+
+
+def test_run_request_claim_quarantines_plan_tampering_after_enqueue(tmp_path):
+    core = _core(tmp_path)
+    request = core.enqueue_workflow_run("p")
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET target=? WHERE plan_id=?",
+            ("192.0.2.99", "p"),
+        )
+    finally:
+        conn.close()
+
+    assert core.workflow_requests.claim("worker") is None
+    stored = core.workflow_run_request(request["id"])
+    assert stored["status"] == "uncertain"
+    assert stored["error"] == "plan integrity failed before run claim"
+    conn = core.store._conn()
+    try:
+        event = conn.execute(
+            "SELECT detail_json FROM workflow_events "
+            "WHERE plan_id=? AND event_type='workflow_run_uncertain' "
+            "ORDER BY id DESC LIMIT 1", ("p",),
+        ).fetchone()
+    finally:
+        conn.close()
+    assert json.loads(event["detail_json"]) == {
+        "reason": "plan_integrity_failed", "request_id": request["id"],
+    }
