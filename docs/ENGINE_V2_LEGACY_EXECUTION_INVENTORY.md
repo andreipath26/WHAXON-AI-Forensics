@@ -371,9 +371,15 @@ V2-owned evidence.
 | Dependency checks and local config | `POST /api/dependencies/verify`, `/snapshots`, `/plan` run bounded local checks, save a local snapshot, or create a remediation preview; `POST /api/settings` persists application settings. | Not target assessment or V2 capability execution. Settings are configuration state, not target authorization. | `test_dependencies.py`, `test_dependency_installer.py`, `test_server.py` settings/dependency cases |
 
 The V2 and legacy mutations above have different actor, persistence and
-evidence contracts. The route map is source/test traceability; unresolved trust
-and authorization acceptance remains open under the relevant later gates and
-must not be inferred from route registration alone.
+evidence contracts. V2 approval and attempt-reconciliation routes derive their
+audit actor from the local peer identity or the username on a Basic-auth request
+that has passed the shared request gate; legacy `actor` body fields are ignored
+for compatibility. A remote username identifies the configured authenticated
+account, not a distinct role or independent approver. Attempt-cost `source`
+remains caller-supplied metadata and is not provider-origin proof. The route map
+is source/test traceability; unresolved trust and authorization acceptance
+remains open under the relevant later gates and must not be inferred from route
+registration alone.
 
 ### Deployment entry points and readiness semantics
 
