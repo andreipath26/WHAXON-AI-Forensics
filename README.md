@@ -37,7 +37,7 @@ We are not trying to claim that every vulnerability can be found or automaticall
 | **Evidence and reports** | Stored assessment information and Markdown, HTML, PDF, and JSON reporting paths |
 | **Remediation retesting** | Tracked retests with outcomes such as fixed, still vulnerable, or inconclusive, where supported |
 | **Interfaces** | Command-line interface, developing `/ui-v2` browser workspace, and optional terminal/desktop interfaces |
-| **Engine V2 foundation** | Versioned plans, persistent missions and requests, provider/capability routing, bounded scheduling, approvals, worker leases, cancellation, and conservative recovery mechanisms |
+| **Engine V2 workflow services** | Versioned mission plans and durable requests; capability/provider routing; approval-bound task execution; bounded scheduling, leases, cancellation, recovery and audit; shared workflow CLI and HTTP APIs |
 
 WHAXON supports integrations with established security tools through its catalog and adapters. **An adapter or catalog entry is not a guarantee that the external tool is installed, fully integrated, or validated on every platform.**
 
@@ -65,9 +65,16 @@ A supported validator may replay a specific request and evaluate a response mark
 
 WHAXON is evolving from several tool-specific execution paths toward **one durable, capability-driven workflow engine** shared by its CLI, web interface, and headless services.
 
-The Engine V2 foundation includes structured task contracts, provider selection, persistent execution requests, worker ownership, cancellation controls, and mechanisms for reconciling interrupted or uncertain operations. Its shared-service phase has passed bounded engineering acceptance, including staged service and recovery tests.
+Engine V2 now has implemented shared workflow services, beyond the initial foundation:
 
-**Work still underway:** migrating remaining legacy execution paths, demonstrating cross-interface consistency, validating real authorized tool runs and failure recovery, and completing security, UI, and deployment acceptance. A passing test suite or a merged phase is not production certification.
+- **Durable workflows:** versioned missions, plans, task graphs and run requests, with bounded concurrency, time/rate/cost limits, approval bindings, worker leases, cancellation, emergency halt and conservative recovery of uncertain external effects.
+- **Provider and audit boundaries:** a capability registry, trusted provider routing, provider-bound plans, lifecycle events, recovery reconciliation and checks that evidence cannot be claimed verified solely because a task completed.
+- **Operator interfaces:** workflow commands and V2 HTTP endpoints for missions, plans, approvals, progress, evidence and run-request state. The developing Run page can discover missions and plans and offers durable workflow controls; it does not mean every supplied UI control is integrated.
+- **Reviewable AI handoff:** the workflow CLI and `POST /api/v2/ai/proposals` can turn a constrained AI suggestion into a provider-pinned proposal. Saving a proposal does **not** approve it, submit a run request or execute tools. Scope and input bounds are checked fail-closed.
+
+The shared-service/headless phase has **bounded engineering acceptance**, supported by CI and supervised systemd/Docker smoke checks. These checks do not establish deployment acceptance or independent real-target validation.
+
+**Work still underway:** migrating the remaining legacy CLI/web/AI/session execution paths into one V2 lifecycle; completing provider/transport and cross-interface parity; finishing supplied UI control wiring; validating audit/evidence integrity and authorized external-tool failure recovery; and completing security, accessibility, deployment and rollback acceptance. The current beta is **not production-approved**.
 
 For the technical implementation and acceptance boundaries, see [Engine V2](docs/ENGINE_V2_MASTER.md) and the [master roadmap](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md).
 
@@ -78,7 +85,7 @@ We are prioritizing a dependable **single-operator defensive assessment workflow
 **Near-term priorities**
 1. Complete the shared Engine V2 execution paths and supported deployment checks.
 2. Validate authorization, evidence quality, reporting, and remediation retesting end to end in controlled environments.
-3. Finish integrating the supplied browser workspace with real, auditable application behavior.
+3. Complete the supplied browser workspace's remaining real-service controls, state consistency and accessibility acceptance.
 4. Improve installation, operational diagnostics, documentation, and reproducibility.
 
 **Research and longer-term directions** *(planned, not shipped)*
