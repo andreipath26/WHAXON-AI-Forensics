@@ -485,3 +485,18 @@ retest in bulk. The Run page consumes the current web route, AI uses a separate
 operator-answer record, and the CLI exposes capability-specific options. Each
 migration needs an explicit capability mapping and parity tests before retiring
 the legacy caller. E6 remains frozen until the operator declares the UI ready.
+
+## AI-to-V2 proposal boundary
+
+`whaxon workflow plan ai-propose` converts one legacy AI `Action` into a
+reviewable, single-task V2 plan. It exposes only installed and selected
+moderate-impact catalog providers, pins the current manifest fingerprint,
+requires the AI target to exactly match the operator-supplied target, and
+rejects session actions or dynamic arguments. `--save` persists the immutable
+plan; it never grants approval, submits a run request, or dispatches work.
+Operators use the existing plan approval and run-request commands separately.
+
+This is an AI-to-V2 handoff, not a migration of `whaxon ai`, `/api/ai/run`, or
+the legacy Executor loop. Those callers still dispatch through the legacy AI
+bridge and remain in the inventory above until their lifecycle and client
+parity work is completed.
