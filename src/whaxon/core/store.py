@@ -3142,7 +3142,8 @@ class JobStore:
             try:
                 c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
-                    "SELECT a.task_id, a.status, p.status AS plan_status "
+                    "SELECT a.task_id, a.status, p.id AS plan_id, "
+                    "p.status AS plan_status "
                     "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                     "JOIN workflow_plans p ON p.id=t.plan_id WHERE a.id=?",
                     (attempt_id,),
@@ -3151,6 +3152,18 @@ class JobStore:
                     raise ValueError(f"unknown task attempt: {attempt_id}")
                 if row["status"] != "running":
                     raise ValueError("task attempt is already terminal")
+                # Revalidate the immutable DAG at the terminal commit boundary.
+                # A provider may have produced effects while persisted task
+                # bindings were changed; such an outcome cannot be certified.
+                try:
+                    self._verify_workflow_plan_integrity_tx(c, row["plan_id"])
+                except ValueError:
+                    status = "uncertain"
+                    result = None
+                    error = (
+                        "workflow plan integrity failed during provider execution; "
+                        "reconcile external effects"
+                    )
                 # The plan cancellation barrier and outcome must serialize in
                 # one write transaction. An external effect cannot be certified
                 # successful after cancellation was durably recorded.
