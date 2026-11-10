@@ -10,7 +10,7 @@ Options:
     --extra "..."          extra arguments passed to the tool
     --data DIR             data directory (default: ./data)
     --timeout SEC          hard timeout in seconds (default: 300)
-    --allow-out-of-scope   bypass the scope check for this run
+    --allow-out-of-scope   unsupported: legacy scope override is disabled
     --quiet                suppress live output (just findings at the end)
     --verbose              print internal state, argv, and full untruncated findings
     --json                 emit findings as JSON to stdout at the end
@@ -37,7 +37,7 @@ def _usage() -> None:
     print("Usage: whaxon run <tool_id> <target> [--extra \"...\"] [--data DIR] "
           "[--timeout SEC] [--allow-out-of-scope] [--quiet] [--verbose] [--json]")
     print()
-    print("  Runs a catalog tool against a target, streaming output live.")
+    print("  Legacy direct execution is disabled; use whaxon workflow for V2 authorization.")
     print("  Examples:")
     print("    whaxon run nmap 10.0.0.5")
     print("    whaxon run nikto 10.0.0.5 --extra \"-p 80,443\"")
@@ -113,147 +113,16 @@ def main(args: list[str] | None = None) -> None:
             print(f"Unknown arg: {a}", file=sys.stderr)
             sys.exit(EXIT_USAGE)
 
-    core = Core(data_dir=data_dir)
-
-    # Validate the tool before running
-    tool = core.catalog.get(tool_id)
-    if tool is None:
-        available = sorted(t.id for t in core.catalog.list())
-        print(f"error: unknown tool {tool_id!r}", file=sys.stderr)
-        if available:
-            print(f"  available: {', '.join(available)}", file=sys.stderr)
-        sys.exit(EXIT_UNKNOWN_TOOL)
-
-    if verbose:
-        print(f"[verbose] tool_id={tool_id!r} target={target!r}", file=sys.stderr)
-        print(f"[verbose] extra_args={extra_args!r}", file=sys.stderr)
-        print(f"[verbose] timeout={timeout_s}s allow_out_of_scope={allow_out_of_scope}", file=sys.stderr)
-
-    # Subscribe to job events for live streaming. We only care about the
-    # job we're about to run; the runner will fire events through the bus.
-    state: dict = {"job_id": None, "findings": []}
-
-    def _on_started(e):
-        state["job_id"] = e.job_id
-        if not quiet:
-            print(f"[run] {e.tool_id} → {e.target}  (job {e.job_id})", file=sys.stderr)
-
-    def _on_output(e):
-        if quiet:
-            return
-        stream = sys.stdout if e.stream == "stdout" else sys.stderr
-        print(e.line, file=stream, flush=True)
-
-    def _on_finished(e):
-        if not quiet:
-            print(f"[run] finished: exit={e.exit_code} in {e.duration_s:.2f}s",
-                  file=sys.stderr)
-
-    def _on_failed(e):
-        print(f"[run] failed: {e.error}", file=sys.stderr)
-
-    def _on_findings(e):
-        state["findings"] = list(e.findings)
-
-    core.bus.subscribe(JobStarted, _on_started)
-    core.bus.subscribe(JobOutput, _on_output)
-    core.bus.subscribe(JobFinished, _on_finished)
-    core.bus.subscribe(JobFailed, _on_failed)
-    core.bus.subscribe(JobFindings, _on_findings)
-
-    async def _go():
-        await core.initialize(drain=False)
-        # Preserve queued work from earlier CLI invocations; this command only
-        # owns jobs newly enqueued by findings from its initial execution.
-        state["pending_before"] = {row["id"] for row in core.store.list_pending()}
-        if verbose:
-            try:
-                match = core.scope.check(target) if core.scope else None
-                if match is not None:
-                    print(f"[verbose] scope: allowed={match.allowed} rule={match.matched_rule!r} reason={match.reason!r}", file=sys.stderr)
-            except Exception as e:
-                print(f"[verbose] scope check raised: {e!r}", file=sys.stderr)
-        # Session-shaped targets skip the pre-dispatch scope check;
-        # the transport does its own check on the extracted host.
-        if (target.startswith("session:")
-                or target.startswith("ssh:")
-                or target.startswith("smb:")):
-            if not allow_out_of_scope:
-                print("[run] session target; scope is enforced by the session transport")
-            result = await core.runner.run_in_session(
-                tool_id, target, extra_args=extra_args,
-                timeout_s=timeout_s,
-            )
-        else:
-            if verbose:
-                try:
-                    argv = core.runner.build_argv(tool_id, target, extra_args=extra_args)
-                    print(f"[verbose] argv: {argv!r}", file=sys.stderr)
-                except Exception as e:
-                    print(f"[verbose] build_argv raised: {e!r}", file=sys.stderr)
-            result = await core.runner.run_tool(
-                tool_id, target,
-                extra_args=extra_args,
-                timeout_s=timeout_s,
-                allow_out_of_scope=allow_out_of_scope,
-            )
-
-        # EventBus delivers findings subscribers (including Automator) on this
-        # loop. Give them a turn to persist any follow-up jobs before closing it.
-        await asyncio.sleep(0)
-        state["primary_job_id"] = state.get("job_id")
-        state["primary_findings"] = list(state.get("findings") or [])
-        # Drain on the same live loop so worker events are delivered normally.
-        from whaxon.core.worker import drain_async
-        state["drained_jobs"] = await drain_async(
-            core.store, core.runner, exclude_ids=state.get("pending_before", set())
-        )
-        return result
-
-
-    try:
-        asyncio.run(_go())
-    except OutOfScopeError as e:
-        print(f"error: target out of scope: {e.reason}", file=sys.stderr)
-        if e.matched_rule:
-            print(f"  matched rule: {e.matched_rule}", file=sys.stderr)
-        if e.overridable:
-            print(f"  override with: whaxon run {tool_id} {target} --allow-out-of-scope",
-                  file=sys.stderr)
-        else:
-            print("  this execution block cannot be overridden", file=sys.stderr)
-        sys.exit(EXIT_OUT_OF_SCOPE)
-    except FileNotFoundError as e:
-        print(f"error: tool binary not found: {e}", file=sys.stderr)
-        sys.exit(EXIT_TOOL_ERROR)
-    except KeyboardInterrupt:
-        print("[run] interrupted", file=sys.stderr)
-        sys.exit(130)
-    except Exception as e:
-        print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
-        sys.exit(EXIT_TOOL_ERROR)
-
-    job_id = state.get("primary_job_id", state.get("job_id"))
-    findings = state.get("primary_findings", state.get("findings") or [])
-    drained = state.get("drained_jobs", 0)
-    if drained and not quiet:
-        print(f"[run] auto-chain: completed {drained} queued job(s)", file=sys.stderr)
-    # Worker events may include other job IDs/findings; keep this command's
-    # report attached to the initial tool execution.
-    state["job_id"] = job_id
-    state["findings"] = findings
-
-    # Load findings from the store if the event didn't fire (e.g. tool
-    # produced no findings, or the adapter errored)
-    if job_id and not findings:
-        findings = core.store.get_findings(job_id) or []
-
-    _print_findings(findings, as_json, verbose)
-
-    if job_id and not as_json:
-        print()
-        print(f"job: {job_id}")
-        print(f"report: whaxon report {job_id}")
+    # The legacy runner cannot prove V2 plan identity, approval binding,
+    # durable task ownership or recovery. Never dispatch it from this command.
+    # Retain argument parsing for compatibility, but fail closed before Core
+    # initialization (which may have unrelated side effects).
+    print(
+        "error: legacy direct execution is disabled; create an authorized "
+        "Engine V2 plan with 'whaxon workflow' instead",
+        file=sys.stderr,
+    )
+    sys.exit(EXIT_TOOL_ERROR)
 
 
 if __name__ == "__main__":
