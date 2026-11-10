@@ -206,6 +206,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('POST', '/api/v2/workflows/<plan_id>/approvals'): 'workflow_v2_approvals',
     ('POST', '/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke'): 'workflow_v2_revoke_approval',
     ('POST', '/api/v2/workflows/<plan_id>/cancel'): 'workflow_v2_cancel',
+    ('POST', '/api/v2/workflows/<plan_id>/followups'): 'workflow_v2_followups',
     ('POST', '/api/v2/workflows/<plan_id>/deadline'): 'workflow_v2_set_deadline',
     ('POST', '/api/v2/workflows/<plan_id>/event-ack'): 'workflow_v2_event_ack',
     ('POST', '/api/v2/workflows/<plan_id>/limits'): 'workflow_v2_set_limits',
