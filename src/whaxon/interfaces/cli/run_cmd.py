@@ -38,6 +38,8 @@ def _usage() -> None:
           "[--timeout SEC] [--allow-out-of-scope] [--quiet] [--verbose] [--json]")
     print()
     print("  Runs a catalog tool against a target, streaming output live.")
+    print("  V2: whaxon run --v2-plan <existing-plan-id> [--data DIR]")
+    print("  V2 requires a persisted plan and task approvals; no legacy fallback.")
     print("  Examples:")
     print("    whaxon run nmap 10.0.0.5")
     print("    whaxon run nikto 10.0.0.5 --extra \"-p 80,443\"")
@@ -86,6 +88,7 @@ def main(args: list[str] | None = None) -> None:
     quiet = False
     as_json = False
     verbose = False
+    timeout_explicit = False
 
     i = 2
     while i < len(args):
@@ -97,6 +100,7 @@ def main(args: list[str] | None = None) -> None:
         elif a == "--timeout" and i + 1 < len(args):
             try:
                 timeout_s = float(args[i + 1])
+                timeout_explicit = True
             except ValueError:
                 print(f"error: --timeout expects a number, got {args[i+1]!r}", file=sys.stderr)
                 sys.exit(EXIT_USAGE)
@@ -116,7 +120,7 @@ def main(args: list[str] | None = None) -> None:
     # Explicit migration bridge: execute only an already persisted V2 plan.
     # No implicit plan creation, approval, target inference or legacy fallback.
     if tool_id == "--v2-plan":
-        if extra_args or allow_out_of_scope:
+        if extra_args or allow_out_of_scope or timeout_explicit or verbose or quiet or as_json:
             print("error: V2 execution refuses legacy argument/scope overrides", file=sys.stderr)
             sys.exit(EXIT_USAGE)
         from whaxon.interfaces.cli import workflow_cmd
