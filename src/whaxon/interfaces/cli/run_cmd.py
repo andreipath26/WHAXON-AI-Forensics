@@ -113,6 +113,20 @@ def main(args: list[str] | None = None) -> None:
             print(f"Unknown arg: {a}", file=sys.stderr)
             sys.exit(EXIT_USAGE)
 
+    # Explicit migration bridge: execute only an already persisted V2 plan.
+    # No implicit plan creation, approval, target inference or legacy fallback.
+    if tool_id == "--v2-plan":
+        if extra_args or allow_out_of_scope:
+            print("error: V2 execution refuses legacy argument/scope overrides", file=sys.stderr)
+            sys.exit(EXIT_USAGE)
+        from whaxon.interfaces.cli import workflow_cmd
+        result = workflow_cmd.main([
+            "--data-dir", str(data_dir), "plan", "run", "--id", target,
+        ])
+        if result:
+            sys.exit(result)
+        return
+
     core = Core(data_dir=data_dir)
 
     # Validate the tool before running
