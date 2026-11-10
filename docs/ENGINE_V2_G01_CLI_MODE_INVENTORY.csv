@@ -1,5 +1,5 @@
 mode,dispatcher_source,engine_owner,classification,v1_boundary_or_limit
-__default__,src/whaxon/cli.py,src/whaxon/interfaces/tui/app.py,default-interface,No arguments select the TUI; the TUI remains a legacy client for direct Core.runner actions.
+__default__,src/whaxon/cli.py,src/whaxon/interfaces/tui/app.py,mixed-interface,"No arguments select the TUI; `w` opens the shared Engine V2 mission/plan approval and durable request screen, while the catalog Run action remains legacy Core.runner dispatch."
 setup,src/whaxon/interfaces/cli/setup_cmd.py,Dependency setup services,supporting-cli,Creates dependency and tool installation plans; installation remains approval-gated and is not a workflow task.
 gui,src/whaxon/interfaces/gui/app.py,Desktop client services,mixed-interface,Desktop GUI client; direct Core.runner actions remain legacy. UI acceptance is separately frozen under G06.
 web,src/whaxon/interfaces/web/server.py,Legacy routes plus V2 Core routes,mixed-interface,Hosts both legacy routes and /api/v2 routes; V2 workflow proposal endpoint supports fixed-argument tools and sealed-evidence verification, while legacy run dispatch remains separate and legacy validation/retest refuses to mutate V2-owned evidence.
