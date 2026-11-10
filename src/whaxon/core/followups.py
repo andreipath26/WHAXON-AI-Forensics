@@ -147,8 +147,12 @@ class EvidenceFollowupPlanner:
         seen: set[tuple[str, str]] = set()
         evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
         # Refuse partial evidence even when an individual attempt looks sealed.
-        if isinstance(evidence, dict) and (
-            evidence.get("all_evidence_recorded") is not True
+        if (
+            not isinstance(evidence, dict)
+            or evidence.get("plan_id") != source_plan_id
+            or evidence.get("mission_id") != source.get("mission_id")
+            or evidence.get("plan_digest") != source.get("digest")
+            or evidence.get("all_evidence_recorded") is not True
             or evidence.get("all_evidence_integrity_verified") is not True
         ):
             return FollowupProposal(source_plan_id, None, None, ({
