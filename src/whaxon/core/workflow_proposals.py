@@ -143,6 +143,8 @@ def propose_finding_verification_plan(
     if source_job is None or selected is None:
         return {"status": "blocked", "reason": "source job or finding sequence was not found"}
     kind = selected.get("kind")
+    if not isinstance(kind, str):
+        return {"status": "blocked", "reason": "finding kind is missing or invalid"}
     capability_by_kind = {
         ("verify", "sqli"): "tool.verify_sqli",
         ("verify", "sql_injection"): "tool.verify_sqli",
