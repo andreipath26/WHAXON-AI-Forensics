@@ -14,6 +14,113 @@ def _client(tmp_path, monkeypatch):
     return app.test_client(), core
 
 
+def test_v2_followups_api_is_evidence_bound_and_inert(tmp_path, monkeypatch):
+    """API reuses the CLI/Core follow-up planner without independent execution."""
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-followup", "authorized lab")
+    core.save_workflow_plan("p-source", WorkflowPlan("m-followup", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+    )))
+    response = client.post(
+        "/api/v2/workflows/p-source/followups",
+        json={"max_tasks": 4, "save": True},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["source_plan_id"] == "p-source"
+    assert body["plan"] is None
+    assert body["created"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_started"] is False
+    assert core.mission_workflow_plans("m-followup")[0]["id"] == "p-source"
+    assert len(core.mission_workflow_plans("m-followup")) == 1
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
+
+    for payload in (
+        {"max_tasks": True}, {"max_tasks": 0}, {"max_tasks": 101},
+        {"max_tasks": "4"}, {"save": "true"}, {"unknown": 1},
+        [], "invalid",
+    ):
+        assert client.post(
+            "/api/v2/workflows/p-source/followups", json=payload,
+        ).status_code == 400
+    assert client.post(
+        "/api/v2/workflows/missing/followups", json={},
+    ).status_code == 404
+    assert client.post(
+        "/api/v2/workflows/p-source/followups", json={},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+
+
+def test_v2_followups_api_persists_only_a_reviewable_plan(tmp_path, monkeypatch):
+    from whaxon.core.followups import FollowupProposal
+
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    core.save_workflow_plan("source", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    proposed_plan = WorkflowPlan("m", (
+        WorkflowTask("followup", "fixture", "192.0.2.10"),
+    ))
+
+    def fake_compile(source_id, *, max_tasks):
+        assert source_id == "source"
+        assert max_tasks == 2
+        return FollowupProposal(source_id, "followup-plan", proposed_plan, ())
+
+    monkeypatch.setattr(core, "propose_workflow_followups", fake_compile)
+    response = client.post(
+        "/api/v2/workflows/source/followups",
+        json={"max_tasks": 2, "save": True},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["created"] is True
+    assert body["digest"] == proposed_plan.digest
+    assert body["approval_granted"] is False
+    assert body["execution_started"] is False
+    assert core.store.get_workflow_plan("followup-plan")["digest"] == proposed_plan.digest
+    assert core.workflow_approvals("followup-plan") == []
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
+
+    again = client.post(
+        "/api/v2/workflows/source/followups",
+        json={"max_tasks": 2, "save": True},
+    )
+    assert again.status_code == 200
+    assert again.get_json()["created"] is False
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
+
+
+def test_v2_mission_report_api_uses_shared_evidence_and_preserves_partial_status(
+    tmp_path, monkeypatch,
+):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-report", "authorized lab")
+    core.save_workflow_plan("p-report", WorkflowPlan("m-report", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    expected = core.workflow_mission_report(
+        "m-report", plan_ids=["p-report"], limit=10,
+    )
+    response = client.get("/api/v2/missions/m-report/report?plan_id=p-report&limit=10")
+    assert response.status_code == 200
+    assert response.get_json() == expected
+    assert response.get_json()["status"] != "complete"
+    assert client.get("/api/v2/missions/missing/report").status_code == 404
+
+    for query in (
+        "limit=0", "limit=1001", "limit=oops", "limit=-5",
+        "plan_id=p-report&plan_id=p-report", "plan_id=other",
+    ):
+        assert client.get(
+            "/api/v2/missions/m-report/report?" + query,
+        ).status_code == 400
+    assert client.post("/api/v2/missions/m-report/report").status_code == 405
+
+
 def test_workflow_v2_read_only_routes_use_shared_persistence(tmp_path, monkeypatch):
     client, core = _client(tmp_path, monkeypatch)
     core.create_mission("m", "controlled")

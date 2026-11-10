@@ -288,6 +288,7 @@ test family remain authoritative for side effects and access-control limits.
 | `POST` | `/api/v2/missions/<mission_id>/cost` | `workflow_v2_mission_cost` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions/<mission_id>/deadline` | `workflow_v2_mission_deadline` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/missions/<mission_id>/plans` | `workflow_v2_mission_plans` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/report` | `workflow_v2_mission_report` | Ordered mission-level, evidence-bound report; partial status is preserved |
 | `GET` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/providers` | `workflow_v2_providers` | Core workflow registry, stores and lifecycle services |
@@ -304,6 +305,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/followups` | `workflow_v2_followups` | Evidence-sealed, scope-checked follow-up proposal; optional plan persistence without approval or execution |
 | `POST` | `/api/v2/workflows/<plan_id>/deadline` | `workflow_v2_set_deadline` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/event-ack` | `workflow_v2_event_ack` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/event-inbox` | `workflow_v2_event_inbox` | Core workflow registry, stores and lifecycle services |
