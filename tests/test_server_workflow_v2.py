@@ -14,6 +14,45 @@ def _client(tmp_path, monkeypatch):
     return app.test_client(), core
 
 
+def test_v2_followups_api_is_evidence_bound_and_inert(tmp_path, monkeypatch):
+    """API reuses the CLI/Core follow-up planner without independent execution."""
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-followup", "authorized lab")
+    core.save_workflow_plan("p-source", WorkflowPlan("m-followup", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+    )))
+    response = client.post(
+        "/api/v2/workflows/p-source/followups",
+        json={"max_tasks": 4, "save": True},
+    )
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["source_plan_id"] == "p-source"
+    assert body["plan"] is None
+    assert body["created"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_started"] is False
+    assert core.mission_workflow_plans("m-followup")[0]["id"] == "p-source"
+    assert len(core.mission_workflow_plans("m-followup")) == 1
+    assert core.workflow_run_queue_summary()["queued"] == 0
+
+    for payload in (
+        {"max_tasks": True}, {"max_tasks": 0}, {"max_tasks": 101},
+        {"max_tasks": "4"}, {"save": "true"}, {"unknown": 1},
+        [], "invalid",
+    ):
+        assert client.post(
+            "/api/v2/workflows/p-source/followups", json=payload,
+        ).status_code == 400
+    assert client.post(
+        "/api/v2/workflows/missing/followups", json={},
+    ).status_code == 404
+    assert client.post(
+        "/api/v2/workflows/p-source/followups", json={},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+
+
 def test_workflow_v2_read_only_routes_use_shared_persistence(tmp_path, monkeypatch):
     client, core = _client(tmp_path, monkeypatch)
     core.create_mission("m", "controlled")
