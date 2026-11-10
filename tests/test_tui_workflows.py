@@ -106,3 +106,28 @@ async def test_tui_creates_mission_and_saves_only_a_reviewable_plan(tmp_path, mo
         assert persisted["plan"]["mission_id"] == "mission-new"
         assert app.core.workflow_approvals("plan-new") == []
         assert screen.run_request_id is None
+
+        verification_plan = WorkflowPlan("mission-new", (
+            WorkflowTask(
+                "verification-1", "tool.retest_sqli", "192.0.2.10",
+                inputs={"source_job_id": "v2-job-1", "finding_seq": 3},
+            ),
+        ))
+        monkeypatch.setattr(
+            workflow_proposals,
+            "propose_finding_verification_plan",
+            lambda *_args, **_kwargs: {
+                "status": "proposed", "plan": verification_plan.to_dict(),
+                "capability_id": "tool.retest_sqli",
+            },
+        )
+        screen.query_one("#workflow-new-plan-id", Input).value = "plan-verify"
+        screen.query_one("#workflow-source-job-id", Input).value = "v2-job-1"
+        screen.query_one("#workflow-finding-seq", Input).value = "3"
+        screen.query_one("#workflow-verification-mode", Input).value = "retest"
+        screen._propose_verification_plan()
+
+        verified = app.core.workflow_plan_details("plan-verify")
+        assert verified["plan"]["tasks"][0]["capability_id"] == "tool.retest_sqli"
+        assert app.core.workflow_approvals("plan-verify") == []
+        assert screen.run_request_id is None
