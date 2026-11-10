@@ -1078,6 +1078,48 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
+    @app.get("/api/v2/workflows/<plan_id>/report")
+    def workflow_v2_plan_report(plan_id):
+        """Return persisted, evidence-scoped workflow report without side effects."""
+        raw_limit = request.args.get("limit", "100")
+        if (
+            len(raw_limit) > 4 or not raw_limit.isascii()
+            or not raw_limit.isdecimal() or not 1 <= int(raw_limit) <= 1000
+        ):
+            return jsonify({"error": "limit must be an integer in 1..1000"}), 400
+        try:
+            return jsonify(core.workflow_report(plan_id, limit=int(raw_limit)))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404 if "unknown" in str(exc) else 400
+
+    @app.get("/api/v2/workflows/<plan_id>/audit-snapshot")
+    def workflow_v2_audit_snapshot(plan_id):
+        """Expose a digest for an external operator-held integrity anchor."""
+        try:
+            return jsonify(core.workflow_audit_snapshot(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.post("/api/v2/workflows/<plan_id>/audit-verify")
+    def workflow_v2_audit_verify(plan_id):
+        """Compare against a caller-held digest; never claim third-party anchoring."""
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or set(payload) != {"expected_digest"}:
+            return jsonify({"error": "expected_digest is required"}), 400
+        try:
+            matched = core.verify_workflow_audit_snapshot(
+                plan_id, payload["expected_digest"],
+            )
+            return jsonify({
+                "plan_id": plan_id,
+                "digest_matches": bool(matched),
+                "independent_anchor_verified": False,
+            })
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), (
+                404 if "unknown workflow plan" in str(exc) else 400
+            )
+
     @app.get("/api/v2/workflows/<plan_id>/readiness")
     def workflow_v2_readiness(plan_id):
         try:

@@ -315,7 +315,10 @@ test family remain authoritative for side effects and access-control limits.
 | `POST` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_set_limits` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/progress` | `workflow_v2_progress` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/rate-limit` | `workflow_v2_set_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/report` | `workflow_v2_plan_report` | Evidence-scoped persisted plan report; never implies release approval |
+| `GET` | `/api/v2/workflows/<plan_id>/audit-snapshot` | `workflow_v2_audit_snapshot` | Read-only lifecycle digest; not an independent anchor |
 | `GET` | `/api/v2/workflows/<plan_id>/readiness` | `workflow_v2_readiness` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/audit-verify` | `workflow_v2_audit_verify` | Compare caller-retained digest without claiming third-party anchoring |
 | `POST` | `/api/v2/workflows/<plan_id>/reconcile` | `workflow_v2_reconcile` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/reconciliation` | `workflow_v2_reconciliation` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |

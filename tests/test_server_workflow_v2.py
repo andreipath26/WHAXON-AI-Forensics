@@ -121,6 +121,55 @@ def test_v2_mission_report_api_uses_shared_evidence_and_preserves_partial_status
     assert client.post("/api/v2/missions/m-report/report").status_code == 405
 
 
+def test_v2_report_and_audit_digest_api_match_shared_core(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-audit", "controlled")
+    core.save_workflow_plan("p-audit", WorkflowPlan("m-audit", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    report = client.get("/api/v2/workflows/p-audit/report?limit=10")
+    assert report.status_code == 200
+    assert report.get_json() == core.workflow_report("p-audit", limit=10)
+    assert report.get_json()["status"] != "complete"
+
+    snapshot = client.get("/api/v2/workflows/p-audit/audit-snapshot")
+    assert snapshot.status_code == 200
+    assert snapshot.get_json() == core.workflow_audit_snapshot("p-audit")
+    digest = snapshot.get_json()["digest"]
+    assert snapshot.get_json()["independent_anchor_verified"] is False
+    verified = client.post(
+        "/api/v2/workflows/p-audit/audit-verify",
+        json={"expected_digest": digest},
+    )
+    assert verified.status_code == 200
+    assert verified.get_json() == {
+        "plan_id": "p-audit", "digest_matches": True,
+        "independent_anchor_verified": False,
+    }
+    wrong = client.post(
+        "/api/v2/workflows/p-audit/audit-verify",
+        json={"expected_digest": "0" * 64 if digest != "0" * 64 else "f" * 64},
+    )
+    assert wrong.status_code == 200
+    assert wrong.get_json()["digest_matches"] is False
+
+    for value in ("0", "1001", "-1", "invalid", "9" * 5000):
+        assert client.get(
+            "/api/v2/workflows/p-audit/report", query_string={"limit": value},
+        ).status_code == 400
+    for payload in ({}, {"expected_digest": "bad"}, {"expected_digest": digest, "extra": 1}):
+        assert client.post(
+            "/api/v2/workflows/p-audit/audit-verify", json=payload,
+        ).status_code == 400
+    assert client.get("/api/v2/workflows/missing/report").status_code == 404
+    assert client.get("/api/v2/workflows/missing/audit-snapshot").status_code == 404
+    assert client.post(
+        "/api/v2/workflows/p-audit/audit-verify",
+        json={"expected_digest": digest},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+
+
 def test_workflow_v2_read_only_routes_use_shared_persistence(tmp_path, monkeypatch):
     client, core = _client(tmp_path, monkeypatch)
     core.create_mission("m", "controlled")
