@@ -2,7 +2,7 @@ mode,dispatcher_source,engine_owner,classification,v1_boundary_or_limit
 __default__,src/whaxon/cli.py,src/whaxon/interfaces/tui/app.py,default-interface,No arguments select the TUI; the TUI remains a legacy client for direct Core.runner actions.
 setup,src/whaxon/interfaces/cli/setup_cmd.py,Dependency setup services,supporting-cli,Creates dependency and tool installation plans; installation remains approval-gated and is not a workflow task.
 gui,src/whaxon/interfaces/gui/app.py,Desktop client services,mixed-interface,Desktop GUI client; direct Core.runner actions remain legacy. UI acceptance is separately frozen under G06.
-web,src/whaxon/interfaces/web/server.py,Legacy routes plus V2 Core routes,mixed-interface,Hosts both legacy routes and /api/v2 routes; legacy dispatch remains separate from V2 workflow ownership. G06 UI work is frozen.
+web,src/whaxon/interfaces/web/server.py,Legacy routes plus V2 Core routes,mixed-interface,Hosts both legacy routes and /api/v2 routes; legacy run dispatch remains separate, while legacy validation/retest refuses to mutate V2-owned evidence.
 serve,src/whaxon/interfaces/web/serve.py,Web service host,service-host,Starts the WSGI web service. The V2 request worker is a separate workflow command.
 doctor,src/whaxon/interfaces/cli/doctor_cmd.py,Readiness and dependency services,supporting-cli,Inspects readiness and can create or apply dependency plans; does not launch target assessment tasks.
 init,src/whaxon/interfaces/cli/init_cmd.py,Legacy initialization,supporting-cli,Initializes local state and optional demo or Metasploit configuration; does not create a V2 mission by default.
@@ -21,8 +21,8 @@ ai,src/whaxon/interfaces/cli/ai_cmd.py,Legacy AI bridge and executor,legacy-exec
 cve,src/whaxon/interfaces/cli/cve_cmd.py,CVE information service,supporting-cli,Information lookup surface; not a V2 target-task dispatch.
 vulndb,src/whaxon/interfaces/cli/vulndb_cmd.py,Vulnerability database service,supporting-cli,Information lookup surface; not a V2 target-task dispatch.
 lookup,src/whaxon/interfaces/cli/lookup_cmd.py,Lookup service,supporting-cli,Information lookup surface; not a V2 target-task dispatch.
-validate,src/whaxon/interfaces/cli/validate_cmd.py,Legacy Validator,legacy-execution,Direct validation probes use legacy JobStore state; not V2 task/attempt ownership.
-retest,src/whaxon/interfaces/cli/retest_cmd.py,Legacy Validator,legacy-execution,Direct retest probes use legacy JobStore state; not V2 task/attempt ownership.
+validate,src/whaxon/interfaces/cli/validate_cmd.py,Legacy Validator with V2 evidence refusal,mixed-interface,Legacy findings still use direct probes; V2-owned evidence is blocked and must use a plan-bound verifier proposal.
+retest,src/whaxon/interfaces/cli/retest_cmd.py,Legacy Validator with V2 evidence refusal,mixed-interface,Legacy findings still use direct probes; V2-owned evidence is blocked and must use a plan-bound verifier proposal.
 coverage,src/whaxon/interfaces/cli/coverage_cmd.py,Legacy coverage store,supporting-cli,Reads legacy coverage records; not V2 mission coverage.
 recon,src/whaxon/interfaces/cli/recon_cmd.py,Legacy ReconRunner,legacy-execution,Runs dedicated recon services outside V2 plan/task authorization.
 findings,src/whaxon/interfaces/cli/findings_cmd.py,Legacy findings store,supporting-cli,Lists or exports legacy findings; not a V2 sealed-evidence report.
