@@ -9,7 +9,7 @@ from textual import on, work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, DataTable, Footer, Header, RichLog, Static
+from textual.widgets import Button, DataTable, Footer, Header, Input, RichLog, Static
 
 from whaxon.core.workflow import WorkflowPlan
 
@@ -33,6 +33,15 @@ class WorkflowScreen(Screen):
             "Review the exact task before approving it.",
             id="workflow-intro",
         )
+        with Horizontal(id="workflow-mission-create"):
+            yield Input(placeholder="Mission ID", id="workflow-mission-id")
+            yield Input(placeholder="Assessment objective", id="workflow-objective")
+            yield Button("Create mission", id="workflow-create-mission")
+        with Horizontal(id="workflow-plan-propose"):
+            yield Input(placeholder="New plan ID", id="workflow-new-plan-id")
+            yield Input(placeholder="Tool ID", id="workflow-tool-id")
+            yield Input(placeholder="Exact in-scope target", id="workflow-target")
+            yield Button("Propose tool plan", id="workflow-propose-tool", disabled=True)
         with Horizontal(id="workflow-browser"):
             with Vertical():
                 yield Static("Missions")
@@ -71,16 +80,37 @@ class WorkflowScreen(Screen):
             )
         self._say(f"Loaded {table.row_count} persisted mission(s).")
 
+    @on(Button.Pressed, "#workflow-create-mission")
+    def _create_mission(self) -> None:
+        mission_id = self.query_one("#workflow-mission-id", Input).value.strip()
+        objective = self.query_one("#workflow-objective", Input).value.strip()
+        if not mission_id or not objective:
+            self._say("Enter a mission ID and objective.", error=True)
+            return
+        try:
+            self.app.core.create_mission(mission_id, objective)
+            self.mission_id = mission_id
+            self._load_missions()
+            self._load_plans_for_mission(mission_id)
+            self.query_one("#workflow-propose-tool", Button).disabled = False
+            self._say(f"Mission {mission_id} created. Add a reviewable tool plan when ready.")
+        except (TypeError, ValueError, RuntimeError) as exc:
+            self._say(f"Mission was not created: {exc}", error=True)
+
     @on(DataTable.RowSelected, "#workflow-missions")
     def _mission_selected(self, event: DataTable.RowSelected) -> None:
         self.mission_id = str(event.row_key.value)
         self.plan_id = None
         self.task_id = None
         self.run_request_id = None
+        self._load_plans_for_mission(self.mission_id)
+        self.query_one("#workflow-propose-tool", Button).disabled = False
+
+    def _load_plans_for_mission(self, mission_id: str) -> None:
         plans = self.query_one("#workflow-plans", DataTable)
         plans.clear()
         self.query_one("#workflow-tasks", DataTable).clear()
-        for plan in self.app.core.mission_workflow_plans(self.mission_id):
+        for plan in self.app.core.mission_workflow_plans(mission_id):
             digest = str(plan.get("digest", ""))
             plan_id = str(plan.get("id", ""))
             metadata = plan.get("plan", {}).get("metadata", {})
@@ -89,6 +119,47 @@ class WorkflowScreen(Screen):
                 key=plan_id,
             )
         self._say(f"Mission {self.mission_id}: loaded {plans.row_count} plan(s).")
+
+    @on(Button.Pressed, "#workflow-propose-tool")
+    def _propose_tool_plan(self) -> None:
+        if not self.mission_id:
+            self._say("Create or select a mission before proposing a plan.", error=True)
+            return
+        plan_id = self.query_one("#workflow-new-plan-id", Input).value.strip()
+        tool_id = self.query_one("#workflow-tool-id", Input).value.strip()
+        target = self.query_one("#workflow-target", Input).value.strip()
+        if not plan_id or not tool_id or not target:
+            self._say("Enter a plan ID, tool ID and exact in-scope target.", error=True)
+            return
+        try:
+            from whaxon.core.workflow_proposals import propose_tool_workflow_plan
+
+            proposal = propose_tool_workflow_plan(
+                self.app.core,
+                mission_id=self.mission_id,
+                plan_id=plan_id,
+                tool_id=tool_id,
+                target=target,
+            )
+            if proposal.get("status") != "proposed":
+                self._say(
+                    f"No plan created: {proposal.get('reason', 'proposal was blocked')}.",
+                    error=True,
+                )
+                return
+            created = self.app.core.save_workflow_plan(
+                plan_id, WorkflowPlan.from_dict(proposal["plan"]),
+            )
+            if not created:
+                self._say(f"Plan ID {plan_id} already exists; no replacement was made.", error=True)
+                return
+            self._load_plans_for_mission(self.mission_id)
+            self._say(
+                f"Plan {plan_id} saved for review ({proposal['capability_id']}). "
+                "No approval or execution was submitted."
+            )
+        except (AttributeError, TypeError, ValueError, RuntimeError) as exc:
+            self._say(f"Plan proposal failed: {exc}", error=True)
 
     @on(DataTable.RowSelected, "#workflow-plans")
     def _plan_selected(self, event: DataTable.RowSelected) -> None:
