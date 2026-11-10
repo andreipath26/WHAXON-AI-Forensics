@@ -178,7 +178,10 @@
     <button id="v2-load-plan" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button">Review Plan</button>
     <button id="v2-submit-run" class="px-space-sm py-1 rounded bg-primary-container text-on-primary font-code-sm text-code-sm font-semibold" type="button" disabled>Submit V2 Run</button>
     <button id="v2-cancel-run" class="px-space-sm py-1 rounded bg-error-container/40 text-error font-code-sm text-code-sm" type="button" disabled>Request Cancel</button>
+    <button id="v2-inspect-report" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled>Inspect Evidence Report</button>
+    <button id="v2-propose-followups" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled>Preview Evidence Follow-ups</button>
   </div>
+  <div id="v2-evidence-preview" class="mt-space-xs rounded bg-surface-container-lowest p-space-sm font-code-sm text-code-sm text-on-surface-variant" role="status" aria-live="polite" hidden></div>
   <p id="v2-run-message" class="mt-space-sm font-code-sm text-code-sm text-on-surface-variant" role="status" aria-live="polite">No V2 workflow selected.</p>
   <div id="v2-plan-tasks" class="mt-space-xs space-y-1 font-code-sm text-code-sm text-on-surface-variant" aria-live="polite"></div>
   <p class="mt-space-xs font-body-sm text-body-sm text-outline">Submission persists a run request; it does not mean execution completed. The worker rechecks scope, provider binding and exact-task approval. Approval must be granted separately.</p>
@@ -613,6 +616,10 @@
   const v2Tasks = $("v2-plan-tasks");
   const v2Submit = $("v2-submit-run");
   const v2Cancel = $("v2-cancel-run");
+  const v2InspectReport = $("v2-inspect-report");
+  const v2PreviewFollowups = $("v2-propose-followups");
+  const v2EvidencePreview = $("v2-evidence-preview");
+  let v2PreviewInProgress = false;
   let v2Plan = null;
   let v2RequestId = null;
   let v2PollTimer = null;
@@ -632,6 +639,8 @@
     if (v2Submit) v2Submit.disabled = !v2Plan || Boolean(v2RequestId);
     if (v2Cancel) v2Cancel.disabled = !v2RequestId;
     if (v2UsePlan) v2UsePlan.disabled = !v2PlanSelect?.value;
+    if (v2InspectReport) v2InspectReport.disabled = !v2Plan || v2PreviewInProgress;
+    if (v2PreviewFollowups) v2PreviewFollowups.disabled = !v2Plan || v2PreviewInProgress;
     if (v2CreateButton) v2CreateButton.disabled = v2CreateInProgress || Boolean(v2RequestId) || v2Capabilities.size === 0;
   };
   async function v2LoadMissions() {
@@ -811,6 +820,10 @@
         throw new Error("A durable run is active for another plan. Reconnect, cancel or finish it before switching plans.");
       }
       v2Plan = {id: planId, details};
+      if (v2EvidencePreview) {
+        v2EvidencePreview.hidden = true;
+        v2EvidencePreview.replaceChildren();
+      }
       if (!v2RequestId && savedPlanId !== planId) {
         sessionStorage.removeItem("whaxon.v2.run_request_id");
       }
@@ -860,6 +873,67 @@
       }
       v2SetControls();
       v2Say("Could not review plan: " + error.message, true);
+    }
+  }
+  function v2ShowEvidence(text, error=false) {
+    if (!v2EvidencePreview) return;
+    v2EvidencePreview.hidden = false;
+    v2EvidencePreview.textContent = text;
+    v2EvidencePreview.className = "mt-space-xs rounded bg-surface-container-lowest p-space-sm font-code-sm text-code-sm " +
+      (error ? "text-error" : "text-on-surface-variant");
+  }
+  async function v2InspectEvidenceReport() {
+    if (!v2Plan || v2PreviewInProgress) return;
+    const planId = v2Plan.id;
+    v2PreviewInProgress = true;
+    v2SetControls();
+    v2ShowEvidence("Loading persisted evidence report…");
+    try {
+      const report = await api("/api/v2/workflows/" + encodeURIComponent(planId) + "/report?limit=100");
+      if (v2Plan?.id !== planId) return;
+      const evidence = report.evidence || {};
+      const attempts = Array.isArray(evidence.attempts) ? evidence.attempts.length : 0;
+      const findings = Array.isArray(report.findings) ? report.findings.length : 0;
+      v2ShowEvidence(
+        "Plan " + planId + " — report status: " + (report.status || "unavailable") +
+        "; recorded attempts: " + attempts + "; findings: " + findings +
+        "; evidence integrity verified: " + (evidence.all_evidence_integrity_verified === true ? "yes" : "no / not established") +
+        ". A partial report is not an accepted assessment."
+      );
+    } catch (error) {
+      if (v2Plan?.id === planId) v2ShowEvidence("Evidence report unavailable: " + error.message, true);
+    } finally {
+      v2PreviewInProgress = false;
+      v2SetControls();
+    }
+  }
+  async function v2PreviewEvidenceFollowups() {
+    if (!v2Plan || v2PreviewInProgress) return;
+    const planId = v2Plan.id;
+    v2PreviewInProgress = true;
+    v2SetControls();
+    v2ShowEvidence("Checking sealed evidence for eligible follow-up proposals…");
+    try {
+      const proposal = await api("/api/v2/workflows/" + encodeURIComponent(planId) + "/followups", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({max_tasks: 16, save: false}),
+      });
+      if (v2Plan?.id !== planId) return;
+      const tasks = Array.isArray(proposal.plan?.tasks) ? proposal.plan.tasks : [];
+      const blocked = Array.isArray(proposal.blocked) ? proposal.blocked.length : 0;
+      v2ShowEvidence(
+        "Source plan " + planId + " — " + tasks.length +
+        " reviewable follow-up task(s), " + blocked +
+        " blocked evidence/rule candidate(s). " +
+        (tasks.length ? "Proposal ID: " + (proposal.plan_id || "unavailable") + ". " : "") +
+        "Preview only: nothing was saved, approved or submitted for execution."
+      );
+    } catch (error) {
+      if (v2Plan?.id === planId) v2ShowEvidence("Follow-up preview unavailable: " + error.message, true);
+    } finally {
+      v2PreviewInProgress = false;
+      v2SetControls();
     }
   }
   async function v2GrantApproval(planId, task) {
@@ -940,6 +1014,8 @@
   v2CreateButton?.addEventListener("click", v2CreatePlan);
   v2Submit?.addEventListener("click", v2SubmitRun);
   v2Cancel?.addEventListener("click", v2CancelRun);
+  v2InspectReport?.addEventListener("click", v2InspectEvidenceReport);
+  v2PreviewFollowups?.addEventListener("click", v2PreviewEvidenceFollowups);
   const savedRequest = sessionStorage.getItem("whaxon.v2.run_request_id");
   const savedPlan = sessionStorage.getItem("whaxon.v2.plan_id");
   if (savedPlan && savedRequest && v2PlanInput) {
