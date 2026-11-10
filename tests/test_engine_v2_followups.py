@@ -320,3 +320,40 @@ def test_e4_aggregate_evidence_must_be_complete_before_followup(
     assert provider.called == 0
     assert result.to_dict()["execution_started"] is False
     assert result.to_dict()["approval_granted"] is False
+
+
+@pytest.mark.parametrize(("field", "value"), [
+    ("plan_id", "another-plan"),
+    ("mission_id", "another-mission"),
+    ("plan_digest", "another-digest"),
+    ("plan_id", None),
+    ("mission_id", None),
+    ("plan_digest", None),
+])
+def test_e4_followup_rejects_mismatched_evidence_envelope(field, value):
+    class MismatchedStore(Store):
+        def get_workflow_evidence(self, plan_id, *, limit):
+            evidence = super().get_workflow_evidence(plan_id, limit=limit)
+            evidence[field] = value
+            return evidence
+
+    provider = Provider()
+    result = planner(store=MismatchedStore(), provider=provider).propose("source")
+    assert result.plan is None
+    assert result.plan_id is None
+    assert result.blocked[0]["reason"] == "source_evidence_incomplete"
+    assert provider.called == 0
+
+
+@pytest.mark.parametrize("legacy_shape", [[], None, "invalid"])
+def test_e4_followup_rejects_unsealed_legacy_evidence_shape(legacy_shape):
+    class LegacyStore(Store):
+        def get_workflow_evidence(self, plan_id, *, limit):
+            return legacy_shape
+
+    provider = Provider()
+    result = planner(store=LegacyStore(), provider=provider).propose("source")
+    assert result.plan is None
+    assert result.plan_id is None
+    assert result.blocked[0]["reason"] == "source_evidence_incomplete"
+    assert provider.called == 0
