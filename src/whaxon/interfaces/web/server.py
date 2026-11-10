@@ -850,8 +850,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         requested_ids = request.args.getlist("plan_id")
         raw_limit = request.args.get("limit", "100")
         if (
-            not raw_limit.isascii() or not raw_limit.isdecimal()
-            or not 1 <= int(raw_limit) <= 1000
+            len(raw_limit) > 4 or not raw_limit.isascii()
+            or not raw_limit.isdecimal() or not 1 <= int(raw_limit) <= 1000
             or len(requested_ids) > 100
             or any(not plan_id or len(plan_id) > 256 for plan_id in requested_ids)
         ):
