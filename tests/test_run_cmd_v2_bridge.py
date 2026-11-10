@@ -1,5 +1,6 @@
 """The CLI V2 bridge must not invent authorization or fall back to ToolRunner."""
 import pytest
+
 from whaxon.interfaces.cli import run_cmd, workflow_cmd
 
 
