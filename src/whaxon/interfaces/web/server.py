@@ -840,6 +840,33 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @app.get("/api/v2/missions/<mission_id>/report")
+    def workflow_v2_mission_report(mission_id):
+        """Return the Core's evidence-bound ordered mission report.
+
+        A partial report must remain partial; this endpoint never infers
+        assessment success from a completed HTTP request.
+        """
+        requested_ids = request.args.getlist("plan_id")
+        raw_limit = request.args.get("limit", "100")
+        if (
+            not raw_limit.isascii() or not raw_limit.isdecimal()
+            or not 1 <= int(raw_limit) <= 1000
+            or len(requested_ids) > 100
+            or any(not plan_id or len(plan_id) > 256 for plan_id in requested_ids)
+        ):
+            return jsonify({"error": "invalid report limit or plan identifiers"}), 400
+        if core.store.get_mission(mission_id) is None:
+            return jsonify({"error": "unknown mission"}), 404
+        try:
+            return jsonify(core.workflow_mission_report(
+                mission_id,
+                plan_ids=requested_ids if requested_ids else None,
+                limit=int(raw_limit),
+            ))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
     @app.post("/api/v2/workflows/<plan_id>/cancel")
     def workflow_v2_cancel(plan_id):
         """Persist stop intent; never imply already executing providers stopped."""
