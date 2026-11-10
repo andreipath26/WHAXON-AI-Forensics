@@ -68,6 +68,7 @@ class MainScreen(Screen):
         ("slash", "focus_search", "Search"),
         ("ctrl+s", "save_output", "Save output"),
         ("a", "show_ai_runs", "AI runs"),
+        ("w", "show_workflows", "V2 workflows"),
     ]
 
     def __init__(self) -> None:
@@ -106,6 +107,10 @@ class MainScreen(Screen):
     def action_show_ai_runs(self) -> None:
         from .ai_runs import AiRunsScreen
         self.app.push_screen(AiRunsScreen())
+
+    def action_show_workflows(self) -> None:
+        from .workflows import WorkflowScreen
+        self.app.push_screen(WorkflowScreen())
 
     def action_show_chain(self) -> None:
         """Fetch pivot graph and render the chain tree into the log."""
