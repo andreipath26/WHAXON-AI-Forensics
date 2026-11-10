@@ -291,3 +291,32 @@ def test_e4_followup_planner_rejects_missing_or_wrong_resolver_contract():
         entry["error_type"] == "AttributeError"
         for entry in proposal.blocked
     )
+
+
+@pytest.mark.parametrize("aggregate_field", [
+    "all_evidence_recorded", "all_evidence_integrity_verified",
+])
+@pytest.mark.parametrize("aggregate_value", [False, None])
+def test_e4_aggregate_evidence_must_be_complete_before_followup(
+    aggregate_field, aggregate_value,
+):
+    """Verified individual rows must not bypass an incomplete evidence view."""
+    class IncompleteStore(Store):
+        def get_workflow_evidence(self, plan_id, *, limit):
+            evidence = super().get_workflow_evidence(plan_id, limit=limit)
+            if aggregate_value is None:
+                evidence.pop(aggregate_field)
+            else:
+                evidence[aggregate_field] = aggregate_value
+            return evidence
+
+    provider = Provider()
+    result = planner(store=IncompleteStore(), provider=provider).propose("source")
+    assert result.plan is None
+    assert result.plan_id is None
+    assert result.blocked == ({
+        "source_task": None, "reason": "source_evidence_incomplete",
+    },)
+    assert provider.called == 0
+    assert result.to_dict()["execution_started"] is False
+    assert result.to_dict()["approval_granted"] is False
