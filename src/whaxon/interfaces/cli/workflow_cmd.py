@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 8663)
-Total output lines: 682
-
 """Headless Engine v2 workflow commands."""
 from __future__ import annotations
 
@@ -311,7 +308,52 @@ def main(args: list[str] | None = None) -> int:
             print(json.dumps(core.capability_portfolio_audit(), indent=2, sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "cost-limit":
-     …663 tokens truncated…ns.id, "created": bool(created)}))
+            core.configure_mission_cost_limit(
+                options.id, max_cost_microusd=options.max_cost_microusd,
+            )
+            print(json.dumps(core.mission_cost_summary(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "cost":
+            print(json.dumps(core.mission_cost_summary(options.id), sort_keys=True))
+            return 0
+        if options.command == "plan" and options.plan_command == "record-cost":
+            amount = core.record_workflow_attempt_cost(
+                options.attempt_id,
+                cost_microusd=options.cost_microusd, source=options.source,
+            )
+            print(json.dumps({"attempt_id": options.attempt_id, "cost_microusd": amount}))
+            return 0
+        if options.command == "mission" and options.mission_command == "rate-limit":
+            core.configure_mission_rate_limit(options.id, min_spacing_s=options.min_spacing_s)
+            print(json.dumps(core.mission_rate_limit(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "rate":
+            print(json.dumps(core.mission_rate_limit(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "deadline":
+            core.configure_mission_deadline(options.id, deadline_at=options.unix_time)
+            print(json.dumps({
+                "mission_id": options.id, "deadline_at": core.mission_deadline(options.id),
+            }, sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "limits":
+            core.configure_mission_execution_limits(
+                options.id, max_total_attempts=options.max_total_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "budget":
+            print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "list":
+            print(json.dumps(core.missions(
+                limit=options.limit, after_created=options.after_created,
+            ), indent=2, sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "create":
+            created = core.create_mission(options.id, options.objective)
+            print(json.dumps({"mission_id": options.id, "created": bool(created)}))
             return 0
         if options.command == "mission" and options.mission_command == "plans":
             print(json.dumps(
