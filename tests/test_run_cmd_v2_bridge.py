@@ -14,6 +14,7 @@ def test_explicit_v2_plan_delegates_to_workflow_service(monkeypatch, tmp_path):
 @pytest.mark.parametrize("arguments", [
     ["--extra", "-sV"], ["--allow-out-of-scope"],
     ["--extra", "-sV", "--allow-out-of-scope"],
+    ["--timeout", "30"], ["--quiet"], ["--json"], ["--verbose"],
 ])
 def test_v2_plan_rejects_legacy_overrides(monkeypatch, tmp_path, arguments):
     monkeypatch.setattr(workflow_cmd, "main", lambda args: pytest.fail("V2 invoked"))
