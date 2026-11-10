@@ -357,3 +357,22 @@ def test_e4_followup_rejects_unsealed_legacy_evidence_shape(legacy_shape):
     assert result.plan_id is None
     assert result.blocked[0]["reason"] == "source_evidence_incomplete"
     assert provider.called == 0
+
+
+@pytest.mark.parametrize("attempts", [None, {}, "invalid", [None], [42],
+                                      [{"task_key": "invalid"}, None]])
+def test_e4_rejects_malformed_attempt_collection_before_provider_resolution(attempts):
+    class MalformedStore(Store):
+        def get_workflow_evidence(self, plan_id, *, limit):
+            evidence = super().get_workflow_evidence(plan_id, limit=limit)
+            evidence["attempts"] = attempts
+            return evidence
+
+    provider = Provider()
+    result = planner(store=MalformedStore(), provider=provider).propose("source")
+    assert result.plan is None
+    assert result.plan_id is None
+    assert result.blocked == ({"source_task": None, "reason": "evidence_unavailable"},)
+    assert provider.called == 0
+    assert result.to_dict()["execution_started"] is False
+    assert result.to_dict()["approval_granted"] is False

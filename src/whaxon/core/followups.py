@@ -158,10 +158,11 @@ class EvidenceFollowupPlanner:
             return FollowupProposal(source_plan_id, None, None, ({
                 "source_task": None, "reason": "source_evidence_incomplete",
             },))
-        rows = evidence.get("attempts") if isinstance(evidence, dict) else evidence
-        if not isinstance(rows, list):
-            rows = []
-            blocked.append({"source_task": None, "reason": "evidence_unavailable"})
+        rows = evidence.get("attempts")
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            return FollowupProposal(source_plan_id, None, None, ({
+                "source_task": None, "reason": "evidence_unavailable",
+            },))
         for row in rows:
             if not isinstance(row, dict):
                 blocked.append({"source_task": None, "reason": "invalid_evidence_row"})
