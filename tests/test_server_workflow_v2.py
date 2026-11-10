@@ -94,6 +94,33 @@ def test_v2_followups_api_persists_only_a_reviewable_plan(tmp_path, monkeypatch)
     assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
 
 
+def test_v2_mission_report_api_uses_shared_evidence_and_preserves_partial_status(
+    tmp_path, monkeypatch,
+):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-report", "authorized lab")
+    core.save_workflow_plan("p-report", WorkflowPlan("m-report", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    expected = core.workflow_mission_report(
+        "m-report", plan_ids=["p-report"], limit=10,
+    )
+    response = client.get("/api/v2/missions/m-report/report?plan_id=p-report&limit=10")
+    assert response.status_code == 200
+    assert response.get_json() == expected
+    assert response.get_json()["status"] != "complete"
+    assert client.get("/api/v2/missions/missing/report").status_code == 404
+
+    for query in (
+        "limit=0", "limit=1001", "limit=oops", "limit=-5",
+        "plan_id=p-report&plan_id=p-report", "plan_id=other",
+    ):
+        assert client.get(
+            "/api/v2/missions/m-report/report?" + query,
+        ).status_code == 400
+    assert client.post("/api/v2/missions/m-report/report").status_code == 405
+
+
 def test_workflow_v2_read_only_routes_use_shared_persistence(tmp_path, monkeypatch):
     client, core = _client(tmp_path, monkeypatch)
     core.create_mission("m", "controlled")
