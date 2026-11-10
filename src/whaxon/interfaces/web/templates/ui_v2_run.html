@@ -1024,6 +1024,11 @@
     v2SetControls();
     v2LoadPlan().then(() => { if (v2RequestId) v2Poll(); });
   }
+  const requestedPlan = new URLSearchParams(window.location.search).get("plan_id");
+  if (requestedPlan && v2PlanInput && !savedRequest) {
+    v2PlanInput.value = requestedPlan;
+    v2LoadPlan();
+  }
   v2LoadMissions();
   v2LoadCapabilities();
   const notice = document.createElement("div");
