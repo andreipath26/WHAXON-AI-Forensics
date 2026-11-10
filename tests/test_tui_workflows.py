@@ -1,7 +1,7 @@
 """TUI workflow controls use persisted V2 plans and durable request services."""
 from __future__ import annotations
 
-from textual.widgets import Button, DataTable, Static
+from textual.widgets import Button, DataTable, Input, Static
 
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 from whaxon.interfaces.tui.app import WhaxonApp
@@ -70,3 +70,39 @@ async def test_tui_reviews_approves_and_cancels_durable_v2_request(tmp_path, mon
 
         screen._cancel_request()
         assert core.workflow_run_request(screen.run_request_id)["status"] == "cancelled"
+
+
+async def test_tui_creates_mission_and_saves_only_a_reviewable_plan(tmp_path, monkeypatch):
+    app = WhaxonApp(data_dir=tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = WorkflowScreen()
+        app.push_screen(screen)
+        await pilot.pause()
+
+        screen.query_one("#workflow-mission-id", Input).value = "mission-new"
+        screen.query_one("#workflow-objective", Input).value = "assess the authorized lab"
+        screen._create_mission()
+
+        plan = WorkflowPlan("mission-new", (
+            WorkflowTask("task-1", "tool.nmap", "192.0.2.10"),
+        ))
+        from whaxon.core import workflow_proposals
+
+        monkeypatch.setattr(
+            workflow_proposals,
+            "propose_tool_workflow_plan",
+            lambda *_args, **_kwargs: {
+                "status": "proposed", "plan": plan.to_dict(),
+                "capability_id": "tool.nmap",
+            },
+        )
+        screen.query_one("#workflow-new-plan-id", Input).value = "plan-new"
+        screen.query_one("#workflow-tool-id", Input).value = "nmap"
+        screen.query_one("#workflow-target", Input).value = "192.0.2.10"
+        screen._propose_tool_plan()
+
+        persisted = app.core.workflow_plan_details("plan-new")
+        assert persisted["plan"]["mission_id"] == "mission-new"
+        assert app.core.workflow_approvals("plan-new") == []
+        assert screen.run_request_id is None
