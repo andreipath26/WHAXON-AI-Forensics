@@ -156,6 +156,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('GET', '/api/v2/missions/<mission_id>/budget'): 'workflow_v2_mission_budget',
     ('GET', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',
     ('GET', '/api/v2/missions/<mission_id>/plans'): 'workflow_v2_mission_plans',
+    ('GET', '/api/v2/missions/<mission_id>/report'): 'workflow_v2_mission_report',
     ('GET', '/api/v2/missions/<mission_id>/rate-limit'): 'workflow_v2_mission_rate_limit',
     ('GET', '/api/v2/providers'): 'workflow_v2_providers',
     ('GET', '/api/v2/providers/portfolio-audit'): 'workflow_v2_portfolio_audit',
