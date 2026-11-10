@@ -292,3 +292,64 @@ def test_run_page_exposes_one_truthful_dispatch_action(page, live_server):
     assert run_button.is_visible()
     assert "Run Selected Tool" in run_button.inner_text()
     assert run_button.is_enabled()
+
+
+def test_v2_run_page_evidence_report_and_followups_are_preview_only(page, live_server):
+    """UI uses the shared V2 endpoints and never saves or executes proposals."""
+    page.goto(f"{live_server}/ui-v2/run")
+    report_button = page.locator("#v2-inspect-report")
+    followup_button = page.locator("#v2-propose-followups")
+    assert report_button.is_disabled()
+    assert followup_button.is_disabled()
+
+    requests = []
+    def details(route):
+        route.fulfill(status=200, content_type="application/json", body=(
+            '{"plan":{"mission_id":"m","tasks":[]},"tasks":[]}'
+        ))
+
+    def approvals(route):
+        route.fulfill(status=200, content_type="application/json", body="[]")
+
+    def report(route):
+        requests.append(("report", route.request.method))
+        route.fulfill(status=200, content_type="application/json", body=(
+            '{"status":"partial","findings":[],"evidence":{'
+            '"attempts":[],"all_evidence_integrity_verified":false}}'
+        ))
+
+    def followups(route):
+        requests.append(("followups", route.request.post_data_json))
+        route.fulfill(status=200, content_type="application/json", body=(
+            '{"plan":null,"plan_id":null,"blocked":[],"created":false,'
+            '"execution_started":false,"approval_granted":false}'
+        ))
+
+    page.route("**/api/v2/workflows/ui-test-plan/approvals", approvals)
+    page.route("**/api/v2/workflows/ui-test-plan/report?limit=100", report)
+    page.route("**/api/v2/workflows/ui-test-plan/followups", followups)
+    page.route("**/api/v2/workflows/ui-test-plan", details)
+    page.locator("#v2-plan-id").fill("ui-test-plan")
+    page.locator("#v2-load-plan").click()
+    page.wait_for_function(
+        "() => !document.querySelector('#v2-inspect-report').disabled",
+        timeout=8000,
+    )
+    report_button.click()
+    page.wait_for_function(
+        "() => document.querySelector('#v2-evidence-preview')?.textContent.includes('report status: partial')",
+        timeout=8000,
+    )
+    assert "not established" in page.locator("#v2-evidence-preview").inner_text()
+    followup_button.click()
+    page.wait_for_function(
+        "() => document.querySelector('#v2-evidence-preview')?.textContent.includes('Preview only')",
+        timeout=8000,
+    )
+    assert requests == [
+        ("report", "GET"),
+        ("followups", {"max_tasks": 16, "save": False}),
+    ]
+    assert "nothing was saved, approved or submitted" in page.locator(
+        "#v2-evidence-preview"
+    ).inner_text()
