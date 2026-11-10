@@ -146,6 +146,14 @@ class EvidenceFollowupPlanner:
         blocked: list[dict] = []
         seen: set[tuple[str, str]] = set()
         evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
+        # Refuse partial evidence even when an individual attempt looks sealed.
+        if isinstance(evidence, dict) and (
+            evidence.get("all_evidence_recorded") is not True
+            or evidence.get("all_evidence_integrity_verified") is not True
+        ):
+            return FollowupProposal(source_plan_id, None, None, ({
+                "source_task": None, "reason": "source_evidence_incomplete",
+            },))
         rows = evidence.get("attempts") if isinstance(evidence, dict) else evidence
         if not isinstance(rows, list):
             rows = []
