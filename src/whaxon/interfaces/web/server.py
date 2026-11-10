@@ -605,6 +605,39 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 404 if message.startswith("unknown mission:") else 400
             )
 
+    @app.post("/api/v2/workflows/<plan_id>/followups")
+    @limiter.limit("10 per minute")
+    def workflow_v2_followups(plan_id):
+        """Compile reviewable follow-ups from verified persisted evidence only.
+
+        Persistence is optional. Neither an empty nor a saved proposal grants
+        approval, submits a run request, or starts any external operation.
+        """
+        payload = request.get_json(silent=True)
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict) or set(payload) - {"max_tasks", "save"}:
+            return jsonify({"error": "max_tasks and save are the only supported fields"}), 400
+        max_tasks = payload.get("max_tasks", 16)
+        save = payload.get("save", False)
+        if type(max_tasks) is not int or not 1 <= max_tasks <= 100:
+            return jsonify({"error": "max_tasks must be an integer in 1..100"}), 400
+        if type(save) is not bool:
+            return jsonify({"error": "save must be a boolean"}), 400
+        try:
+            proposal = core.propose_workflow_followups(plan_id, max_tasks=max_tasks)
+            created = False
+            if save and proposal.plan is not None and proposal.plan_id is not None:
+                created = core.save_workflow_plan(proposal.plan_id, proposal.plan)
+            return jsonify({
+                **proposal.to_dict(), "created": bool(created),
+                "execution_started": False, "approval_granted": False,
+            }), 200
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), (
+                404 if "unknown source workflow plan" in str(exc) else 409
+            )
+
     @app.route("/api/v2/missions", methods=["GET", "POST"])
     def workflow_v2_missions():
         if request.method == "POST":
