@@ -14,6 +14,7 @@ EXIT_OK = 0
 EXIT_NOT_FOUND = 1
 EXIT_USAGE = 2
 EXIT_SCOPE_BLOCKED = 4
+EXIT_V2_WORKFLOW_REQUIRED = 5
 
 def main(args: list[str] | None = None) -> int:
     args = list(args or [])
@@ -63,6 +64,19 @@ def main(args: list[str] | None = None) -> int:
         return EXIT_NOT_FOUND
 
     job = core.store.get(job_id)
+    try:
+        is_v2_job = core.store.is_engine_v2_execution_job(job_id)
+    except Exception:
+        print("Cannot validate: V2 evidence ownership could not be confirmed; no request was sent.", file=sys.stderr)
+        return EXIT_SCOPE_BLOCKED
+    if is_v2_job:
+        print(
+            "This finding belongs to Engine V2 evidence. Use "
+            "'whaxon workflow plan propose-verification --mode verify' to prepare "
+            "a plan; approval and execution are separate.",
+            file=sys.stderr,
+        )
+        return EXIT_V2_WORKFLOW_REQUIRED
     raw_target = (job or {}).get("target", "")
     target_url = raw_target if raw_target.startswith(("http://", "https://")) else f"http://{raw_target}" if raw_target else None
 
