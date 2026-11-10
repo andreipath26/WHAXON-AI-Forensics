@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import getpass
+import sqlite3
 import time
 import uuid
 
@@ -42,6 +43,14 @@ class WorkflowScreen(Screen):
             yield Input(placeholder="Tool ID", id="workflow-tool-id")
             yield Input(placeholder="Exact in-scope target", id="workflow-target")
             yield Button("Propose tool plan", id="workflow-propose-tool", disabled=True)
+        with Horizontal(id="workflow-verification-propose"):
+            yield Input(placeholder="V2 source job ID", id="workflow-source-job-id")
+            yield Input(placeholder="Finding sequence", id="workflow-finding-seq", type="integer")
+            yield Input(placeholder="verify or retest", id="workflow-verification-mode", value="retest")
+            yield Button(
+                "Propose sealed-evidence verification",
+                id="workflow-propose-verification", disabled=True,
+            )
         with Horizontal(id="workflow-browser"):
             with Vertical():
                 yield Static("Missions")
@@ -93,8 +102,9 @@ class WorkflowScreen(Screen):
             self._load_missions()
             self._load_plans_for_mission(mission_id)
             self.query_one("#workflow-propose-tool", Button).disabled = False
+            self.query_one("#workflow-propose-verification", Button).disabled = False
             self._say(f"Mission {mission_id} created. Add a reviewable tool plan when ready.")
-        except (TypeError, ValueError, RuntimeError) as exc:
+        except (sqlite3.Error, TypeError, ValueError, RuntimeError) as exc:
             self._say(f"Mission was not created: {exc}", error=True)
 
     @on(DataTable.RowSelected, "#workflow-missions")
@@ -105,6 +115,7 @@ class WorkflowScreen(Screen):
         self.run_request_id = None
         self._load_plans_for_mission(self.mission_id)
         self.query_one("#workflow-propose-tool", Button).disabled = False
+        self.query_one("#workflow-propose-verification", Button).disabled = False
 
     def _load_plans_for_mission(self, mission_id: str) -> None:
         plans = self.query_one("#workflow-plans", DataTable)
@@ -158,8 +169,52 @@ class WorkflowScreen(Screen):
                 f"Plan {plan_id} saved for review ({proposal['capability_id']}). "
                 "No approval or execution was submitted."
             )
-        except (AttributeError, TypeError, ValueError, RuntimeError) as exc:
+        except (AttributeError, sqlite3.Error, TypeError, ValueError, RuntimeError) as exc:
             self._say(f"Plan proposal failed: {exc}", error=True)
+
+    @on(Button.Pressed, "#workflow-propose-verification")
+    def _propose_verification_plan(self) -> None:
+        if not self.mission_id:
+            self._say("Create or select a mission before proposing verification.", error=True)
+            return
+        plan_id = self.query_one("#workflow-new-plan-id", Input).value.strip()
+        source_job_id = self.query_one("#workflow-source-job-id", Input).value.strip()
+        raw_seq = self.query_one("#workflow-finding-seq", Input).value.strip()
+        mode = self.query_one("#workflow-verification-mode", Input).value.strip()
+        if not plan_id or not source_job_id or not raw_seq:
+            self._say("Enter a plan ID, V2 source job ID and finding sequence.", error=True)
+            return
+        try:
+            finding_seq = int(raw_seq)
+            from whaxon.core.workflow_proposals import propose_finding_verification_plan
+
+            proposal = propose_finding_verification_plan(
+                self.app.core,
+                mission_id=self.mission_id,
+                plan_id=plan_id,
+                source_job_id=source_job_id,
+                finding_seq=finding_seq,
+                mode=mode,
+            )
+            if proposal.get("status") != "proposed":
+                self._say(
+                    f"No verification plan created: {proposal.get('reason', 'proposal was blocked')}.",
+                    error=True,
+                )
+                return
+            created = self.app.core.save_workflow_plan(
+                plan_id, WorkflowPlan.from_dict(proposal["plan"]),
+            )
+            if not created:
+                self._say(f"Plan ID {plan_id} already exists; no replacement was made.", error=True)
+                return
+            self._load_plans_for_mission(self.mission_id)
+            self._say(
+                f"Sealed-evidence {mode} plan {plan_id} saved for review "
+                f"({proposal['capability_id']}). No approval or execution was submitted."
+            )
+        except (AttributeError, sqlite3.Error, TypeError, ValueError, RuntimeError) as exc:
+            self._say(f"Verification proposal failed: {exc}", error=True)
 
     @on(DataTable.RowSelected, "#workflow-plans")
     def _plan_selected(self, event: DataTable.RowSelected) -> None:
