@@ -433,6 +433,13 @@ class MainScreen(Screen):
                 tool_id=tool_id, target=target, extra_args=extra_args, timeout_s=300,
             )
         except OutOfScopeError as e:
+            if not e.overridable:
+                log.write(
+                    f"[bold red]blocked:[/] {target} failed an execution-boundary "
+                    "scope check; no request was sent"
+                )
+                self._set_status("blocked — scope denial cannot be overridden")
+                return
             # Ask the user whether to override
             allow = await self._confirm_out_of_scope(tool_id, target, e)
             if not allow:
