@@ -137,3 +137,35 @@ def test_retest_halt_uses_live_history_and_fixture_controls_are_disabled(page, l
         assert button.is_disabled(), f"Disconnected retest control remains enabled: {button.inner_text()}"
     assert "server must re-check scope" in page.locator("#whaxon-live-retest").inner_text()
 
+
+def test_retest_page_surfaces_v2_workflow_required_without_claiming_success(page, live_server):
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"jobs":[{"job":{"id":"0123456789ab"},"job_id":"0123456789ab",'
+                 '"findings":[{"seq":0,"kind":"sqli","verification_status":"verified"}]}]}',
+        ),
+    )
+
+    def reject_legacy_retest(route):
+        route.fulfill(
+            status=409, content_type="application/json",
+            body='{"error":"Engine V2 evidence requires a plan-bound verification or retest workflow"}',
+        )
+
+    page.route("**/api/retest/**", reject_legacy_retest)
+    page.goto(f"{live_server}/ui-v2/retest")
+    page.wait_for_function(
+        "() => document.querySelector('#retest-status')?.textContent.includes('1 finding record(s)')",
+        timeout=8000,
+    )
+    page.get_by_role("button", name="Retest verified finding").click()
+    page.wait_for_function(
+        "() => document.querySelector('#retest-status')?.textContent.includes('plan-bound')",
+        timeout=8000,
+    )
+    status = page.locator("#retest-status").inner_text()
+    assert "Retest not completed" in status
+    assert "Retest result" not in status
+
