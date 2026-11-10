@@ -96,7 +96,7 @@ async def test_catalog_table_has_columns(tmp_path):
 def test_main_screen_bindings_present():
     """BINDINGS list contains the user-facing key set."""
     keys = {b[0] if isinstance(b, tuple) else b.key for b in MainScreen.BINDINGS}
-    for expected in ("r", "x", "s", "g", "i", "ctrl+q"):
+    for expected in ("r", "x", "s", "g", "i", "w", "ctrl+q"):
         assert expected in keys, f"missing binding: {expected}"
 
 
