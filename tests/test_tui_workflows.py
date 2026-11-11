@@ -72,6 +72,36 @@ async def test_tui_reviews_approves_and_cancels_durable_v2_request(tmp_path, mon
         assert core.workflow_run_request(screen.run_request_id)["status"] == "cancelled"
 
 
+async def test_tui_reconnects_to_active_durable_request_after_screen_restart(tmp_path):
+    app = WhaxonApp(data_dir=tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        core = app.core
+        core.create_mission("mission-reconnect", "resume an authorized lab")
+        plan = WorkflowPlan("mission-reconnect", (
+            WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+        ))
+        core.save_workflow_plan("plan-reconnect", plan)
+        request = core.enqueue_workflow_run("plan-reconnect")
+
+        screen = WorkflowScreen()
+        app.push_screen(screen)
+        await pilot.pause()
+
+        requests = screen.query_one("#workflow-requests", DataTable)
+        assert requests.row_count == 1
+        requests.focus()
+        requests.move_cursor(row=0)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert screen.run_request_id == request["id"]
+        assert screen.plan_id == "plan-reconnect"
+        assert "Request " + request["id"] + ": queued" in str(
+            screen.query_one("#workflow-status", Static).content,
+        )
+
+
 async def test_tui_creates_mission_and_saves_only_a_reviewable_plan(tmp_path, monkeypatch):
     app = WhaxonApp(data_dir=tmp_path)
     async with app.run_test() as pilot:
