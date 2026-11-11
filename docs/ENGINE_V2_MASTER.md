@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 31406)
+Total output lines: 1148
+
 Warning: truncated output (original token count: 30404)
 Total output lines: 1079
 
@@ -399,256 +402,7 @@ A task's declared timeout now covers both deterministic authorization and provid
 | **E1 — Correctness and security** | P1; §0 invariants; G02–G04 | Complete fail-closed scope/DNS/redirect/session/pivot/replay/follow-up checks; exact action/consent, startup no-unrelated-dispatch, cancellation boundaries, parser/evidence integrity and adversarial coverage. Preserve existing corrections. | Controlled negative/positive authorization, evidence and recovery tests; no unauthorized effect; explicit limitations for external tool networking. |
 | **E2 — Versioned domain contracts** | P2; §49; G01/G05 | Complete and version canonical mission, authorization, plan/task/attempt, manifest/provider, policy/approval, budget/context, observation/finding/verification, evidence/audit/readiness contracts; migrations and compatibility façades. | Schema/version/backward compatibility, immutable digests, explicit unsupported results, no implicit authorizations. |
 | **E3 — Durable operations** | P2; G02/G04/G05 | Finish mission-wide rate/time/request/resource/cost/concurrency limits, leases, cancellation/emergency stop, retry/reconciliation, outbox/audit integrity and failures, crash/restart safety and bounded work. Adapt existing scheduler/store rather than introducing a second one. | Real worker crash, duplicate delivery, lease loss, cancellation, queue/store/audit failures and recovery without unsafe replay. |
-| **E4 — Capability migration** | P0/P2, §49–50; tool-intelligence portfolio audit; G01/G02 | Reconcile every existing catalog, adapter, entry point, local/session/RPC transport, parser, runner dispatch path and advertised UI/API/CLI capability; stable operation-level capability IDs independent of product/tool names; provider-neutral deterministic routing; capability-specific readiness; evidence-driven follow-up and no hard-coded chains; demonstrate another compatible provider without modifying scheduler. | Complete mismatch/unsupported inventory; truthful authorization/readiness; provider substitution and bounded follow-up equivalence; no legacy bypass. |
-| **E5 — Shared services and headless** | P2/P3; G05/G07 | One mission/approval/run/progress/evidence/verification service for CLI, API, supplied web UI and headless; durable execution ownership and process restart behavior; health/readiness, deployment/secrets, installation state and client reconnect. | Client disconnect/server crash does not lose accepted work; supported daemon/systemd/container, backup/restore and clean-install acceptance. |
-| **E6 — Solo v1.0 and supplied UI** | P4/P5; §38 G01–G10 | Integrate supplied design with **zero redesign**, preserve distinct source variants, wire visible controls to real service contracts, report blocked/untested accurately; prove authorized scope→recon→enumeration→supported initial access→verification→evidence/report→retest. | Visual/accessibility/API parity, controlled seeded lab, truthful evidence/report/export, packaging and exact-candidate release decision. |
-| **E7 — Independent bounty and bounded autonomy** | P6; G02/G04/G05 | Separate programme/engagement policy and state; provenanced source ingestion, review/activation, envelope-aware manual/guided/supervised/autonomous campaigns, stop/reapproval and verified follow-ups. | Customer/bounty isolation, no scope expansion by inference, bounded operation and adverse-input tests; never self-approval. |
-| **E8 — Multi-target and measurement** | P7; §38 applicable gates | Canonical URL/domain/IP/CIDR/mixed assets, scoped bounded fan-out/fan-in, per-target policy and quotas, isolated failures, aggregation, reachability/pivot constraints; reproducible seeded comparative measurement. | Cancellation/recovery/partial coverage per asset and sourced benchmark with known-ground-truth limitations. |
-| **E9 — Selective advanced expansion** | P8; §50 retained §§20, 35–37, 39, 45–52 | Add only justified Metasploit/Armitage breadth, new scanner/API/browser/cloud/code/container/Kubernetes/SBOM providers, remediation, graph/retrieval, monitoring, team/PTaaS/enterprise integrations through existing contracts. | Per-provider requirements, license, compatibility, risk, trust, cost, isolation, lifecycle, tests and specific product gate; deferred features do not block solo v1.0. |
-
-**Phase ordering:** Master roadmap P0–P5, §0 dependency and §38 release gates remain binding; P6–P8 are gated expansions. Unfreezing E0–E3 permits necessary foundation repair, **not** bypass of those dependencies. Work may run in parallel only with stable contracts, bounded ownership, explicit integration order and independent verification. Do not report approximate percentages as accepted coverage.
-
-### 14.2 Permanent engine ownership and boundaries
-
-One authority owns each concern. The intended dependency path is:
-
-\`\`\`text
-CLI / API / supplied UI / headless / optional integrations
-                    |
-          Versioned application services
-                    |
-Mission/engagement/programme + campaign objective/mode/budgets
-                    |
-Typed plan compiler -> deterministic policy -> exact approval
-                    |
-          Durable task graph and scheduler
-                    |
-   Versioned capability resolver + trusted provider bindings
-                    |
-    Explicit typed execution adapters and bounded workers
-                    |
-Raw artifacts -> normalized observations -> independent verification
-                    |
-  Coverage / audit / recovery / report / operator progress
-\`\`\`
-
-- **Planning:** support typed input/output, DAG dependencies, conditional branches, bounded loops, fan-out/fan-in/joins, human gates, validated constraints, plan digests and versioned replanning. No model or UI can bypass the compiler.
-- **Security:** distinct customer and bounty policy engines; target/identity/route/session/redirect/scope revalidation at the actual effect boundary; consent bound to actor, plan/task, parameters, impact, budgets, manifest/policy versions and expiry. All new transports reapply it.
-- **Durable runtime:** persistent task/attempt/lease/approval/budget/checkpoint/stop/event/evidence state; fenced ownership, no unsafe retry of unknown effects, explicit outcomes, bounded concurrency/time/requests/storage/cost and audit failure semantics. Queue and database changes must preserve transaction boundaries and recovery semantics.
-- **Evidence:** raw output and source identity, parser/normalizer version, asset, timestamps, hash/provenance, redaction/retention and independent verification. Neither exit code 0 nor tool/AI confidence is proof of a finding.
-- **Service clients:** no browser request, desktop process, TUI or model session owns long-running execution, permissions or authoritative result state; clients can disconnect, reconnect and inspect recovery honestly.
-- **Forward compatibility:** schema-version all durable and provider-facing contracts, define deprecation/migration rules and feature negotiation, and test that new compatible providers do not require mission/scheduler/evidence-core modifications.
-
-### 14.3 Tool- and provider-independent capability model
-
-Do not equate \`tool.nmap\`, \`tool.nikto\` or another executable name with a permanent semantic operation. Maintain migration aliases where necessary, but canonical capability IDs describe an **operation and its semantics**; different providers may implement that operation with compatible typed schemas and evidence guarantees. Compatibility must be demonstrated rather than assumed: overlapping tools are not automatically interchangeable.
-
-The **single canonical CapabilityManifest/ProviderRegistration model** must be able to represent:
-
-1. Stable capability/operation ID; provider, tool and upstream identity/version/edition; module or sub-operation identity when relevant; provenance and deprecation.
-2. Typed input, output, pre/postconditions and schema versions; target, protocol, platform, architecture, identity, authentication and session applicability.
-3. Explicit execution kind (local argv, session/transport, HTTP/API, browser, cloud SDK, local analysis) with its own boundary-specific credential, network, cancellation, cleanup, timeout and evidence contract.
-4. Prerequisites, dependencies, environment, platform/installation checks, secret **references**, privilege, supported versions and optional features.
-5. Permissions, side effects, impact and risk, rate/concurrency/compute/storage/cost limits, idempotency, retry and reconciliation semantics.
-6. Raw evidence formats, parser/normalizer versions, provenance, verification methods, limitations and known blind spots.
-7. Capability-specific readiness at a named environment/version: discovered/researched/installed/registered/smoke-tested/lab-validated/end-to-end-verified/degraded/stale/unsupported, with timestamps and linked proof. Do not collapse these into a single \`available\` Boolean.
-8. Resolution trace explaining compatible candidates, rejections, tie-break and policy restrictions; pin provider identity/manifest digest to an approved task and revalidate before execution.
-
-**Registration never grants execution authority.** Persisted or imported metadata cannot become an executable provider merely by claiming a safe label. Loading external plugins, remote MCP descriptions or downloaded candidate code is not automatic discovery.
-
-### 14.4 Complete current-portfolio reconciliation and future-tool admission
-
-**E4/P0/P2 migration prerequisite:** reconcile packaged catalog, internal/entry-point adapters, parsers, local runner, legacy Automator, sequential AI executor, worker, session/SSH/SMB/WMI paths, Metasploit RPC, existing passive recon, validators, CLI/API/UI exposure, dependency checks, platform limitations, audit/evidence and tests. Identify all catalog-only, adapter-only, import-only, duplicate, stale, unavailable, unregistered, unreachable-dispatch, partially supported, supported-but-untested and intentionally excluded cases. A catalog listing is not proof of supported capability.
-
-**Future tool pipeline** (P8 implementation only after prerequisites): discover -> source-backed research -> extract capabilities -> normalize into existing manifest -> compare gaps/overlap -> assess license/version/maintenance/platform/security/credentials/cost -> operator decision -> implement adapter -> independently validate -> enable with separate runtime policy. Versioned Tool Capability Reports preserve upstream claims, WHAXON implemented behavior, environment-specific test/readiness, and current authorization as four **separate** states. Reassess upstream drift; never silently upgrade, install, load a plugin, broaden scope or activate an operation.
-
-The provider seam must support at least one independently authored second provider for an already supported semantic capability and prove deterministic selection/explicit rejection under missing readiness, incompatible schema, version, target, platform or policy. Generic provider fallback is not permitted to lower safety requirements or change test meaning.
-
-### 14.5 Future product compatibility without premature implementation
-
-| Roadmap direction | Shared contract to support from the foundation | Feature delivery rule |
-|---|---|---|
-| New scanners, recon and passive intelligence | Operation-level capability, bounded discovery, parser/provenance, readiness | Add approved providers under E4/P8 admission; no fixed tool count. |
-| Metasploit / Armitage / shells / Meterpreter / pivots | Dynamic Framework/version/module/option discovery; typed job/console/session/handler/route/loot operations; identity/approval/evidence and reconciliation | Follow detailed Metasploit design and lab gates; do not hard-code module totals or self-authorize exploit/post work. |
-| Authenticated APIs / browser workflows | Explicit auth/identity/session/reference, redirect/DNS/network boundaries, versioned I/O, recording, cancellation | Each transport needs its own approved adapter and lifecycle/evidence tests. |
-| Cloud / containers / code / SBOM / Kubernetes | Account/project/region/cluster/resource identity, role/privilege, secret refs, cost and inventory provenance | Typed SDK/source-analysis providers under P8, not general CLI-string escape hatches. |
-| Bug bounty and autonomy | Independent activated programme policy, bounded consent envelope, human gates, plan versioning, stop/recovery | P6/E7 only after foundation and isolation acceptance. |
-| Multi-target / subnet work | Canonical assets, scope proofs, bounded graph fan-out/joins, …404 tokens truncated…ain jobs survive process exit as SQLite pending rows and are claimed atomically.
-- AI is structurally separated from core execution: it proposes typed `Action` objects, while an executor validates them.
-- Customer engagement execution, bug-bounty policy evaluation, and AI approvals are not yet unified under the target authorization model.
-- There is no persisted mission/plan/task graph, scheduler lease model, budget ledger, durable event log/outbox, or plan-digest approval contract in the inspected schema.
-
-## 2. Repository inventory
-
-The recursive Git tree at the baseline contained 621 file paths and was not truncated. Relevant source areas include:
-
-| Area | Existing implementation |
-|---|---|
-| Core execution | `core/runner.py`, `core/worker.py`, `core/automation.py`, `core/events.py` |
-| Persistence | `core/store.py` (SQLite) |
-| Tool discovery | `core/catalog.py`, packaged `data/tools.json` |
-| Adapter integration | `adapters/base.py`, `adapters/registry.py`, per-tool adapters |
-| AI planning | `ai/actions.py`, `ai/agent.py`, provider implementations |
-| AI execution gate | `ai/executor.py`, `core/ai_bridge.py` |
-| Scope / authorization | `core/scope.py`, `core/override_log.py`, `core/program_policy.py` |
-| Session / pivot | `core/msf.py`, `core/msf_tracker.py`, `core/routes.py`, `core/pivot.py`, `core/portfwd.py`, session adapters |
-| Findings / verification | `core/findings.py`, `core/correlator.py`, `core/validator.py`, `core/reproduce.py` |
-| Recon / enrichment | `core/recon.py`, `core/recon_checks.py`, `core/suggester.py` |
-| Interfaces | CLI, Flask web server, GUI and TUI |
-| Setup / readiness | `core/dependencies.py`, `core/dependency_jobs.py`, installer and setup modules |
-
-The packaged tool catalog currently contains 24 entries: 16 local CLI tools and 8 session-transport entries (MSF, SSH, SMB and WMI). The adapter registry autoloads built-ins and supports Python entry points. These are valuable provider foundations, but the catalog's `Tool` record currently describes executable details and transport, not a complete capability contract.
-
-## 3. Current end-to-end execution paths
-
-### 3.1 CLI plan creation and explicit legacy dispatch
-
-`whaxon run <tool> <target>` now creates a mission, checks live scope and provider readiness, and saves a provider-pinned Engine V2 plan for review. It does not approve or execute. `whaxon run --v2-plan <id>` is the separate execution command and still requires persisted task approvals. The former direct runner behavior is available only through `whaxon run <tool> <target> --legacy`; its session transports, extra-argument overrides, and Automator follow-up drain remain outside V2 ownership. Legacy callsites are inventoried in `ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md`.
-
-### 3.2 Durable follow-up execution
-
-`JobFindings` → `Automator._on_findings` → detect Nmap `open_port` findings for a fixed HTTP service/port list → check Nikto presence and recent history → `jobs.status='pending'` row → worker `claim_pending` → `ToolRunner.run_tool`.
-
-The worker claims one row at a time and drains serially, with a default maximum of 50 jobs per invocation. The durable queue is a good stepping stone, but it is not yet a task graph or a general workflow scheduler.
-
-### 3.3 Long-lived interface execution
-
-The Flask server exposes run APIs and uses an `AsyncRunner` background thread/event loop to execute jobs. Web routes perform their own fail-closed scope check and reject free-form extra arguments. `Core.initialize(drain=True)` reconciles stale jobs and drains pending work at initialization. GUI/TUI and other interfaces share `Core` and runner services to varying degrees; interface-level ownership and lifecycle need a complete integration audit during E5.
-
-### 3.4 AI execution
-
-AI provider → `Agent.next_action` → one typed `Action` proposal → `Executor` → catalog lookup, target lock, scope check, duplicate-action check and session checks → injected runner callable → persisted AI step/history.
-
-This planner/executor split is worth preserving. The limitation is that the planner emits one action at a time and the executor serially executes it. It cannot compile, validate, approve, schedule, checkpoint or recover a versioned DAG. `ExecutorLimits.max_wall_seconds` is declared but is not enforced in the inspected `Executor.run` loop.
-
-### 3.5 Bug-bounty path
-
-The program-policy loader validates a policy document and resolves a host to one matching program. The CLI checks tool allow/deny policy, then explicitly prints that dispatch is not wired in v1. The program-policy gate is therefore not yet a full campaign execution service. It must remain separate from customer-engagement policy when dispatch is implemented.
-
-### 3.6 Session execution
-
-The runner currently supports MSF, SSH, SMB and WMI session transports. Session state is observed by `MSFTracker` and stored in SQLite. SSH/SMB/WMI transport helpers extract a host and perform a scope check. The MSF session execution path checks that the session exists and optionally matches a required session type, but the inspected `run_in_session` / `_run_msf_session` path does not re-check the stored session host against engagement scope immediately before execution. The AI session executor checks liveness but does not bind the session host to its target lock. This boundary must be fixed before autonomous session chaining.
-
-## 4. Persistence and event model
-
-### 4.1 Existing SQLite tables
-
-The inspected schema contains:
-
-- `jobs`: job ID, tool, target, status, exit/error, start/finish and duration.
-- `lines`: ordered stdout/stderr lines.
-- `findings`: normalized finding fields, raw line, enrichment JSON and verification status.
-- `coverage`: skipped/blocked coverage records.
-- `sessions`: session identity, host/type, info and lifecycle timestamps.
-- `evidence`: evidence kind/name/path/note and timestamp.
-- `ai_runs`, `ai_run_steps`, `approvals`: sequential AI run history and human answers.
-
-SQLite WAL and synchronous=NORMAL are enabled. Existing migrations add columns idempotently.
-
-### 4.2 Missing engine-level persistence
-
-No tables/contracts were found for Mission, Plan, Task, TaskAttempt, capability/provider manifest snapshots, policy decisions, plan-bound approvals, worker leases/heartbeats, budget reservations/consumption, durable event/outbox records, independent verification runs, or immutable evidence metadata/content hashes.
-
-The current `evidence` table stores path-oriented references; it is not yet the architecture's content-addressed evidence vault. The current audit trail is distributed across job rows, AI steps, override log and operational logs rather than one causally linked, tamper-evident event history.
-
-### 4.3 Queue and recovery limitations
-
-- `claim_pending` atomically changes a pending row to running, but there is no lease owner, lease token, heartbeat or expiry.
-- `reconcile_stale` marks every running row older than 60 seconds failed. It cannot distinguish a dead worker from a legitimate long-running job owned by another process. A second process starting while a scan runs longer than the threshold can therefore misclassify that active job.
-- Recovery changes the job to failed; it does not reconcile uncertain external side effects before retry.
-- There is no retry policy, backoff, attempt history, idempotency key, per-mission/target concurrency, fairness, priority or resource budget.
-- Drains are serial and bounded by a count, not a scheduler with a worker pool.
-- Some initialization paths catch and ignore recovery/drain exceptions. That can conceal a failed recovery step from operators.
-- The event bus is in-process pub/sub. It does not persist events, provide durable consumer offsets, or use an outbox to atomically couple state changes and event publication.
-
-**Priority:** replace stale-age-only recovery with explicit worker leases and heartbeats before enabling multiple independent workers or headless multi-process operation.
-
-## 5. Capability and adapter model
-
-### What exists
-- `ToolCatalog` loads a JSON catalog and checks local binary availability.
-- The `Tool` dataclass includes binary, args template, package, transport, command, required session type and pivot capability.
-- `Adapter` defines parsing and optional next-step/remediation/impact/CVSS hooks.
-- Registry autoloads built-in adapters and discovers third-party Python entry points.
-- `Suggester` exposes adapter-suggested next steps.
-- Existing parser output is normalized into `Finding` objects and retained with raw lines.
-
-### What is missing
-- Stable capability IDs independent of tool names.
-- Versioned input/output schemas and compatibility rules.
-- Explicit target/protocol/platform/auth support and prerequisites.
-- Permission and side-effect/impact classifications.
-- Transport requirements and credential reference contracts.
-- Timeout, cancellation, retry, idempotency and reconciliation declarations.
-- Resource/rate/concurrency requirements.
-- Evidence format and parser/normalizer version declarations.
-- Readiness levels beyond a local binary-available boolean.
-- Deterministic provider resolution and explainable fallback selection.
-
-**Migration decision:** keep existing `Tool` and adapter interfaces behind a compatibility bridge initially. Add manifests and validate their truthfulness; do not rewrite parsers just to fit the new architecture.
-
-## 6. Authorization and safety boundaries
-
-### Existing strengths
-- Scope defaults to a restrictive local/private-network allowlist.
-- Malformed scope files and failed hostname resolution are rejected.
-- Out-of-scope rules override in-scope rules.
-- Hostnames are checked against resolved addresses, requiring all answers to satisfy scope.
-- CLI overrides are explicit and logged; web tool-run routes reject out-of-scope targets and do not trust client-supplied override flags.
-- Runner uses `create_subprocess_exec`, not a shell command string, and rejects common alternate-target flags/arguments.
-- AI tool actions are catalog-checked and scope-checked; free-form AI extra arguments are rejected for ordinary tool execution.
-- Bounty policy loading rejects missing/ambiguous matching policy and has a separate tool allow/deny check.
-
-### Gaps requiring design/implementation
-
-1. **DNS time-of-check/time-of-use:** scope resolves a hostname, but the external tool later resolves it independently. Pinning or enforcing the authorized resolved-address set at the actual network boundary is not yet provided by the generic runner.
-2. **MSF session host binding:** session liveness/type is checked, but host-to-scope/target-lock revalidation is absent in the inspected MSF execution path.
-3. **Pivot destination policy:** the runner can rewrite a pivot-capable tool's target to a local forwarded port after checking the original target. Route identity, pivot chain and authorization context need to be explicit and revalidated.
-4. **Approval binding:** AI `ask_human` answers are associated with a run/sequence, not an immutable plan digest, target/parameters, impact, budgets, policy version and expiry. This is an interaction checkpoint, not the Engine v2 approval contract.
-5. **Bounty policy semantics:** the current loader validates a subset of fields and the CLI gate does not dispatch. Source freshness, activation, exclusions, techniques, time windows, rate/impact limits and authorization decisions need their own validated contract.
-6. **Explicit scope disable:** the operator can set `enabled:false`, which intentionally makes every target pass the scope manager. Preserve this as an explicit configuration capability only if the future policy model clearly labels and constrains it; it must never be an implicit fallback.
-7. **Session command contracts:** session tools can represent remote commands. They need typed command/input schemas, transport-specific escaping and impact classification; do not treat a session command as an ordinary local tool invocation.
-
-## 7. Findings, evidence and verification
-
-Existing strengths:
-- Raw stdout/stderr lines are persisted with sequence numbers (runner caps capture at 5,000 lines / 1 MB and caps individual lines).
-- Adapters parse rich tool-specific findings; a legacy parser fallback exists.
-- Findings retain source, raw line, data and enrichment, including request context.
-- Verification states are persisted and validators conservatively keep unsupported/incomplete evidence as candidate.
-- CoverageSkipped events are persisted.
-- The validator has curated non-destructive HTTP probes and distinguishes candidate from verified.
-
-Gaps:
-- Evidence artifacts do not yet have content-addressed identity, cryptographic integrity, provenance chain, access/tenant boundary, redaction metadata and retention policy in the core schema.
-- A job's terminal exit code and parsed findings are not a sufficient semantic task outcome contract.
-- Verification is not yet represented as a first-class durable task/run with method, authorization snapshot, limitations and linked evidence.
-- Coverage is currently mainly skip records; it does not represent planned/approved/attempted/completed/verified/inconclusive/blocked/skipped/untested graph nodes.
-- Parser exceptions are caught and parsing can fall back to legacy logic; parser failure/partial parse needs explicit machine-readable outcomes while preserving raw output.
-
-## 8. Current tests and verification posture
-
-The repository has focused regression tests for:
-- Runner argv construction, scope, subprocess output, timeout and cancellation.
-- Durable pending rows, atomic single claims, stale recovery and process-separated queue/drain.
-- CLI auto-draining newly created follow-ups while preserving older pending jobs.
-- Scope malformed-config and DNS fail-closed cases.
-- AI/core import boundary, unknown-tool rejection, out-of-scope rejection and session action checks.
-- Approval storage/API behavior.
-- Bounty policy validation and allow/deny checks.
-- Adapter parsing, findings, verification, web routes and UI behavior.
-
-Two previous reported defects are already represented as fixed in current source:
-- `run_cmd.py` drains follow-ups generated by the initial CLI run; `tests/test_run_cmd.py` includes `test_run_automatically_drains_jobs_queued_by_automator`.
-- `adapters/nikto.py` strips bracketed Nikto IDs and `See:` suffixes while parsing; this must remain protected by parser fixtures/regressions.
-
-CI configuration declares Python 3.11/3.12/3.13, Ruff, mypy, full pytest, package build/metadata checks, wheel smoke tests and setup smoke across Ubuntu/macOS/Windows. **This E0 review did not execute the test suite or verify the latest remote CI run.** Current test and CI health must be established at the start of E1, not inferred from the workflow definition.
-
-## 9. Prioritized gap register
-
-| ID | Priority | Gap | Required response |
-|---|---|---|---|
-| E0-01 | Critical | Stale-age-only job recovery can misclassify a live long-running worker | Lease owner/token, heartbeat, expiry and safe reconciliation |
+| **E4 — Capability migration** | P0/P2, §49–50; tool-intelligence portfolio audit; G01/G02 | Reconcile every existing catalog, adapter, entry point, local/session/RPC transport, parser, runner dispatch path and advertised UI/API/CLI capability; stable operation-level capability IDs independent of product/tool names; provider-neutral deterministic routing; capability-specific readiness; evidence-driven follow-up and no hard-coded chains; demonst…6406 tokens truncated…-only job recovery can misclassify a live long-running worker | Lease owner/token, heartbeat, expiry and safe reconciliation |
 | E0-02 | Critical | Session host/target-lock scope binding incomplete for MSF | Revalidate session identity and host authorization at dispatch |
 | E0-03 | Critical | DNS authorization can diverge from address used by external tool | Authorized resolution pinning/network-boundary enforcement and redirect checks |
 | E0-04 | Critical | Approval is not bound to exact immutable plan/action | Digest-bound, expiring, revocable approvals |
@@ -1131,4 +885,18 @@ longer sends answers to pending legacy executions. The legacy server routes and
 autonomous executor remain available to other clients and are still an open
 migration boundary. This is a client-path cutover only, not full AI execution
 parity or UI-10 acceptance.
+
+## CLI AI plan-only default — 2026-11-11
+
+`whaxon ai "<goal>"` now uses the existing V2 AI proposal service to create a
+mission and save one scope-checked, provider-pinned review plan. It prints
+separate review, approval and durable submission commands; none are executed
+automatically. The legacy autonomous executor and legacy `--resume` flow now
+require `--legacy`, while `--approvals` remains read-only. Planning requires
+`WHAXON_AI_ENABLED=1`, a configured provider, and an explicit target (or a
+target extractable from the goal). The proposal rejects out-of-scope targets
+before invoking the provider and retains the existing one-task, moderate-impact
+and fixed-input limits. `/api/ai/run` and autonomous multi-step AI remain
+legacy boundaries. Static CLI checks are pending exact-head CI; no local tests
+were run in this implementation batch.
 
