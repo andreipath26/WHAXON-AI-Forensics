@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 
+from .providers import SEMANTIC_OPERATION_IDS
 from .workflow import WorkflowPlan, WorkflowTask
 
 
@@ -17,8 +18,10 @@ def propose_tool_workflow_plan(
     """Prepare a fixed-argument catalog tool plan without saving or executing it.
 
     Only installed, selected Engine V2 providers with an empty input contract are
-    eligible. Scope and provider readiness are checked before a proposal is
-    returned. Saving, approval and execution remain separate operator actions.
+    eligible. Admitted catalog tools use stable semantic operation IDs; other
+    tools must have an explicitly bound capability. Scope and provider
+    readiness are checked before a proposal is returned. Saving, approval and
+    execution remain separate operator actions.
     """
     for name, value in (("mission_id", mission_id), ("plan_id", plan_id),
                         ("tool_id", tool_id), ("target", target)):
@@ -40,7 +43,7 @@ def propose_tool_workflow_plan(
             "reason": f"target is outside current scope: {getattr(scope, 'reason', '')}",
         }
 
-    capability_id = f"tool.{tool_id}"
+    capability_id = SEMANTIC_OPERATION_IDS.get(tool_id, f"tool.{tool_id}")
     try:
         manifest = core.providers.manifest_for(capability_id)
     except (LookupError, ValueError, TypeError, RuntimeError):
