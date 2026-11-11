@@ -249,8 +249,12 @@ def propose_tool_workflow_plan(
 
     try:
         reload_scope = getattr(core.scope, "load", None)
-        if callable(reload_scope):
-            reload_scope()
+        if not callable(reload_scope):
+            return {
+                "status": "blocked",
+                "reason": "scope refresh is unavailable; no plan was created",
+            }
+        reload_scope()
         execution_check = getattr(core.scope, "check_for_execution", None)
         if not callable(execution_check):
             return {
