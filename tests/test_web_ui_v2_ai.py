@@ -50,17 +50,18 @@ def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofe
     page.locator("#ai-goal").fill("Assess this explicitly out-of-scope target")
     with page.expect_response(
         lambda response: response.request.method == "POST"
-        and response.url.endswith("/api/ai/run")
+        and response.url.endswith("/api/v2/ai/proposals")
     ) as response_info:
         page.locator("#ai-run-form button[type=submit]").click()
-    assert response_info.value.status == 403
+    assert response_info.value.status == 200
+    assert response_info.value.json()["status"] == "blocked"
     page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.toLowerCase().includes('out of scope')",
+        "() => document.querySelector('#ai-run-status')?.textContent.toLowerCase().includes('outside current scope')",
         timeout=8000,
     )
 
 
-def test_ai_strategy_gate_authorize_button_records_real_pending_answer(page, live_server):
+def test_ai_strategy_gate_does_not_resume_legacy_pending_runs(page, live_server):
     calls = []
     pending_state = {"active": True}
 
@@ -71,29 +72,18 @@ def test_ai_strategy_gate_authorize_button_records_real_pending_answer(page, liv
     def runs(route):
         route.fulfill(status=200, content_type="application/json", body="[]")
 
-    def answer(route):
-        calls.append({"method": route.request.method, "body": route.request.post_data_json})
-        pending_state["active"] = False
-        route.fulfill(status=200, content_type="application/json", body='{"ok":true,"run_id":"ai-pending-ui-test","seq":1}')
-
     page.route("**/api/ai/pending", pending)
     page.route("**/api/ai/runs", runs)
-    page.route("**/api/ai/runs/ai-pending-ui-test/answer", answer)
     page.goto(f"{live_server}/ui-v2/ai")
     page.wait_for_function(
         "() => document.querySelector('#ai-pending-list')?.textContent.includes('Confirm the next phase')",
         timeout=8000,
     )
-    assert page.locator("#btn-authorize").is_enabled()
+    assert page.locator("#btn-authorize").is_disabled()
+    assert "read-only" in page.locator("#ai-pending-list").inner_text().lower()
     page.locator("#btn-authorize").click()
-    page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('Operator response recorded')",
-        timeout=8000,
-    )
-    assert len(calls) == 1
-    assert calls[0]["method"] == "POST"
-    assert calls[0]["body"]["answer"] == "yes"
-    assert calls[0]["body"]["user"] == "local"
+    assert calls == []
+    assert pending_state["active"] is True
 
 
 def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
@@ -126,7 +116,7 @@ def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
     assert calls == ["POST"]
 
 
-def test_ai_strategy_gate_reject_records_reason(page, live_server):
+def test_ai_strategy_gate_disables_legacy_reject_action(page, live_server):
     calls = []
     pending_state = {"active": True}
 
@@ -137,28 +127,17 @@ def test_ai_strategy_gate_reject_records_reason(page, live_server):
     def runs(route):
         route.fulfill(status=200, content_type="application/json", body="[]")
 
-    def answer(route):
-        calls.append(route.request.post_data_json)
-        pending_state["active"] = False
-        route.fulfill(status=200, content_type="application/json", body='{"ok":true,"run_id":"ai-reject-ui-test","seq":1}')
-
     page.route("**/api/ai/pending", pending)
     page.route("**/api/ai/runs", runs)
-    page.route("**/api/ai/runs/ai-reject-ui-test/answer", answer)
-    page.on("dialog", lambda dialog: dialog.accept("Not authorized for this phase"))
     page.goto(f"{live_server}/ui-v2/ai")
     page.wait_for_function(
         "() => document.querySelector('#ai-pending-list')?.textContent.includes('Confirm the next phase')",
         timeout=8000,
     )
+    assert page.locator("#btn-reject").is_disabled()
     page.locator("#btn-reject").click()
-    page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('Operator response recorded')",
-        timeout=8000,
-    )
-    assert len(calls) == 1
-    assert calls[0]["answer"] == "no: Not authorized for this phase"
-    assert calls[0]["note"] == "Not authorized for this phase"
+    assert calls == []
+    assert pending_state["active"] is True
 
 
 def test_ai_strategy_gate_engagement_button_opens_scope_page(page, live_server):
@@ -172,7 +151,8 @@ def test_ai_strategy_gate_engagement_button_opens_scope_page(page, live_server):
 
 
 def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_server):
-    submitted = []
+    submitted = {"mission": [], "proposal": []}
+    legacy_calls = []
 
     def scope_check(route):
         route.fulfill(
@@ -181,16 +161,31 @@ def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_se
             body='{"allowed":true,"reason":"matched local loopback rule"}',
         )
 
-    def submit(route):
-        submitted.append(route.request.post_data_json)
+    def create_mission(route):
+        submitted["mission"].append(route.request.post_data_json)
         route.fulfill(
-            status=202,
+            status=201,
             content_type="application/json",
-            body='{"run_id":"ai-ui-submit-test"}',
+            body='{"mission_id":"mission-ui-submit-test","created":true}',
+        )
+
+    def propose(route):
+        submitted["proposal"].append(route.request.post_data_json)
+        payload = route.request.post_data_json
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=(
+                '{"status":"proposed","created":true,"plan_id":"' + payload["id"] + '",'
+                '"digest":"test-digest","reason":null,"approval_granted":false,'
+                '"execution_submitted":false}'
+            ),
         )
 
     page.route("**/api/scope/check", scope_check)
-    page.route("**/api/ai/run", submit)
+    page.route("**/api/v2/missions", create_mission)
+    page.route("**/api/v2/ai/proposals", propose)
+    page.route("**/api/ai/run", lambda route: legacy_calls.append(route.request.url) or route.fulfill(status=500))
     page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.goto(f"{live_server}/ui-v2/ai")
@@ -202,13 +197,14 @@ def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_se
     page.locator("#ai-goal").fill("Review the authorized local target")
     page.locator("#ai-run-form button[type=submit]").click()
     page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('AI run submitted: ai-ui-submit-test')",
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('No execution was submitted')",
         timeout=8000,
     )
-    assert submitted == [{
-        "target": "127.0.0.1",
-        "goal": "Review the authorized local target",
-    }]
+    assert submitted["mission"] and submitted["mission"][0]["objective"] == "Review the authorized local target"
+    assert submitted["proposal"] and submitted["proposal"][0]["target"] == "127.0.0.1"
+    assert submitted["proposal"][0]["save"] is True
+    assert page.locator("#ai-v2-plan-result a").get_attribute("href").startswith("/ui-v2/run?plan_id=ai-plan-")
+    assert legacy_calls == []
 
 
 def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_pending_run(page, live_server):
@@ -222,7 +218,7 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert page.locator("#btn-authorize").is_disabled()
     assert page.locator("#btn-reject").is_disabled()
     assert page.get_by_text("HTTP Request Wire Preview").is_hidden()
-    assert page.locator("#ai-pending-list").inner_text().find("No AI runs are currently waiting") >= 0
+    assert page.locator("#ai-pending-list").inner_text().find("No legacy AI runs are waiting") >= 0
     visible_text = page.locator("body").inner_text()
     assert "CVE-2023-38606" not in visible_text
     assert "staging-api.corp.net" not in visible_text
@@ -245,8 +241,8 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert "98.0%" not in visible_text
     assert "50 req/sec" not in visible_text
     assert "Chain-of-Thought" not in visible_text
-    assert "Live AI strategy gate" in visible_text
-    assert "No AI action is currently awaiting approval" in visible_text
+    assert "Engine V2 AI plan proposal" in visible_text
+    assert "No legacy AI run is awaiting a response" in visible_text
     assert "AI Planner proposes spawning Nuclei" not in visible_text
     assert "LIVE PROPOSAL DETAILS" in visible_text
     assert "LIVE PROPOSAL DETAILS" in visible_text
@@ -276,8 +272,12 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
         lambda route: route.fulfill(status=200, content_type="application/json", body='{"allowed":true,"reason":"matched test scope"}'),
     )
     page.route(
-        "**/api/ai/run",
-        lambda route: route.fulfill(status=202, content_type="application/json", body='{"run_id":"scope-refresh-test"}'),
+        "**/api/v2/missions",
+        lambda route: route.fulfill(status=201, content_type="application/json", body='{"mission_id":"scope-refresh-test","created":true}'),
+    )
+    page.route(
+        "**/api/v2/ai/proposals",
+        lambda route: route.fulfill(status=200, content_type="application/json", body='{"status":"proposed","created":true,"plan_id":"scope-refresh-plan","digest":"scope-refresh-digest","approval_granted":false,"execution_submitted":false}'),
     )
 
     page.goto(f"{live_server}/ui-v2/ai")
@@ -292,7 +292,7 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
     page.locator("#ai-goal").fill("Check scope refresh behavior")
     page.locator("#ai-run-form button[type=submit]").click()
     page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('AI run submitted: scope-refresh-test')",
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('No execution was submitted')",
         timeout=8000,
     )
     page.wait_for_function(
