@@ -1121,3 +1121,14 @@ remains a legacy direct-dispatch path. Exact-head CI is pending; this is not a
 release acceptance claim, and AI execution, recon, GUI, other legacy API paths
 and unsupported transports remain outside V2 ownership.
 
+## AI Gate client handoff — 2026-11-11
+
+The web AI Gate now creates a mission and saves a plan through the V2 AI
+proposal endpoint. A successful proposal links into the Run page for separate
+review, approval and durable submission; the form never starts `/api/ai/run`.
+Existing legacy AI run history remains visible read-only, and the page no
+longer sends answers to pending legacy executions. The legacy server routes and
+autonomous executor remain available to other clients and are still an open
+migration boundary. This is a client-path cutover only, not full AI execution
+parity or UI-10 acceptance.
+
