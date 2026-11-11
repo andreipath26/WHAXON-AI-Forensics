@@ -15,7 +15,7 @@ class _Core:
             allowed=allowed, reason="blocked by scope",
         ))
         self.manifest = SimpleNamespace(
-            capability_id="tool.nmap", provider_id="whaxon.local.nmap",
+            capability_id="network.services.discover", provider_id="whaxon.local.nmap",
             fingerprint="manifest-sha256", impact="moderate",
             input_schema={"properties": {}, "required": [], "additionalProperties": False},
             permissions=("network.scan",), timeout_s=90,
@@ -25,7 +25,7 @@ class _Core:
             resolve_task=lambda task, **kwargs: self.resolved.append((task, kwargs)),
         )
         self.capability_inventory = lambda: [{
-            "capability_id": "tool.nmap", "provider_id": "whaxon.local.nmap",
+            "capability_id": "network.services.discover", "provider_id": "whaxon.local.nmap",
             "selected_for_execution": ready, "installed": ready, "executable": ready,
         }]
 
@@ -45,7 +45,7 @@ def test_tool_proposal_is_fixed_argument_and_provider_pinned():
     assert proposal["execution_submitted"] is False
     assert proposal["approval_granted"] is False
     task = WorkflowPlan.from_dict(proposal["plan"]).tasks[0]
-    assert task.capability_id == "tool.nmap"
+    assert task.capability_id == "network.services.discover"
     assert task.inputs == {}
     assert proposal["plan"]["metadata"]["provider_bindings"]["task-1"] == {
         "provider_id": "whaxon.local.nmap",
