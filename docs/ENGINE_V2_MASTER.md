@@ -501,11 +501,9 @@ The packaged tool catalog currently contains 24 entries: 16 local CLI tools and 
 
 ## 3. Current end-to-end execution paths
 
-### 3.1 Direct CLI tool execution
+### 3.1 CLI plan creation and explicit legacy dispatch
 
-`whaxon run` → construct `Core` → `Core.initialize(drain=False)` → `ToolRunner.run_tool` → scope check → catalog lookup / argv construction → `ToolRunner.run` → subprocess → typed job events → SQLite store → adapter parse / fallback parser → findings events → correlator, suggester and Automator.
-
-The CLI captures pending IDs before its primary run, yields to event subscribers, and calls `drain_async` excluding work that was already pending. This ensures it drains follow-up work created by the current run without unexpectedly executing old pending work. Regression coverage exists in `tests/test_run_cmd.py`.
+`whaxon run <tool> <target>` now creates a mission, checks live scope and provider readiness, and saves a provider-pinned Engine V2 plan for review. It does not approve or execute. `whaxon run --v2-plan <id>` is the separate execution command and still requires persisted task approvals. The former direct runner behavior is available only through `whaxon run <tool> <target> --legacy`; its session transports, extra-argument overrides, and Automator follow-up drain remain outside V2 ownership. Legacy callsites are inventoried in `ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md`.
 
 ### 3.2 Durable follow-up execution
 
@@ -1105,4 +1103,18 @@ and both inline scripts passed `node --check`; browser execution still awaits
 exact-head CI because Chromium is not installed locally. Other CLI, AI, GUI,
 session and server-side legacy callers remain open, as do full UI-03 behavior
 and E4 parity gates.
+
+## CLI default dispatch migration — 2026-11-11
+
+The default `whaxon run <tool> <target>` path now saves a scoped, provider-pinned
+Engine V2 review plan and stops before approval or execution. Its task uses the
+stable semantic operation ID for admitted catalog providers. `whaxon run
+--v2-plan <id>` remains the separate approved-plan execution path; direct legacy
+dispatch and its session/extra-argument behavior require an explicit `--legacy`
+flag. The command reports the mission, plan, digest, provider, and next review
+commands. README, CLI mode and legacy execution inventories now describe the
+cutover. Existing direct-dispatch CLI callsites remain visible behind the
+explicit compatibility flag. Exact-head CI is pending; this is not a release
+acceptance claim, and AI, recon, GUI, other legacy API paths and unsupported
+transports remain outside V2 ownership.
 
