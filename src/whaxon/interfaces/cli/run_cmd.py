@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shlex
 import sys
 import uuid
 from pathlib import Path
@@ -198,6 +199,22 @@ def main(args: list[str] | None = None) -> None:
         if proposal.get("status") != "proposed" or not proposal.get("created"):
             print(json.dumps(proposal, indent=2, sort_keys=True))
             sys.exit(EXIT_TOOL_ERROR)
+        next_commands = [
+            shlex.join([
+                "whaxon", "workflow", "--data-dir", str(data_dir),
+                "plan", "show", "--id", plan_id,
+            ]),
+            shlex.join([
+                "whaxon", "workflow", "--data-dir", str(data_dir),
+                "plan", "approval", "grant", "--id", plan_id,
+                "--task", "task-1", "--approval-id", "<approval-id>",
+                "--actor", "<operator>", "--expires-at", "<unix-time>",
+            ]),
+            shlex.join([
+                "whaxon", "run", "--v2-plan", plan_id,
+                "--data", str(data_dir),
+            ]),
+        ]
         print(json.dumps({
             "status": "plan_saved_for_review",
             "mission_id": mission_id,
@@ -207,12 +224,7 @@ def main(args: list[str] | None = None) -> None:
             "provider_id": proposal["provider_id"],
             "execution_submitted": False,
             "approval_granted": False,
-            "next": [
-                f"whaxon workflow --data-dir {data_dir} plan show --id {plan_id}",
-                f"whaxon workflow --data-dir {data_dir} plan approval grant --id {plan_id} --task task-1 "
-                f"--approval-id <approval-id> --actor <operator> --expires-at <unix-time>",
-                f"whaxon run --v2-plan {plan_id} --data {data_dir}",
-            ],
+            "next": next_commands,
         }, indent=2, sort_keys=True))
         return
 
