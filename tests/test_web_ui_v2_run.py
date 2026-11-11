@@ -141,7 +141,7 @@ def test_run_page_primary_action_saves_reviewable_v2_plan_only(page, live_server
     page.locator("#v2-capability-select").select_option("network.services.discover")
     page.locator("#run-active-btn").click()
     page.wait_for_function(
-        "() => document.querySelector('#v2-authoring-message')?.textContent.includes('Created mission')",
+        "() => document.querySelector('#v2-run-message')?.textContent.includes('reviewed')",
         timeout=8000,
     )
     assert len(calls["scope"]) == len(calls["missions"]) == len(calls["plans"]) == 1
@@ -233,7 +233,7 @@ def test_run_page_disables_ai_planner_toggle_without_scope_enforcement(page, liv
     toggle = page.locator("#ai-planner-toggle")
     assert toggle.is_disabled()
     assert not toggle.is_checked()
-    assert "does not enforce the same scope boundary" in toggle.get_attribute("title").lower()
+    assert "approved engine v2 workflow plans" in toggle.get_attribute("title").lower()
     planner_card = toggle.locator("xpath=ancestor::div[contains(@class, 'bg-surface-container-low')][1]")
     assert "AI planner execution is disabled" in planner_card.inner_text()
     assert "GATE: NOT VERIFIED" in planner_card.inner_text()
