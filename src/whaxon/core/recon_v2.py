@@ -176,7 +176,7 @@ class _BoundedDnsWorker:
         self.scope_path = scope_path
         self.timeout_s = timeout_s
         self._lock = threading.Lock()
-        self._process = None
+        self._process: Any = None
         self._started = False
         self._cancel_requested = False
 
@@ -202,7 +202,7 @@ class _BoundedDnsWorker:
             daemon=True,
         )
         with self._lock:
-            self._process: Any = process
+            self._process = process
         started_at = time.monotonic()
         try:
             process.start()
