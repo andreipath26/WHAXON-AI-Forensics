@@ -371,11 +371,28 @@ def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page,
             const x = rect.left + rect.width / 2;
             const y = rect.top + rect.height / 2;
             const hit = document.elementFromPoint(x, y);
+            const ancestors = [];
+            for (let node = button; node && node !== document.body; node = node.parentElement) {
+                const style = getComputedStyle(node);
+                const box = node.getBoundingClientRect();
+                ancestors.push({
+                    tag: node.tagName,
+                    id: node.id,
+                    className: typeof node.className === "string" ? node.className : "",
+                    left: box.left,
+                    width: box.width,
+                    marginLeft: style.marginLeft,
+                    paddingLeft: style.paddingLeft,
+                    position: style.position,
+                    transform: style.transform,
+                });
+            }
             return {
                 rect: {left: rect.left, top: rect.top, width: rect.width, height: rect.height},
                 viewport: {width: innerWidth, height: innerHeight},
                 scroll: {x: scrollX, y: scrollY},
                 hit: hit?.outerHTML?.slice(0, 240),
+                ancestors,
             };
         }""")
         print(f"replay hit-test: {hit_test}")
