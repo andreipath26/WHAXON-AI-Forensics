@@ -120,6 +120,7 @@ class Core:
         # as the existing interfaces. Bounded verification and the opt-in,
         # fixed-target lab provider have separate approval-bound contracts.
         from .capabilities import CapabilityRegistry
+        from .dns_full_v2 import DnsFullPostureProvider
         from .lab_access import MetasploitableLabAccessProvider
         from .providers import (
             BoundProviderRouter,
@@ -127,7 +128,6 @@ class Core:
             FindingVerificationProvider,
             SemanticOperationProvider,
         )
-        from .dns_full_v2 import DnsFullPostureProvider
         from .recon_v2 import PassiveDnsReconProvider
         self.capabilities = CapabilityRegistry(self.store)
         catalog_provider = CatalogAdapterProvider(

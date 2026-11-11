@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 import uuid
 from multiprocessing.connection import Connection
@@ -133,7 +132,7 @@ def _dns_full_worker(conn: Connection, target: str, scope_path: str) -> None:
             if not match.allowed:
                 _send_child_result(conn, {
                     "status": "scope_denied",
-                    "reason": f"{query_name}: {str(match.reason or 'scope denied')}"[:MAX_TEXT],
+                    "reason": f"{query_name}: {match.reason or 'scope denied'!s}"[:MAX_TEXT],
                 })
                 return
         from .recon_checks import check_dns_full

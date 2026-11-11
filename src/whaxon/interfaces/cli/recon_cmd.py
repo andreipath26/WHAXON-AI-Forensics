@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 from whaxon.core import Core
-from whaxon.core.recon_v2 import CAPABILITY_ID
 from whaxon.core.dns_full_v2 import CAPABILITY_ID as DNS_FULL_CAPABILITY_ID
+from whaxon.core.recon_v2 import CAPABILITY_ID
 
 EXIT_OK = 0
 EXIT_OUT_OF_SCOPE = 1
