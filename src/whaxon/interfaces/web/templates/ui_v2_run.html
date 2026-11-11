@@ -628,7 +628,7 @@
     v2Message.className = "mt-space-sm font-code-sm text-code-sm " + (error ? "text-error" : "text-on-surface-variant");
   };
   const v2SetControls = () => {
-    if (activeRunButton) activeRunButton.disabled = v2CreateInProgress || v2Capabilities.size === 0;
+    if (activeRunButton) activeRunButton.disabled = v2CreateInProgress || Boolean(v2RequestId) || v2Capabilities.size === 0;
     if (v2Submit) v2Submit.disabled = !v2Plan || Boolean(v2RequestId);
     if (v2Cancel) v2Cancel.disabled = !v2RequestId;
     if (v2UsePlan) v2UsePlan.disabled = !v2PlanSelect?.value;
