@@ -98,6 +98,8 @@ def propose_v2_workflow_plan(
             ),
         }
 
+    from .providers import SEMANTIC_OPERATION_IDS
+
     inventory = {
         (item.get("capability_id"), item.get("provider_id")): item
         for item in core.capability_inventory()
@@ -106,7 +108,7 @@ def propose_v2_workflow_plan(
     candidates: dict[str, Any] = {}
     catalog: list[dict[str, Any]] = []
     for tool in core.catalog.list():
-        capability_id = f"tool.{tool.id}"
+        capability_id = SEMANTIC_OPERATION_IDS.get(tool.id, f"tool.{tool.id}")
         try:
             manifest = core.providers.manifest_for(capability_id)
         except (LookupError, ValueError, TypeError):
