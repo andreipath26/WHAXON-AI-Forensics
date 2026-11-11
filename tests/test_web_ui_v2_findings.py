@@ -365,6 +365,18 @@ def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page,
     )
     page.locator("#whaxon-findings-list [data-finding-index]").first.click()
     with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
-        page.locator("#replay-btn").focus()
-        page.keyboard.press("Enter")
+        page.evaluate("""() => {
+            const button = document.querySelector("#replay-btn");
+            const rect = button.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            console.log("replay hit-test", JSON.stringify({
+                rect: {left: rect.left, top: rect.top, width: rect.width, height: rect.height},
+                viewport: {width: innerWidth, height: innerHeight},
+                scroll: {x: scrollX, y: scrollY},
+                hit: hit?.outerHTML?.slice(0, 240),
+            }));
+        }""")
+        page.locator("#replay-btn").click()
     assert calls == []
