@@ -80,6 +80,7 @@ def test_retest_page_only_posts_for_verified_findings_with_valid_sequence(page, 
     assert verified.is_enabled()
     assert unverified.is_disabled()
     assert page.get_by_role("button", name="Retest verified finding").count() == 2
+    assert report_calls["count"] == 1
 
     verified.click()
     page.wait_for_function(
