@@ -11,8 +11,7 @@ from whaxon.core.recon import ReconRunner
 from whaxon.core.recon_v2 import PassiveDnsReconProvider
 from whaxon.core.runner import ToolRunner
 from whaxon.core.validator import Validator
-from whaxon.core.workflow import WorkflowPlan
-from whaxon.core.workflow_proposals import propose_passive_dns_plan
+from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 from whaxon.interfaces.cli import coverage_cmd, recon_cmd, retest_cmd, validate_cmd
 
 
@@ -102,14 +101,26 @@ def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
         if isinstance(item, PassiveDnsReconProvider)
     )
     monkeypatch.setattr(provider, "_readiness", lambda: True)
-    proposal = propose_passive_dns_plan(
-        core,
-        mission_id="dns-mission",
-        plan_id="dns-plan",
+    manifest = core.providers.manifest_for("dns.recon.passive")
+    task = WorkflowTask(
+        id="task-1",
+        capability_id=manifest.capability_id,
         target="example.test",
+        inputs={},
+        permissions=manifest.permissions,
+        impact=manifest.impact,
+        timeout_s=manifest.timeout_s,
+        idempotency_key="v2-recon-cli-isolation",
     )
-    assert proposal["status"] == "proposed", proposal
-    core.save_workflow_plan("dns-plan", WorkflowPlan.from_dict(proposal["plan"]))
+    plan = WorkflowPlan(
+        mission_id="dns-mission",
+        tasks=(task,),
+        metadata={"provider_bindings": {"task-1": {
+            "provider_id": manifest.provider_id,
+            "manifest_fingerprint": manifest.fingerprint,
+        }}},
+    )
+    core.save_workflow_plan("dns-plan", plan)
     core.store.create_pending("unrelated", "echo", "127.0.0.1")
 
     tool_dispatches = []
