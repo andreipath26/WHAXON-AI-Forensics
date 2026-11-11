@@ -7,12 +7,12 @@ import pytest
 
 from whaxon.core import Core
 from whaxon.core.findings import Finding
-from whaxon.core.recon_v2 import PassiveDnsReconProvider
-from whaxon.core.workflow import WorkflowPlan
-from whaxon.core.workflow_proposals import propose_passive_dns_plan
 from whaxon.core.recon import ReconRunner
+from whaxon.core.recon_v2 import PassiveDnsReconProvider
 from whaxon.core.runner import ToolRunner
 from whaxon.core.validator import Validator
+from whaxon.core.workflow import WorkflowPlan
+from whaxon.core.workflow_proposals import propose_passive_dns_plan
 from whaxon.interfaces.cli import coverage_cmd, recon_cmd, retest_cmd, validate_cmd
 
 
@@ -92,8 +92,10 @@ def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
         "enabled": True,
         "in_scope": ["example.test"],
         "out_of_scope": [],
-    }))
+        "notes": "deterministic V2 recon CLI isolation fixture",
+    }), encoding="utf-8")
     core = Core(data)
+    core.scope.load()
     core.create_mission("dns-mission", "Collect scoped passive DNS evidence")
     provider = next(
         item for item in core.providers._providers
@@ -106,7 +108,7 @@ def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
         plan_id="dns-plan",
         target="example.test",
     )
-    assert proposal["status"] == "proposed"
+    assert proposal["status"] == "proposed", proposal
     core.save_workflow_plan("dns-plan", WorkflowPlan.from_dict(proposal["plan"]))
     core.store.create_pending("unrelated", "echo", "127.0.0.1")
 
