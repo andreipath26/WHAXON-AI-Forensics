@@ -19,6 +19,7 @@ from whaxon.core.recon_v2 import (
     RECORD_TYPES,
     _BoundedDnsWorker,
     _decode_findings,
+    _send_child_result,
 )
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 from whaxon.core.workflow_proposals import propose_passive_dns_plan
@@ -178,13 +179,35 @@ def test_dns_query_contract_uses_only_fixed_record_types(monkeypatch):
     assert len(json.dumps([item.to_dict() for item in findings]).encode()) < MAX_CHILD_OUTPUT_BYTES
 
 
+def test_dns_child_output_cap_replaces_oversized_payload_with_error():
+    class _Capture:
+        value: dict | None = None
+
+        def send_bytes(self, encoded: bytes) -> None:
+            self.value = json.loads(encoded.decode("utf-8"))
+
+    conn = _Capture()
+    _send_child_result(conn, {
+        "status": "complete",
+        "findings": [],
+        "oversized": "x" * MAX_CHILD_OUTPUT_BYTES,
+    })
+    assert conn.value == {
+        "status": "error",
+        "error": "child output exceeded the configured limit",
+    }
+
+
 def test_dns_findings_decoder_rejects_provider_contract_drift():
     records = [_finding("example.test", record_type, "answer")
                for record_type in RECORD_TYPES]
     decoded = _decode_findings(records, "example.test")
     assert [item.data["record_type"] for item in decoded] == list(RECORD_TYPES)
 
-    malformed = [dict(records[0], data={"record_type": "CAA", "value": "x", "host": "example.test"})]
+    malformed = [dict(
+        records[0],
+        data={"record_type": "CAA", "value": "x", "host": "example.test"},
+    )]
     with pytest.raises(RuntimeError, match="unsupported record type"):
         _decode_findings(malformed, "example.test")
 

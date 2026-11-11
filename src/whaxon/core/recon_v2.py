@@ -88,6 +88,7 @@ _MANIFEST = CapabilityManifest(
         "Queries only A, AAAA, MX, NS, TXT and SOA through the configured resolver.",
         "Hostname targets only; no caller-supplied DNS record types or resolver addresses.",
         "Resolver work is terminated when the bounded child-process deadline expires.",
+        "Child IPC output is capped at 1 MiB; larger result batches fail closed.",
         "DNS answers are observations, not proof of service availability or ownership.",
     ),
 )
