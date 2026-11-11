@@ -949,6 +949,10 @@ performs the full fresh scope check. Python syntax compilation passed; tests
 were not run, so runtime readiness, cancellation, and attempt-seal behavior
 remain unqualified.
 It remains separate from `dns_full` (CAA/DMARC/SPF policy analysis). Recon CLI
-default behavior remains legacy until this provider's implementation and
-contract are reviewed; no recon parity or acceptance is claimed yet.
+default behavior remains legacy. The V2 Run builder admits the provider when
+selected and installed, validates hostname-only targets, and previews scope
+with the DNS-specific policy. The headless CLI exposes
+`workflow plan propose-dns-recon`; both authoring paths create only a
+provider-pinned plan, leaving approval and dispatch as separate operator steps.
+No recon parity or runtime acceptance is claimed yet.
 

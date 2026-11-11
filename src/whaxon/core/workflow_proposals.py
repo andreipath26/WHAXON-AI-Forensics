@@ -7,6 +7,104 @@ from .providers import SEMANTIC_OPERATION_IDS
 from .workflow import WorkflowPlan, WorkflowTask
 
 
+def propose_passive_dns_plan(
+    core,
+    *,
+    mission_id: str,
+    plan_id: str,
+    target: str,
+) -> dict:
+    """Prepare a fixed passive-DNS V2 plan without saving or executing it.
+
+    This operation has no catalog-tool alias. Keep its target authorization
+    aligned with Core's DNS-query policy and bind the reviewed plan to the
+    currently selected provider manifest.
+    """
+    from .recon_v2 import CAPABILITY_ID
+
+    for name, value in (("mission_id", mission_id), ("plan_id", plan_id),
+                        ("target", target)):
+        if not isinstance(value, str) or not value.strip() or value != value.strip():
+            return {"status": "blocked", "reason": f"{name} must be normalized non-empty text"}
+
+    if core.store.get_mission(mission_id) is None:
+        return {"status": "blocked", "reason": f"unknown mission: {mission_id}"}
+
+    try:
+        reload_scope = getattr(core.scope, "load", None)
+        if callable(reload_scope):
+            reload_scope()
+        scope = core.scope.check_for_dns_query(target)
+    except Exception:
+        return {"status": "blocked", "reason": "DNS-query scope evaluation failed; no plan was created"}
+    if not getattr(scope, "allowed", False):
+        return {
+            "status": "blocked",
+            "reason": f"target is outside current DNS-query scope: {getattr(scope, 'reason', '')}",
+        }
+
+    try:
+        manifest = core.providers.manifest_for(CAPABILITY_ID)
+    except (LookupError, ValueError, TypeError, RuntimeError):
+        return {"status": "blocked", "reason": "no V2 passive-DNS provider is registered"}
+    if manifest.capability_id != CAPABILITY_ID:
+        return {"status": "blocked", "reason": "provider capability does not match passive DNS"}
+    if (
+        manifest.impact != "moderate"
+        or manifest.target_types != ("hostname",)
+        or manifest.input_schema.get("properties") != {}
+        or manifest.input_schema.get("required", []) != []
+        or manifest.input_schema.get("additionalProperties") is not False
+    ):
+        return {"status": "blocked", "reason": "passive-DNS provider contract differs from the reviewed fixed operation"}
+
+    readiness = next((
+        item for item in core.capability_inventory()
+        if isinstance(item, dict)
+        and item.get("capability_id") == CAPABILITY_ID
+        and item.get("provider_id") == manifest.provider_id
+    ), None)
+    if not readiness or any(
+        readiness.get(key) is not True
+        for key in ("selected_for_execution", "installed", "executable")
+    ):
+        return {"status": "blocked", "reason": "V2 passive-DNS provider is not selected and ready"}
+
+    task_id = "task-1"
+    task = WorkflowTask(
+        id=task_id,
+        capability_id=CAPABILITY_ID,
+        target=target,
+        inputs={},
+        permissions=manifest.permissions,
+        impact=manifest.impact,
+        timeout_s=manifest.timeout_s,
+        idempotency_key=uuid.uuid5(
+            uuid.NAMESPACE_URL, f"whaxon:passive-dns-proposal:{mission_id}:{plan_id}",
+        ).hex,
+    )
+    try:
+        core.providers.resolve_task(task, require_installed=True)
+    except (LookupError, ValueError, TypeError, RuntimeError):
+        return {"status": "blocked", "reason": "V2 passive-DNS provider or target compatibility check failed"}
+
+    plan = WorkflowPlan(
+        mission_id=mission_id,
+        metadata={"provider_bindings": {task_id: {
+            "provider_id": manifest.provider_id,
+            "manifest_fingerprint": manifest.fingerprint,
+        }}},
+        tasks=(task,),
+    )
+    return {
+        "status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
+        "digest": plan.digest, "capability_id": CAPABILITY_ID,
+        "provider_id": manifest.provider_id,
+        "manifest_fingerprint": manifest.fingerprint,
+        "execution_submitted": False, "approval_granted": False,
+    }
+
+
 def propose_tool_workflow_plan(
     core,
     *,

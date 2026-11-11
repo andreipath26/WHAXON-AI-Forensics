@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 33233)
+Total output lines: 3078
+
 """Minimal Flask server for WHAXON. Stage 1: JSON API only."""
 from __future__ import annotations
 
@@ -1425,294 +1428,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/ai/runs/<run_id>")
     def ai_run_get(run_id: str):
-        run = core.store.get_ai_run(run_id)
-        if run is None:
-            return {"error": "run not found"}, 404
-        return run
-
-    @app.get("/api/ai/runs/<run_id>/stream")
-    def ai_run_stream(run_id: str):
-        import json as _json
-        import time as _t
-
-        from flask import Response
-
-        if core.store.get_ai_run(run_id) is None:
-            return {"error": "run not found"}, 404
-
-        def generate():
-            last_seq = 0
-            deadline = _t.monotonic() + 600.0
-            while _t.monotonic() < deadline:
-                run = core.store.get_ai_run(run_id)
-                if run is None:
-                    return
-                for step in run.get("steps", []):
-                    seq = step.get("seq", 0)
-                    if seq <= last_seq:
-                        continue
-                    last_seq = seq
-                    payload = {"type": "step", "seq": seq,
-                               "action": step.get("action"),
-                               "result": step.get("result")}
-                    yield "data: %s\n\n" % _json.dumps(payload)
-                if run.get("status") in ("done", "failed", "error"):
-                    yield "data: %s\n\n" % _json.dumps(
-                        {"type": "finished", "status": run.get("status"),
-                         "error": run.get("error", "")})
-                    return
-                _t.sleep(1.0)
-                yield ": ping\n\n"
-
-        return Response(generate(), mimetype="text/event-stream",
-                        headers={"Cache-Control": "no-cache",
-                                 "X-Accel-Buffering": "no"})
-
-    @app.get("/api/jobs/<job_id>/stream")
-    def stream_job(job_id: str):
-        import json as _json
-
-        from flask import Response
-
-        if registry.get(job_id) is None:
-            return {"error": "unknown job"}, 404
-
-        def generate():
-            q = registry.subscribe(job_id)
-            try:
-                current = registry.get(job_id)
-                if current:
-                    yield f"data: {_json.dumps({'type': 'status', 'status': current['status']})}\n\n"
-                    for line in current["lines"]:
-                        yield f"data: {_json.dumps({'type': 'line', **line})}\n\n"
-                    if current["status"] == "finished":
-                        yield f"data: {_json.dumps({'type': 'finished', 'exit_code': current['exit_code']})}\n\n"
-                        return
-                    if current["status"] == "failed":
-                        yield f"data: {_json.dumps({'type': 'failed', 'error': current['error']})}\n\n"
-                        return
-                while True:
-                    try:
-                        item = q.get(timeout=30)
-                    except queue.Empty:
-                        yield ": ping\n\n"
-                        continue
-                    if item is None:
-                        return
-                    yield f"data: {_json.dumps(item)}\n\n"
-            finally:
-                registry.unsubscribe(job_id, q)
-
-        return Response(generate(), mimetype="text/event-stream",
-                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-    @app.get("/api/history")
-    def list_history():
-        return jsonify(registry.history())
-
-    @app.get("/api/jobs/active")
-    def list_active_jobs():
-        """Return currently running jobs for operational status and cancellation."""
-        return jsonify(registry.core.store.active_jobs())
-
-    @app.get("/api/jobs/<job_id>/evidence")
-    def list_evidence(job_id: str):
-        if not registry.core.store.get(job_id):
-            return {"error": "job not found"}, 404
-        items = registry.core.store.list_evidence(job_id)
-        return jsonify(items)
-
-    @app.post("/api/jobs/<job_id>/evidence")
-    def add_evidence(job_id: str):
-        if not registry.core.store.get(job_id):
-            return {"error": "job not found"}, 404
-        data = request.get_json(silent=True)
-        if data and (data.get("note") or data.get("kind") == "note"):
-            note = data.get("note", "")
-            name = data.get("name", "note")
-            if not isinstance(note, str) or len(note) > 10000:
-                return {"error": "note must be a string of at most 10000 characters"}, 400
-            if not isinstance(name, str) or len(name) > 200:
-                return {"error": "name must be a string of at most 200 characters"}, 400
-            seq = registry.core.store.add_evidence(
-                job_id, "note", name, note=note)
-            return {"seq": seq}, 201
-        f = request.files.get("file")
-        if f is None:
-            return {"error": "provide file (multipart) or {note: ...} JSON"}, 400
-        from werkzeug.utils import secure_filename
-        safe_name = secure_filename(f.filename or "")
-        if not safe_name:
-            return {"error": "filename is empty or invalid"}, 400
-        try:
-            target_dir = _evidence_dir(registry.core, job_id)
-        except ValueError as exc:
-            return {"error": str(exc)}, 400
-        import uuid as _uuid
-        disk_name = f"{_uuid.uuid4().hex[:12]}-{safe_name}"
-        dest = target_dir / disk_name
-        try:
-            f.save(str(dest))
-            relative_path = str(dest.resolve().relative_to(Path(registry.core.data_dir).resolve()))
-            seq = registry.core.store.add_evidence(
-                job_id, "file", safe_name,
-                path=relative_path,
-                note=request.form.get("note", "")[:10000])
-        except Exception:
-            try:
-                dest.unlink(missing_ok=True)
-            except OSError:
-                app.logger.exception("Failed to clean up partial evidence upload")
-            app.logger.exception("Evidence upload failed for job %s", job_id)
-            return {"error": "evidence upload failed"}, 500
-        return {"seq": seq, "name": safe_name}, 201
-
-    @app.delete("/api/jobs/<job_id>/evidence/<int:seq>")
-    def delete_evidence(job_id: str, seq: int):
-        if not registry.core.store.get(job_id):
-            return {"error": "job not found"}, 404
-        items = registry.core.store.list_evidence(job_id)
-        item = next((x for x in items if x["seq"] == seq), None)
-        if item is None:
-            return {"ok": False}, 404
-        if item.get("path"):
-            try:
-                full = _resolve_evidence_path(registry.core, item["path"])
-            except ValueError:
-                app.logger.error("Refusing to delete evidence with unsafe path for job %s", job_id)
-                return {"error": "unsafe evidence path"}, 403
-            try:
-                full.unlink(missing_ok=True)
-            except OSError:
-                app.logger.exception("Failed to remove evidence file for job %s", job_id)
-                return {"error": "failed to remove evidence file"}, 500
-        ok = registry.core.store.remove_evidence(job_id, seq)
-        return {"ok": ok}, (200 if ok else 404)
-
-    @app.get("/api/jobs/<job_id>/evidence/<int:seq>/download")
-    def download_evidence(job_id: str, seq: int):
-        from flask import send_file
-        if not registry.core.store.get(job_id):
-            return {"error": "job not found"}, 404
-        items = registry.core.store.list_evidence(job_id)
-        item = next((x for x in items if x["seq"] == seq), None)
-        if not item or not item.get("path"):
-            return {"error": "not a file"}, 404
-        try:
-            full = _resolve_evidence_path(registry.core, item["path"])
-        except ValueError:
-            app.logger.error("Refusing to download evidence with unsafe path for job %s", job_id)
-            return {"error": "unsafe evidence path"}, 403
-        if not full.is_file():
-            return {"error": "file missing"}, 404
-        return send_file(str(full), as_attachment=True, download_name=item["name"])
-
-    def _msf_session_scope_error(session_id: str):
-        """Require a live, persisted-identity-matching session in current scope."""
-        client = registry.core.msf
-        if not client.is_up():
-            return {"error": "msf not reachable; session scope cannot be verified"}, 503
-        try:
-            live = client.sessions()
-        except Exception:
-            app.logger.exception("Could not read Metasploit sessions for scope check")
-            return {"error": "could not verify session scope"}, 503
-        info = live.get(str(session_id))
-        if info is None:
-            return {"error": "session not found"}, 404
-        if not isinstance(info, dict):
-            return {"error": "session details are invalid; refusing to act"}, 503
-        host = (
-            info.get("target_host") or info.get("session_host")
-            or info.get("tunnel_peer") or info.get("peer_host") or info.get("host")
-        )
-        if not host:
-            return {"error": "session host is unknown; refusing out-of-scope-capable action"}, 403
-
-        # Session IDs are reusable by Metasploit. Never authorize a live session
-        # solely from its current host: bind it to the identity first persisted
-        # by the tracker, and reject missing/closed records or host drift.
-        try:
-            stored = registry.core.store.get_session(str(session_id))
-        except Exception:
-            app.logger.exception("Could not read persisted Metasploit session identity")
-            return {"error": "could not verify persisted session identity"}, 503
-        if not isinstance(stored, dict) or stored.get("status") != "open":
-            return {"error": "session has no active persisted identity; refusing to act"}, 403
-        stored_host = stored.get("host")
-        if not stored_host or str(stored_host).strip() in {"", "?"}:
-            return {"error": "persisted session host is unknown; refusing to act"}, 403
-        from whaxon.core.runner import ToolRunner
-        live_identity = ToolRunner._canonical_session_host(host)
-        stored_identity = ToolRunner._canonical_session_host(stored_host)
-        if not live_identity or live_identity != stored_identity:
-            return {
-                "error": "Metasploit session identity changed since it was persisted; refusing to act",
-                "persisted_host": str(stored_host),
-                "live_host": str(host),
-            }, 409
-        stored_type = str(stored.get("type") or "").strip().lower()
-        live_type = str(info.get("type") or "").strip().lower()
-        if stored_type and live_type and stored_type != live_type:
-            return {
-                "error": "Metasploit session type changed since it was persisted; refusing to act",
-                "persisted_type": stored_type,
-                "live_type": live_type,
-            }, 409
-
-        try:
-            match = _check_execution_scope(registry.core.scope, str(host))
-        except Exception:
-            app.logger.exception("Scope evaluation failed for Metasploit session host")
-            return {"error": "scope evaluation failed; action was not performed"}, 503
-        if match is None or not getattr(match, "allowed", False):
-            reason = getattr(match, "reason", "target could not be confirmed in scope")
-            return {
-                "error": f"session host out of scope: {reason}",
-                "target": str(host),
-                "matched_rule": getattr(match, "matched_rule", None),
-            }, 403
-        return None
-
-    @app.get("/api/msf/status")
-    def msf_status():
-        client = registry.core.msf
-        up = client.is_up()
-        payload = {"up": up, "config": client.config.display()}
-        if up:
-            try:
-                payload["version"] = client.version()
-                payload["modules"] = client.module_counts()
-            except Exception as e:
-                payload["error"] = str(e)
-        return jsonify(payload)
-
-    @app.get("/api/msf/sessions")
-    def msf_sessions():
-        client = registry.core.msf
-        stored = registry.core.store.list_sessions(include_closed=True)
-        live = client.sessions() if client.is_up() else {}
-        return jsonify({
-            "stored": stored,
-            "live": live,
-            "live_count": len(live),
-        })
-
-    @app.post("/api/msf/run")
-    def msf_run():
-        import re as _re
-        import uuid as _uuid
-        data = request.get_json(silent=True)
-        if not isinstance(data, dict):
-            return {"error": "request body must be a JSON object"}, 400
-        module_type = data.get("module_type", "exploit")
-        module_path = data.get("module_path", "")
-        options = data.get("options") or {}
-        target_value = data.get("target") or ""
-        if not isinstance(module_type, str) or not isinstance(module_path, str):
-            return {"error": "module_type and module_path must be strings"}, 400
-        if not isinstance(options, dict):
-            return {"error": "options must be a JSON object"}, 400
+   …3233 tokens truncated…   return {"error": "options must be a JSON object"}, 400
         module_type = module_type.strip()
         module_path = module_path.strip()
         if not module_path:
@@ -1992,6 +1708,36 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not target:
             return {"error": "target required"}, 400
         match = _check_execution_scope(registry.core.scope, target)
+        return jsonify(match.to_dict())
+
+    @app.post("/api/v2/scope/check")
+    def check_v2_authoring_scope():
+        """Preview the target scope gate used by a selected V2 capability."""
+        data = request.get_json(silent=True) or {}
+        target = data.get("target")
+        capability_id = data.get("capability_id")
+        if not isinstance(target, str) or not target.strip():
+            return {"error": "target required"}, 400
+        if not isinstance(capability_id, str) or not capability_id.strip():
+            return {"error": "capability_id required"}, 400
+        try:
+            core.capabilities.resolve(capability_id)
+        except Exception:
+            return {"error": "unknown V2 capability"}, 404
+        if capability_id == "dns.recon.passive":
+            from whaxon.core.recon_v2 import _valid_hostname
+
+            if not _valid_hostname(target):
+                return jsonify({
+                    "allowed": False,
+                    "reason": "passive DNS requires a normalized ASCII hostname",
+                })
+            reload_scope = getattr(core.scope, "load", None)
+            if callable(reload_scope):
+                reload_scope()
+            match = core.scope.check_for_dns_query(target)
+        else:
+            match = _check_execution_scope(core.scope, target)
         return jsonify(match.to_dict())
 
     @app.post("/api/scope/override")

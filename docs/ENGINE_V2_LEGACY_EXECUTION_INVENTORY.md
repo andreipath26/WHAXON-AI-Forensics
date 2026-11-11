@@ -38,6 +38,15 @@ before sending a request or mutating its finding; legacy job behavior remains.
 This does not add unsupported validator kinds or finish full validator client
 parity.
 
+The V2 Run builder admits the fixed-input, moderate-impact
+`dns.recon.passive` provider when it is installed and selected. Its plan is
+provider-pinned and remains unapproved and undispatched until the operator
+reviews, approves, and submits it. Target preview uses the DNS-query scope
+policy and accepts hostnames only; generic target checks retain the stricter
+execution policy. The CLI also provides
+`whaxon workflow plan propose-dns-recon --mission-id M --id P --target HOST`
+with optional `--save`. Neither authoring path dispatches DNS queries.
+
 Additional execution actions need their own semantic inventory. CLI passive
 recon and legacy-job CLI/API validate/retest callers still use dedicated legacy
 services rather than `ToolRunner`. A separate V2 provider now covers

@@ -93,7 +93,10 @@ def _valid_hostname(value: object) -> bool:
         return False
     except ValueError:
         pass
-    labels = value.rstrip(".").split(".")
+    # A single terminal dot is a valid absolute DNS name. Stripping every dot
+    # would silently accept malformed names such as ``example.com..``.
+    hostname = value[:-1] if value.endswith(".") else value
+    labels = hostname.split(".")
     return bool(labels) and all(_LABEL.fullmatch(label) for label in labels)
 
 
