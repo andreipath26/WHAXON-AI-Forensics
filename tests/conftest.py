@@ -200,6 +200,29 @@ def page(browser):
     yield pg
     ctx.close()
 
+
+@pytest.fixture
+def workflow_halt_sources(page):
+    """Stub both job ownership domains for Emergency Halt UI controls."""
+    import json
+
+    def install(*, jobs=None, active_requests=None):
+        page.route(
+            "**/api/jobs/active",
+            lambda route: route.fulfill(
+                status=200, content_type="application/json",
+                body=json.dumps(jobs if jobs is not None else []),
+            ),
+        )
+        page.route(
+            "**/api/v2/workflow-runs/summary",
+            lambda route: route.fulfill(
+                status=200, content_type="application/json",
+                body=json.dumps({"active_requests": active_requests if active_requests is not None else []}),
+            ),
+        )
+    return install
+
 def make_report_dict(data_dir, seed_fn):
     """Build a real report dict by calling _load on a seeded store.
     seed_fn(store) populates the store. The helper does the Core setup and

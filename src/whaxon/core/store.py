@@ -819,10 +819,15 @@ class JobStore:
         c = self._conn()
         try:
             rows = c.execute(
-                "SELECT id, tool, target, status, started_at FROM jobs "
+                "SELECT id, tool, target, status, started_at, "
+                "EXISTS(SELECT 1 FROM engine_v2_execution_jobs v2 "
+                "WHERE v2.job_id=jobs.id) AS engine_v2_owned FROM jobs "
                 "WHERE status='running' ORDER BY started_at DESC"
             ).fetchall()
-            return [dict(row) for row in rows]
+            return [
+                {**dict(row), "engine_v2_owned": bool(row["engine_v2_owned"])}
+                for row in rows
+            ]
         finally:
             c.close()
 

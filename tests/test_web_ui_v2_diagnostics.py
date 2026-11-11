@@ -107,7 +107,8 @@ def test_diagnostics_terminal_log_button_navigates_to_run_workspace(page, live_s
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_diagnostics_emergency_halt_reports_when_no_jobs_are_active(page, live_server):
+def test_diagnostics_emergency_halt_reports_when_no_jobs_are_active(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2/diagnostics")
     page.wait_for_function(
         "() => document.querySelector('#diagnostics-status')?.textContent.includes('Live values loaded')"
@@ -116,7 +117,7 @@ def test_diagnostics_emergency_halt_reports_when_no_jobs_are_active(page, live_s
     )
     page.get_by_role("button", name="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#diagnostics-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#diagnostics-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
 

@@ -336,7 +336,8 @@ def test_compliance_header_reflects_live_scope_and_global_navigation(page, live_
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_compliance_header_halt_button_uses_live_job_history(page, live_server):
+def test_compliance_header_halt_uses_active_workflow_apis(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2/compliance")
     page.wait_for_function(
         "() => document.querySelector('#compliance-status')?.textContent.includes('recorded finding(s)')"
@@ -345,7 +346,7 @@ def test_compliance_header_halt_button_uses_live_job_history(page, live_server):
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#compliance-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#compliance-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
 
@@ -390,7 +391,8 @@ def test_threat_intel_header_uses_live_scope_and_real_navigation(page, live_serv
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_threat_intel_halt_uses_live_history_and_demo_controls_are_disabled(page, live_server):
+def test_threat_intel_halt_uses_active_workflow_apis_and_disables_demo_controls(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2/threat-intel")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('external threat-intelligence feed')"
@@ -399,7 +401,7 @@ def test_threat_intel_halt_uses_live_history_and_demo_controls_are_disabled(page
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('No running or queued jobs were found')"
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('No running legacy jobs or durable workflow requests were found')"
         " || document.querySelector('#whaxon-live-threat-intel [role=status]')?.textContent.includes('Emergency halt failed:')",
         timeout=5000,
     )
@@ -439,7 +441,8 @@ def test_bas_header_uses_live_scope_and_global_navigation(page, live_server):
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_bas_halt_is_live_and_provider_simulation_controls_are_not_actionable(page, live_server):
+def test_bas_halt_uses_active_workflow_apis_and_disables_simulations(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
@@ -453,7 +456,7 @@ def test_bas_halt_is_live_and_provider_simulation_controls_are_not_actionable(pa
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#bas-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#bas-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():
@@ -484,7 +487,8 @@ def test_approvals_header_reflects_live_scope_and_terminal_navigation(page, live
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server):
+def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     calls = {"queue": 0}
 
     def queue(route):
@@ -509,7 +513,7 @@ def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server):
 
     page.get_by_role("button", name="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():
@@ -603,7 +607,8 @@ def test_threat_intel_filter_and_refresh_use_live_catalog_apis(page, live_server
     assert calls["tools"] > before[0] and calls["report"] > before[1]
 
 
-def test_threat_intel_halt_uses_history_and_disables_unwired_controls(page, live_server):
+def test_threat_intel_halt_uses_active_workflow_apis_and_disables_unwired_controls(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(
@@ -630,7 +635,7 @@ def test_threat_intel_halt_uses_history_and_disables_unwired_controls(page, live
     )
     page.get_by_role("button", name="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.innerText.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#whaxon-live-threat-intel [role=status]')?.innerText.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():

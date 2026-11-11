@@ -152,7 +152,8 @@ def test_attack_chain_header_reflects_live_scope_and_navigation(page, live_serve
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_attack_chain_halt_uses_live_history_and_disables_unwired_actions(page, live_server):
+def test_attack_chain_halt_uses_active_workflow_apis_and_disables_unwired_actions(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
@@ -165,7 +166,7 @@ def test_attack_chain_halt_uses_live_history_and_disables_unwired_actions(page, 
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#chains-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#chains-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for label in (

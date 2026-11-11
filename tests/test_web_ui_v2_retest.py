@@ -218,7 +218,8 @@ def test_retest_header_reflects_live_scope_and_routes_to_scope_and_run(page, liv
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_retest_halt_uses_live_history_and_fixture_controls_are_disabled(page, live_server):
+def test_retest_halt_uses_active_workflow_apis_and_disables_fixture_controls(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
@@ -231,7 +232,7 @@ def test_retest_halt_uses_live_history_and_fixture_controls_are_disabled(page, l
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#retest-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#retest-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():

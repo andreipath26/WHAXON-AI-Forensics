@@ -86,21 +86,17 @@ def test_ai_strategy_gate_does_not_resume_legacy_pending_runs(page, live_server)
     assert pending_state["active"] is True
 
 
-def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
+def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server, workflow_halt_sources):
     calls = []
 
-    def history(route):
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='{"jobs":[{"id":"job-to-cancel","status":"running"}]}',
-        )
+    workflow_halt_sources(jobs=[{
+        "id": "job-to-cancel", "status": "running", "engine_v2_owned": False,
+    }])
 
     def cancel(route):
         calls.append(route.request.method)
         route.fulfill(status=200, content_type="application/json", body='{"ok":true}')
 
-    page.route("**/api/history", history)
     page.route("**/api/jobs/job-to-cancel/cancel", cancel)
     page.on("dialog", lambda dialog: dialog.accept())
     page.goto(f"{live_server}/ui-v2/ai")
@@ -110,7 +106,7 @@ def test_ai_strategy_gate_emergency_halt_cancels_active_job(page, live_server):
     )
     page.get_by_role("button", name="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('1 of 1 active job(s)')",
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('1 of 1 legacy job(s)')",
         timeout=8000,
     )
     assert calls == ["POST"]

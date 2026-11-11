@@ -28,7 +28,8 @@ def test_ptaas_live_report_portal_and_navigation(page, live_server):
     assert page.url.endswith("/ui-v2/retest")
 
 
-def test_ptaas_halt_and_unwired_client_actions_are_safe(page, live_server):
+def test_ptaas_halt_and_unwired_client_actions_are_safe(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
@@ -41,7 +42,7 @@ def test_ptaas_halt_and_unwired_client_actions_are_safe(page, live_server):
     )
     page.locator("header button").filter(has_text="HALT SCAN").click()
     page.wait_for_function(
-        "() => document.querySelector('#ptaas-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#ptaas-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():

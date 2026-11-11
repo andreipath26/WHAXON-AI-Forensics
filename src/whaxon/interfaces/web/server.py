@@ -2914,6 +2914,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/jobs/<job_id>/cancel")
     def cancel_job(job_id: str):
+        if core.store.is_engine_v2_execution_job(job_id):
+            return jsonify({
+                "ok": False,
+                "job_id": job_id,
+                "error": "Engine V2 jobs must be cancelled through their durable workflow run request",
+                "cancellation_endpoint": "/api/v2/workflow-runs/<request_id>/cancel",
+            }), 409
         ok = _cancel_job_blocking(core, job_id)
         return {"ok": ok, "job_id": job_id}
 

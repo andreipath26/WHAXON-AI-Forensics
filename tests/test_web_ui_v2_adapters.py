@@ -57,7 +57,8 @@ def test_adapter_header_uses_live_scope_and_global_navigation(page, live_server)
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_adapter_halt_uses_live_history_and_static_mutations_are_disabled(page, live_server):
+def test_adapter_halt_uses_active_workflow_apis_and_static_mutations_are_disabled(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
@@ -70,7 +71,7 @@ def test_adapter_halt_uses_live_history_and_static_mutations_are_disabled(page, 
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#adapter-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#adapter-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for control_id in ("btn-sync", "btn-reload", "btn-register", "btn-mock-test", "btn-resign", "btn-save-conf"):

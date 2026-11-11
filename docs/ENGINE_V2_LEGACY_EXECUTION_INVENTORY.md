@@ -548,3 +548,16 @@ plans and verified findings for V2 retest plans. The server requires sealed V2
 evidence and current scope before saving either plan. Legacy validation and
 retest APIs remain available for compatibility clients; saved plans still
 require review, approval, and separate run submission.
+
+## Cancellation ownership boundary — 2026-11-11
+
+`GET /api/jobs/active` now marks each row with its durable Engine V2 ownership.
+V2 UI emergency-halt controls must cancel legacy rows through
+`POST /api/jobs/<job_id>/cancel` and V2 runs through
+`POST /api/v2/workflow-runs/<request_id>/cancel`. The legacy job-cancel route
+rejects a marked V2 execution job with HTTP 409, so a client cannot bypass the
+workflow plan's persisted stop barrier. Durable cancellation records a request
+to stop; it does not prove that an already-dispatched external effect stopped.
+The V2 request and its task outcomes may require reconciliation. This boundary
+covers cancellation ownership; it does not migrate the remaining legacy
+execution routes listed above.

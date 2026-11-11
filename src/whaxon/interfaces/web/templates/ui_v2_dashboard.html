@@ -867,17 +867,19 @@
             || !workflowSummary.active_requests.every(run => run && typeof run === "object" && !Array.isArray(run))) {
           throw new Error("Workflow queue API returned an invalid active-request list.");
         }
+        // V2-owned job rows are cancelled only through their durable request IDs.
+        const legacyJobs = active.filter(job => job.engine_v2_owned === false);
         const activeRuns = workflowSummary.active_requests.filter(run =>
           ["queued", "running", "uncertain"].includes(String(run.status || "").toLowerCase())
         );
-        if (!active.length && !activeRuns.length) {
+        if (!legacyJobs.length && !activeRuns.length) {
           showActionStatus("No running jobs or durable workflow requests were found. Nothing was cancelled.");
           return;
         }
-        if (!window.confirm("Request cancellation for " + active.length + " legacy job(s) and "
+        if (!window.confirm("Request cancellation for " + legacyJobs.length + " legacy job(s) and "
             + activeRuns.length + " durable workflow run(s)? Running or uncertain external effects may continue.")) return;
         const [jobResults, workflowResults] = await Promise.all([
-          Promise.all(active.map(async job => {
+          Promise.all(legacyJobs.map(async job => {
           try {
             const id = job.id || job.job_id;
             if (typeof id !== "string" || !id.trim()) return false;
@@ -903,9 +905,9 @@
         ]);
         const cancelledJobs = jobResults.filter(Boolean).length;
         const cancelledRuns = workflowResults.filter(Boolean).length;
-        const complete = cancelledJobs === active.length && cancelledRuns === activeRuns.length;
-        showActionStatus("Cancellation requested for " + cancelledJobs + " of " + active.length
-          + " active job(s) and " + cancelledRuns + " of " + activeRuns.length
+        const complete = cancelledJobs === legacyJobs.length && cancelledRuns === activeRuns.length;
+        showActionStatus("Cancellation requested for " + cancelledJobs + " of " + legacyJobs.length
+          + " legacy job(s) and " + cancelledRuns + " of " + activeRuns.length
           + " durable workflow run(s). A running or uncertain provider effect is not confirmed stopped.",
           complete ? "success" : "error");
         await load();

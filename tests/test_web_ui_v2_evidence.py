@@ -124,7 +124,8 @@ def test_evidence_header_reflects_live_scope_and_navigation(page, live_server):
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_evidence_header_halt_button_uses_live_job_history(page, live_server):
+def test_evidence_header_halt_uses_active_workflow_apis(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2/evidence")
     page.wait_for_function(
         "() => document.querySelector('#evidence-status')?.textContent.includes('No recorded jobs')"
@@ -134,7 +135,7 @@ def test_evidence_header_halt_button_uses_live_job_history(page, live_server):
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#evidence-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#evidence-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
 

@@ -1008,15 +1008,16 @@
       const jobs=await jobsResponse.json(),workflowSummary=await workflowResponse.json();
       if(!Array.isArray(jobs)||!jobs.every(job=>job&&typeof job==="object"&&!Array.isArray(job)))throw new Error("Active jobs API returned an invalid response");
       if(!workflowSummary||!Array.isArray(workflowSummary.active_requests)||!workflowSummary.active_requests.every(run=>run&&typeof run==="object"&&!Array.isArray(run)))throw new Error("Workflow queue API returned an invalid active-request list");
+      const legacyJobs=jobs.filter(job=>job.engine_v2_owned===false);
       const runs=workflowSummary.active_requests.filter(run=>["queued","running","uncertain"].includes(String(run.status||"").toLowerCase()));
-      if(!jobs.length&&!runs.length){if(status)status.textContent="No running or queued jobs were found. No active durable workflow run requests were found. Nothing was cancelled.";return;}
-      if(!window.confirm("Request cancellation for "+jobs.length+" legacy job(s) and "+runs.length+" durable workflow run(s)? Running or uncertain external effects may continue."))return;
+      if(!legacyJobs.length&&!runs.length){if(status)status.textContent="No running legacy jobs or durable workflow requests were found. Nothing was cancelled.";return;}
+      if(!window.confirm("Request cancellation for "+legacyJobs.length+" legacy job(s) and "+runs.length+" durable workflow run(s)? A running or uncertain external effect may continue."))return;
       const [jobResults,workflowResults]=await Promise.all([
-        Promise.all(jobs.map(async job=>{try{const id=job.id||job.job_id;if(typeof id!=="string"||!id.trim())return false;const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!result.ok)return false;const body=await result.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}})),
+        Promise.all(legacyJobs.map(async job=>{try{const id=job.id||job.job_id;if(typeof id!=="string"||!id.trim())return false;const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});if(!result.ok)return false;const body=await result.json().catch(()=>({}));return body.ok===true;}catch(_){return false;}})),
         Promise.all(runs.map(async run=>{try{if(typeof run.id!=="string"||!run.id.trim())return false;const result=await fetch("/api/v2/workflow-runs/"+encodeURIComponent(run.id)+"/cancel",{method:"POST"});if(!result.ok)return false;const body=await result.json().catch(()=>({}));return body.cancellation_requested===true;}catch(_){return false;}}))
       ]);
       const cancelledJobs=jobResults.filter(Boolean).length,cancelledRuns=workflowResults.filter(Boolean).length;
-      if(status)status.textContent="Cancellation requested for "+cancelledJobs+" of "+jobs.length+" legacy job(s) and "+cancelledRuns+" of "+runs.length+" durable workflow run(s). A running or uncertain provider effect is not confirmed stopped.";
+      if(status)status.textContent="Cancellation requested for "+cancelledJobs+" of "+legacyJobs.length+" legacy job(s) and "+cancelledRuns+" of "+runs.length+" durable workflow run(s). A running or uncertain provider effect is not confirmed stopped.";
     }catch(error){if(status)status.textContent="Emergency halt failed: "+error.message;}
   });
 })();
