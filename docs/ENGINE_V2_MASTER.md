@@ -1114,7 +1114,10 @@ dispatch and its session/extra-argument behavior require an explicit `--legacy`
 flag. The command reports the mission, plan, digest, provider, and next review
 commands. README, CLI mode and legacy execution inventories now describe the
 cutover. Existing direct-dispatch CLI callsites remain visible behind the
-explicit compatibility flag. Exact-head CI is pending; this is not a release
-acceptance claim, and AI, recon, GUI, other legacy API paths and unsupported
-transports remain outside V2 ownership.
+explicit compatibility flag. The AI-to-plan proposal helper now uses the same
+stable operation IDs for admitted catalog tools while preserving provider
+bindings. This does not migrate the separate autonomous AI executor, which
+remains a legacy direct-dispatch path. Exact-head CI is pending; this is not a
+release acceptance claim, and AI execution, recon, GUI, other legacy API paths
+and unsupported transports remain outside V2 ownership.
 
