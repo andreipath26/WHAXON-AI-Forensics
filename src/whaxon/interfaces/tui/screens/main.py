@@ -1,4 +1,4 @@
-"""Main TUI screen: catalog table, target input, live output from the runner."""
+"""Main TUI screen: catalog browsing and Engine V2 plan handoff."""
 from __future__ import annotations
 
 import asyncio
@@ -59,7 +59,7 @@ class JobFailedMsg(Message):
 class MainScreen(Screen):
     BINDINGS = [
         ("ctrl+q", "graceful_quit", "Quit"),
-        ("r", "run_selected", "Run"),
+        ("r", "run_selected", "Plan in V2"),
         ("x", "cancel_job", "Cancel"),
         ("escape", "focus_catalog", "Catalog"),
         ("i", "focus_target", "Target"),
@@ -96,7 +96,7 @@ class MainScreen(Screen):
                     id="extra",
                 )
                 with Horizontal(id="actions"):
-                    yield Button("Run", id="run", variant="success")
+                    yield Button("Plan in V2", id="run", variant="success")
                     yield Button("Cancel", id="cancel", variant="error", disabled=True)
                 yield Label("Output", classes="panel-title")
                 yield RichLog(id="output", highlight=True, markup=True, wrap=True)
@@ -298,7 +298,15 @@ class MainScreen(Screen):
             self._set_status("enter a target first")
             self.query_one("#target", Input).focus()
             return
-        self._run_tool(tool.id, target, extra_args)
+        if extra_args:
+            self._set_status(
+                "Engine V2 accepts only the catalog's fixed arguments here; "
+                "clear extra args before preparing a reviewable plan"
+            )
+            return
+        from .workflows import WorkflowScreen
+
+        self.app.push_screen(WorkflowScreen(tool_id=tool.id, target=target))
 
     def action_cancel_job(self) -> None:
         if not self.current_job_id:
