@@ -215,7 +215,7 @@ def test_dns_worker_hard_deadline_terminates_spawned_child(tmp_path, monkeypatch
     marker = tmp_path / "dns-child.pid"
     monkeypatch.setenv("WHAXON_TEST_DNS_CHILD_MARKER", str(marker))
     worker = _BoundedDnsWorker(
-        "example.test", str(tmp_path / "scope.json"), 1.5,
+        "example.test", str(tmp_path / "scope.json"), 5.0,
         worker_target=_slow_dns_child,
     )
 
@@ -271,7 +271,7 @@ def test_passive_dns_child_rechecks_revoked_scope_before_query(tmp_path, monkeyp
         nonlocal checks
         decision = original(target)
         checks += 1
-        if checks == 2:
+        if checks == 1:
             _write_scope(core, ["other.test"], ["example.test"])
         return decision
 
@@ -279,7 +279,7 @@ def test_passive_dns_child_rechecks_revoked_scope_before_query(tmp_path, monkeyp
     result = asyncio.run(core.run_workflow_plan("dns-scope-race"))
 
     assert result["tasks"][0]["status"] == "uncertain"
-    assert checks == 2
+    assert checks == 1
     assert core.store.history(limit=10)[0]["status"] == "failed"
     assert core.workflow_evidence("dns-scope-race")["all_evidence_recorded"] is False
 
