@@ -117,8 +117,6 @@ whaxon doctor --json
 
 The setup profile command **previews** dependency requirements; it does not silently install every security tool.
 
-`whaxon run <tool_id> <target>` creates and saves a scope-checked Engine V2 plan for review; it does not execute it. Review with `whaxon workflow plan show --id <plan-id>`, grant task approval under your operator identity, then run the persisted plan with `whaxon run --v2-plan <plan-id>`. The former direct-dispatch behavior is available only with `--legacy` and remains outside V2 workflow ownership.
-
 To open the developing local browser workspace:
 
 ```bash
