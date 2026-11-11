@@ -10,8 +10,7 @@ from pathlib import Path
 import dns.resolver
 import pytest
 
-from whaxon.core import Core
-from whaxon.core import recon_v2
+from whaxon.core import Core, recon_v2
 from whaxon.core.recon_checks import check_dns
 from whaxon.core.recon_v2 import (
     CAPABILITY_ID,
