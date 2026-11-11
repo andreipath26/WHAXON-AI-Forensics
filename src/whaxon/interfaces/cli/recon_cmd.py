@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from whaxon.core import Core
+from whaxon.core.recon_v2 import CAPABILITY_ID
 
 EXIT_OK = 0
 EXIT_OUT_OF_SCOPE = 1
@@ -18,6 +19,8 @@ def main(args: list[str] | None = None) -> int:
     data_dir = Path("data")
     checks: list[str] | None = None
     verbose = False
+    engine = "legacy"
+    plan_id: str | None = None
     positional: list[str] = []
     i = 0
     while i < len(args):
@@ -27,6 +30,10 @@ def main(args: list[str] | None = None) -> int:
         elif a == "--checks" and i + 1 < len(args):
             checks = [c.strip() for c in args[i + 1].split(",") if c.strip()]
             i += 2
+        elif a == "--engine" and i + 1 < len(args):
+            engine = args[i + 1]; i += 2
+        elif a == "--plan-id" and i + 1 < len(args):
+            plan_id = args[i + 1]; i += 2
         elif a in ("-v", "--verbose"):
             verbose = True; i += 1
         elif a in ("-h", "--help"):
@@ -35,19 +42,28 @@ def main(args: list[str] | None = None) -> int:
         else:
             positional.append(a); i += 1
 
-    if len(positional) != 1:
+    if len(positional) != 1 or engine not in {"legacy", "v2"}:
+        _usage()
+        return EXIT_USAGE
+    if (engine == "v2" and (not plan_id or checks is not None)) or (
+        engine == "legacy" and plan_id is not None
+    ):
         _usage()
         return EXIT_USAGE
 
     target = positional[0]
     core = Core(data_dir)
-    asyncio.run(core.initialize(drain=False))
 
     if verbose:
         print(f"[recon] target={target}", file=sys.stderr)
         print(f"[recon] data_dir={data_dir}", file=sys.stderr)
         print(f"[recon] checks={checks or 'all'}", file=sys.stderr)
+        print(f"[recon] engine={engine}", file=sys.stderr)
 
+    if engine == "v2":
+        return _run_v2(core, target, plan_id or "", verbose=verbose)
+
+    asyncio.run(core.initialize(drain=False))
     match = core.scope.check(target)
     if verbose:
         print(f"[recon] scope: allowed={match.allowed} reason={match.reason} rule={match.matched_rule}", file=sys.stderr)
@@ -75,11 +91,76 @@ def main(args: list[str] | None = None) -> int:
     return EXIT_OK
 
 
+def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
+    """Run only a matching persisted passive-DNS task through Engine V2."""
+    try:
+        details = core.workflow_plan_details(plan_id)
+    except (ValueError, TypeError, RuntimeError) as exc:
+        print(f"V2 recon plan rejected: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    plan = details.get("plan")
+    tasks = plan.get("tasks") if isinstance(plan, dict) else None
+    if not isinstance(tasks, list) or len(tasks) != 1 or not isinstance(tasks[0], dict):
+        print("V2 recon requires a persisted plan with exactly one task", file=sys.stderr)
+        return EXIT_USAGE
+
+    task = tasks[0]
+    if (
+        task.get("capability_id") != CAPABILITY_ID
+        or task.get("target") != target
+        or task.get("inputs") != {}
+        or task.get("depends_on", []) != []
+    ):
+        print(
+            "V2 recon plan must contain one fixed passive-DNS task matching the target",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    try:
+        async def execute():
+            await core.initialize(drain=False)
+            return await core.run_workflow_plan(plan_id)
+
+        result = asyncio.run(execute())
+        report = core.workflow_report(plan_id)
+    except (OSError, ValueError, TypeError, RuntimeError) as exc:
+        print(f"V2 recon workflow failed: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+
+    findings = report.get("findings", []) if isinstance(report, dict) else []
+    result_tasks = result.get("tasks", [])
+    status = (
+        result_tasks[0].get("status", "unknown")
+        if isinstance(result_tasks, list) and result_tasks
+        and isinstance(result_tasks[0], dict)
+        else "unknown"
+    )
+    print(f"recon: {target}  (plan {plan_id}, {status}, {len(findings)} findings)")
+    for finding in findings:
+        print(
+            f"  [{finding.get('severity', 'info'):8s}] "
+            f"{finding.get('kind', 'finding'):28s} "
+            f"{finding.get('raw_line', '')[:90]}"
+        )
+    if verbose:
+        print(f"V2 workflow complete={result.get('complete', False)}", file=sys.stderr)
+    return (
+        EXIT_OK
+        if result.get("complete") and status == "succeeded"
+        and report.get("status") == "complete"
+        else EXIT_ERROR
+    )
+
+
 def _usage() -> None:
     print(
         "Usage: whaxon recon <target> [--data DIR] [--checks a,b,c]\n"
+        "       whaxon recon <target> --engine v2 --plan-id ID [--data DIR]\n"
         "\n"
         "  Runs passive recon checks against <target>. Target must be in scope.\n"
+        "  V2 requires one persisted passive-DNS plan with exact approval.\n"
         "\n"
         "  Available checks:\n"
         "    dns        A/AAAA/MX/NS/TXT/SOA records\n"
