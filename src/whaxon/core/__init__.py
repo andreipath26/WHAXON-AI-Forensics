@@ -120,6 +120,7 @@ class Core:
         # as the existing interfaces. Bounded verification and the opt-in,
         # fixed-target lab provider have separate approval-bound contracts.
         from .capabilities import CapabilityRegistry
+        from .dns_full_v2 import DnsFullPostureProvider
         from .lab_access import MetasploitableLabAccessProvider
         from .providers import (
             BoundProviderRouter,
@@ -145,12 +146,16 @@ class Core:
         passive_dns_provider = PassiveDnsReconProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        dns_full_provider = DnsFullPostureProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
             verification_provider,
             lab_access_provider,
             passive_dns_provider,
+            dns_full_provider,
         ))
 
     def _wire_store(self) -> None:
@@ -939,12 +944,13 @@ class Core:
             reload_scope = getattr(self.scope, "load", None)
             if callable(reload_scope):
                 reload_scope()
-            if task.capability_id == "dns.recon.passive":
-                # Passive DNS collection asks the configured resolver for
-                # records and never connects to a target-resolved address.
-                # Avoid an uncancellable getaddrinfo call on this scheduler
-                # thread. This requires explicit hostname scope; the provider
-                # repeats the full check inside its bounded child process.
+            if task.capability_id in {"dns.recon.passive", "dns.recon.full"}:
+                # These fixed DNS operations query the configured resolver and
+                # never connect to a target-resolved address. Avoid an
+                # uncancellable getaddrinfo call on this scheduler thread.
+                # Each provider repeats all query-name checks inside its
+                # bounded child process; DNS-full checks its _dmarc subdomain
+                # separately before querying it.
                 return self.scope.check_for_dns_query(task.target).allowed is True
             execution_check = getattr(self.scope, "check_for_execution", None)
             if not callable(execution_check):

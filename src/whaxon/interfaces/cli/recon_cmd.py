@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from whaxon.core import Core
+from whaxon.core.dns_full_v2 import CAPABILITY_ID as DNS_FULL_CAPABILITY_ID
 from whaxon.core.recon_v2 import CAPABILITY_ID
 
 EXIT_OK = 0
@@ -107,13 +108,13 @@ def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
 
     task = tasks[0]
     if (
-        task.get("capability_id") != CAPABILITY_ID
+        task.get("capability_id") not in {CAPABILITY_ID, DNS_FULL_CAPABILITY_ID}
         or task.get("target") != target
         or task.get("inputs") != {}
         or task.get("depends_on", []) != []
     ):
         print(
-            "V2 recon plan must contain one fixed passive-DNS task matching the target",
+            "V2 recon plan must contain one fixed DNS task matching the target",
             file=sys.stderr,
         )
         return EXIT_USAGE
