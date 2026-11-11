@@ -38,6 +38,15 @@ before sending a request or mutating its finding; legacy job behavior remains.
 This does not add unsupported validator kinds or finish full validator client
 parity.
 
+The V2 Run builder admits the fixed-input, moderate-impact
+`dns.recon.passive` provider when it is installed and selected. Its plan is
+provider-pinned and remains unapproved and undispatched until the operator
+reviews, approves, and submits it. Target preview uses the DNS-query scope
+policy and accepts hostnames only; generic target checks retain the stricter
+execution policy. The CLI also provides
+`whaxon workflow plan propose-dns-recon --mission-id M --id P --target HOST`
+with optional `--save`. Neither authoring path dispatches DNS queries.
+
 Additional execution actions need their own semantic inventory. CLI passive
 recon and legacy-job CLI/API validate/retest callers still use dedicated legacy
 services rather than `ToolRunner`. A separate V2 provider now covers
@@ -224,7 +233,7 @@ is not UI acceptance or authorization to change the frozen pages.
 
 #### Exact Flask API method/path/handler census
 
-The following index lists every one of the **104** `/api/*` decorator bindings
+The following index lists every one of the **105** `/api/*` decorator bindings
 from the AST guard. It is a binding census, not a security approval: GET routes
 are reads/status/exports; POST and DELETE routes may mutate state or dispatch
 work, as classified in the family tables below. Handler source and the cited
@@ -289,6 +298,7 @@ test family remain authoritative for side effects and access-control limits.
 | `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope/check` | `check_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope/override` | `log_override` | Scope policy service/configuration |
+| `POST` | `/api/v2/scope/check` | `check_v2_authoring_scope` | Capability-aware authoring scope preview; scheduler rechecks before execution |
 | `GET` | `/api/settings` | `api_settings_get` | Application settings store |
 | `POST` | `/api/settings` | `api_settings_post` | Application settings store |
 | `GET` | `/api/status` | `api_status` | Runtime diagnostics |
@@ -352,6 +362,7 @@ test family remain authoritative for side effects and access-control limits.
 | Legacy Metasploit | `POST /api/msf/run`; `POST /api/msf/sessions/<session_id>/exec` | Module path validates inputs and scope before worker dispatch. Session command checks live session scope before RPC. | Legacy job/session paths; no V2 task/attempt lifecycle. |
 | Metasploit pivot forwarding | `GET`, `POST`, and `DELETE /api/msf/sessions/<session_id>/portfwd` | Every operation checks the session host against current scope. Creation separately checks the destination and writes a pivot edge; removal calls the legacy forward manager. | Network/pivot side effects remain outside V2 task ownership. See `test_server_portfwd.py` and scope-denial cases in `test_server.py`. |
 | Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest recheck current target scope; retest requires existing verified status. The resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
+| V2 authoring scope preview | `POST /api/v2/scope/check` | Uses the selected capability's target policy for authoring feedback; passive DNS requires a hostname and DNS-query scope. This preview does not authorize or dispatch a task. | Core scheduler and the supervised DNS child recheck current scope before execution. |
 | Scope policy | `GET`, `POST /api/scope`; `POST /api/scope/check`; `POST /api/scope/override` | Scope POST persists rules and requires explicit confirmation to disable enforcement. Scope check evaluates a target. Override only writes a legacy audit-style record; it does not authorize dispatch. | Scope configuration feeds shared Core checks, but the legacy override record is not a V2 approval. See `test_web_scope.py`, `test_scope_failclosed.py`, and `test_server.py`. |
 | Legacy job cancellation | `POST /api/jobs/<job_id>/cancel` | Calls `_cancel_job_blocking` for a legacy job process/event state. | Separate from durable V2 run-request and plan cancellation endpoints. Route-level lifecycle parity remains open under G05. |
 | Dependency provisioning | `POST /api/dependencies/install`, `/install-batch`; `POST /api/dependencies/install/<operation_id>/cancel` | Runs only from a current approved install plan and uses separate OS/package-manager authority; this is system provisioning, not target assessment. | Outside workflow task dispatch. See `test_dependencies.py`, `test_dependency_installer.py`, and dependency server tests. |

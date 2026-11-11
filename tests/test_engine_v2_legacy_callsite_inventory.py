@@ -205,6 +205,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('POST', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',
     ('POST', '/api/v2/missions/<mission_id>/deadline'): 'workflow_v2_mission_deadline',
     ('POST', '/api/v2/missions/<mission_id>/rate-limit'): 'workflow_v2_mission_rate_limit',
+    ('POST', '/api/v2/scope/check'): 'check_v2_authoring_scope',
     ('POST', '/api/v2/workflow-runs/<request_id>/cancel'): 'workflow_v2_cancel_run_request',
     ('POST', '/api/v2/workflows'): 'workflow_v2_save_plan',
     ('POST', '/api/v2/workflows/<plan_id>/approvals'): 'workflow_v2_approvals',

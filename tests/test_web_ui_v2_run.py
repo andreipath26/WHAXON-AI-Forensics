@@ -64,7 +64,7 @@ def _stub_v2_plan_authoring(page, *, in_scope=True):
             tasks = [dict(task, task_key=task["id"], status="proposed") for task in plan["tasks"]]
             route.fulfill(status=200, content_type="application/json", body=json.dumps({"plan": plan, "tasks": tasks}))
 
-    page.route("**/api/scope/check", scope)
+    page.route("**/api/v2/scope/check", scope)
     page.route("**/api/v2/capabilities", capabilities)
     page.route("**/api/v2/providers", providers)
     page.route("**/api/v2/missions**", missions_api)

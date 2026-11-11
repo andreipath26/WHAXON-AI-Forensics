@@ -1994,6 +1994,36 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         match = _check_execution_scope(registry.core.scope, target)
         return jsonify(match.to_dict())
 
+    @app.post("/api/v2/scope/check")
+    def check_v2_authoring_scope():
+        """Preview the target scope gate used by a selected V2 capability."""
+        data = request.get_json(silent=True) or {}
+        target = data.get("target")
+        capability_id = data.get("capability_id")
+        if not isinstance(target, str) or not target.strip():
+            return {"error": "target required"}, 400
+        if not isinstance(capability_id, str) or not capability_id.strip():
+            return {"error": "capability_id required"}, 400
+        try:
+            core.capabilities.resolve(capability_id)
+        except Exception:
+            return {"error": "unknown V2 capability"}, 404
+        if capability_id == "dns.recon.passive":
+            from whaxon.core.recon_v2 import _valid_hostname
+
+            if not _valid_hostname(target):
+                return jsonify({
+                    "allowed": False,
+                    "reason": "passive DNS requires a normalized ASCII hostname",
+                })
+            reload_scope = getattr(core.scope, "load", None)
+            if callable(reload_scope):
+                reload_scope()
+            match = core.scope.check_for_dns_query(target)
+        else:
+            match = _check_execution_scope(core.scope, target)
+        return jsonify(match.to_dict())
+
     @app.post("/api/scope/override")
     def log_override():
         data = request.get_json(silent=True) or {}

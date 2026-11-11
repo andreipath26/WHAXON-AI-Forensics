@@ -93,7 +93,10 @@ def _valid_hostname(value: object) -> bool:
         return False
     except ValueError:
         pass
-    labels = value.rstrip(".").split(".")
+    # A single terminal dot is a valid absolute DNS name. Stripping every dot
+    # would silently accept malformed names such as ``example.com..``.
+    hostname = value[:-1] if value.endswith(".") else value
+    labels = hostname.split(".")
     return bool(labels) and all(_LABEL.fullmatch(label) for label in labels)
 
 
@@ -173,7 +176,7 @@ class _BoundedDnsWorker:
         self.scope_path = scope_path
         self.timeout_s = timeout_s
         self._lock = threading.Lock()
-        self._process = None
+        self._process: Any = None
         self._started = False
         self._cancel_requested = False
 

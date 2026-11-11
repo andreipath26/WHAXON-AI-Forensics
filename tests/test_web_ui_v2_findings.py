@@ -363,6 +363,38 @@ def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page,
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 1",
         timeout=5000,
     )
+    page.locator("#whaxon-findings-list [data-finding-index]").first.click()
     with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
-        page.get_by_role("button", name="Open V2 Verification & Retest Studio").click()
+        hit_test = page.evaluate("""() => {
+            const button = document.querySelector("#replay-btn");
+            const rect = button.getBoundingClientRect();
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            const hit = document.elementFromPoint(x, y);
+            const ancestors = [];
+            for (let node = button; node && node !== document.body; node = node.parentElement) {
+                const style = getComputedStyle(node);
+                const box = node.getBoundingClientRect();
+                ancestors.push({
+                    tag: node.tagName,
+                    id: node.id,
+                    className: typeof node.className === "string" ? node.className : "",
+                    left: box.left,
+                    width: box.width,
+                    marginLeft: style.marginLeft,
+                    paddingLeft: style.paddingLeft,
+                    position: style.position,
+                    transform: style.transform,
+                });
+            }
+            return {
+                rect: {left: rect.left, top: rect.top, width: rect.width, height: rect.height},
+                viewport: {width: innerWidth, height: innerHeight},
+                scroll: {x: scrollX, y: scrollY},
+                hit: hit?.outerHTML?.slice(0, 240),
+                ancestors,
+            };
+        }""")
+        print(f"replay hit-test: {hit_test}")
+        page.locator("#replay-btn").click()
     assert calls == []

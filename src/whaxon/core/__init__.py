@@ -945,12 +945,11 @@ class Core:
                 # Avoid an uncancellable getaddrinfo call on this scheduler
                 # thread. This requires explicit hostname scope; the provider
                 # repeats the full check inside its bounded child process.
-                scope_check = self.scope.check_for_dns_query
-            else:
-                scope_check = getattr(self.scope, "check_for_execution", None)
-                if not callable(scope_check):
-                    scope_check = self.scope.check
-            return scope_check(task.target).allowed is True
+                return self.scope.check_for_dns_query(task.target).allowed is True
+            execution_check = getattr(self.scope, "check_for_execution", None)
+            if not callable(execution_check):
+                execution_check = self.scope.check
+            return execution_check(task.target).allowed is True
         except Exception:
             return False
 

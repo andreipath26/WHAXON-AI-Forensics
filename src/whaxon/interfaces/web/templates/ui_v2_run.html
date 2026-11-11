@@ -737,6 +737,13 @@
       : Array.from(cryptoApi.getRandomValues(new Uint8Array(16)), value => value.toString(16).padStart(2, "0")).join("");
     return prefix + token.slice(0, 16);
   }
+  function v2IsPassiveDnsHostname(value) {
+    if (typeof value !== "string" || !value || value.length > 253 || /[^\x21-\x7e]/.test(value) || /[\/?#@:\\[\]]/.test(value)) return false;
+    const hostname = value.endsWith(".") ? value.slice(0, -1) : value;
+    const labels = hostname.split(".");
+    if (!labels.length || labels.some(label => label.length < 1 || label.length > 63 || !/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label))) return false;
+    return !/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname) && !hostname.includes(":");
+  }
   async function v2CreatePlan() {
     if (v2CreateInProgress) return;
     const target = targetInput?.value.trim();
@@ -745,13 +752,19 @@
     if (!target) { v2AuthoringSay("Enter an authorized target in the Run target field above.", true); targetInput?.focus(); return; }
     if (!objective) { v2AuthoringSay("Enter the mission objective.", true); v2ObjectiveInput?.focus(); return; }
     if (!selected) { v2AuthoringSay("Choose an installed V2 capability.", true); return; }
+    const isPassiveDns = selected.manifest.capability_id === "dns.recon.passive";
+    if (isPassiveDns && !v2IsPassiveDnsHostname(target)) {
+      v2AuthoringSay("Passive DNS accepts an ASCII hostname only; enter a hostname without a URL, path, or IP address.", true);
+      targetInput?.focus();
+      return;
+    }
     v2CreateInProgress = true;
     if (v2CreateButton) { v2CreateButton.disabled = true; v2CreateButton.setAttribute("aria-busy", "true"); }
     v2SetControls();
     let missionId = null;
     try {
       v2AuthoringSay("Checking the target against the configured scope (preview only)…");
-      const verdict = await api("/api/scope/check", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});
+      const verdict = await api("/api/v2/scope/check", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target, capability_id: selected.manifest.capability_id})});
       if (verdict.allowed !== true) throw new Error("Target is outside the configured scope. No mission or plan was created.");
       missionId = v2NewId("ui-mission-");
       const planId = v2NewId("ui-plan-");

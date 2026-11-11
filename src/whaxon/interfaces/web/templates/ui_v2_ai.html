@@ -607,8 +607,8 @@
      const reviewLink=document.createElement("a");reviewLink.href="/ui-v2/run?plan_id="+encodeURIComponent(planId);reviewLink.textContent="Review task, provider binding and approvals in Run & Orchestration";reviewLink.className="mt-1 inline-block underline text-secondary";
      v2PlanResult.append(planLabel,reviewLink);
      form.reset();
-     try{await load();}catch(_refreshError){}
      status.textContent="V2 AI plan saved. No approval was granted and no execution was submitted.";
+     load().catch(()=>{});
    }catch(error){status.textContent="V2 AI plan not saved: "+error.message;}
    finally{submit.disabled=false;}
  });

@@ -112,7 +112,11 @@ def test_approval_queue_grants_v2_task_consent_and_keeps_legacy_runs_read_only(p
         timeout=8000,
     )
     assert page.get_by_text("web.server.audit → example.test", exact=False).is_visible()
-    assert page.get_by_text("Legacy runs (read-only)").is_visible()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-legacy-approval-readonly')?.innerText.includes('Legacy waiting run')",
+        timeout=8000,
+    )
+    assert page.get_by_text("Legacy AI runs (read-only)").is_visible()
     assert page.get_by_text("cannot grant a V2 task approval or resume its legacy executor", exact=False).is_visible()
     assert page.get_by_role("textbox").count() == 0
     page.get_by_role("checkbox", name="I reviewed this exact capability, target, impact, and plan digest and grant a one-hour task approval.").check()
