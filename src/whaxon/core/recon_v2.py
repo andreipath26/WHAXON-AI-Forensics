@@ -32,7 +32,7 @@ from .workflow import WorkflowTask
 
 CAPABILITY_ID = "dns.recon.passive"
 PROVIDER_ID = "whaxon.recon.dns"
-PROVIDER_VERSION = "1.0.0"
+PROVIDER_VERSION = "1.0.1"
 TRANSPORT = "isolated_process"
 RECORD_TYPES = ("A", "AAAA", "MX", "NS", "TXT", "SOA")
 PROCESS_TIMEOUT_S = 40.0
@@ -64,6 +64,44 @@ _MANIFEST = CapabilityManifest(
     },
     output_schema={
         "type": "object",
+        "properties": {
+            "job_id": {"type": "string", "minLength": 1},
+            "tool_id": {"const": CAPABILITY_ID},
+            "target": {"type": "string", "minLength": 1},
+            "exit_code": {"type": "integer"},
+            "duration_s": {"type": "number", "minimum": 0},
+            "findings": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"enum": ["dns_record", "recon_error"]},
+                        "severity": {"const": "info"},
+                        "source": {"const": "recon:dns"},
+                        "data": {"type": "object"},
+                        "raw_line": {"type": "string", "maxLength": MAX_TEXT},
+                        "remediation": {"type": "string"},
+                        "impact": {"type": "string"},
+                        "cvss": {"type": ["number", "null"]},
+                        "cwe": {"type": "string"},
+                        "references": {"type": "array", "items": {"type": "string"}},
+                        "lookup_hint": {"type": "string"},
+                        "request_context": {"type": "object"},
+                    },
+                    "required": [
+                        "kind", "severity", "source", "data", "raw_line",
+                        "remediation", "impact", "cvss", "cwe", "references",
+                        "lookup_hint", "request_context",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
+            "provider_id": {"const": PROVIDER_ID},
+            "provider_version": {"const": PROVIDER_VERSION},
+            "manifest_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "registry_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "transport": {"const": TRANSPORT},
+        },
         "required": [
             "job_id", "tool_id", "target", "exit_code", "duration_s",
             "findings", "provider_id", "provider_version",
@@ -75,6 +113,7 @@ _MANIFEST = CapabilityManifest(
         "Queries only A, AAAA, MX, NS, TXT and SOA through the configured resolver.",
         "Hostname targets only; no caller-supplied DNS record types or resolver addresses.",
         "Resolver work is terminated when the bounded child-process deadline expires.",
+        "Child IPC output is capped at 1 MiB; larger result batches fail closed.",
         "DNS answers are observations, not proof of service availability or ownership.",
     ),
 )
@@ -171,10 +210,14 @@ def _terminate_process(process) -> None:
 class _BoundedDnsWorker:
     """Own a child process that can be stopped when its async caller cancels."""
 
-    def __init__(self, target: str, scope_path: str, timeout_s: float) -> None:
+    def __init__(
+        self, target: str, scope_path: str, timeout_s: float, *,
+        worker_target=None,
+    ) -> None:
         self.target = target
         self.scope_path = scope_path
         self.timeout_s = timeout_s
+        self.worker_target = worker_target or _dns_worker
         self._lock = threading.Lock()
         self._process: Any = None
         self._started = False
@@ -196,7 +239,7 @@ class _BoundedDnsWorker:
         context = multiprocessing.get_context("spawn")
         parent_conn, child_conn = context.Pipe(duplex=False)
         process = context.Process(
-            target=_dns_worker,
+            target=self.worker_target,
             args=(child_conn, self.target, self.scope_path),
             name="whaxon-v2-dns-recon",
             daemon=True,
