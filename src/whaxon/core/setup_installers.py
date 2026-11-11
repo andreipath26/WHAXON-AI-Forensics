@@ -191,7 +191,7 @@ def _command_for_action(
     manager_path: str,
     *,
     allow_elevation: bool,
-    which: Callable[[str], str | None] = shutil.which,
+    which: Callable[[str], str | None] | None = None,
 ) -> list[str]:
     manager = action["package_manager"]
     package = action["package_id"]
@@ -208,7 +208,7 @@ def _command_for_action(
     if manager in _PRIVILEGED_MANAGERS and os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() != 0:
         if not allow_elevation:
             raise ValueError("system package installation requires explicit --allow-elevation consent")
-        sudo = which("sudo")
+        sudo = (which or shutil.which)("sudo")
         if not sudo:
             raise ValueError("sudo is unavailable; run WHAXON from an administrator/root shell")
         argv = [sudo, "-n", *argv]

@@ -53,6 +53,91 @@ def test_v2_followups_api_is_evidence_bound_and_inert(tmp_path, monkeypatch):
     ).status_code == 403
 
 
+def test_v2_workflow_proposal_api_is_inert_and_validates_contract(
+    tmp_path, monkeypatch,
+):
+    from whaxon.core import workflow_proposals
+
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-proposal", "authorized lab")
+    plan = WorkflowPlan("m-proposal", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+    ))
+    calls = []
+
+    def propose_tool(_core, **kwargs):
+        calls.append(("tool", kwargs))
+        return {
+            "status": "proposed", "plan": plan.to_dict(),
+            "execution_submitted": False, "approval_granted": False,
+        }
+
+    def propose_verification(_core, **kwargs):
+        calls.append(("verification", kwargs))
+        return {
+            "status": "proposed", "plan": plan.to_dict(),
+            "execution_submitted": False, "approval_granted": False,
+        }
+
+    monkeypatch.setattr(workflow_proposals, "propose_tool_workflow_plan", propose_tool)
+    monkeypatch.setattr(
+        workflow_proposals, "propose_finding_verification_plan", propose_verification,
+    )
+
+    response = client.post("/api/v2/workflow-proposals", json={
+        "kind": "tool", "mission_id": "m-proposal", "id": "p-proposed",
+        "tool": "nmap", "target": "192.0.2.10",
+    })
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["status"] == "proposed"
+    assert body["created"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_submitted"] is False
+    assert calls[-1] == ("tool", {
+        "mission_id": "m-proposal", "plan_id": "p-proposed",
+        "tool_id": "nmap", "target": "192.0.2.10",
+    })
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
+
+    response = client.post("/api/v2/workflow-proposals", json={
+        "kind": "verification", "mission_id": "m-proposal", "id": "p-verify",
+        "source_job_id": "job-source", "finding_seq": 2, "mode": "retest",
+        "save": True,
+    })
+    assert response.status_code == 200
+    assert response.get_json()["created"] is True
+    assert response.get_json()["execution_submitted"] is False
+    assert response.get_json()["approval_granted"] is False
+    assert calls[-1] == ("verification", {
+        "mission_id": "m-proposal", "plan_id": "p-verify",
+        "source_job_id": "job-source", "finding_seq": 2, "mode": "retest",
+    })
+    assert core.store.get_workflow_plan("p-verify")["digest"] == plan.digest
+    assert core.workflow_approvals("p-verify") == []
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
+
+    invalid = (
+        [], {"kind": "other"}, {"kind": "tool", "mission_id": "m", "id": "p"},
+        {"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
+         "target": "192.0.2.10", "extra": True},
+        {"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
+         "target": "192.0.2.10", "save": "true"},
+        {"kind": "verification", "mission_id": "m", "id": "p",
+         "source_job_id": "job", "finding_seq": True, "mode": "verify"},
+        {"kind": "verification", "mission_id": "m", "id": "p",
+         "source_job_id": "job", "finding_seq": 0, "mode": "execute"},
+    )
+    for payload in invalid:
+        assert client.post("/api/v2/workflow-proposals", json=payload).status_code == 400
+    assert client.post(
+        "/api/v2/workflow-proposals",
+        json={"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
+              "target": "192.0.2.10"},
+        headers={"Origin": "https://attacker.invalid"},
+    ).status_code == 403
+
+
 def test_v2_followups_api_persists_only_a_reviewable_plan(tmp_path, monkeypatch):
     from whaxon.core.followups import FollowupProposal
 
@@ -806,3 +891,28 @@ def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monk
         assert response.status_code == 400
         assert "history exceeds allowed limits" in response.get_json()["error"]
     assert core.store.get_workflow_plan("p-ai") is None
+
+
+def test_legacy_validation_routes_refuse_engine_v2_evidence(tmp_path, monkeypatch):
+    from whaxon.core.findings import Finding
+
+    client, core = _client(tmp_path, monkeypatch)
+    job_id = "0123456789ab"
+    core.store.create(job_id)
+    core.store.set_started(job_id, "verify_sqli", "http://192.0.2.10/search?id=1")
+    core.store.append_finding(job_id, Finding(
+        kind="sqli", severity="high", source="engine-v2-verifier",
+        data={"parameter": "id"}, raw_line="verified finding",
+    ), 0)
+    core.store.update_verification(job_id, 0, "verified", by="engine-v2", reason="sealed result")
+    core.store.mark_engine_v2_execution_job(job_id)
+
+    before = core.store.get_findings(job_id)
+    validate = client.post(f"/api/validate/{job_id}/0")
+    retest = client.post(f"/api/retest/{job_id}/0")
+
+    assert validate.status_code == 409
+    assert retest.status_code == 409
+    assert "plan-bound" in validate.get_json()["error"]
+    assert "plan-bound" in retest.get_json()["error"]
+    assert core.store.get_findings(job_id) == before

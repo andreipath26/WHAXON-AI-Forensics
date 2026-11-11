@@ -82,7 +82,6 @@ EXPECTED_RUNNER_CALLS = Counter(
         ("interfaces/cli/run_cmd.py", "main._go", "run_tool"): 1,
         ("interfaces/cli/run_cmd.py", "main._go", "run_in_session"): 1,
         ("interfaces/gui/main_window.py", "_run_tool", "run_tool"): 2,
-        ("interfaces/tui/screens/main.py", "_run_tool", "run_tool"): 2,
         ("interfaces/web/server.py", "_run_job_blocking", "run_tool"): 1,
     }
 )
@@ -152,6 +151,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('GET', '/api/ui-v2/findings'): 'api_ui_v2_findings',
     ('GET', '/api/v2/capabilities'): 'workflow_v2_capabilities',
     ('POST', '/api/v2/ai/proposals'): 'workflow_v2_ai_proposal',
+    ('POST', '/api/v2/workflow-proposals'): 'workflow_v2_workflow_proposal',
     ('GET', '/api/v2/missions'): 'workflow_v2_missions',
     ('GET', '/api/v2/missions/<mission_id>/budget'): 'workflow_v2_mission_budget',
     ('GET', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',
@@ -165,6 +165,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('GET', '/api/v2/workflow-runs/summary'): 'workflow_v2_run_queue_summary',
     ('GET', '/api/v2/workflows/<plan_id>'): 'workflow_v2_plan_details',
     ('GET', '/api/v2/workflows/<plan_id>/approvals'): 'workflow_v2_approvals',
+    ('GET', '/api/v2/approval-queue'): 'workflow_v2_approval_queue',
     ('GET', '/api/v2/workflows/<plan_id>/attempts'): 'workflow_v2_attempts',
     ('GET', '/api/v2/workflows/<plan_id>/audit'): 'workflow_v2_audit',
     ('GET', '/api/v2/workflows/<plan_id>/event-inbox'): 'workflow_v2_event_inbox',

@@ -75,7 +75,7 @@ def test_bad_timeout_value_exits_usage(tmp_path, capsys):
 def test_echo_run_succeeds(tmp_path, capsys):
     """Run the echo tool against 127.0.0.1. Should exit 0, print a job id."""
     _seed_data_dir(tmp_path)
-    run_cmd.main(["echo", "127.0.0.1", "--quiet",
+    run_cmd.main(["echo", "127.0.0.1", "--legacy", "--quiet",
                   "--data", str(tmp_path)])
     out = capsys.readouterr().out
     assert "job:" in out
@@ -85,7 +85,7 @@ def test_echo_run_succeeds(tmp_path, capsys):
 def test_echo_run_json_output(tmp_path, capsys):
     """--json emits findings as a JSON array (empty for echo)."""
     _seed_data_dir(tmp_path)
-    run_cmd.main(["echo", "127.0.0.1", "--quiet", "--json",
+    run_cmd.main(["echo", "127.0.0.1", "--legacy", "--quiet", "--json",
                   "--data", str(tmp_path)])
     out = capsys.readouterr().out
     # JSON array — either "[]" or a list with items
@@ -95,7 +95,7 @@ def test_echo_run_json_output(tmp_path, capsys):
 def test_echo_run_creates_job_in_store(tmp_path):
     """After a run, the job exists in the store with the correct tool."""
     _seed_data_dir(tmp_path)
-    run_cmd.main(["echo", "127.0.0.1", "--quiet", "--data", str(tmp_path)])
+    run_cmd.main(["echo", "127.0.0.1", "--legacy", "--quiet", "--data", str(tmp_path)])
     # Reopen the store and find the most recent job
     from whaxon.core import Core
     core = Core(data_dir=tmp_path)
@@ -174,7 +174,7 @@ def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch
         return core
 
     monkeypatch.setattr(run_cmd, "Core", make_core)
-    run_cmd.main(["nmap", "burpbountylab.com", "--extra", "-sV -p 80,443",
+    run_cmd.main(["nmap", "burpbountylab.com", "--legacy", "--extra", "-sV -p 80,443",
                   "--quiet", "--data", str(tmp_path)])
 
     core = cores[0]

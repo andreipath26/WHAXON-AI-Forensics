@@ -47,8 +47,8 @@ def test_ptaas_hides_unimplemented_client_actions(page, live_server):
     assert "BOLA / IDOR in Merchant Transfer Settlement Route" not in visible
     assert "REPRODUCIBLE EXPLOIT ARTIFACT" not in visible
 
-def test_bas_validation_only_offers_actions_for_real_sequence_ids(page, live_server):
-    calls = []
+def test_bas_validation_hands_off_to_v2_plan_authoring(page, live_server):
+    legacy_calls = []
 
     def findings(route):
         route.fulfill(
@@ -59,73 +59,71 @@ def test_bas_validation_only_offers_actions_for_real_sequence_ids(page, live_ser
                  '{"seq":null,"kind":"missing sequence","severity":"high","verification_status":"candidate"}]}]}',
         )
 
-    def validate(route):
-        calls.append(route.request.url)
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='{"status":"candidate","reason":"no deterministic replay signal"}',
-        )
-
     page.route("**/api/ui-v2/findings", findings)
-    page.route("**/api/validate/**", validate)
+    page.route("**/api/validate/**", lambda route: legacy_calls.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/bas")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-live-bas-status')?.textContent.includes('2 persisted finding(s)') || document.body.innerText.includes('2 persisted finding(s)')",
         timeout=8000,
     )
-    buttons = page.get_by_role("button", name="Validate recorded finding")
-    assert buttons.count() == 1
-    buttons.first.click()
-    page.wait_for_function(
-        "() => document.body.innerText.includes('Validation result: candidate')",
-        timeout=8000,
-    )
-    assert calls == [f"{live_server}/api/validate/job-bas/3"]
+    button = page.get_by_role("button", name="Open V2 Verification Studio")
+    assert button.count() == 1
+    with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
+        button.click()
+    assert legacy_calls == []
 
-def test_approval_queue_submits_answer_to_waiting_run(page, live_server):
-    pending_calls = {"count": 0}
-    answers = []
+def test_approval_queue_grants_v2_task_consent_and_keeps_legacy_runs_read_only(page, live_server):
+    grants = []
 
-    def pending(route):
-        pending_calls["count"] += 1
-        body = (
-            '[{"run_id":"run-123","goal":"Review the proposed in-scope plan","status":"waiting"}]'
-            if pending_calls["count"] == 1 else "[]"
-        )
-        route.fulfill(status=200, content_type="application/json", body=body)
-
-    def runs(route):
-        route.fulfill(status=200, content_type="application/json", body="[]")
-
-    def answer(route):
-        answers.append(route.request.post_data_json)
+    def queue(route):
         route.fulfill(
             status=200,
             content_type="application/json",
-            body='{"ok":true,"run_id":"run-123","seq":1}',
+            body='{"items":[{"mission_id":"mission-1","objective":"Review an authorized target",'
+                 '"plan_id":"plan-1","task_key":"task-1","capability_id":"web.server.audit",'
+                 '"target":"example.test","impact":"moderate","task_status":"pending","digest":"sha256:plan-digest",'
+                 '"approval_valid":false,"current_approval":null}]}',
         )
 
+    def pending(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='[{"run_id":"legacy-run","goal":"Legacy waiting run","status":"waiting",'
+                 '"pending_question":"Legacy executor question"}]',
+        )
+
+    def grant(route):
+        grants.append(route.request.post_data_json)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"plan_id":"plan-1","granted":true}',
+        )
+
+    legacy_writes = []
+    page.route("**/api/v2/approval-queue**", queue)
     page.route("**/api/ai/pending", pending)
-    page.route("**/api/ai/runs", runs)
-    page.route("**/api/ai/runs/run-123/answer", answer)
+    page.route("**/api/v2/workflows/plan-1/approvals", grant)
+    page.route("**/api/ai/runs/**", lambda route: legacy_writes.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/approvals")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('1 pending item(s)')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('1 pending or previously blocked V2 task(s)')",
         timeout=8000,
     )
-    page.get_by_label("Answer for run run-123").fill("Proceed only with the approved scope.")
-    page.get_by_label("Approval note for run run-123").fill("Reviewed against the engagement scope.")
-    with page.expect_response("**/api/ai/runs/run-123/answer"):
-        page.get_by_role("button", name="Submit answer").click()
-    page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('Answer recorded for run run-123')",
-        timeout=8000,
-    )
-    assert answers == [{
-        "answer": "Proceed only with the approved scope.",
-        "note": "Reviewed against the engagement scope.",
-    }]
+    assert page.get_by_text("web.server.audit → example.test", exact=False).is_visible()
+    assert page.get_by_text("Legacy runs (read-only)").is_visible()
+    assert page.get_by_text("cannot grant a V2 task approval or resume its legacy executor", exact=False).is_visible()
+    assert page.get_by_role("textbox").count() == 0
+    page.get_by_role("checkbox", name="I reviewed this exact capability, target, impact, and plan digest and grant a one-hour task approval.").check()
+    with page.expect_response(
+        lambda response: response.request.method == "POST"
+        and response.url.endswith("/api/v2/workflows/plan-1/approvals")
+    ):
+        page.get_by_role("button", name="Grant one-hour task approval").click()
+    assert grants and grants[0]["task_key"] == "task-1"
+    assert grants[0]["expires_at"] > 0
+    assert legacy_writes == []
 
 def test_bug_bounty_workspace_filters_live_jobs_and_refreshes(page, live_server):
     calls = {"report": 0, "history": 0}
@@ -469,8 +467,8 @@ def test_bas_halt_is_live_and_provider_simulation_controls_are_not_actionable(pa
 def test_approvals_header_reflects_live_scope_and_terminal_navigation(page, live_server):
     page.goto(f"{live_server}/ui-v2/approvals")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('pending item(s)')"
-        " || document.querySelector('#whaxon-live-approvals')?.innerText.includes('Live data unavailable')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('pending or previously blocked V2 task(s)')"
+        " || document.querySelector('#whaxon-live-approvals')?.innerText.includes('Live V2 approvals unavailable')",
         timeout=10000,
     )
     scope = page.evaluate("() => fetch('/api/scope').then(response => response.json())")
@@ -487,27 +485,27 @@ def test_approvals_header_reflects_live_scope_and_terminal_navigation(page, live
 
 
 def test_approvals_refresh_queue_and_halt_use_live_apis(page, live_server):
-    calls = {"pending": 0}
+    calls = {"queue": 0}
 
-    def pending(route):
-        calls["pending"] += 1
-        route.fulfill(status=200, content_type="application/json", body="[]")
+    def queue(route):
+        calls["queue"] += 1
+        route.fulfill(status=200, content_type="application/json", body='{"items":[]}')
 
-    page.route("**/api/ai/pending", pending)
-    page.route("**/api/ai/runs", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
+    page.route("**/api/v2/approval-queue**", queue)
+    page.route("**/api/ai/pending", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.route("**/api/history", lambda route: route.fulfill(status=200, content_type="application/json", body="[]"))
     page.goto(f"{live_server}/ui-v2/approvals")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('0 pending item(s)')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('0 pending or previously blocked V2 task(s)')",
         timeout=8000,
     )
-    before = calls["pending"]
+    before = calls["queue"]
     # The displayed count is already zero; observing it does not prove the
     # refresh has reached the API. Wait for the real request and response.
-    with page.expect_response("**/api/ai/pending", timeout=8000) as refreshed:
+    with page.expect_response("**/api/v2/approval-queue?limit=100", timeout=8000) as refreshed:
         page.get_by_role("button", name="Refresh queue").click()
     assert refreshed.value.status == 200
-    assert calls["pending"] > before
+    assert calls["queue"] > before
 
     page.get_by_role("button", name="Emergency Halt Scan").click()
     page.wait_for_function(

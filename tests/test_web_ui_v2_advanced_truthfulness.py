@@ -67,16 +67,16 @@ def test_approvals_workspace_loads_real_queue_and_disables_demo_decisions(page, 
     panel = page.locator("#whaxon-live-approvals")
     assert panel.is_visible()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('pending item(s)')"
-        " || document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Live data unavailable')",
+        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('pending or previously blocked V2 task(s)')"
+        " || document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Live V2 approvals unavailable')",
         timeout=10000,
     )
     refresh = panel.get_by_role("button", name="Refresh queue")
     assert refresh.is_enabled()
     refresh.click()
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('pending item(s)')"
-        " || document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Live data unavailable')",
+        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('pending or previously blocked V2 task(s)')"
+        " || document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Live V2 approvals unavailable')",
         timeout=10000,
     )
     # Check a single DOM snapshot: refreshing the live queue may insert a
@@ -94,39 +94,30 @@ def test_approvals_workspace_loads_real_queue_and_disables_demo_decisions(page, 
     assert not unwired, f"Unwired approval controls remain enabled: {unwired}"
 
 
-def test_approvals_workspace_submits_operator_answer_to_waiting_run(page, live_server):
+def test_approvals_workspace_keeps_legacy_waiting_runs_read_only(page, live_server):
+    legacy_writes = []
+    page.route("**/api/ai/runs/**", lambda route: legacy_writes.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/approvals")
     panel = page.locator("#whaxon-live-approvals")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('pending item(s)')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('Legacy runs (read-only)')",
         timeout=10000,
     )
-    answer = panel.get_by_role("textbox", name="Answer for run seed-ai-approval-ui")
-    assert answer.is_visible()
-    answer.fill("Proceed with the next permitted phase.")
-    note = panel.get_by_role("textbox", name="Approval note for run seed-ai-approval-ui")
-    note.fill("Browser acceptance test")
-    with page.expect_response(
-        lambda response: response.request.method == "POST"
-        and response.url.endswith("/api/ai/runs/seed-ai-approval-ui/answer")
-    ) as response_info:
-        panel.get_by_role("article").filter(has_text="UI acceptance: operator approval").get_by_role("button", name="Submit answer").click()
-    response = response_info.value
-    assert response.status == 200
-    assert response.json()["ok"] is True
-    page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals p')?.textContent.includes('Answer recorded for run seed-ai-approval-ui.')",
-        timeout=10000,
-    )
-    assert panel.get_by_role("textbox", name="Answer for run seed-ai-approval-ui").count() == 0
-    assert panel.get_by_role("textbox", name="Answer for run seed-ai-approval-ui").count() == 0
+    assert "seed-ai-approval-ui" in panel.inner_text()
+    assert "cannot grant a V2 task approval or resume its legacy executor" in panel.inner_text()
+    assert panel.get_by_role("textbox").count() == 0
+    assert panel.get_by_role("button", name="Submit answer").count() == 0
+    assert page.evaluate(
+        "() => performance.getEntriesByType('resource').map(entry => entry.name).filter(url => url.includes('/api/ai/runs/'))"
+    ) == []
+    assert legacy_writes == []
     pending = page.evaluate("() => fetch('/api/ai/pending').then(response => response.json())")
     pending_items = pending if isinstance(pending, list) else pending.get("items", pending.get("pending", []))
-    assert not any(
+    assert any(
         str(item.get("run_id") or item.get("id")) == "seed-ai-approval-ui"
         for item in pending_items
     )
     approvals = page.evaluate(
         "() => fetch('/api/ai/runs/seed-ai-approval-ui').then(response => response.json())"
     )
-    assert approvals["status"] in ("waiting", "running", "finished")
+    assert approvals["status"] == "waiting"

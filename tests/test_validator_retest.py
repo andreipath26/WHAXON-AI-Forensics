@@ -86,3 +86,25 @@ def test_retest_cli_refuses_out_of_scope_target(tmp_path, monkeypatch, capsys):
     rc = retest_cmd.main(["outside", "1"])
     assert rc == retest_cmd.EXIT_SCOPE_BLOCKED
     assert "out of scope" in capsys.readouterr().err.lower()
+
+
+def test_retest_cli_refuses_to_mutate_engine_v2_evidence(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    from whaxon.core import Core
+    from whaxon.interfaces.cli import retest_cmd
+
+    core = Core(tmp_path / "data")
+    asyncio.run(core.initialize(drain=False))
+    core.store.create("0123456789ab")
+    core.store.set_started("0123456789ab", "verify_sqli", "127.0.0.1:80")
+    finding = Finding(kind="sqli", severity="high", source="engine-v2-verifier",
+                      data={"parameter": "id"}, raw_line="verified")
+    core.store.append_finding("0123456789ab", finding, 0)
+    core.store.update_verification("0123456789ab", 0, "verified", by="engine-v2")
+    core.store.mark_engine_v2_execution_job("0123456789ab")
+
+    rc = retest_cmd.main(["0123456789ab", "0"])
+
+    assert rc == retest_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    assert "plan propose-verification" in capsys.readouterr().err
+    assert core.store.get_findings("0123456789ab")[0]["verification_status"] == "verified"

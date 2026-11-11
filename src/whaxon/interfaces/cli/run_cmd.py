@@ -1,12 +1,12 @@
-"""whaxon run <tool> <target> — execute a catalog tool from the CLI.
-
-Streams stdout/stderr live as the tool runs. Persists to the store the
-same way the TUI and web UI do. Prints a findings summary on finish.
+"""Create reviewable V2 plans or explicitly use legacy direct dispatch.
 
 Usage:
     whaxon run <tool_id> <target> [options]
 
 Options:
+    --mission-id ID        mission for the V2 plan (generated if omitted)
+    --plan-id ID            immutable V2 plan ID (generated if omitted)
+    --legacy                use the old direct-dispatch path explicitly
     --extra "..."          extra arguments passed to the tool
     --data DIR             data directory (default: ./data)
     --timeout SEC          hard timeout in seconds (default: 300)
@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shlex
 import sys
+import uuid
 from pathlib import Path
 
 from whaxon.core import Core
@@ -34,14 +36,17 @@ EXIT_USAGE = 64
 
 
 def _usage() -> None:
-    print("Usage: whaxon run <tool_id> <target> [--extra \"...\"] [--data DIR] "
-          "[--timeout SEC] [--allow-out-of-scope] [--quiet] [--verbose] [--json]")
+    print("Usage: whaxon run <tool_id> <target> [--data DIR] "
+          "[--mission-id ID] [--plan-id ID]")
     print()
-    print("  Runs a catalog tool against a target, streaming output live.")
+    print("  Creates and saves a provider-pinned Engine V2 plan for operator review.")
+    print("  V2: whaxon run --v2-plan <existing-plan-id> [--data DIR]")
+    print("  V2 requires a persisted plan and task approvals; no legacy fallback.")
+    print("  Legacy direct dispatch is explicit: whaxon run <tool_id> <target> --legacy")
     print("  Examples:")
     print("    whaxon run nmap 10.0.0.5")
-    print("    whaxon run nikto 10.0.0.5 --extra \"-p 80,443\"")
-    print("    whaxon run nmap 10.0.0.5 --quiet --json")
+    print("    whaxon run nmap 10.0.0.5 --legacy --quiet --json")
+    print("    whaxon run nikto 10.0.0.5 --legacy --extra \"-p 80,443\"")
 
 
 def _print_findings(findings, as_json: bool, verbose: bool = False) -> None:
@@ -81,11 +86,15 @@ def main(args: list[str] | None = None) -> None:
 
     extra_args = ""
     data_dir = Path("data")
+    mission_id = None
+    plan_id = None
     timeout_s = 300.0
     allow_out_of_scope = False
     quiet = False
     as_json = False
     verbose = False
+    timeout_explicit = False
+    legacy = False
 
     i = 2
     while i < len(args):
@@ -97,6 +106,7 @@ def main(args: list[str] | None = None) -> None:
         elif a == "--timeout" and i + 1 < len(args):
             try:
                 timeout_s = float(args[i + 1])
+                timeout_explicit = True
             except ValueError:
                 print(f"error: --timeout expects a number, got {args[i+1]!r}", file=sys.stderr)
                 sys.exit(EXIT_USAGE)
@@ -109,9 +119,114 @@ def main(args: list[str] | None = None) -> None:
             as_json = True; i += 1
         elif a == "--verbose":
             verbose = True; i += 1
+        elif a == "--legacy":
+            legacy = True; i += 1
+        elif a == "--mission-id" and i + 1 < len(args):
+            mission_id = args[i + 1]; i += 2
+        elif a == "--plan-id" and i + 1 < len(args):
+            plan_id = args[i + 1]; i += 2
         else:
             print(f"Unknown arg: {a}", file=sys.stderr)
             sys.exit(EXIT_USAGE)
+
+    # Explicit migration bridge: execute only an already persisted V2 plan.
+    # No implicit plan creation, approval, target inference or legacy fallback.
+    if tool_id == "--v2-plan":
+        if (legacy or extra_args or allow_out_of_scope or timeout_explicit or verbose
+                or quiet or as_json or mission_id or plan_id):
+            print("error: V2 execution refuses legacy argument/scope overrides", file=sys.stderr)
+            sys.exit(EXIT_USAGE)
+        from whaxon.interfaces.cli import workflow_cmd
+        result = workflow_cmd.main([
+            "--data-dir", str(data_dir), "plan", "run", "--id", target,
+        ])
+        if result:
+            sys.exit(result)
+        return
+
+    if legacy and (mission_id or plan_id):
+        print("error: --mission-id and --plan-id apply only to V2 plan creation", file=sys.stderr)
+        sys.exit(EXIT_USAGE)
+
+    if not legacy:
+        if extra_args or allow_out_of_scope or timeout_explicit or verbose or quiet or as_json:
+            print(
+                "error: direct-dispatch options require --legacy; default `whaxon run` "
+                "creates a reviewable V2 plan",
+                file=sys.stderr,
+            )
+            sys.exit(EXIT_USAGE)
+        mission_id = mission_id or f"mission-{uuid.uuid4().hex}"
+        plan_id = plan_id or f"plan-{uuid.uuid4().hex}"
+        if any(not value.strip() or value != value.strip() for value in (mission_id, plan_id)):
+            print("error: mission and plan IDs must be normalized non-empty text", file=sys.stderr)
+            sys.exit(EXIT_USAGE)
+        core = Core(data_dir=data_dir)
+        if core.catalog.get(tool_id) is None:
+            available = sorted(tool.id for tool in core.catalog.list())
+            print(f"error: unknown tool {tool_id!r}", file=sys.stderr)
+            if available:
+                print(f"  available: {', '.join(available)}", file=sys.stderr)
+            sys.exit(EXIT_UNKNOWN_TOOL)
+
+        async def _propose():
+            await core.initialize(drain=False)
+            core.create_mission(
+                mission_id,
+                f"Operator-requested {tool_id} assessment of {target}",
+                metadata={"created_by": "whaxon run"},
+            )
+            from whaxon.core.workflow_proposals import propose_tool_workflow_plan
+            proposal = propose_tool_workflow_plan(
+                core,
+                mission_id=mission_id,
+                plan_id=plan_id,
+                tool_id=tool_id,
+                target=target,
+            )
+            if proposal.get("status") == "proposed":
+                from whaxon.core.workflow import WorkflowPlan
+                proposal["created"] = core.save_workflow_plan(
+                    plan_id, WorkflowPlan.from_dict(proposal["plan"]),
+                )
+            return proposal
+
+        try:
+            proposal = asyncio.run(_propose())
+        except (OutOfScopeError, OSError, ValueError, TypeError, RuntimeError) as exc:
+            print(f"error: unable to create Engine V2 plan: {exc}", file=sys.stderr)
+            sys.exit(EXIT_TOOL_ERROR)
+        if proposal.get("status") != "proposed" or not proposal.get("created"):
+            print(json.dumps(proposal, indent=2, sort_keys=True))
+            sys.exit(EXIT_TOOL_ERROR)
+        next_commands = [
+            shlex.join([
+                "whaxon", "workflow", "--data-dir", str(data_dir),
+                "plan", "show", "--id", plan_id,
+            ]),
+            shlex.join([
+                "whaxon", "workflow", "--data-dir", str(data_dir),
+                "plan", "approval", "grant", "--id", plan_id,
+                "--task", "task-1", "--approval-id", "<approval-id>",
+                "--actor", "<operator>", "--expires-at", "<unix-time>",
+            ]),
+            shlex.join([
+                "whaxon", "run", "--v2-plan", plan_id,
+                "--data", str(data_dir),
+            ]),
+        ]
+        print(json.dumps({
+            "status": "plan_saved_for_review",
+            "mission_id": mission_id,
+            "plan_id": plan_id,
+            "digest": proposal["digest"],
+            "capability_id": proposal["capability_id"],
+            "provider_id": proposal["provider_id"],
+            "execution_submitted": False,
+            "approval_granted": False,
+            "next": next_commands,
+        }, indent=2, sort_keys=True))
+        return
 
     core = Core(data_dir=data_dir)
 

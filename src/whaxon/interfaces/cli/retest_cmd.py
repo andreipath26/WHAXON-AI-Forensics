@@ -14,6 +14,7 @@ EXIT_NOT_FOUND = 1
 EXIT_USAGE = 2
 EXIT_NOT_VERIFIED = 3
 EXIT_SCOPE_BLOCKED = 4
+EXIT_V2_WORKFLOW_REQUIRED = 5
 
 
 def main(args: list[str] | None = None) -> int:
@@ -62,6 +63,20 @@ def main(args: list[str] | None = None) -> int:
     if not target_f:
         print(f"Finding not found: {job_id} seq {seq}", file=sys.stderr)
         return EXIT_NOT_FOUND
+
+    try:
+        is_v2_job = core.store.is_engine_v2_execution_job(job_id)
+    except Exception:
+        print("Cannot retest: V2 evidence ownership could not be confirmed; no request was sent.", file=sys.stderr)
+        return EXIT_SCOPE_BLOCKED
+    if is_v2_job:
+        print(
+            "This finding belongs to Engine V2 evidence. Use "
+            "'whaxon workflow plan propose-verification --mode retest' to prepare "
+            "a plan; approval and execution are separate.",
+            file=sys.stderr,
+        )
+        return EXIT_V2_WORKFLOW_REQUIRED
 
     if target_f.get("verification_status") != "verified":
         print(

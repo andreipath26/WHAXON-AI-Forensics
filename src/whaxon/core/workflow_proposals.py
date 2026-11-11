@@ -1,0 +1,219 @@
+"""Deterministic helpers for preparing operator-reviewable workflow plans."""
+from __future__ import annotations
+
+import uuid
+
+from .providers import SEMANTIC_OPERATION_IDS
+from .workflow import WorkflowPlan, WorkflowTask
+
+
+def propose_tool_workflow_plan(
+    core,
+    *,
+    mission_id: str,
+    plan_id: str,
+    tool_id: str,
+    target: str,
+) -> dict:
+    """Prepare a fixed-argument catalog tool plan without saving or executing it.
+
+    Only installed, selected Engine V2 providers with an empty input contract are
+    eligible. Admitted catalog tools use stable semantic operation IDs; other
+    tools must have an explicitly bound capability. Scope and provider
+    readiness are checked before a proposal is returned. Saving, approval and
+    execution remain separate operator actions.
+    """
+    for name, value in (("mission_id", mission_id), ("plan_id", plan_id),
+                        ("tool_id", tool_id), ("target", target)):
+        if not isinstance(value, str) or not value.strip() or value != value.strip():
+            return {"status": "blocked", "reason": f"{name} must be normalized non-empty text"}
+
+    if core.store.get_mission(mission_id) is None:
+        return {"status": "blocked", "reason": f"unknown mission: {mission_id}"}
+    if core.catalog.get(tool_id) is None:
+        return {"status": "blocked", "reason": f"unknown catalog tool: {tool_id}"}
+
+    try:
+        scope = core.scope.check(target)
+    except Exception:
+        return {"status": "blocked", "reason": "scope evaluation failed; no plan was created"}
+    if not getattr(scope, "allowed", False):
+        return {
+            "status": "blocked",
+            "reason": f"target is outside current scope: {getattr(scope, 'reason', '')}",
+        }
+
+    capability_id = SEMANTIC_OPERATION_IDS.get(tool_id, f"tool.{tool_id}")
+    try:
+        manifest = core.providers.manifest_for(capability_id)
+    except (LookupError, ValueError, TypeError, RuntimeError):
+        return {"status": "blocked", "reason": "no V2 provider is registered for this tool"}
+    if manifest.capability_id != capability_id:
+        return {"status": "blocked", "reason": "provider capability does not match the requested tool"}
+    if (
+        manifest.impact != "moderate"
+        or manifest.input_schema.get("properties") != {}
+        or manifest.input_schema.get("required", []) != []
+        or manifest.input_schema.get("additionalProperties") is not False
+    ):
+        return {
+            "status": "blocked",
+            "reason": "V2 plan proposals support only fixed-argument moderate-impact providers",
+        }
+
+    readiness = next((
+        item for item in core.capability_inventory()
+        if isinstance(item, dict)
+        and item.get("capability_id") == capability_id
+        and item.get("provider_id") == manifest.provider_id
+    ), None)
+    if not readiness or any(
+        readiness.get(key) is not True
+        for key in ("selected_for_execution", "installed", "executable")
+    ):
+        return {"status": "blocked", "reason": "V2 provider is not selected and ready for execution"}
+
+    task_id = "task-1"
+    task = WorkflowTask(
+        id=task_id,
+        capability_id=capability_id,
+        target=target,
+        inputs={},
+        permissions=manifest.permissions,
+        impact=manifest.impact,
+        timeout_s=manifest.timeout_s,
+        idempotency_key=uuid.uuid5(
+            uuid.NAMESPACE_URL, f"whaxon:tool-proposal:{mission_id}:{plan_id}",
+        ).hex,
+    )
+    try:
+        core.providers.resolve_task(task, require_installed=True)
+    except (LookupError, ValueError, TypeError, RuntimeError):
+        return {"status": "blocked", "reason": "V2 provider or target compatibility check failed"}
+
+    plan = WorkflowPlan(
+        mission_id=mission_id,
+        metadata={"provider_bindings": {task_id: {
+            "provider_id": manifest.provider_id,
+            "manifest_fingerprint": manifest.fingerprint,
+        }}},
+        tasks=(task,),
+    )
+    return {
+        "status": "proposed",
+        "plan_id": plan_id,
+        "plan": plan.to_dict(),
+        "digest": plan.digest,
+        "capability_id": capability_id,
+        "provider_id": manifest.provider_id,
+        "manifest_fingerprint": manifest.fingerprint,
+        "execution_submitted": False,
+        "approval_granted": False,
+    }
+
+
+def propose_finding_verification_plan(
+    core,
+    *,
+    mission_id: str,
+    plan_id: str,
+    source_job_id: str,
+    finding_seq: int,
+    mode: str,
+) -> dict:
+    """Prepare a plan for the bounded V2 SQLi/XSS verifier or retester.
+
+    The source job and finding must already be persisted. Provider resolution
+    verifies the V2 evidence seal and exact finding-kind contract; this helper
+    never contacts the target, saves the plan, grants approval, or executes it.
+    """
+    for name, value in (("mission_id", mission_id), ("plan_id", plan_id),
+                        ("source_job_id", source_job_id)):
+        if not isinstance(value, str) or not value.strip() or value != value.strip():
+            return {"status": "blocked", "reason": f"{name} must be normalized non-empty text"}
+    if isinstance(finding_seq, bool) or not isinstance(finding_seq, int) or finding_seq < 0:
+        return {"status": "blocked", "reason": "finding_seq must be a non-negative integer"}
+    if mode not in {"verify", "retest"}:
+        return {"status": "blocked", "reason": "mode must be verify or retest"}
+    if core.store.get_mission(mission_id) is None:
+        return {"status": "blocked", "reason": f"unknown mission: {mission_id}"}
+
+    source_job = core.store.get(source_job_id)
+    selected = next((
+        row for row in (core.store.get_findings(source_job_id) or [])
+        if isinstance(row, dict) and row.get("seq") == finding_seq
+    ), None)
+    if source_job is None or selected is None:
+        return {"status": "blocked", "reason": "source job or finding sequence was not found"}
+    kind = selected.get("kind")
+    if not isinstance(kind, str):
+        return {"status": "blocked", "reason": "finding kind is missing or invalid"}
+    capability_by_kind = {
+        ("verify", "sqli"): "tool.verify_sqli",
+        ("verify", "sql_injection"): "tool.verify_sqli",
+        ("verify", "xss"): "tool.verify_xss",
+        ("retest", "sqli"): "tool.retest_sqli",
+        ("retest", "sql_injection"): "tool.retest_sqli",
+        ("retest", "xss"): "tool.retest_xss",
+    }
+    capability_id = capability_by_kind.get((mode, kind))
+    if capability_id is None:
+        return {"status": "blocked", "reason": "finding kind is unsupported by the V2 verifier"}
+    target = source_job.get("target")
+    if not isinstance(target, str) or not target:
+        return {"status": "blocked", "reason": "source job has no exact target"}
+    try:
+        scope = core.scope.check(target)
+    except Exception:
+        return {"status": "blocked", "reason": "scope evaluation failed; no plan was created"}
+    if not getattr(scope, "allowed", False):
+        return {
+            "status": "blocked",
+            "reason": f"target is outside current scope: {getattr(scope, 'reason', '')}",
+        }
+
+    try:
+        manifest = core.providers.manifest_for(capability_id)
+    except (LookupError, ValueError, TypeError, RuntimeError):
+        return {"status": "blocked", "reason": "V2 verification provider is unavailable"}
+    task_id = "verification-1"
+    task = WorkflowTask(
+        id=task_id,
+        capability_id=capability_id,
+        target=target,
+        inputs={"source_job_id": source_job_id, "finding_seq": finding_seq},
+        permissions=manifest.permissions,
+        impact=manifest.impact,
+        timeout_s=manifest.timeout_s,
+        idempotency_key=uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"whaxon:verification-proposal:{mission_id}:{plan_id}",
+        ).hex,
+    )
+    try:
+        core.providers.resolve_task(task, require_installed=True)
+    except (LookupError, ValueError, TypeError, RuntimeError):
+        return {
+            "status": "blocked",
+            "reason": "source evidence, provider, target, or verification contract is not valid",
+        }
+
+    plan = WorkflowPlan(
+        mission_id=mission_id,
+        metadata={"provider_bindings": {task_id: {
+            "provider_id": manifest.provider_id,
+            "manifest_fingerprint": manifest.fingerprint,
+        }}},
+        tasks=(task,),
+    )
+    return {
+        "status": "proposed",
+        "plan_id": plan_id,
+        "plan": plan.to_dict(),
+        "digest": plan.digest,
+        "capability_id": capability_id,
+        "provider_id": manifest.provider_id,
+        "manifest_fingerprint": manifest.fingerprint,
+        "execution_submitted": False,
+        "approval_granted": False,
+    }

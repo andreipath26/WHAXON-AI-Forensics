@@ -605,6 +605,80 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 404 if message.startswith("unknown mission:") else 400
             )
 
+    @app.post("/api/v2/workflow-proposals")
+    @limiter.limit("20 per minute")
+    def workflow_v2_workflow_proposal():
+        """Prepare a fixed tool or evidence-bound verification plan for review."""
+        from whaxon.core.workflow import WorkflowPlan
+        from whaxon.core.workflow_proposals import (
+            propose_finding_verification_plan,
+            propose_tool_workflow_plan,
+        )
+
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify({"error": "JSON object required"}), 400
+        kind = payload.get("kind")
+        save = payload.get("save", False)
+        if type(save) is not bool:
+            return jsonify({"error": "save must be a boolean"}), 400
+        if kind == "tool":
+            required = ("mission_id", "id", "tool", "target")
+            allowed = {*required, "kind", "save"}
+            if set(payload) - allowed or any(
+                not isinstance(payload.get(key), str) or not payload[key].strip()
+                for key in required
+            ):
+                return jsonify({"error": "tool proposal requires mission_id, id, tool and target"}), 400
+            if len(payload["target"]) > 2048:
+                return jsonify({"error": "target exceeds allowed limits"}), 400
+            proposal_args = {
+                "mission_id": payload["mission_id"], "plan_id": payload["id"],
+                "tool_id": payload["tool"], "target": payload["target"],
+            }
+        elif kind == "verification":
+            required = ("mission_id", "id", "source_job_id", "finding_seq", "mode")
+            allowed = {*required, "kind", "save"}
+            if set(payload) - allowed or any(
+                not isinstance(payload.get(key), str) or not payload[key].strip()
+                for key in ("mission_id", "id", "source_job_id", "mode")
+            ) or type(payload.get("finding_seq")) is not int or payload["finding_seq"] < 0:
+                return jsonify({
+                    "error": "verification proposal requires mission_id, id, source_job_id, non-negative finding_seq and mode",
+                }), 400
+            if payload["mode"] not in {"verify", "retest"}:
+                return jsonify({"error": "mode must be verify or retest"}), 400
+            proposal_args = {
+                "mission_id": payload["mission_id"], "plan_id": payload["id"],
+                "source_job_id": payload["source_job_id"],
+                "finding_seq": payload["finding_seq"], "mode": payload["mode"],
+            }
+        else:
+            return jsonify({"error": "kind must be tool or verification"}), 400
+
+        try:
+            proposal = (
+                propose_tool_workflow_plan(core, **proposal_args)
+                if kind == "tool"
+                else propose_finding_verification_plan(core, **proposal_args)
+            )
+            created = False
+            if save and proposal.get("status") == "proposed":
+                created = core.save_workflow_plan(
+                    payload["id"], WorkflowPlan.from_dict(proposal["plan"]),
+                )
+            return jsonify({
+                **proposal,
+                "created": bool(created),
+                "execution_submitted": False,
+                "approval_granted": False,
+            }), 200
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            message = str(exc)
+            return jsonify({"error": message}), (
+                404 if message.startswith("unknown mission:") else 400
+            )
+
     @app.post("/api/v2/workflows/<plan_id>/followups")
     @limiter.limit("10 per minute")
     def workflow_v2_followups(plan_id):
@@ -901,6 +975,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             return jsonify(core.workflow_approvals(plan_id))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/approval-queue")
+    def workflow_v2_approval_queue():
+        raw_limit = request.args.get("limit", "100")
+        if (
+            len(raw_limit) > 4 or not raw_limit.isascii()
+            or not raw_limit.isdecimal() or not 1 <= int(raw_limit) <= 1000
+        ):
+            return jsonify({"error": "approval queue limit must be between 1 and 1000"}), 400
+        try:
+            return jsonify({
+                "items": core.workflow_approval_queue(limit=int(raw_limit)),
+            })
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
     @app.post("/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke")
     def workflow_v2_revoke_approval(plan_id, approval_id):
@@ -1933,6 +2022,23 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             }, 403
         return None
 
+    def _legacy_validation_v2_error(job_id: str):
+        """Keep legacy validators from mutating sealed V2 evidence."""
+        checker = getattr(registry.core.store, "is_engine_v2_execution_job", None)
+        if not callable(checker):
+            return {"error": "could not confirm evidence ownership; replay was not attempted"}, 503
+        try:
+            is_v2_job = checker(job_id)
+        except Exception:
+            app.logger.exception("Could not confirm evidence ownership before validation replay")
+            return {"error": "could not confirm evidence ownership; replay was not attempted"}, 503
+        if is_v2_job:
+            return {
+                "error": "Engine V2 evidence requires a plan-bound verification or retest workflow",
+                "workflow": "whaxon workflow plan propose-verification",
+            }, 409
+        return None
+
     @app.post("/api/validate/<job_id>/<int:seq>")
     def api_validate(job_id: str, seq: int):
         from whaxon.core.findings import Finding
@@ -1941,6 +2047,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         target_f = next((f for f in findings if f["seq"] == seq), None)
         if not target_f:
             return {"error": "finding not found"}, 404
+        evidence_error = _legacy_validation_v2_error(job_id)
+        if evidence_error:
+            return evidence_error
         job = registry.core.store.get(job_id) or {}
         raw_target = job.get("target", "")
         if raw_target.startswith(("http://", "https://")):
@@ -1972,6 +2081,9 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         target_f = next((f for f in findings if f["seq"] == seq), None)
         if not target_f:
             return {"error": "finding not found"}, 404
+        evidence_error = _legacy_validation_v2_error(job_id)
+        if evidence_error:
+            return evidence_error
         if target_f.get("verification_status") != "verified":
             return {
                 "error": "not verified",

@@ -8,11 +8,12 @@ a callsite requires reviewing its execution path and updating the classification
 | Source | Caller | Classification | Notes |
 | --- | --- | --- | --- |
 | `interfaces/web/server.py` | `_run_job_blocking` | Legacy | `/api/run`; scope checked, but no persisted V2 request or task lease. |
-| `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy | Used by web and CLI AI execution; approvals remain in legacy `ai_runs`. |
+| `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy | Used only by legacy `/api/ai/run` and explicit `whaxon ai --legacy` execution/resume; approvals remain in legacy `ai_runs`. The separate `propose_v2_workflow_plan` path creates reviewable plan tasks and does not dispatch. |
 | `ai/executor.py`, `ai/providers/*` | Executor/provider actions | Legacy | Indirect callbacks still dispatch through `ToolRunner`. |
-| `interfaces/cli/run_cmd.py` | `main._go` | Legacy | Direct tool/session execution; legacy override semantics remain. |
+| `interfaces/cli/run_cmd.py` | default proposal path / `main._go` | Mixed; default V2 plan-only | `whaxon run <tool> <target>` saves a provider-pinned review plan after scope/readiness checks; it does not approve or execute. `--v2-plan` executes only a previously persisted and approved plan. Direct ToolRunner and session transports require explicit `--legacy`; there is no V2-to-legacy fallback. |
 | `core/worker.py` | `drain_async` | Legacy | Drains Automator follow-up jobs outside workflow-plan authorization. |
-| `interfaces/gui/main_window.py`, `interfaces/tui/screens/main.py` | `_run_tool` | Legacy | Desktop and terminal clients still use direct dispatch. |
+| `interfaces/gui/main_window.py` | `_run_tool` | Legacy; dormant module | The shipped `whaxon-gui` entry point is `interfaces.gui.app:main` and embeds `/ui-v2`; repository search found no import of this older widget. The module remains packaged until documented downstream-import and clean-wheel checks permit removal. It is not the active desktop dispatch path. |
+| `interfaces/tui/screens/main.py` | catalog Run handoff / workflow screen | Engine V2 workflow client | Catalog Run opens V2 authoring with tool and target prefilled. The workflow screen proposes fixed-tool and sealed-evidence plans, reviews task bindings, records per-task approval, submits durable requests, reconnects and requests cancellation through shared Core services. No direct ToolRunner call remains in the TUI. |
 | `core/providers.py` | `dispatch` | Engine V2 | Canonical provider dispatch after workflow authorization and scheduler checks. |
 
 The legacy routes already apply scope checks and tool validation. Their remaining
@@ -21,9 +22,25 @@ identity, task leases, plan-bound approval, cancellation, reconnect, and recover
 This inventory is evidence of caller coverage, not a claim that those controls
 are absent from every legacy path or that a migration is safe.
 
+The workflow CLI also provides `plan propose-tool` for supported catalog tools.
+It creates a fixed-argument, provider-pinned review proposal only after current
+scope and provider readiness checks. Saving remains explicit; approval and
+execution are separate commands. The default `whaxon run <tool> <target>` now
+uses this proposal path and persists the plan; unsupported/session transports
+remain available through explicit `--legacy` dispatch only.
+
+`plan propose-verification` similarly prepares V2 verify/retest plans for
+supported SQLi and reflected-XSS findings. The selected verifier rechecks the
+source job's V2 execution marker, evidence seal, exact finding sequence, target,
+and prior verification state for retests. This is a separate route for eligible
+V2 evidence. Legacy CLI/API validator entry points now refuse V2-owned evidence
+before sending a request or mutating its finding; legacy job behavior remains.
+This does not add unsupported validator kinds or finish full validator client
+parity.
+
 Additional execution actions need their own semantic inventory. CLI passive
-recon and the existing CLI/API validate/retest callers still use dedicated
-legacy services rather than `ToolRunner`. A separate V2 provider now covers
+recon and legacy-job CLI/API validate/retest callers still use dedicated legacy
+services rather than `ToolRunner`. A separate V2 provider now covers
 only sealed-finding SQLi verification/retest under a plan-bound contract; this
 does not migrate those legacy callers or cover the other validator kinds.
 
@@ -36,10 +53,10 @@ runner inventory.
 | Source | Caller | Service path | Scope/consent boundary | Persistence and V2 status |
 | --- | --- | --- | --- | --- |
 | `interfaces/cli/recon_cmd.py` | `main` | `core.recon.run` → `ReconRunner.run` → registered DNS/TLS/HTTP checks | CLI checks scope before execution; `ReconRunner.run` checks scope again. No plan-bound approval or V2 task authorization. | `JobStarted`/`JobFindings` enter the legacy event bus and its store subscribers. Direct service execution; no V2 workflow request, lease, attempt or cancellation record. |
-| `interfaces/cli/validate_cmd.py` | `main` | `Validator.validate` | CLI resolves the stored finding target, requires it, then checks active scope before calling the validator. The validator itself does not enforce scope. | Writes verification state to the legacy job store and records proof for verified outcomes. Direct HTTP probes; no V2 task/attempt record. |
-| `interfaces/cli/retest_cmd.py` | `main` | `Validator.revalidate` → `Validator.validate` | Requires a previously verified finding and rechecks target scope before calling the validator. The validator itself does not enforce scope. | Updates legacy finding verification state. Direct HTTP probes; no V2 task/attempt record. |
-| `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | `_validation_scope_error` checks target presence and current scope before the probe. The validator itself does not enforce scope. | Updates legacy verification state and proof through `JobStore`; not dispatched as a V2 workflow task. |
-| `interfaces/web/server.py` | `create_app.api_retest` | `Validator.revalidate` → `Validator.validate` | Requires `verification_status == "verified"`; `_validation_scope_error` checks target presence and current scope before the probe. | Updates legacy verification state through `JobStore`; not dispatched as a V2 workflow task. |
+| `interfaces/cli/validate_cmd.py` | `main` | `Validator.validate` | V2-owned evidence is refused before target replay; legacy jobs still require target and active scope. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
+| `interfaces/cli/retest_cmd.py` | `main` | `Validator.revalidate` → `Validator.validate` | V2-owned evidence is refused before replay; legacy findings still require prior verification and current scope. | Legacy job updates remain in `JobStore`; V2 retest uses the plan-bound provider path. |
+| `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy jobs still pass `_validation_scope_error` before the probe. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
+| `interfaces/web/server.py` | `create_app.api_retest` | `Validator.revalidate` → `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy findings still require prior verification and current scope. | Legacy job updates remain in `JobStore`; V2 retest uses the plan-bound provider path. |
 | `interfaces/web/server.py`, `adapters/msf.py` | `create_app.msf_run._do_run` → `MSFAdapter.run_module` | `MSFClient.execute` (module and optional auto-chain post modules) | The MSF route validates module/target inputs and checks target scope before enqueueing its worker. This direct adapter path is not a `ToolRunner` dispatch. The optional post-module auto-chain is not plan-bound V2 dispatch. | Persists job output/findings through `JobStore`; no V2 workflow task, lease, attempt or cancellation record. Keep separate from catalog tools routed through `ToolRunner`. |
 | `interfaces/web/server.py` | `create_app.msf_session_exec` | `MSFClient.session_exec` | `_msf_session_scope_error` resolves the session host and checks current scope before sending the supplied session command. | Returns output directly; no V2 task/attempt record or durable workflow evidence link. |
 | `core/runner.py` | `run_in_session` → `_run_msf_session` | `MSFClient.session_exec` | Runner requires a persisted open session, authorizes its stored host, re-reads the live RPC session and authorizes its host, rejects host identity drift, and enforces a required session type when available before dispatch. | Emits legacy job events and stores capped output; this session-scoped execution path is not scheduler-owned V2 workflow dispatch. |
@@ -158,10 +175,10 @@ execution evidence; deployment-host readiness remains unverified.
 
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
-| CLI workflow | `whaxon workflow` → shared `Core` workflow/approval/provider services | `whaxon run`, `ai`, `recon`, `validate`, and `retest` retain direct legacy execution; `whaxon msf` only inspects status/sessions/modules | V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
-| HTTP API | `/api/v2/capabilities`, `/api/v2/ai/proposals`, `/providers`, `/workflows`, `/workflow-runs` and related lifecycle routes call shared Core services | `/api/run`, `/api/ai/run`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths | V2 route evidence: `test_server_workflow_v2.py`; legacy paths retain legacy job/AI state and are not all V2 request/task-owned. |
+| CLI workflow | `whaxon run`, default `whaxon ai`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients | V2 AI/Findings/BAS/Retest/Approvals clients do not call legacy executor, answer, validation or retest mutations. Their legacy history is read-only; proposals and approvals remain separate from submission. Legacy APIs stay available to older clients and are not V2 request/task-owned. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
-| Native desktop and terminal | None of their direct execution actions are V2 workflow dispatches | GUI/TUI call `Core.runner` directly | Legacy `JobStore`/event path; see `test_gui_entrypoint.py`, `test_tui_main.py`, and runner tests. |
+| Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
 
 ### Consequential HTTP route ownership
 
@@ -266,7 +283,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/pivot/graph` | `api_pivot_graph` | Legacy pivot/session graph |
 | `GET` | `/api/pivot/sessions/<session_id>/chain` | `api_pivot_chain` | Legacy pivot/session graph |
 | `GET` | `/api/report` | `api_report` | Legacy report, finding or loot view |
-| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Legacy Validator and JobStore |
+| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
 | `POST` | `/api/run` | `run_tool` | Legacy ToolRunner and JobStore |
 | `GET` | `/api/scope` | `get_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
@@ -280,6 +297,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/ui-v2/findings` | `api_ui_v2_findings` | Legacy finding/evidence API adapter |
 | `GET` | `/api/v2/capabilities` | `workflow_v2_capabilities` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/ai/proposals` | `workflow_v2_ai_proposal` | AI Action to V2 workflow proposal; optional immutable plan persistence; no approval or execution |
+| `POST` | `/api/v2/workflow-proposals` | `workflow_v2_workflow_proposal` | Fixed-argument tool or evidence-bound verification plan proposal; optional immutable plan persistence; no approval or execution |
 | `GET` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/missions/<mission_id>/budget` | `workflow_v2_mission_budget` | Core workflow registry, stores and lifecycle services |
@@ -301,6 +319,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>` | `workflow_v2_plan_details` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/approval-queue` | `workflow_v2_approval_queue` | Bounded pending/blocked moderate+ V2 tasks with exact approval state for the V2 Approvals UI |
 | `POST` | `/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke` | `workflow_v2_revoke_approval` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
@@ -324,7 +343,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Legacy Validator and JobStore |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
@@ -436,7 +455,8 @@ label is not authenticated-principal evidence.
 The CLI split also distinguishes three V2 execution modes: `workflow plan run`
 uses the V2 scheduler/policy/provider path synchronously; `workflow plan
 submit-run` plus `serve-requests` uses the durable request queue and supervised
-worker; legacy `whaxon run`, `ai`, `recon`, `validate`, and `retest` remain
+worker; `whaxon run <tool> <target>` creates a saved plan but does not execute;
+explicit `whaxon run --legacy`, `ai`, `recon`, `validate`, and `retest` remain
 outside V2 task/request ownership. `workflow plan run` is not a legacy runner
 dispatch, although it bypasses the durable run-request queue. The top-level
 help omission for `recon` was corrected and is guarded by
@@ -487,10 +507,11 @@ runner and service callsite guards.
 ## Migration constraint
 
 Do not redirect `/api/run`, `/api/ai/run`, CLI tool/session execution, recon, or
-retest in bulk. The Run page consumes the current web route, AI uses a separate
-operator-answer record, and the CLI exposes capability-specific options. Each
-migration needs an explicit capability mapping and parity tests before retiring
-the legacy caller. E6 remains frozen until the operator declares the UI ready.
+retest in bulk. The Run and AI Gate pages now hand off to persisted V2 plans;
+the legacy HTTP routes remain for older clients, CLI AI still uses separate
+legacy run records, and recon retains its dedicated service. Each migration
+needs an explicit capability mapping and parity before retiring the legacy
+caller. UI-10 and broader E6 acceptance remain open.
 
 ## AI-to-V2 proposal boundary
 
@@ -504,7 +525,26 @@ operator-supplied target and rejects session actions or dynamic arguments.
 approval, submits a run request, or dispatches work. Operators use the existing
 plan approval and run-request commands separately.
 
-This adds the V2 proposal API but does not migrate `whaxon ai`, `/api/ai/run`,
-or the legacy Executor loop. Those callers still dispatch through the legacy AI
-bridge and remain in the inventory above until their lifecycle and client
-parity work is completed.
+The AI Gate page now uses the V2 proposal endpoint and hands saved plans to the
+Run page. Default `whaxon ai "<goal>"` now creates and saves a scope-checked V2
+proposal, then prints separate review, approval and submission commands. It
+does not grant approval or submit a run. The old autonomous executor and
+`--resume` path require explicit `--legacy`; `/api/ai/run` remains a legacy API
+for existing clients. V2 AI action generation is still bounded to one
+moderate-impact catalog action with an exact target and no dynamic arguments;
+multi-step autonomous planning remains outside this migration slice.
+
+The V2 Approvals page now reads `GET /api/v2/approval-queue` and grants
+plan/task-bound, expiring consent through
+`POST /api/v2/workflows/<plan_id>/approvals`. It never resumes a legacy AI
+run: `/api/ai/pending` is displayed read-only, and
+`POST /api/ai/runs/<id>/answer` remains available only for older clients.
+Granting consent does not submit the separate V2 run request; blocked tasks
+remain blocked and must be replanned.
+
+The V2 Findings, BAS and Retest pages no longer call the legacy validation or
+retest mutation routes. They hand off candidate findings for V2 verification
+plans and verified findings for V2 retest plans. The server requires sealed V2
+evidence and current scope before saving either plan. Legacy validation and
+retest APIs remain available for compatibility clients; saved plans still
+require review, approval, and separate run submission.

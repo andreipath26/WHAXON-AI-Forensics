@@ -127,6 +127,7 @@ def test_cli_validate_restores_request_context(tmp_path, monkeypatch):
         "request_context": context,
     }
     store = SimpleNamespace(
+        is_engine_v2_execution_job=lambda job_id: False,
         get_findings=lambda job_id: [finding_row],
         get=lambda job_id: {"target": "https://example.test"},
         update_verification=lambda *args, **kwargs: None,
@@ -171,6 +172,7 @@ def test_cli_retest_restores_request_context(tmp_path, monkeypatch):
         "request_context": context,
     }
     store = SimpleNamespace(
+        is_engine_v2_execution_job=lambda job_id: False,
         get_findings=lambda job_id: [finding_row],
         get=lambda job_id: {"target": "https://example.test"},
         update_verification=lambda *args, **kwargs: None,

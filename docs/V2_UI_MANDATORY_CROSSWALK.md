@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 30271)
+Total output lines: 1574
+
 # WHAXON — UI V2 DESIGN, INTERACTION AND ACCEPTANCE MASTER
 
 > **Current UI / delivery reconciliation — 2026-11-06.** The implementation baseline is main `0cef416155623199d8cb551b809dd469d62b4778`; its recorded exact-head CI run [42253317306](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/42253317306) passed 20/20. All 22 production routes have page-level browser suites, but route coverage does not prove complete control behavior. UI implementation continues. Complete the agreed V2 UI and engine functionality, with internal browser/API tests throughout. Defer D1–D6 external/manual/deployment qualification until the agreed V2 scope is complete and internal checks pass. The supported UI scope is desktop.
@@ -51,6 +54,23 @@
 | UI-21 | Threat Intel | `/ui-v2/threat-intel` | `ui_v2_threat_intel.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
 | UI-22 | Approvals | `/ui-v2/approvals` | `ui_v2_approvals.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
 
+### Approvals migration checkpoint — 2026-11-11
+
+The Approvals page now loads persisted moderate/high/critical V2 tasks from
+`GET /api/v2/approval-queue` and records exact task approvals through the V2
+workflow approval endpoint. It does not submit work. Pending legacy AI runs
+remain visible read-only; this page no longer posts answers or resumes their
+executor. Blocked V2 tasks are displayed without a grant action because an
+approval cannot unblock or retry them. UI-22 remains open for the D1–D6 review
+gates below, broader queue-state coverage, and exact-head CI evidence.
+
+The V2 Findings, BAS and Retest pages also no longer issue legacy validation
+or retest mutations. Candidate findings link to V2 verification planning and
+verified findings to V2 retest planning; both require sealed Engine V2 evidence
+and current scope before the server saves a plan. Review, approval and durable
+submission remain separate. Legacy routes remain available to older clients.
+UI-11 and UI-17 remain open for the D1–D6 gates below.
+
 All templates live under `src/whaxon/interfaces/web/templates/`; browser tests live under `tests/`. The dashboard alias `/ui-v2/dashboard` and root entry route `/` additionally require parity checks. Common tests: `test_web_ui_v2_route_matrix.py`, `test_web_ui_v2_navigation.py`, `test_web_ui_v2_control_inventory.py`; auxiliary pages share the listed suites. The inventory records **793 static controls**; script references do not establish live bindings.
 
 ## Acceptance criteria for EVERY row
@@ -80,11 +100,17 @@ Dashboard batch 1 hardens malformed-history export: a successful HTTP response w
 
 **Evidence and limits:** Local `ruff check tests/test_web_ui_v2_run.py` and `tests/test_v2_ui_mandatory_crosswalk.py` passed. The browser regression could not run locally because the Playwright Chromium download was truncated in this environment. Exact-head CI is required. This is one safety improvement; it does not establish complete control mapping, backend V2 parity or any D1–D6 acceptance. UI-03 remains **OPEN** pending the complete per-page evidence and approver sign-offs.
 
-**Engine V2 durable run handoff — 2026-11-09:** The Run page now has a separate control for reviewing an already-persisted V2 plan, displaying its task capability/target/impact bindings, checking listed approvals for each moderate-or-higher task, submitting through `POST /api/v2/workflows/<plan_id>/run`, reconnecting through durable snapshots, and requesting cancellation through the durable run-request endpoint. It does not grant approval, claim that a queued request completed, or claim that cancellation stopped an external effect. The active V2 request ID is retained in session storage for same-tab reconnect. The existing guarded `/api/run` path remains a separate legacy control while capability mapping/parity is unfinished. This is one V2 integration slice; full UI-03 migration, browser acceptance and D1–D6 remain **OPEN**.
+**Engine V2 durable run handoff — 2026-11-09:** The Run page now has a separate control for reviewing an already-persisted V2 plan, displaying its task capability/target/impact bindings, checking listed approvals for each moderate-or-higher task, submitting through `POST /api/v2/workflows/<plan_id>/run`, reconnecting through durable snapshots, and requesting cancellation through the durable run-request endpoint. It does not grant approval, claim that a queued request completed, or claim that cancellation stopped an external effect. The active V2 request ID is retained in session storage for same-tab reconnect. The server's legacy `/api/run` endpoint remained available to other clients while parity was unfinished.
 
 **Saved plan discovery — 2026-11-09:** The V2 handoff now lists persisted missions and their plans through the bounded mission/plan read APIs. Operators can select a plan and review its immutable tasks before submitting. A plan ID can still be entered directly when working from a CLI/API-created plan. No mission or plan is created by this selector, and all authorization remains in the V2 execution path. Full UI-03 acceptance remains **OPEN**.
 
 **Constrained plan authoring and consent — 2026-11-09:** The Run page can create a mission and one-task immutable plan only from an installed, selected, moderate-impact V2 capability whose declared inputs require no caller-supplied fields. The plan records the provider ID and inventory manifest fingerprint for execution-time pinning. Creation performs a scope preview and creates no execution request. A separate explicit confirmation records one-hour exact-task approval through the V2 approval endpoint. The actor is server-derived (`local` for loopback, verified username for remote Basic-auth requests); the endpoint does not provide role separation or an independent-approver guarantee. The scheduler still rechecks scope, provider binding, plan integrity and approval binding. Multi-step plans and capabilities requiring inputs remain CLI/API authored. UI-03 and D1–D6 remain **OPEN**.
+
+**Engine V2 finding ownership and retest proposal — 2026-11-11:** Legacy CLI and web `validate`/`retest` routes reject V2-owned evidence before network replay or mutation, returning a workflow-required result. V2 Findings, BAS and Retest pages avoid legacy validation/retest posts. Candidate findings link to V2 verification-plan authoring, while verified findings link to V2 retest-plan authoring through `POST /api/v2/workflow-proposals`. The provider checks source-job ownership, evidence seal, exact finding sequence, supported kind, and current scope. A saved plan links to Run & Orchestration for task review, explicit approval, and separate durable run submission; proposal creation itself neither approves nor executes. Legacy validation/retest remains available to older clients and for legacy-owned findings. Browser acceptance cases were updated; execution still requires the existing V2 consent and lifecycle path. No supplied design source was changed. UI-11, UI-17 and D1–D6 remain **OPEN**.
+
+**Run page primary dispatch migration — 2026-11-11:** The primary Run page action now creates an immutable Engine V2 mission and single-task plan from the selected installed V2 capability, after a scope preview. It does not call `/api/run`, open the legacy job event stream, or execute the new plan. The operator reviews the exact task, separately grants approval, and submits through the durable V2 run control. The catalog selector is marked as inventory-only; the unconstrained direct-run cancel control is hidden. Browser regressions cover saved-plan-only behavior, out-of-scope refusal, and single-flight plan creation with no legacy dispatch. The server's `/api/run` endpoint remains for legacy clients, and broader capability/transport parity and UI-03 acceptance remain **OPEN**.
+
+**AI Gate plan-only migration — 2026-11-11:** The AI Gate form now creates a V2 mission and requests a saved plan through `POST /api/v2/ai/proposals`. The proposal is scope-checked again by the server and uses the bound provider contract. A saved plan links to Run & Orchestration for separate task review, exact approval and durable submission. The page does not call `/api/ai/run`; its legacy AI run history is read-only, and pending legacy runs cannot be authorized or resumed from this page. The legacy API and answer route remain available to other existing clients pending full API parity. Browser regressions cover blocked server scope despite a spoofed client preview, plan-only save, no legacy resume, and the Run handoff. UI-10 and D1–D6 remain **OPEN**.
 
 **Reviewer record template:** UI-ID, base/head SHA, approved PNG/design variant, affected control IDs, backend routes and policy, D1–D6 evidence links, expected/observed states, limitations, independent reviewer, explicit decision.
 
@@ -180,8 +206,8 @@ The new templates use the supplied Obsidian Kinetic visual system. The original 
 | `/` | Default web entry point | Redirects to `/ui-v2`; exact-baseline CI above passed; future candidates need their own CI evidence |
 | `/ui-v2` | Canonical Obsidian Kinetic dashboard | Implemented |
 | `/ui-v2/dashboard` | Dashboard alias | Implemented |
-| `/ui` | Previous web interface | Preserved compatibility/reference route; desktop `gui/embed.py` still points here |
-| Desktop launcher | `gui/app.py` → `embed.URL` | Still opens `/ui`; migrate to accepted new default and test startup/navigation |
+| `/ui` | Previous web interface | Preserved compatibility/reference route; the shipped desktop launcher does not use it |
+| Desktop launcher | `gui/app.py` → `embed.URL` | Opens `/ui-v2`; regression coverage verifies the launcher destination matches the root redirect and renders the supplied V2 UI |
 
 ## 3. Canonical screen-to-route map
 
@@ -247,7 +273,7 @@ These controls must remain disabled/hidden until a real backend implementation, 
 3. **Accessibility:** browser tests exist, but a full keyboard/focus-management/screen-reader/WCAG 1.4.1 acceptance pass is not evidenced by the current test names or contents reviewed. Add automated checks where practical and record manual checks separately.
 4. **All-control inventory:** the 22 pages have dedicated or shared browser tests, but a complete per-control inventory proving every visible control is wired, disabled or hidden has not yet been recorded. Continue page-by-page and extend tests for any uncovered controls.
 5. **Deployment dependencies:** the supplied pages load Tailwind, fonts/icons and images from external hosts. Decide and test whether the supported deployment requires network-independent bundled assets; do not silently claim air-gapped readiness while external runtime assets remain.
-6. **Desktop/default entry points:** the web server redirects `/` to `/ui-v2`, but `src/whaxon/interfaces/gui/embed.py` still sets its URL to `/ui`. Correct the desktop entry point, test startup/navigation against the accepted supplied UI and preserve legacy design source unchanged. Web-route CI does not prove desktop parity.
+6. **Desktop/default entry points:** the shipped `whaxon-gui` entry point opens `/ui-v2`; `tests/test_gui_entrypoint.py` checks that destination against the root redirect and verifies the page renders. The separate, unreferenced `interfaces/gui/main_window.py` still contains direct legacy runner calls and remains packaged pending downstream-import review and clean-wheel qualification. Web-route CI does not prove native desktop parity.
 7. **Exact candidate:** the inspected baseline is CI-green. Repeat required browser/E2E and acceptance checks for the final release candidate rather than relying on earlier commits.
 
 ## 7. Branch and PR reconciliation
@@ -281,8 +307,8 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 |---|---|---|---|---|---|
 | F.01 | Findings list | Load and render validated live report records; show empty, unavailable, malformed-response, and retry states | Implemented | GET /api/report?format=json | TESTS ADDED; BROWSER RUN PENDING |
 | F.02 | Finding card | Select a finding and inspect only recorded fields | Implemented | none | EXISTING BROWSER TEST |
-| F.03 | Validate selected finding | Submit validation and report the returned result | Implemented | POST /api/validate/<job>/<seq> | EXISTING BROWSER TEST |
-| F.04 | Retest selected / verified findings | Submit retest; report each failed item in a verified batch | Implemented | POST /api/retest/<job>/<seq> | TEST ADDED; BROWSER RUN PENDING |
+| F.03 | Validate selected finding | Open V2 Verification & Retest Studio for a sealed-evidence verification proposal | V2 plan proposal only | `/api/v2/workflow-proposals`; legacy POST remains for older clients | Browser test guards against legacy mutation |
+| F.04 | Retest selected / verified findings | Open V2 Verification & Retest Studio for a sealed-evidence retest proposal | V2 plan proposal only | `/api/v2/workflow-proposals`; legacy POST remains for older clients | Browser test guards against legacy mutation |
 | F.05 | Severity, status, and adapter filters | Filter the live list; each filter can be cleared | Implemented | none | WIRED |
 | F.06 | Finding search | Search finding and recorded evidence fields | Implemented | none | EXISTING BROWSER TEST |
 | F.07 | Copy Evidence | Copy the selected finding's recorded evidence | Implemented | Clipboard API | WIRED |
@@ -312,8 +338,10 @@ The former F.05 “Sort headers” and F.06 “Density toggle” rows described 
 | P.05 | Known Vulns preview | Show CVE table | Hardcoded | none | MOCKUP |
 
 ## Retest page
-| T.01 | Queue table | Show verified findings | Live queue | GET /api/report | WIRED |
-| T.02 | Retest button (row) | POST /api/retest | Wired | POST /api/retest/<job>/<seq> | WIRED |
+| T.01 | Queue table | Show candidate and verified findings with current recorded status | Live queue | GET /api/report | WIRED |
+| T.02 | Verify/retest button (row) | Save a V2 plan proposal for a candidate/verified sealed finding | V2 plan proposal only | POST /api/v2/workflow-proposals | Existing browser acceptance case |
+| T.03 | V2 retest proposal | Persist a sealed-evidence retest plan for a selected V2 mission; never approve or execute it | UI proposal | POST /api/v2/workflow-proposals | IMPLEMENTED; BROWSER TEST ADDED |
+| T.04 | Review V2 plan | Open the saved plan in Run & Orchestration for exact binding review, approval and separate durable submission | Canonical V2 run workflow | `/ui-v2/run?plan_id=<id>` → GET `/api/v2/workflows/<plan_id>` | IMPLEMENTED; BROWSER TEST ADDED |
 
 ## Sessions page
 | X.01 | Sessions list | Fetch /api/msf/sessions | Live list | GET /api/msf/sessions | WIRED |
@@ -444,326 +472,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 7:13350 | button | gavel Emergency Halt Scan | unresolved-static | — |
 | 18:1 | button | sync Sync whaxon.adapters | script-reference | btn-sync |
 | 22:1 | button | restart_alt Reload Entry Points | script-reference | btn-reload |
-| 26:1 | button | add_circle + Register New Adapter | script-reference | btn-register |
-| 116:1 | input | Search adapters by tool name, entrypoint, author, tags... | script-reference | adapter-search |
-| 121:1 | button | All (14) | unresolved-static | — |
-| 124:1 | button | Recon (5) | unresolved-static | — |
-| 127:1 | button | Vulnerability (4) | unresolved-static | — |
-| 130:1 | button | Exploitation (3) | unresolved-static | — |
-| 133:1 | button | Ingestion (2) | unresolved-static | — |
-| 140:1 | select | All States Binary Found (12) Missing Binary (2) Untrusted (0) | script-reference | status-select |
-| 188:1 | button | CONFIGURE tune | unresolved-static | — |
-| 232:1 | button | CONFIGURE tune | unresolved-static | — |
-| 276:1 | button | CONFIGURE tune | unresolved-static | — |
-| 320:1 | button | CONFIGURE tune | unresolved-static | — |
-| 363:1 | button | CONFIGURE tune | unresolved-static | — |
-| 407:1 | button | CONFIGURE CONNECTION settings | unresolved-static | — |
-| 451:1 | button | CONFIGURE tune | unresolved-static | — |
-| 495:1 | button | CONFIGURE tune | unresolved-static | — |
-| 545:1 | button | Close Panel | script-reference | close-drawer |
-| 583:1 | button | Remove flag | unresolved-static | — |
-| 587:1 | button | Remove flag | unresolved-static | — |
-| 591:1 | button | Remove flag | unresolved-static | — |
-| 595:1 | button | Remove flag | unresolved-static | — |
-| 597:1 | input | + Add CLI parameter... | unresolved-static | add-flag-input |
-| 631:1 | input | (unnamed) | unresolved-static | — |
-| 638:1 | input | (unnamed) | disabled | — |
-| 645:1 | input | (unnamed) | unresolved-static | — |
-| 661:1 | button | play_arrow Test Adapter Execution with Mock Output | script-reference | btn-mock-test |
-| 666:1 | button | Re-sign Manifest | script-reference | btn-resign |
-| 669:1 | button | Save Configuration | script-reference | btn-save-conf |
-
-### ui_v2_ai.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4579 | a | Dashboard / Zero State | script-reference | # |
-| 4:4836 | a | Scope & Targets | script-reference | # |
-| 4:5087 | a | Run & Orchestration | script-reference | # |
-| 4:5346 | a | Trust Layer & Findings | script-reference | # |
-| 4:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 4:6086 | a | AI Strategy Gate | script-reference | # |
-| 4:6332 | a | Remediation Retest Studio | script-reference | # |
-| 4:6597 | a | Correlated Attack Chains | script-reference | # |
-| 4:7060 | a | Job Execution History | script-reference | # |
-| 4:7317 | a | Evidence File Inspector | script-reference | # |
-| 4:7578 | a | Cryptographic Audit Log | script-reference | # |
-| 4:8041 | a | System Diagnostics & Health | script-reference | # |
-| 4:8316 | a | Adapter & Plugin Manager | script-reference | # |
-| 4:8585 | a | Settings & API Explorer | script-reference | # |
-| 4:10949 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
-| 4:11306 | button | add New | unresolved-static | — |
-| 4:13011 | button | terminal Terminal Log | unresolved-static | — |
-| 4:13350 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 84:1 | button | close Reject & Re-plan [Esc] | script-reference | btn-reject |
-| 91:1 | button | bolt Authorize & Execute [Enter] | script-reference | btn-authorize |
-| 258:1 | button | content_copy Copy | unresolved-static | — |
-
-### ui_v2_approvals.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4475 | a | target Scope & Targets | script-reference | # |
-| 4:4807 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5149 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5502 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9037 | button | terminal Terminal Log | unresolved-static | — |
-| 4:9376 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
-| 126:1 | button | ALL | unresolved-static | — |
-| 127:1 | button | CRIT (1) | unresolved-static | — |
-| 128:1 | button | HIGH (2) | unresolved-static | — |
-| 129:1 | button | MED (1) | unresolved-static | — |
-| 130:1 | button | LOW (0) | unresolved-static | — |
-| 135:1 | button | VERIFIED (6) | unresolved-static | — |
-| 136:1 | button | CANDIDATE (11) | unresolved-static | — |
-| 137:1 | button | REVIEW NEEDED | unresolved-static | — |
-| 142:1 | button | Nuclei | unresolved-static | — |
-| 143:1 | button | sqlmap | unresolved-static | — |
-| 144:1 | button | Nikto | unresolved-static | — |
-| 149:1 | input | Filter proof pattern, URL, CVE... | unresolved-static | — |
-| 164:1 | div | CRITICAL SQLi: Time-based Blind VERIFIED /api/v1/catalog/items?id= C | inline-handler | selectFinding(1) |
-| 191:1 | div | HIGH Stored Cross-Site Scripting (XSS) VERIFIED /v1/reviews/post (co | inline-handler | selectFinding(2) |
-| 218:1 | div | HIGH BOLA Authorization Bypass CANDIDATE /api/v2/tenant/billing (ten | inline-handler | selectFinding(3) |
-| 245:1 | div | MEDIUM Exposed .env Backup Secret File VERIFIED /backup/.env.product | inline-handler | selectFinding(4) |
-| 332:1 | button | content_copy Copy Command | inline-handler | copyProofCurl() |
-| 407:1 | button | play_arrow Replay Test (Retest) | inline-handler | triggerReplayAction() |
-| 411:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
-| 417:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
-| 421:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
-| 521:1518 | button | close | source-hidden | document.getElementById('approvals-modal').remove() |
-| 529:600 | input | (unnamed) | source-hidden | — |
-| 529:1089 | input | (unnamed) | source-hidden | — |
-| 529:1561 | input | (unnamed) | source-hidden | — |
-| 529:2020 | textarea | Cross-tenant billing data was exposed in JSON response payload despi | source-hidden | — |
-| 529:2759 | button | redo Skip Item | source-hidden | — |
-| 529:3032 | button | Refute / False Positive | source-hidden | document.getElementById('approvals-modal').remove() |
-| 529:3289 | button | Hold for Retest | source-hidden | document.getElementById('approvals-modal').remove() |
-| 529:3573 | button | how_to_reg Approve as Verified (Sign Proof) | source-hidden | document.getElementById('approvals-modal').remove() |
-
-### ui_v2_audit.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 4:4579 | a | Dashboard / Zero State | script-reference | # |
-| 4:4836 | a | Scope & Targets | script-reference | # |
-| 4:5087 | a | Run & Orchestration | script-reference | # |
-| 4:5346 | a | Trust Layer & Findings | script-reference | # |
-| 4:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 4:6086 | a | AI Strategy Gate | script-reference | # |
-| 4:6333 | a | Remediation Retest Studio | script-reference | # |
-| 4:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 4:6895 | a | Correlated Attack Chains | script-reference | # |
-| 4:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 4:7443 | a | PTaaS Client Portal | script-reference | # |
-| 4:7896 | a | Job Execution History | script-reference | # |
-| 4:8153 | a | Evidence File Inspector | script-reference | # |
-| 4:8414 | a | Cryptographic Audit Log | script-reference | # |
-| 4:8876 | a | System Diagnostics & Health | script-reference | # |
-| 4:9151 | a | Adapter & Plugin Manager | script-reference | # |
-| 4:9420 | a | Settings & Secrets Vault | script-reference | # |
-| 4:11786 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
-| 4:12143 | button | add New | unresolved-static | — |
-| 4:13848 | button | terminal Terminal Log | unresolved-static | — |
-| 4:14187 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 38:1 | button | sync Verify Entire Merkle Root | inline-handler | triggerMerkleVerification() |
-| 42:1 | button | enhanced_encryption Export Attestation (.sig) | inline-handler | downloadSigAttestation() |
-| 157:1 | input | Search seq #, actor ID, SHA-256 digest, or payload target... | inline-handler | ledger-search |
-| 162:1 | select | ALL SIGNALS (6) SCOPE MODIFICATION FINDING VERIFICATION PAYLOAD DETO | inline-handler | category-filter |
-| 171:1 | button | shield SEALED ONLY | unresolved-static | — |
-| 178:1 | button | chevron_left | unresolved-static | — |
-| 181:1 | button | chevron_right | unresolved-static | — |
-| 203:1 | tr | 2026-03-30T14:22:08.892401Z #EVT-9941 Finding Verified person OP//77 | inline-handler | selectEvent('EVT-9941') |
-| 235:1 | button | Inspect Hash Tree | unresolved-static | — |
-| 241:1 | tr | 2026-03-30T14:18:41.119830Z #EVT-9940 Scope Change key OP//4108-BRAV | inline-handler | selectEvent('EVT-9940') |
-| 273:1 | button | Inspect Hash Tree | unresolved-static | — |
-| 279:1 | tr | 2026-03-30T14:05:12.601944Z #EVT-9939 Payload Detonation memory AUTO | inline-handler | selectEvent('EVT-9939') |
-| 311:1 | button | Inspect Hash Tree | unresolved-static | — |
-| 317:1 | tr | 2026-03-30T13:42:01.002195Z #EVT-9938 Emergency Halt gavel OP//7749- | inline-handler | selectEvent('EVT-9938') |
-| 349:1 | button | Inspect Hash Tree | unresolved-static | — |
-| 355:1 | tr | 2026-03-30T13:15:55.441920Z #EVT-9937 Tool Invocation terminal DAEMO | inline-handler | selectEvent('EVT-9937') |
-| 386:1 | button | Inspect Hash Tree | unresolved-static | — |
-| 392:1 | tr | 2026-03-30T12:59:10.104510Z #EVT-9936 Policy Override verified_user  | inline-handler | selectEvent('EVT-9936') |
-| 423:1 | button | Inspect Hash Tree | unresolved-static | — |
-| 446:1 | button | content_copy Copy Raw Hex | inline-handler | copyRawProof() |
-| 561:1 | button | gavel Court-Ready Forensic Bundle (.zip) | inline-handler | downloadCourtReadyPackage() |
-| 565:1 | button | Cryptographic QR Verification Slip | inline-handler | generateQrCert() |
-
-### ui_v2_bas.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 5:6895 | a | Correlated Attack Chains | script-reference | # |
-| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
-| 5:7724 | a | BAS & Detection Validation | script-reference | # |
-| 5:8209 | a | Job Execution History | script-reference | # |
-| 5:8466 | a | Evidence File Inspector | script-reference | # |
-| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 5:9473 | a | System Diagnostics & Health | script-reference | # |
-| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:10017 | a | PTaaS Client Portal | script-reference | # |
-| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
-| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
-| 5:12993 | button | add New | unresolved-static | — |
-| 5:14698 | button | terminal Terminal Log | unresolved-static | — |
-| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 40:1 | button | play_circle Detonate Sequence | unresolved-static | — |
-| 44:1 | button | chevron_forward Query Blue Telemetry | unresolved-static | — |
-| 48:1 | button | assessment Gap Report | unresolved-static | — |
-| 443:1 | button | tune Configure Vector Filters | unresolved-static | — |
-| 495:1 | button | Push Rule to SIEM | unresolved-static | — |
-| 573:1 | button | download Export Validation Matrix (Navigator JSON + PDF) | unresolved-static | — |
-| 601:1 | button | rocket_launch Deploy to Sentinel | unresolved-static | — |
-| 628:1 | button | publish Deploy to Splunk | unresolved-static | — |
-
-### ui_v2_bug_bounty.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 206:1124 | a | terminal Dashboard / Zero State | script-reference | # |
-| 206:1479 | a | radar Scope & Targets | script-reference | # |
-| 206:1821 | a | play_circle Run & Orchestration | script-reference | # |
-| 206:2177 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 206:2541 | a | description PTES Coverage & Reports | script-reference | # |
-| 206:3082 | a | psychology AI Strategy Gate | script-reference | # |
-| 206:3429 | a | build_circle Remediation Retest Studio | script-reference | # |
-| 206:3796 | a | account_tree Correlated Attack Chains | script-reference | # |
-| 206:4161 | a | open_in_browser Bug Bounty & Live Browser | script-reference | # |
-| 206:4702 | a | history_toggle_off Job Execution History | script-reference | # |
-| 206:5067 | a | folder_zip Evidence File Inspector | script-reference | # |
-| 206:5428 | a | encrypted Cryptographic Audit Log | script-reference | # |
-| 206:5957 | a | monitor_heart System Diagnostics & Health | script-reference | # |
-| 206:6331 | a | extension Adapter & Plugin Manager | script-reference | # |
-| 206:6695 | a | shield_person PTaaS Client Portal | script-reference | # |
-| 206:7051 | a | key Settings & Secrets Vault | script-reference | # |
-| 206:8931 | button | terminal LOGS | unresolved-static | — |
-| 206:9234 | button | dangerous HALT SCAN | unresolved-static | — |
-| 305:1 | button | Go back | unresolved-static | — |
-| 306:1 | button | Go forward | unresolved-static | — |
-| 307:1 | button | Reload target view | unresolved-static | — |
-| 313:1 | input | (unnamed) | unresolved-static | — |
-| 320:1 | select | User_A (Attacker Context) User_B (Victim / Target #092) Unauthentica | unresolved-static | — |
-| 384:1 | input | (unnamed) | unresolved-static | — |
-| 389:1 | input | (unnamed) | unresolved-static | — |
-| 414:1 | button | send EXECUTE COMMIT (TAMPERED) | unresolved-static | — |
-| 439:1 | button | CLEAR CACHE | unresolved-static | — |
-| 440:1 | button | DUMP DOM SNAPSHOT | unresolved-static | — |
-| 555:1 | button | terminal INSPECTOR: POST /app/transfer/commit | unresolved-static | — |
-| 595:1 | button | cached SEND TO VALIDATOR | unresolved-static | — |
-| 599:1 | button | difference DIFF ANALYSIS | unresolved-static | — |
-| 603:1 | button | verified_user PROMOTE TO FINDING | unresolved-static | — |
-
-### ui_v2_chains.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Correlated Attack Chains | script-reference | # |
-| 5:7061 | a | Job Execution History | script-reference | # |
-| 5:7318 | a | Evidence File Inspector | script-reference | # |
-| 5:7579 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8042 | a | System Diagnostics & Health | script-reference | # |
-| 5:8317 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:8586 | a | Settings & API Explorer | script-reference | # |
-| 5:10950 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
-| 5:11307 | button | add New | unresolved-static | — |
-| 5:13012 | button | terminal Terminal Log | unresolved-static | — |
-| 5:13351 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 29:1 | button | sync_saved_locally Re-compute Graph | script-reference | btn-recompute |
-| 35:1 | select | Severity: All Vectors Severity: Critical & Compound 10.0 Severity: H | unresolved-static | — |
-| 41:1 | button | download Export Graph SVG/JSON | unresolved-static | — |
-| 338:1 | button | play_arrow Simulate Controlled Replay | unresolved-static | — |
-| 342:1 | button | menu_book Export PTES Chapter | unresolved-static | — |
-| 429:1 | button | Add Custom Mitigation Rule (Envoy WAF) | unresolved-static | — |
-| 432:1 | button | Generate Red Team Retest Script | unresolved-static | — |
-
-### ui_v2_compliance.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 5:4579 | a | Dashboard / Zero State | script-reference | # |
-| 5:4836 | a | Scope & Targets | script-reference | # |
-| 5:5087 | a | Run & Orchestration | script-reference | # |
-| 5:5346 | a | Trust Layer & Findings | script-reference | # |
-| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
-| 5:6086 | a | AI Strategy Gate | script-reference | # |
-| 5:6333 | a | Remediation Retest Studio | script-reference | # |
-| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 5:6895 | a | Correlated Attack Chains | script-reference | # |
-| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
-| 5:7724 | a | BAS & Detection Validation | script-reference | # |
-| 5:8209 | a | Job Execution History | script-reference | # |
-| 5:8466 | a | Evidence File Inspector | script-reference | # |
-| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
-| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 5:9473 | a | System Diagnostics & Health | script-reference | # |
-| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
-| 5:10017 | a | PTaaS Client Portal | script-reference | # |
-| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
-| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
-| 5:12993 | button | add New | unresolved-static | — |
-| 5:14698 | button | terminal Terminal Log | unresolved-static | — |
-| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 22:1 | button | tune Configure Scope | unresolved-static | — |
-| 26:1 | button | picture_as_pdf Auditor Crosswalk PDF | unresolved-static | — |
-| 30:1 | button | archive Export Package (.ZIP) | unresolved-static | — |
-| 201:1 | button | PCI-DSS v4.0 (5) | unresolved-static | — |
-| 204:1 | button | OWASP Top 10 (4) | unresolved-static | — |
-| 207:1 | button | SOC 2 Type II (8) | unresolved-static | — |
-| 210:1 | button | ISO 27001 (6) | unresolved-static | — |
-| 213:1 | button | NIST CSF (3) | unresolved-static | — |
-| 216:1 | button | MITRE ATT&CK | unresolved-static | — |
-| 423:1 | button | PREV | unresolved-static | — |
-| 425:1 | button | NEXT | unresolved-static | — |
-| 479:1 | input | (unnamed) | unresolved-static | — |
-| 486:1 | input | (unnamed) | unresolved-static | — |
-| 493:1 | input | (unnamed) | unresolved-static | — |
-| 500:1 | input | (unnamed) | unresolved-static | — |
-| 522:1 | button | lock_clock Compile Signed Matrix (.PDF / .JSON) | unresolved-static | — |
-
-### ui_v2_dashboard.html
-
-| Line:column | Tag | Label | Static state | Binding evidence |
-|---|---|---|---|---|
-| 17:4342 | a | Dashboard / Zero State | script-reference | # |
-| 17:4598 | a | Scope & Targets | script-reference | # |
-| 17:4849 | a | Run & Orchestration | script-reference | # |
-| 17:5108 | a | Trust Layer & Findings | script-reference | # |
-| 17:5373 | a | PTES Coverage & Reports | script-reference | # |
-| 17:5848 | a | AI Strategy Gate | script-reference | # |
-| 17:6095 | a | Remediation Retest Studio | script-reference | # |
-| 17:6360 | a | Correlated Attack Chains | script-reference | # |
-| 17:6823 | a | Job Execution History | script-reference | # |
-| 17:7080 | a | Evidence File Inspector | script-reference | # |
-| 17:7341 | a | Cryptographic Audit Log | script-reference | # |
-| 17:7804 | a | System Diagnostics & Health | script-reference | # |
-| 17:8079 | a | Adapter & Plugin Manager | script-reference | # |
-| 17:8348 | a | Settings & API Explorer | script-reference | # |
-| 17:8813 | a | Attack Surface & Continuous Monitoring | script-reference | # |
-| 17:9110 | a | Bug Bounty & Live Browser Studio | script-reference | # |
-| 17:9395 | a | PTaaS Client Portal | script-reference | # |
-| 17:9648 | a | Threat Intelligence | script-reference | # |
-| 17:9914 | a | BAS & Detection Validation | script-reference | # |
-| 17:10187 | a | Compliance & Framework Crosswalk | script-reference | # |
-| 17:10472 | a | Trust Layer Approvals Queue | script-reference | # |
-| 17:12865 | button | No active engagement (No target selected) arrow_drop_down | unresolved-static | — |
+| 26:1 | button | add_cir…5271 tokens truncated…) arrow_drop_down | unresolved-static | — |
 | 17:13230 | button | add New | unresolved-static | — |
 | 17:14943 | button | terminal Terminal Log | unresolved-static | — |
 | 17:15282 | button | gavel Emergency Halt Scan | unresolved-static | — |
@@ -865,7 +574,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 4:5148 | a | terminal Run & Orchestration | script-reference | # |
 | 4:5490 | a | verified_user Trust Layer & Findings | script-reference | # |
 | 4:5843 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
+| 30:1 | button | replay Open V2 Verification & Retest Studio | inline-handler | openV2RetestStudio() |
 | 126:1 | button | ALL | script-reference | filter:severity:all |
 | 127:1 | button | CRIT (1) | script-reference | filter:severity:critical |
 | 128:1 | button | HIGH (2) | script-reference | filter:severity:high |
@@ -882,7 +591,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 151:1 | input | Filter findings by proof pattern, URL, or CVE | script-reference | whaxon-finding-filter |
 | 165:229 | button | Retry | source-hidden | whaxon-findings-retry |
 | 248:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
-| 310:1 | button | play_arrow Replay Test (Retest) | script-reference | replay-btn |
+| 310:1 | button | play_arrow Open V2 Verification & Retest Studio | script-reference | replay-btn |
 | 314:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
 | 320:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
 | 324:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
@@ -1138,7 +847,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 141:1 | input | (unnamed) | unresolved-static | — |
 | 149:1 | select | WHAXON tool | script-reference | run-tool-select |
 | 150:1 | input | Authorized target host or URL | script-reference | run-target-input |
-| 151:1 | button | play_arrow Run Selected Tool | script-reference | run-active-btn |
+| 151:1 | button | play_arrow Create V2 Plan | script-reference | run-active-btn |
 | 187:1 | input | ai-planner-toggle | script-reference | ai-planner-toggle |
 | 223:1 | button | View stdout open_in_new | inline-handler | showNmapStdout() |
 | 230:1 | button | Re-run | unresolved-static | — |

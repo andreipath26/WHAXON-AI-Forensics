@@ -193,6 +193,24 @@ class Core:
     def workflow_approvals(self, plan_id: str):
         return self.store.list_workflow_approvals(plan_id)
 
+    def workflow_approval_queue(self, *, limit: int = 100):
+        """Return bounded persisted V2 tasks and their exact approval state."""
+        candidates = self.store.list_workflow_approval_candidates(limit=limit)
+        approvals_by_plan = {}
+        for item in candidates:
+            plan_id = item["plan_id"]
+            if plan_id not in approvals_by_plan:
+                approvals_by_plan[plan_id] = self.store.list_workflow_approvals(plan_id)
+            approvals = approvals_by_plan[plan_id]
+            task_approvals = [
+                row for row in approvals if row["task_key"] == item["task_key"]
+            ]
+            item["current_approval"] = task_approvals[-1] if task_approvals else None
+            item["approval_valid"] = self.store.has_valid_workflow_approval(
+                plan_id, item["task_key"],
+            ) is True
+        return candidates
+
     def configure_workflow_rate_limit(self, plan_id: str, *, min_spacing_s: float):
         return self.store.set_workflow_rate_limit(plan_id, min_spacing_s=min_spacing_s)
 
