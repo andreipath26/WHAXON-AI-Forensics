@@ -202,7 +202,7 @@ class _BoundedDnsWorker:
             daemon=True,
         )
         with self._lock:
-            self._process = process
+            self._process: Any = process
         started_at = time.monotonic()
         try:
             process.start()
