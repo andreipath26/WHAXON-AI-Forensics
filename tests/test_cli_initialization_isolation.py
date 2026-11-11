@@ -7,6 +7,9 @@ import pytest
 
 from whaxon.core import Core
 from whaxon.core.findings import Finding
+from whaxon.core.recon_v2 import PassiveDnsReconProvider
+from whaxon.core.workflow import WorkflowPlan
+from whaxon.core.workflow_proposals import propose_passive_dns_plan
 from whaxon.core.recon import ReconRunner
 from whaxon.core.runner import ToolRunner
 from whaxon.core.validator import Validator
@@ -72,6 +75,63 @@ def test_one_shot_preserves_unrelated_pending_jobs(
 
     assert command.main(args) == expected
     assert dispatched == []
+    assert core.store.list_pending() == [
+        {"id": "unrelated", "tool": "echo", "target": "127.0.0.1"},
+    ]
+    assert core.store.get("unrelated")["status"] == "pending"
+
+
+def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.chdir(tmp_path)
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "scope.json").write_text(json.dumps({
+        "engagement": "v2-recon-cli-isolation",
+        "enabled": True,
+        "in_scope": ["example.test"],
+        "out_of_scope": [],
+    }))
+    core = Core(data)
+    core.create_mission("dns-mission", "Collect scoped passive DNS evidence")
+    provider = next(
+        item for item in core.providers._providers
+        if isinstance(item, PassiveDnsReconProvider)
+    )
+    monkeypatch.setattr(provider, "_readiness", lambda: True)
+    proposal = propose_passive_dns_plan(
+        core,
+        mission_id="dns-mission",
+        plan_id="dns-plan",
+        target="example.test",
+    )
+    assert proposal["status"] == "proposed"
+    core.save_workflow_plan("dns-plan", WorkflowPlan.from_dict(proposal["plan"]))
+    core.store.create_pending("unrelated", "echo", "127.0.0.1")
+
+    tool_dispatches = []
+    provider_dispatches = []
+
+    async def record_tool_dispatch(self, *args, **kwargs):
+        tool_dispatches.append((args, kwargs))
+
+    async def record_provider_dispatch(self, task):
+        provider_dispatches.append(task.id)
+        raise AssertionError("unapproved DNS task must not dispatch")
+
+    monkeypatch.setattr(ToolRunner, "run_tool", record_tool_dispatch)
+    monkeypatch.setattr(PassiveDnsReconProvider, "dispatch", record_provider_dispatch)
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+
+    status = recon_cmd.main([
+        "example.test", "--engine", "v2", "--plan-id", "dns-plan",
+        "--data", str(data),
+    ])
+
+    assert status == recon_cmd.EXIT_ERROR
+    assert tool_dispatches == []
+    assert provider_dispatches == []
     assert core.store.list_pending() == [
         {"id": "unrelated", "tool": "echo", "target": "127.0.0.1"},
     ]
