@@ -8,7 +8,7 @@ a callsite requires reviewing its execution path and updating the classification
 | Source | Caller | Classification | Notes |
 | --- | --- | --- | --- |
 | `interfaces/web/server.py` | `_run_job_blocking` | Legacy | `/api/run`; scope checked, but no persisted V2 request or task lease. |
-| `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy | Used by web and CLI AI execution; approvals remain in legacy `ai_runs`. |
+| `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy | Used only by legacy `/api/ai/run` and explicit `whaxon ai --legacy` execution/resume; approvals remain in legacy `ai_runs`. The separate `propose_v2_workflow_plan` path creates reviewable plan tasks and does not dispatch. |
 | `ai/executor.py`, `ai/providers/*` | Executor/provider actions | Legacy | Indirect callbacks still dispatch through `ToolRunner`. |
 | `interfaces/cli/run_cmd.py` | default proposal path / `main._go` | Mixed; default V2 plan-only | `whaxon run <tool> <target>` saves a provider-pinned review plan after scope/readiness checks; it does not approve or execute. `--v2-plan` executes only a previously persisted and approved plan. Direct ToolRunner and session transports require explicit `--legacy`; there is no V2-to-legacy fallback. |
 | `core/worker.py` | `drain_async` | Legacy | Drains Automator follow-up jobs outside workflow-plan authorization. |
@@ -175,7 +175,7 @@ execution evidence; deployment-host readiness remains unverified.
 
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
-| CLI workflow | `whaxon run` proposal path and `whaxon workflow` use shared `Core` workflow/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `ai`, `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| CLI workflow | `whaxon run`, default `whaxon ai`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
 | HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and `/ui-v2/ai` plan handoff use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for other clients | The AI Gate saves a proposal and links to V2 Run; its legacy AI history is read-only and it cannot resume pending legacy execution. Legacy API endpoints are still available and are not V2 request/task-owned. Other proposal surfaces save fixed-argument tool or sealed-evidence plans; saving never approves or submits. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
@@ -525,7 +525,10 @@ approval, submits a run request, or dispatches work. Operators use the existing
 plan approval and run-request commands separately.
 
 The AI Gate page now uses the V2 proposal endpoint and hands saved plans to the
-Run page. This does not migrate `whaxon ai`, `/api/ai/run`, or the legacy
-Executor loop; those callers still dispatch through the legacy AI bridge and
-remain in the inventory above until their lifecycle and client parity work is
-completed.
+Run page. Default `whaxon ai "<goal>"` now creates and saves a scope-checked V2
+proposal, then prints separate review, approval and submission commands. It
+does not grant approval or submit a run. The old autonomous executor and
+`--resume` path require explicit `--legacy`; `/api/ai/run` remains a legacy API
+for existing clients. V2 AI action generation is still bounded to one
+moderate-impact catalog action with an exact target and no dynamic arguments;
+multi-step autonomous planning remains outside this migration slice.
