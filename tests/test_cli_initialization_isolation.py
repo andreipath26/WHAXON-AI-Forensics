@@ -8,8 +8,10 @@ import pytest
 from whaxon.core import Core
 from whaxon.core.findings import Finding
 from whaxon.core.recon import ReconRunner
+from whaxon.core.recon_v2 import PassiveDnsReconProvider
 from whaxon.core.runner import ToolRunner
 from whaxon.core.validator import Validator
+from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 from whaxon.interfaces.cli import coverage_cmd, recon_cmd, retest_cmd, validate_cmd
 
 
@@ -72,6 +74,77 @@ def test_one_shot_preserves_unrelated_pending_jobs(
 
     assert command.main(args) == expected
     assert dispatched == []
+    assert core.store.list_pending() == [
+        {"id": "unrelated", "tool": "echo", "target": "127.0.0.1"},
+    ]
+    assert core.store.get("unrelated")["status"] == "pending"
+
+
+def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.chdir(tmp_path)
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "scope.json").write_text(json.dumps({
+        "engagement": "v2-recon-cli-isolation",
+        "enabled": True,
+        "in_scope": ["example.test"],
+        "out_of_scope": [],
+        "notes": "deterministic V2 recon CLI isolation fixture",
+    }), encoding="utf-8")
+    core = Core(data)
+    core.scope.load()
+    core.create_mission("dns-mission", "Collect scoped passive DNS evidence")
+    provider = next(
+        item for item in core.providers._providers
+        if isinstance(item, PassiveDnsReconProvider)
+    )
+    monkeypatch.setattr(provider, "_readiness", lambda: True)
+    manifest = core.providers.manifest_for("dns.recon.passive")
+    task = WorkflowTask(
+        id="task-1",
+        capability_id=manifest.capability_id,
+        target="example.test",
+        inputs={},
+        permissions=manifest.permissions,
+        impact=manifest.impact,
+        timeout_s=manifest.timeout_s,
+        idempotency_key="v2-recon-cli-isolation",
+    )
+    plan = WorkflowPlan(
+        mission_id="dns-mission",
+        tasks=(task,),
+        metadata={"provider_bindings": {"task-1": {
+            "provider_id": manifest.provider_id,
+            "manifest_fingerprint": manifest.fingerprint,
+        }}},
+    )
+    core.save_workflow_plan("dns-plan", plan)
+    core.store.create_pending("unrelated", "echo", "127.0.0.1")
+
+    tool_dispatches = []
+    provider_dispatches = []
+
+    async def record_tool_dispatch(self, *args, **kwargs):
+        tool_dispatches.append((args, kwargs))
+
+    async def record_provider_dispatch(self, task):
+        provider_dispatches.append(task.id)
+        raise AssertionError("unapproved DNS task must not dispatch")
+
+    monkeypatch.setattr(ToolRunner, "run_tool", record_tool_dispatch)
+    monkeypatch.setattr(PassiveDnsReconProvider, "dispatch", record_provider_dispatch)
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+
+    status = recon_cmd.main([
+        "example.test", "--engine", "v2", "--plan-id", "dns-plan",
+        "--data", str(data),
+    ])
+
+    assert status == recon_cmd.EXIT_ERROR
+    assert tool_dispatches == []
+    assert provider_dispatches == []
     assert core.store.list_pending() == [
         {"id": "unrelated", "tool": "echo", "target": "127.0.0.1"},
     ]
