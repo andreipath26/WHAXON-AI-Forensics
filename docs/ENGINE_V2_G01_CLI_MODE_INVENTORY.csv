@@ -17,7 +17,7 @@ burp-import,src/whaxon/interfaces/cli/burp_cmd.py,Legacy finding import,supporti
 evidence,src/whaxon/interfaces/cli/evidence_cmd.py,Legacy evidence store,supporting-cli,Reads or mutates legacy job evidence; not V2 attempt-sealed evidence.
 report,src/whaxon/interfaces/cli/report_cmd.py,Legacy report store,supporting-cli,"Renders reports from legacy job state; the report overhaul changes presentation, not execution ownership."
 jobs,src/whaxon/interfaces/cli/jobs_cmd.py,Legacy job registry and store,supporting-cli,Inspects legacy jobs and lifecycle; not the durable V2 request/task status surface.
-ai,src/whaxon/interfaces/cli/ai_cmd.py,Legacy AI bridge and executor,legacy-execution,AI remains a proposer/executor through legacy AI-run records; not a V2 plan-bound task path.
+ai,src/whaxon/interfaces/cli/ai_cmd.py,Shared V2 AI proposal service plus explicit legacy executor,mixed-interface,"A goal now saves a scope-checked V2 review plan without approval or execution; legacy autonomous execution and resume require --legacy. --approvals remains a read-only legacy history view."
 cve,src/whaxon/interfaces/cli/cve_cmd.py,CVE information service,supporting-cli,Information lookup surface; not a V2 target-task dispatch.
 vulndb,src/whaxon/interfaces/cli/vulndb_cmd.py,Vulnerability database service,supporting-cli,Information lookup surface; not a V2 target-task dispatch.
 lookup,src/whaxon/interfaces/cli/lookup_cmd.py,Lookup service,supporting-cli,Information lookup surface; not a V2 target-task dispatch.
