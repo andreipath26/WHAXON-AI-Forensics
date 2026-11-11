@@ -933,3 +933,22 @@ already-dispatched external action stopped. Existing browser fixtures were
 aligned to the new API contract; tests were not run in this implementation
 batch, and exact-head CI remains pending.
 
+## Recon V2 parity and first provider slice — 2026-11-11
+
+The legacy recon command contains ten protocol checks with no behaviorally
+equivalent V2 provider. Existing `dig` and `dnsrecon` capabilities overlap only
+part of the legacy DNS query set and have different fixed argv and finding
+contracts. The first migration unit is a dedicated passive DNS provider
+implemented in `core/recon_v2.py`. It preserves A, AAAA, MX, NS, TXT and SOA
+results, rechecks current scope inside a supervised child process, and returns
+evidence linked to a V2-owned job.
+Core authorization uses a non-resolving DNS-specific preflight so a synchronous
+hostname lookup cannot outlive the scheduler deadline; when IP/CIDR scope is
+present, this operation requires an explicit hostname rule before its child
+performs the full fresh scope check. Python syntax compilation passed; tests
+were not run, so runtime readiness, cancellation, and attempt-seal behavior
+remain unqualified.
+It remains separate from `dns_full` (CAA/DMARC/SPF policy analysis). Recon CLI
+default behavior remains legacy until this provider's implementation and
+contract are reviewed; no recon parity or acceptance is claimed yet.
+

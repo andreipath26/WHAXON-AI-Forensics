@@ -127,6 +127,7 @@ class Core:
             FindingVerificationProvider,
             SemanticOperationProvider,
         )
+        from .recon_v2 import PassiveDnsReconProvider
         self.capabilities = CapabilityRegistry(self.store)
         catalog_provider = CatalogAdapterProvider(
             catalog=self.catalog,
@@ -141,11 +142,15 @@ class Core:
         lab_access_provider = MetasploitableLabAccessProvider(
             store=self.store, registry=self.capabilities, scope=self.scope, msf=self.msf,
         )
+        passive_dns_provider = PassiveDnsReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
             verification_provider,
             lab_access_provider,
+            passive_dns_provider,
         ))
 
     def _wire_store(self) -> None:
@@ -925,18 +930,27 @@ class Core:
                 and task.target == "172.28.0.10"
             ):
                 return False
-        # The network-execution gate is stricter than a UI scope preview:
-        # DNS-rebinding-prone hostnames must not be authorized under CIDR scope.
+        # Network execution uses the stricter DNS-rebinding gate. The one
+        # passive DNS-query operation has a narrower scope path because it
+        # does not connect to the hostname's resolved address.
         try:
             # Scope may be revoked by another CLI/server process. Refresh the
             # persisted policy at each decision; malformed updates fail closed.
             reload_scope = getattr(self.scope, "load", None)
             if callable(reload_scope):
                 reload_scope()
-            execution_check = getattr(self.scope, "check_for_execution", None)
-            if not callable(execution_check):
-                execution_check = self.scope.check
-            return execution_check(task.target).allowed is True
+            if task.capability_id == "dns.recon.passive":
+                # Passive DNS collection asks the configured resolver for
+                # records and never connects to a target-resolved address.
+                # Avoid an uncancellable getaddrinfo call on this scheduler
+                # thread. This requires explicit hostname scope; the provider
+                # repeats the full check inside its bounded child process.
+                scope_check = self.scope.check_for_dns_query
+            else:
+                scope_check = getattr(self.scope, "check_for_execution", None)
+                if not callable(scope_check):
+                    scope_check = self.scope.check
+            return scope_check(task.target).allowed is True
         except Exception:
             return False
 

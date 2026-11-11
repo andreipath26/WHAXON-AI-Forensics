@@ -446,3 +446,36 @@ class ScopeManager:
             )
         return checked
 
+    def check_for_dns_query(self, raw_target: str) -> ScopeMatch:
+        """Preflight a passive DNS query without resolving the name here.
+
+        The DNS provider performs the full current scope check in its
+        supervised child immediately before querying. Core authorization must
+        not call synchronous ``getaddrinfo`` in an uncancellable scheduler
+        thread, so this preflight requires an explicit hostname rule when IP
+        or CIDR rules are also configured. Out-of-scope hostname rules still
+        take precedence.
+        """
+        if not self._enabled:
+            return ScopeMatch(allowed=True, reason="scope disabled")
+        try:
+            host, kind = _normalize_target(raw_target)
+        except (TypeError, ValueError):
+            return ScopeMatch(allowed=False, reason="invalid DNS target")
+        if kind != "host" or not host:
+            return ScopeMatch(allowed=False, reason="DNS query requires a hostname")
+        for rule in self._out:
+            if _rule_matches_host(rule, host):
+                return ScopeMatch(False, "matches out-of-scope hostname rule", rule)
+        for rule in self._in:
+            if _rule_matches_host(rule, host):
+                return ScopeMatch(True, "matches explicit in-scope hostname rule", rule)
+        if any(_is_ip_rule(rule) for rule in (*self._in, *self._out)):
+            return ScopeMatch(
+                False,
+                "DNS query requires an explicit hostname scope rule when IP/CIDR rules are configured",
+                host,
+                overridable=False,
+            )
+        return ScopeMatch(False, "no matching in-scope hostname rule", host)
+
