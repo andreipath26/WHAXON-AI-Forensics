@@ -189,15 +189,15 @@
 <!-- Dispatch Controls & Target Input -->
 <div class="flex flex-col gap-1.5 pt-1 border-t border-outline-variant/30">
 <div class="flex items-center gap-space-xs">
-<select id="run-tool-select" aria-label="WHAXON tool" class="max-w-[13rem] bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40"><option value="">Loading available tools…</option></select>
+<select id="run-tool-select" aria-label="Legacy tool catalog (inventory only)" class="max-w-[13rem] bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40"><option value="">Loading available tools…</option></select>
 <input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface px-space-sm py-1 rounded border border-outline-variant/40 focus:outline-none focus:ring-1 focus:ring-secondary font-mono" placeholder="Authorized target host or URL" type="text" id="run-target-input" value=""/>
 <button id="run-active-btn" class="flex items-center gap-1 px-space-sm py-1 bg-primary-container hover:bg-primary text-on-primary font-code-sm text-code-sm font-semibold rounded transition-colors shadow-sm shrink-0" type="button">
 <span class="material-symbols-outlined text-sm">play_arrow</span>
-<span>Run Selected Tool</span>
+<span>Create V2 Plan</span>
 </button>
 </div>
 <div class="flex items-center justify-between text-code-sm text-on-surface-variant font-mono bg-surface-container-lowest px-space-sm py-1 rounded">
-<span class="text-outline text-xs">Current Job:</span><span id="run-job-id" class="text-secondary text-xs truncate">No job started</span><span id="run-job-status" class="text-on-surface-variant text-xs">Idle</span>
+<span class="text-outline text-xs">V2 Request:</span><span id="run-job-id" class="text-secondary text-xs truncate">No V2 request submitted</span><span id="run-job-status" class="text-on-surface-variant text-xs">Review plan above</span>
 </div>
 </div>
 </div><div class="flex items-center justify-between">
@@ -585,25 +585,17 @@
   const targetInput = $("run-target-input");
   const toolSelect = $("run-tool-select");
   const stdout = $("terminal-stdout");
-  const statusEl = $("run-job-status");
-  const jobEl = $("run-job-id");
   const cliInput = $("cli-input");
   if (cliInput) {
     cliInput.disabled = true;
-    cliInput.placeholder = "Shell commands are disabled; use the tool selector above";
-    cliInput.title = "Arbitrary shell commands are not supported by the guarded web runner.";
-    cliInput.setAttribute("aria-label", "Shell command input disabled; use the tool selector above");
+    cliInput.placeholder = "Shell commands are disabled; use the Engine V2 workflow controls";
+    cliInput.title = "Arbitrary shell commands are not supported by Engine V2 workflow plans.";
+    cliInput.setAttribute("aria-label", "Shell command input disabled; use the Engine V2 workflow controls");
   }
   const passiveRunButton = $("run-passive-btn");
-  if (passiveRunButton) passiveRunButton.title = "Runs the selected tool through the guarded runner; a separate passive mode is not exposed by the current backend.";
+  if (passiveRunButton) passiveRunButton.title = "Unavailable: use the Engine V2 workflow to prepare and review a plan.";
   const activeRunButton = $("run-active-btn");
-  if (activeRunButton) activeRunButton.title = "Starts the selected tool through the guarded runner after scope validation.";
-  let currentJob = null;
-  let source = null;
-  let currentStatus = "idle";
-  let startInProgress = false;
-  let startedAt = null;
-  let timerId = null;
+  if (activeRunButton) activeRunButton.title = "Creates a saved Engine V2 plan; approval and execution remain separate.";
   const v2PlanInput = $("v2-plan-id");
   const v2MissionSelect = $("v2-mission-select");
   const v2PlanSelect = $("v2-plan-select");
@@ -636,6 +628,7 @@
     v2Message.className = "mt-space-sm font-code-sm text-code-sm " + (error ? "text-error" : "text-on-surface-variant");
   };
   const v2SetControls = () => {
+    if (activeRunButton) activeRunButton.disabled = v2CreateInProgress || v2Capabilities.size === 0;
     if (v2Submit) v2Submit.disabled = !v2Plan || Boolean(v2RequestId);
     if (v2Cancel) v2Cancel.disabled = !v2RequestId;
     if (v2UsePlan) v2UsePlan.disabled = !v2PlanSelect?.value;
@@ -725,11 +718,13 @@
       v2AuthoringSay(v2Capabilities.size
         ? `${v2Capabilities.size} installed provider(s) meet the single-task plan-builder limits.`
         : "No installed provider currently meets the constrained plan-builder requirements. Existing plans remain available above.");
+      v2SetControls();
     } catch (error) {
       v2CapabilitySelect.replaceChildren(new Option("Provider inventory unavailable", ""));
       v2CapabilitySelect.disabled = true;
       if (v2CreateButton) v2CreateButton.disabled = true;
       v2AuthoringSay("Could not load installed V2 providers: " + error.message, true);
+      v2SetControls();
     }
   }
   function v2NewId(prefix) {
@@ -752,6 +747,7 @@
     if (!selected) { v2AuthoringSay("Choose an installed V2 capability.", true); return; }
     v2CreateInProgress = true;
     if (v2CreateButton) { v2CreateButton.disabled = true; v2CreateButton.setAttribute("aria-busy", "true"); }
+    v2SetControls();
     let missionId = null;
     try {
       v2AuthoringSay("Checking the target against the configured scope (preview only)…");
@@ -801,6 +797,7 @@
         v2CreateButton.removeAttribute("aria-busy");
         v2CreateButton.disabled = Boolean(v2RequestId) || v2Capabilities.size === 0;
       }
+      v2SetControls();
     }
   }
   async function v2ReviewSelectedPlan() {
@@ -1065,27 +1062,13 @@
     stdout.append(row);
     stdout.scrollTop = stdout.scrollHeight;
   }
-  function updateElapsed() {
-    const elapsed = $("elapsed-timer");
-    if (!elapsed || !startedAt || currentStatus === "idle") return;
-    elapsed.textContent = Math.floor((Date.now() - startedAt) / 1000) + "s";
-  }
-  function setStatus(status) {
-    currentStatus = status || "unknown";
-    if (statusEl) statusEl.textContent = currentStatus.toUpperCase();
-    updateElapsed();
-    const pauseText = $("btn-pause-text");
-    if (pauseText) pauseText.textContent = ["running","queued"].includes(currentStatus) ? "Cancel Job" : "No Active Job";
-    const pause = $("btn-pause");
-    if (pause) pause.disabled = !currentJob || !["running","queued"].includes(currentStatus);
-  }
   async function loadTools() {
     const tools = await api("/api/tools");
     const usable = tools.filter(t => t.transport !== "msf_session" && (t.binary_available || t.available));
     toolSelect.replaceChildren();
     if (!usable.length) {
       toolSelect.add(new Option("No available adapters", ""));
-      say("No installed tools with available adapters were found.", false);
+      say("No installed tools with available adapters were found in the legacy catalog.", false);
       return;
     }
     for (const tool of usable) {
@@ -1093,92 +1076,15 @@
       option.dataset.description = tool.description || "";
       toolSelect.add(option);
     }
-    line("Loaded " + usable.length + " available tool adapters from WHAXON.", "whaxon.catalog", "success");
+    line("Loaded " + usable.length + " legacy catalog entries for reference. Execution uses Engine V2 capabilities.", "whaxon.catalog", "success");
   }
   async function startJob() {
-    const target = targetInput?.value.trim();
-    const tool_id = toolSelect?.value;
-    if (!target) { say("Enter a target that you are authorized to assess.", false); targetInput?.focus(); return; }
-    if (!tool_id) { say("Choose an installed tool with an available adapter.", false); return; }
-    if (startInProgress) return;
-    if (currentJob && ["running","queued"].includes(currentStatus)) {
-      say("A job is already active. Cancel it or wait for it to finish.", false); return;
+    if (!v2CapabilitySelect?.value) {
+      v2Say("Choose an installed Engine V2 capability above before creating a plan.", true);
+      v2CapabilitySelect?.focus();
+      return;
     }
-    startInProgress = true;
-    if (activeRunButton) {
-      activeRunButton.disabled = true;
-      activeRunButton.setAttribute("aria-busy", "true");
-    }
-    try {
-      say("Checking the target against the active WHAXON scope…");
-      const verdict = await api("/api/scope/check", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});
-      if (!verdict.allowed) {
-        line("Job not started: target is outside configured scope. " + (verdict.reason || ""), "whaxon.scope", "error");
-        say("Target was blocked by scope enforcement. No job was started.", false);
-        return;
-      }
-      const result = await api("/api/run", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tool_id,target})});
-      currentJob = result.job_id;
-      startedAt = Date.now();
-      if (jobEl) jobEl.textContent = currentJob;
-      stdout?.replaceChildren();
-      line("Scope check passed. Job " + currentJob + " accepted for " + target + ".", "whaxon.scope", "success");
-      line("Tool: " + tool_id + ". Streaming live job events…", "whaxon.runner");
-      setStatus("queued");
-      say("Job accepted. Live output is connected.");
-      connectStream(currentJob);
-    } catch (error) {
-      line(error.message, "whaxon.web", "error");
-      say("Could not start job: " + error.message, false);
-    } finally {
-      startInProgress = false;
-      if (activeRunButton) {
-        activeRunButton.disabled = false;
-        activeRunButton.removeAttribute("aria-busy");
-      }
-    }
-  }
-  function connectStream(jobId) {
-    if (source) source.close();
-    source = new EventSource("/api/jobs/" + encodeURIComponent(jobId) + "/stream");
-    source.onopen = () => {
-      const socket = $("run-sse-state");
-      if (socket) { socket.textContent = "Connected"; socket.className = "font-label-sm text-label-sm text-primary"; }
-    };
-    source.onmessage = event => {
-      let data; try { data = JSON.parse(event.data); } catch (_) { return; }
-      if (data.type === "status") setStatus(data.status);
-      else if (data.type === "line") {
-        const message = data.line || data.text || data.message || JSON.stringify(data);
-        line(message, data.source || data.tool || "whaxon.runner");
-      } else if (data.type === "finished") {
-        setStatus("finished");
-        line("Job finished with exit code " + data.exit_code + ".", "whaxon.runner", data.exit_code === 0 ? "success" : "error");
-        source?.close(); source = null; say("Job finished. Review output and findings in the Findings page.");
-      } else if (data.type === "failed") {
-        setStatus("failed"); line(data.error || "Job failed.", "whaxon.runner", "error");
-        source?.close(); source = null; say("Job failed: " + (data.error || "unknown error"), false);
-      }
-    };
-    source.onerror = () => {
-      const socket = $("run-sse-state");
-      if (source && ["finished","failed","cancelled"].includes(currentStatus)) {
-        source.close(); source = null;
-        if (socket) { socket.textContent = "Disconnected"; socket.className = "font-label-sm text-label-sm text-outline"; }
-      } else if (socket) {
-        socket.textContent = "Reconnecting";
-        socket.className = "font-label-sm text-label-sm text-tertiary";
-      }
-    };
-  }
-  async function cancelJob() {
-    if (!currentJob || !["running","queued"].includes(currentStatus)) return;
-    if (!window.confirm("Cancel WHAXON job " + currentJob + "?")) return;
-    try {
-      const result = await api("/api/jobs/" + encodeURIComponent(currentJob) + "/cancel", {method:"POST"});
-      line(result.ok ? "Cancellation requested." : "Job could not be cancelled by the runner.", "whaxon.runner", result.ok ? "success" : "error");
-      if (result.ok) { setStatus("cancelling"); say("Cancellation requested; waiting for runner state."); }
-    } catch (error) { say("Cancellation failed: " + error.message, false); }
+    await v2CreatePlan();
   }
   function clearLog() { stdout?.replaceChildren(); }
   function removeStaticDemoState() {
@@ -1224,7 +1130,7 @@
     document.querySelectorAll("[onclick]").forEach(element => element.removeAttribute("onclick"));
     document.querySelectorAll("button").forEach(button => {
       const label = button.textContent.trim();
-      if (/terminal log|emergency halt scan|emergency abort|inject payload|spawn sub.tool|engage replay|re.run|^pause$|^abort$|view stdout|execute/i.test(label) && !["run-passive-btn","run-active-btn","btn-pause"].includes(button.id)) {
+      if (/terminal log|emergency halt scan|emergency abort|inject payload|spawn sub.tool|engage replay|re.run|^pause$|^abort$|view stdout|execute/i.test(label) && !["run-passive-btn","run-active-btn"].includes(button.id)) {
         button.style.display = "none";
         button.setAttribute("aria-hidden","true");
         button.disabled = true;
@@ -1264,32 +1170,31 @@
       }
     });
     document.querySelectorAll("main button").forEach(button => {
-      if (!["run-passive-btn","run-active-btn","btn-pause"].includes(button.id) && !button.style.display) {
+      if (!["run-passive-btn","run-active-btn"].includes(button.id) && !button.style.display) {
         if (/WhatWeb|Gobuster|WPScan/.test(button.textContent)) button.style.display="none";
       }
     });
   }
+  const legacyCancel = $("btn-pause");
+  if (legacyCancel) {
+    legacyCancel.disabled = true;
+    legacyCancel.title = "Legacy direct-run cancellation is unavailable here; use Engine V2 Request Cancel after submitting a plan.";
+    legacyCancel.style.display = "none";
+    legacyCancel.setAttribute("aria-hidden", "true");
+  }
   $("run-active-btn")?.addEventListener("click", startJob);
-  $("btn-pause")?.addEventListener("click", cancelJob);
   $("cli-input")?.addEventListener("keydown", event => {
-    if (event.key === "Enter") { event.preventDefault(); say("Arbitrary shell commands are not supported by the web runner.", false); }
+    if (event.key === "Enter") { event.preventDefault(); say("Arbitrary shell commands are not supported by Engine V2 workflow plans.", false); }
   });
   const clearButton = [...document.querySelectorAll("button[title='Clear buffer']")][0];
   clearButton?.addEventListener("click", clearLog);
-  // Keep elapsed time live while a runner job is active and release timers on navigation.
-  timerId = window.setInterval(updateElapsed, 1000);
-  window.addEventListener("pagehide", () => {
-    if (timerId !== null) window.clearInterval(timerId);
-    source?.close();
-  });
-  // The AI planner endpoint does not enforce the same scope boundary as /api/run.
-  // Disable the visual toggle and replace its unsupported enforcement claims.
+  // AI suggestions are not yet reviewable and executable as approved V2 plans.
   const plannerToggle = $("ai-planner-toggle");
   if (plannerToggle) {
     plannerToggle.checked = false;
     plannerToggle.disabled = true;
-    plannerToggle.title = "Unavailable: the AI planner endpoint does not enforce the same scope boundary as the live runner.";
-    plannerToggle.setAttribute("aria-label", "AI planner disabled because scope enforcement is not verified");
+    plannerToggle.title = "Unavailable: AI suggestions cannot yet become reviewed, approved Engine V2 workflow plans.";
+    plannerToggle.setAttribute("aria-label", "AI planner disabled because Engine V2 plan integration is incomplete");
     const toggleLabel = plannerToggle.closest("label");
     if (toggleLabel) {
       toggleLabel.classList.remove("cursor-pointer");
@@ -1298,7 +1203,7 @@
     const plannerCard = plannerToggle.closest(".bg-surface-container-low.rounded-lg");
     if (plannerCard) {
       const description = plannerCard.querySelector("p");
-      if (description) description.textContent = "AI planner execution is disabled in this web runner because its endpoint does not enforce the same server-side scope boundary as /api/run.";
+      if (description) description.textContent = "AI planner execution is disabled until suggestions can be reviewed and approved as Engine V2 workflow plans.";
       plannerCard.querySelectorAll("span").forEach(span => {
         const value = span.textContent.trim();
         if (value === "Kiln / Ollama") span.textContent = "Model not reported";
@@ -1337,8 +1242,7 @@
   removeStaticDemoState();
   disableFakeControls();
   clearLog();
-  line("No job output yet. This panel will show events returned by the live WHAXON runner.", "whaxon.web");
-  setStatus("idle");
+  line("No run request has been submitted. Review the Engine V2 workflow above for plan state and durable progress.", "whaxon.web");
   loadTools().catch(error => say("Unable to load tools: " + error.message, false));
 })();
 </script>
