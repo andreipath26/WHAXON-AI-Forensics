@@ -145,6 +145,7 @@ def test_workflow_authorization_reloads_scope_revoked_after_proposal(tmp_path):
     _write_scope(scope_path, [])
     assert Core.authorize_workflow_task(core, task) is False
 
+
 def test_tool_proposal_blocks_out_of_scope_target():
     proposal = workflow_proposals.propose_tool_workflow_plan(
         _Core(allowed=False), mission_id="mission-1", plan_id="plan-1",
