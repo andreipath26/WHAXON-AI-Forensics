@@ -178,7 +178,12 @@ def test_dns_full_proposal_requires_scope_for_base_and_dmarc_subdomain(tmp_path)
 
 def test_dns_full_workflow_persists_sealed_findings_and_requires_approval(tmp_path, monkeypatch):
     core = Core(tmp_path)
-    _write_scope(core, ["example.test", "*.example.test"])
+    _write_scope(core, ["example.test", "*.example.test", "192.0.2.0/24"])
+    monkeypatch.setattr(
+        core.scope,
+        "check_for_execution",
+        lambda _target: pytest.fail("DNS-only workflow used the execution scope gate"),
+    )
     provider = next(
         item for item in core.providers._providers
         if isinstance(item, DnsFullPostureProvider)
