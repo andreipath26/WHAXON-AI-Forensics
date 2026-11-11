@@ -1070,3 +1070,26 @@ chain and retained evidence remain to be proven by exact-head CI. Timing and
 observation verification are explicitly unsupported in this crosswalk and
 remain a separate G03 gap. G01 remains open and unfrozen; G02 stays parked.
 
+## Desktop terminal client migration — 2026-11-11
+
+The TUI catalog's primary Run action now hands the selected fixed-argument tool
+and exact target to the Engine V2 workflow screen. The operator must select or
+create a mission, save a reviewable plan, inspect its task binding, grant the
+required approval, and submit a durable request before execution can begin.
+Free-form extra arguments are refused because they cannot be safely represented
+by the fixed V2 capability binding. The legacy runner implementation remains
+available internally for compatibility and is no longer called by the catalog
+Run action.
+
+The workflow screen also lists persisted queued, running and uncertain run
+requests from the shared Core queue. Selecting one reconnects the TUI to its
+plan and request status after reopening the screen; cancellation stays a
+request and does not claim that an external effect stopped. Regressions cover
+the catalog-to-plan handoff, rejection of free-form arguments, queue reconnect,
+explicit approvals and cancellation. Local verification: 20 TUI tests passed,
+Ruff passed, and mypy passed. The Chromium browser binary is unavailable in
+this local environment, so the Retest browser regression relies on exact-head
+CI. This closes one TUI dispatch path and one client reconnect gap only; web
+and GUI legacy dispatch, remaining CLI/AI/session/provider parity, recovery and
+release acceptance remain open.
+
