@@ -20,12 +20,14 @@ class WorkflowScreen(Screen):
 
     BINDINGS = [("escape", "back", "Back")]
 
-    def __init__(self) -> None:
+    def __init__(self, *, tool_id: str | None = None, target: str | None = None) -> None:
         super().__init__()
         self.mission_id: str | None = None
         self.plan_id: str | None = None
         self.task_id: str | None = None
         self.run_request_id: str | None = None
+        self.proposed_tool_id = tool_id
+        self.proposed_target = target
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -84,6 +86,13 @@ class WorkflowScreen(Screen):
         )
         self._load_missions()
         self._load_active_requests()
+        if self.proposed_tool_id:
+            self.query_one("#workflow-tool-id", Input).value = self.proposed_tool_id
+            self.query_one("#workflow-target", Input).value = self.proposed_target or ""
+            self._say(
+                f"{self.proposed_tool_id} selected from the catalog. Create or select a "
+                "mission, then propose and review its Engine V2 plan; nothing has run."
+            )
 
     def _load_active_requests(self) -> None:
         table = self.query_one("#workflow-requests", DataTable)
