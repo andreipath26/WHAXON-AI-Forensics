@@ -1,4 +1,4 @@
-"""whaxon ai <goal> — autonomous planner run, with --resume support."""
+"""whaxon ai: V2 plan proposals by default; legacy autonomous runs are opt-in."""
 from __future__ import annotations
 
 import asyncio
@@ -270,11 +270,15 @@ def _propose_v2(goal: str, target: str, data_dir: Path) -> int:
     suffix = uuid.uuid4().hex[:12]
     mission_id = f"ai-mission-{suffix}"
     plan_id = f"ai-plan-{suffix}"
-    core.create_mission(mission_id, goal)
-    proposal = propose_v2_workflow_plan(
-        core, mission_id=mission_id, plan_id=plan_id, goal=goal,
-        target=target, step=1, history=[],
-    )
+    try:
+        core.create_mission(mission_id, goal)
+        proposal = propose_v2_workflow_plan(
+            core, mission_id=mission_id, plan_id=plan_id, goal=goal,
+            target=target, step=1, history=[],
+        )
+    except Exception as exc:
+        print(f"V2 AI proposal failed: {exc}", file=sys.stderr)
+        return 1
     if proposal.get("status") != "proposed" or not isinstance(proposal.get("plan"), dict):
         print(json.dumps({
             "mission_id": mission_id,
@@ -285,8 +289,12 @@ def _propose_v2(goal: str, target: str, data_dir: Path) -> int:
         }, indent=2, sort_keys=True))
         return 1
 
-    plan = WorkflowPlan.from_dict(proposal["plan"])
-    core.save_workflow_plan(plan_id, plan)
+    try:
+        plan = WorkflowPlan.from_dict(proposal["plan"])
+        core.save_workflow_plan(plan_id, plan)
+    except Exception as exc:
+        print(f"V2 AI plan could not be saved: {exc}", file=sys.stderr)
+        return 1
     task_id = plan.tasks[0].id
     approval_id = f"approval-{suffix}"
     approval_expires = int(time.time()) + 3600
