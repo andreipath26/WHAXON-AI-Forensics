@@ -976,6 +976,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 404
 
+    @app.get("/api/v2/approval-queue")
+    def workflow_v2_approval_queue():
+        raw_limit = request.args.get("limit", "100")
+        if (
+            len(raw_limit) > 4 or not raw_limit.isascii()
+            or not raw_limit.isdecimal() or not 1 <= int(raw_limit) <= 1000
+        ):
+            return jsonify({"error": "approval queue limit must be between 1 and 1000"}), 400
+        try:
+            return jsonify({
+                "items": core.workflow_approval_queue(limit=int(raw_limit)),
+            })
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
     @app.post("/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke")
     def workflow_v2_revoke_approval(plan_id, approval_id):
         payload = request.get_json(silent=True)

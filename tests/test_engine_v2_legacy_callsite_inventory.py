@@ -165,6 +165,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('GET', '/api/v2/workflow-runs/summary'): 'workflow_v2_run_queue_summary',
     ('GET', '/api/v2/workflows/<plan_id>'): 'workflow_v2_plan_details',
     ('GET', '/api/v2/workflows/<plan_id>/approvals'): 'workflow_v2_approvals',
+    ('GET', '/api/v2/approval-queue'): 'workflow_v2_approval_queue',
     ('GET', '/api/v2/workflows/<plan_id>/attempts'): 'workflow_v2_attempts',
     ('GET', '/api/v2/workflows/<plan_id>/audit'): 'workflow_v2_audit',
     ('GET', '/api/v2/workflows/<plan_id>/event-inbox'): 'workflow_v2_event_inbox',

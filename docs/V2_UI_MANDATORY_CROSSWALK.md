@@ -54,6 +54,23 @@ Total output lines: 1574
 | UI-21 | Threat Intel | `/ui-v2/threat-intel` | `ui_v2_threat_intel.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
 | UI-22 | Approvals | `/ui-v2/approvals` | `ui_v2_approvals.html` | `test_web_ui_v2_auxiliary_pages.py`, `test_web_ui_v2_advanced_truthfulness.py` | OPEN |
 
+### Approvals migration checkpoint — 2026-11-11
+
+The Approvals page now loads persisted moderate/high/critical V2 tasks from
+`GET /api/v2/approval-queue` and records exact task approvals through the V2
+workflow approval endpoint. It does not submit work. Pending legacy AI runs
+remain visible read-only; this page no longer posts answers or resumes their
+executor. Blocked V2 tasks are displayed without a grant action because an
+approval cannot unblock or retry them. UI-22 remains open for the D1–D6 review
+gates below, broader queue-state coverage, and exact-head CI evidence.
+
+The V2 Findings, BAS and Retest pages also no longer issue legacy validation
+or retest mutations. Candidate findings link to V2 verification planning and
+verified findings to V2 retest planning; both require sealed Engine V2 evidence
+and current scope before the server saves a plan. Review, approval and durable
+submission remain separate. Legacy routes remain available to older clients.
+UI-11 and UI-17 remain open for the D1–D6 gates below.
+
 All templates live under `src/whaxon/interfaces/web/templates/`; browser tests live under `tests/`. The dashboard alias `/ui-v2/dashboard` and root entry route `/` additionally require parity checks. Common tests: `test_web_ui_v2_route_matrix.py`, `test_web_ui_v2_navigation.py`, `test_web_ui_v2_control_inventory.py`; auxiliary pages share the listed suites. The inventory records **793 static controls**; script references do not establish live bindings.
 
 ## Acceptance criteria for EVERY row
@@ -89,7 +106,7 @@ Dashboard batch 1 hardens malformed-history export: a successful HTTP response w
 
 **Constrained plan authoring and consent — 2026-11-09:** The Run page can create a mission and one-task immutable plan only from an installed, selected, moderate-impact V2 capability whose declared inputs require no caller-supplied fields. The plan records the provider ID and inventory manifest fingerprint for execution-time pinning. Creation performs a scope preview and creates no execution request. A separate explicit confirmation records one-hour exact-task approval through the V2 approval endpoint. The actor is server-derived (`local` for loopback, verified username for remote Basic-auth requests); the endpoint does not provide role separation or an independent-approver guarantee. The scheduler still rechecks scope, provider binding, plan integrity and approval binding. Multi-step plans and capabilities requiring inputs remain CLI/API authored. UI-03 and D1–D6 remain **OPEN**.
 
-**Engine V2 finding ownership and retest proposal — 2026-11-10:** Legacy CLI and web `validate`/`retest` routes reject V2-owned evidence before network replay or mutation, returning a workflow-required result. The Retest page now lets the operator create or select a V2 mission and request a saved retest plan for a verified finding through `POST /api/v2/workflow-proposals`. The provider checks source-job ownership, evidence seal, exact finding sequence, supported kind, and current scope. A saved plan links to Run & Orchestration for task review, explicit approval, and separate durable run submission; proposal creation itself neither approves nor executes. Legacy retest remains available for legacy-owned findings. Browser regressions cover plan authoring and Run page handoff; execution still requires the existing V2 consent and lifecycle path. No supplied design source was changed. UI-11 and D1–D6 remain **OPEN**.
+**Engine V2 finding ownership and retest proposal — 2026-11-11:** Legacy CLI and web `validate`/`retest` routes reject V2-owned evidence before network replay or mutation, returning a workflow-required result. V2 Findings, BAS and Retest pages avoid legacy validation/retest posts. Candidate findings link to V2 verification-plan authoring, while verified findings link to V2 retest-plan authoring through `POST /api/v2/workflow-proposals`. The provider checks source-job ownership, evidence seal, exact finding sequence, supported kind, and current scope. A saved plan links to Run & Orchestration for task review, explicit approval, and separate durable run submission; proposal creation itself neither approves nor executes. Legacy validation/retest remains available to older clients and for legacy-owned findings. Browser acceptance cases were updated; execution still requires the existing V2 consent and lifecycle path. No supplied design source was changed. UI-11, UI-17 and D1–D6 remain **OPEN**.
 
 **Run page primary dispatch migration — 2026-11-11:** The primary Run page action now creates an immutable Engine V2 mission and single-task plan from the selected installed V2 capability, after a scope preview. It does not call `/api/run`, open the legacy job event stream, or execute the new plan. The operator reviews the exact task, separately grants approval, and submits through the durable V2 run control. The catalog selector is marked as inventory-only; the unconstrained direct-run cancel control is hidden. Browser regressions cover saved-plan-only behavior, out-of-scope refusal, and single-flight plan creation with no legacy dispatch. The server's `/api/run` endpoint remains for legacy clients, and broader capability/transport parity and UI-03 acceptance remain **OPEN**.
 
@@ -290,8 +307,8 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 |---|---|---|---|---|---|
 | F.01 | Findings list | Load and render validated live report records; show empty, unavailable, malformed-response, and retry states | Implemented | GET /api/report?format=json | TESTS ADDED; BROWSER RUN PENDING |
 | F.02 | Finding card | Select a finding and inspect only recorded fields | Implemented | none | EXISTING BROWSER TEST |
-| F.03 | Validate selected finding | Submit validation and report the returned result | Implemented | POST /api/validate/<job>/<seq> | EXISTING BROWSER TEST |
-| F.04 | Retest selected / verified findings | Submit retest; report each failed item in a verified batch | Implemented | POST /api/retest/<job>/<seq> | TEST ADDED; BROWSER RUN PENDING |
+| F.03 | Validate selected finding | Open V2 Verification & Retest Studio for a sealed-evidence verification proposal | V2 plan proposal only | `/api/v2/workflow-proposals`; legacy POST remains for older clients | Browser test guards against legacy mutation |
+| F.04 | Retest selected / verified findings | Open V2 Verification & Retest Studio for a sealed-evidence retest proposal | V2 plan proposal only | `/api/v2/workflow-proposals`; legacy POST remains for older clients | Browser test guards against legacy mutation |
 | F.05 | Severity, status, and adapter filters | Filter the live list; each filter can be cleared | Implemented | none | WIRED |
 | F.06 | Finding search | Search finding and recorded evidence fields | Implemented | none | EXISTING BROWSER TEST |
 | F.07 | Copy Evidence | Copy the selected finding's recorded evidence | Implemented | Clipboard API | WIRED |
@@ -321,8 +338,8 @@ The former F.05 “Sort headers” and F.06 “Density toggle” rows described 
 | P.05 | Known Vulns preview | Show CVE table | Hardcoded | none | MOCKUP |
 
 ## Retest page
-| T.01 | Queue table | Show verified findings | Live queue | GET /api/report | WIRED |
-| T.02 | Retest button (row) | POST /api/retest | Wired | POST /api/retest/<job>/<seq> | WIRED |
+| T.01 | Queue table | Show candidate and verified findings with current recorded status | Live queue | GET /api/report | WIRED |
+| T.02 | Verify/retest button (row) | Save a V2 plan proposal for a candidate/verified sealed finding | V2 plan proposal only | POST /api/v2/workflow-proposals | Existing browser acceptance case |
 | T.03 | V2 retest proposal | Persist a sealed-evidence retest plan for a selected V2 mission; never approve or execute it | UI proposal | POST /api/v2/workflow-proposals | IMPLEMENTED; BROWSER TEST ADDED |
 | T.04 | Review V2 plan | Open the saved plan in Run & Orchestration for exact binding review, approval and separate durable submission | Canonical V2 run workflow | `/ui-v2/run?plan_id=<id>` → GET `/api/v2/workflows/<plan_id>` | IMPLEMENTED; BROWSER TEST ADDED |
 
@@ -557,7 +574,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 4:5148 | a | terminal Run & Orchestration | script-reference | # |
 | 4:5490 | a | verified_user Trust Layer & Findings | script-reference | # |
 | 4:5843 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
+| 30:1 | button | replay Open V2 Verification & Retest Studio | inline-handler | openV2RetestStudio() |
 | 126:1 | button | ALL | script-reference | filter:severity:all |
 | 127:1 | button | CRIT (1) | script-reference | filter:severity:critical |
 | 128:1 | button | HIGH (2) | script-reference | filter:severity:high |
@@ -574,7 +591,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 151:1 | input | Filter findings by proof pattern, URL, or CVE | script-reference | whaxon-finding-filter |
 | 165:229 | button | Retry | source-hidden | whaxon-findings-retry |
 | 248:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
-| 310:1 | button | play_arrow Replay Test (Retest) | script-reference | replay-btn |
+| 310:1 | button | play_arrow Open V2 Verification & Retest Studio | script-reference | replay-btn |
 | 314:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
 | 320:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
 | 324:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |

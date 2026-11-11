@@ -60,36 +60,27 @@ def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
     assert "Baseline: 34ms" not in html
 
 
-def test_replay_button_posts_to_live_validation_route(page, live_server):
-    calls = []
-
-    def respond(route):
-        calls.append((route.request.method, route.request.url))
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='{"status":"verified","reason":"browser test response"}',
-        )
-
-    page.route("**/api/validate/**", respond)
-    page.route("**/api/retest/**", respond)
+def test_verified_finding_action_routes_to_v2_retest_studio(page, live_server):
+    legacy_calls = []
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body='{"jobs":[{"job":{"id":"sealed-candidate"},"job_id":"sealed-candidate",'
+                 '"findings":[{"seq":1,"title":"Verified candidate",'
+                 '"verification_status":"verified","data":{}}]}]}',
+        ),
+    )
+    page.route("**/api/validate/**", lambda route: legacy_calls.append(route.request.url))
+    page.route("**/api/retest/**", lambda route: legacy_calls.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
         timeout=5000,
     )
-    page.locator("#whaxon-findings-list [data-finding-index]").first.click()
-    with page.expect_response(
-        lambda response: response.request.method == "POST"
-        and ("/api/validate/" in response.url or "/api/retest/" in response.url)
-    ) as response_info:
-        # Trigger the control directly: the fixed navigation rail can overlap the action
-        # hit target in the narrow CI viewport, while this test is specifically about
-        # the live validation request wiring rather than pointer hit-testing.
+    with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
         page.locator("#replay-btn").evaluate("(button) => button.click()")
-    assert response_info.value.ok
-    assert calls and calls[0][0] == "POST"
-    assert "/api/validate/" in calls[0][1] or "/api/retest/" in calls[0][1]
+    assert legacy_calls == []
 
 
 def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, live_server):
@@ -335,7 +326,7 @@ def test_findings_403_and_network_error_are_unavailable_and_retryable(page, live
     assert calls == 2
 
 
-def test_verified_batch_retest_reports_each_failed_finding(page, live_server):
+def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page, live_server):
     payload = {
         "jobs": [{
             "job": {"id": "verified-job", "target": "127.0.0.1", "tool": "nuclei"},
@@ -351,7 +342,6 @@ def test_verified_batch_retest_reports_each_failed_finding(page, live_server):
         }],
     }
     calls = []
-    page.add_init_script("window.__whaxonAlerts=[];window.confirm=()=>true;window.alert=message=>window.__whaxonAlerts.push(String(message));")
 
     page.route(
         "**/api/report**",
@@ -373,10 +363,6 @@ def test_verified_batch_retest_reports_each_failed_finding(page, live_server):
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 1",
         timeout=5000,
     )
-    page.get_by_role("button", name="Retest Verified Scope").click()
-    page.wait_for_function("() => window.__whaxonAlerts.length > 0", timeout=5000)
-    assert calls and len(calls) == 1
-    messages = page.evaluate("() => window.__whaxonAlerts")
-    assert messages
-    assert "1 failed" in messages[-1]
-    assert "Recorded verified finding (HTTP 403): target blocked by scope" in messages[-1]
+    with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
+        page.get_by_role("button", name="Open V2 Verification & Retest Studio").click()
+    assert calls == []

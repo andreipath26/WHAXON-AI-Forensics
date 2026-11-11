@@ -127,8 +127,8 @@ def _seed(data_dir: Path) -> None:
         "ai_source": "rules",
     }))
 
-    # Dedicated UI acceptance run: legacy approval tests may answer seed-ai-run.
-    # This isolated identifier keeps the UI test independent of test ordering.
+    # Dedicated UI fixture proves legacy pending runs stay visible but read-only
+    # in the V2 approvals page, independent of test ordering.
     store.create_ai_run("seed-ai-approval-ui", "UI acceptance: operator approval",
                         provider="rules", phase="recon", owner="local")
     store.set_ai_run_waiting("seed-ai-approval-ui", _json.dumps({

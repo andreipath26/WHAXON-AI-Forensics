@@ -1232,6 +1232,29 @@ class JobStore:
         finally:
             c.close()
 
+    def list_workflow_approval_candidates(self, *, limit=100):
+        """Return bounded pending moderate+ tasks for the V2 approval UI."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise ValueError("approval queue limit must be between 1 and 1000")
+        c = self._conn()
+        try:
+            rows = c.execute(
+                "SELECT t.plan_id, t.task_key, t.capability_id, t.target, t.impact, "
+                "t.status AS task_status, p.status AS plan_status, p.digest, "
+                "m.id AS mission_id, m.objective "
+                "FROM workflow_tasks t "
+                "JOIN workflow_plans p ON p.id=t.plan_id "
+                "JOIN missions m ON m.id=p.mission_id "
+                "WHERE t.impact IN ('moderate','high','critical') "
+                "AND t.status IN ('pending','blocked') "
+                "AND p.status!='cancel_requested' "
+                "ORDER BY t.created_at DESC, t.task_key LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            c.close()
+
     def has_valid_workflow_approval(self, plan_id, task_key, *, policy_version="policy.v1"):
         """Validate unrevoked, unexpired consent against current canonical plan."""
         from .workflow import ApprovalBinding, WorkflowPlan

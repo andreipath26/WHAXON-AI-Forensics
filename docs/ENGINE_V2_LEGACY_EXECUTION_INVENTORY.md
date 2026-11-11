@@ -176,7 +176,7 @@ execution evidence; deployment-host readiness remains unverified.
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
 | CLI workflow | `whaxon run`, default `whaxon ai`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
-| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and `/ui-v2/ai` plan handoff use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for other clients | The AI Gate saves a proposal and links to V2 Run; its legacy AI history is read-only and it cannot resume pending legacy execution. Legacy API endpoints are still available and are not V2 request/task-owned. Other proposal surfaces save fixed-argument tool or sealed-evidence plans; saving never approves or submits. |
+| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients | V2 AI/Findings/BAS/Retest/Approvals clients do not call legacy executor, answer, validation or retest mutations. Their legacy history is read-only; proposals and approvals remain separate from submission. Legacy APIs stay available to older clients and are not V2 request/task-owned. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
 
@@ -319,6 +319,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>` | `workflow_v2_plan_details` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/approval-queue` | `workflow_v2_approval_queue` | Bounded pending/blocked moderate+ V2 tasks with exact approval state for the V2 Approvals UI |
 | `POST` | `/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke` | `workflow_v2_revoke_approval` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
@@ -532,3 +533,18 @@ does not grant approval or submit a run. The old autonomous executor and
 for existing clients. V2 AI action generation is still bounded to one
 moderate-impact catalog action with an exact target and no dynamic arguments;
 multi-step autonomous planning remains outside this migration slice.
+
+The V2 Approvals page now reads `GET /api/v2/approval-queue` and grants
+plan/task-bound, expiring consent through
+`POST /api/v2/workflows/<plan_id>/approvals`. It never resumes a legacy AI
+run: `/api/ai/pending` is displayed read-only, and
+`POST /api/ai/runs/<id>/answer` remains available only for older clients.
+Granting consent does not submit the separate V2 run request; blocked tasks
+remain blocked and must be replanned.
+
+The V2 Findings, BAS and Retest pages no longer call the legacy validation or
+retest mutation routes. They hand off candidate findings for V2 verification
+plans and verified findings for V2 retest plans. The server requires sealed V2
+evidence and current scope before saving either plan. Legacy validation and
+retest APIs remain available for compatibility clients; saved plans still
+require review, approval, and separate run submission.

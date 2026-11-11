@@ -900,3 +900,23 @@ and fixed-input limits. `/api/ai/run` and autonomous multi-step AI remain
 legacy boundaries. Static CLI checks are pending exact-head CI; no local tests
 were run in this implementation batch.
 
+## Approvals UI V2 consent queue — 2026-11-11
+
+`/ui-v2/approvals` now loads the bounded persisted V2 approval queue and grants
+consent through the plan/task approval lifecycle. Legacy pending AI runs are
+read-only on this page; the client no longer calls the legacy answer/resume
+route. Approval remains separate from durable run submission, and a blocked
+task is not resumed by granting consent. This removes the Approvals page's
+legacy executor-resumption path but does not retire the compatibility API.
+Existing browser acceptance cases were updated; local tests were not run in
+this batch. Exact-head CI is pending.
+
+## Findings, BAS and Retest UI execution boundary — 2026-11-11
+
+The V2 Findings, BAS and Retest pages no longer issue direct legacy validation
+or retest requests. Verified findings link to V2 retest-plan authoring;
+candidate findings link to V2 verification-plan authoring. Both paths require
+sealed Engine V2 source evidence and leave approval and submission as separate
+steps. Legacy APIs remain for older clients and legacy-owned records. No plan
+proposal approves or submits work.
+

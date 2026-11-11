@@ -44,8 +44,8 @@ def test_retest_page_never_displays_static_fixture_evidence_or_commands(page, li
     assert page.locator("#whaxon-live-retest").is_visible()
 
 
-def test_retest_page_only_posts_for_verified_findings_with_valid_sequence(page, live_server):
-    calls = []
+def test_retest_page_only_offers_v2_plan_for_verified_findings(page, live_server):
+    legacy_calls = []
     report_calls = {"count": 0}
 
     def report(route):
@@ -55,42 +55,25 @@ def test_retest_page_only_posts_for_verified_findings_with_valid_sequence(page, 
             content_type="application/json",
             body='{"jobs":[{"job_id":"job-live-1","findings":['
                  '{"seq":7,"kind":"verified finding","severity":"low","verification_status":"verified"},'
-                 '{"seq":8,"kind":"unverified finding","severity":"high","verification_status":"pending"},'
+                 '{"seq":8,"kind":"sqli","severity":"high","verification_status":"pending"},'
                  '{"seq":null,"kind":"missing sequence","verification_status":"verified"}]}]}',
         )
 
-    def retest(route):
-        calls.append({"method": route.request.method, "url": route.request.url})
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='{"status":"INCONCLUSIVE","reason":"test replay completed without a decisive signal"}',
-        )
-
     page.route("**/api/report?format=json", report)
-    page.route("**/api/retest/**", retest)
+    page.route("**/api/retest/**", lambda route: legacy_calls.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/retest")
     page.wait_for_function(
         "() => document.querySelector('#retest-status')?.textContent.includes('2 finding record(s)')",
         timeout=8000,
     )
 
-    verified = page.get_by_role("button", name="Retest verified finding").nth(0)
-    unverified = page.get_by_role("button", name="Retest verified finding").nth(1)
-    assert verified.is_enabled()
-    assert unverified.is_disabled()
-    assert page.get_by_role("button", name="Retest verified finding").count() == 2
+    retest = page.get_by_role("button", name="Propose V2 retest plan")
+    verify = page.get_by_role("button", name="Propose V2 verification plan")
+    assert retest.count() == 1 and retest.is_enabled()
+    assert verify.count() == 1 and verify.is_enabled()
     assert report_calls["count"] == 1
-
-    verified.click()
-    page.wait_for_function(
-        "() => document.querySelector('#retest-status')?.textContent.includes('Retest result: INCONCLUSIVE')",
-        timeout=8000,
-    )
-    assert calls == [{
-        "method": "POST",
-        "url": f"{live_server}/api/retest/job-live-1/7",
-    }]
+    assert page.get_by_role("button", name="Retest verified finding").count() == 0
+    assert legacy_calls == []
 
 
 def test_v2_retest_proposal_is_saved_but_not_approved_or_submitted(page, live_server):
@@ -255,10 +238,10 @@ def test_retest_halt_uses_live_history_and_fixture_controls_are_disabled(page, l
         if button.evaluate("(el) => el.closest('#whaxon-live-retest') !== null"):
             continue
         assert button.is_disabled(), f"Disconnected retest control remains enabled: {button.inner_text()}"
-    assert "server must re-check scope" in page.locator("#whaxon-live-retest").inner_text()
+    assert "server confirms sealed Engine V2 evidence" in page.locator("#whaxon-live-retest").inner_text()
 
 
-def test_retest_page_surfaces_v2_workflow_required_without_claiming_success(page, live_server):
+def test_v2_owned_retest_evidence_has_no_legacy_replay_control(page, live_server):
     page.route(
         "**/api/report?format=json",
         lambda route: route.fulfill(
@@ -268,24 +251,14 @@ def test_retest_page_surfaces_v2_workflow_required_without_claiming_success(page
         ),
     )
 
-    def reject_legacy_retest(route):
-        route.fulfill(
-            status=409, content_type="application/json",
-            body='{"error":"Engine V2 evidence requires a plan-bound verification or retest workflow"}',
-        )
-
-    page.route("**/api/retest/**", reject_legacy_retest)
+    legacy_calls = []
+    page.route("**/api/retest/**", lambda route: legacy_calls.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/retest")
     page.wait_for_function(
         "() => document.querySelector('#retest-status')?.textContent.includes('1 finding record(s)')",
         timeout=8000,
     )
-    page.get_by_role("button", name="Retest verified finding").click()
-    page.wait_for_function(
-        "() => document.querySelector('#retest-status')?.textContent.includes('plan-bound')",
-        timeout=8000,
-    )
-    status = page.locator("#retest-status").inner_text()
-    assert "Retest not completed" in status
-    assert "Retest result" not in status
+    assert page.get_by_role("button", name="Retest verified finding").count() == 0
+    assert page.get_by_role("button", name="Propose V2 retest plan").is_enabled()
+    assert legacy_calls == []
 
