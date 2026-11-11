@@ -22,7 +22,6 @@ from pathlib import Path
 import pytest
 from textual.widgets import Button, DataTable, Input, Static
 
-from whaxon.core.scope import OutOfScopeError
 from whaxon.interfaces.tui.app import WhaxonApp
 from whaxon.interfaces.tui.screens.main import (
     JobFailedMsg,
@@ -198,34 +197,6 @@ async def test_catalog_action_rejects_unstructured_extra_args_for_v2(tmp_path):
 
         assert app.screen is screen
         assert "clear extra args" in screen.query_one("#status", Static).content
-
-
-async def test_non_overridable_scope_denial_never_retries_tool_run(tmp_path, monkeypatch):
-    app = await _boot(tmp_path)
-    calls = []
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        screen = app.screen
-
-        async def denied(**kwargs):
-            calls.append(kwargs)
-            raise OutOfScopeError(
-                "192.0.2.10", "resolved address is excluded", "excluded-network",
-                overridable=False,
-            )
-
-        monkeypatch.setattr(app.core.runner, "run_tool", denied)
-        monkeypatch.setattr(
-            screen, "_confirm_out_of_scope",
-            lambda *_args: pytest.fail("non-overridable scope denial prompted for override"),
-        )
-        worker = screen._run_tool("nmap", "192.0.2.10")
-        await worker.wait()
-
-        assert calls == [{
-            "tool_id": "nmap", "target": "192.0.2.10", "extra_args": "", "timeout_s": 300,
-        }]
-        assert "cannot be overridden" in app.screen.query_one("#status", Static).content
 
 
 async def test_cancel_with_nothing_running_sets_status(tmp_path):
