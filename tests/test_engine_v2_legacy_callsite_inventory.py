@@ -82,7 +82,6 @@ EXPECTED_RUNNER_CALLS = Counter(
         ("interfaces/cli/run_cmd.py", "main._go", "run_tool"): 1,
         ("interfaces/cli/run_cmd.py", "main._go", "run_in_session"): 1,
         ("interfaces/gui/main_window.py", "_run_tool", "run_tool"): 2,
-        ("interfaces/tui/screens/main.py", "_run_tool", "run_tool"): 2,
         ("interfaces/web/server.py", "_run_job_blocking", "run_tool"): 1,
     }
 )
