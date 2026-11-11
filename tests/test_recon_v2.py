@@ -232,7 +232,7 @@ def test_dns_worker_hard_deadline_terminates_spawned_child(tmp_path, monkeypatch
 def test_passive_dns_workflow_persists_and_seals_child_findings(tmp_path, monkeypatch):
     core = Core(tmp_path)
     _write_scope(core, ["example.test"])
-    provider = _provider(core, monkeypatch)
+    _provider(core, monkeypatch)
     _bind_fake_worker(monkeypatch, _fixture_dns_child)
     proposal = _approved_plan(core)
     assert proposal["capability_id"] == CAPABILITY_ID
@@ -260,7 +260,7 @@ def test_passive_dns_workflow_persists_and_seals_child_findings(tmp_path, monkey
 def test_passive_dns_child_rechecks_revoked_scope_before_query(tmp_path, monkeypatch):
     core = Core(tmp_path)
     _write_scope(core, ["example.test"])
-    provider = _provider(core, monkeypatch)
+    _provider(core, monkeypatch)
     proposal = _approved_plan(core, "dns-scope-race")
     assert proposal["status"] == "proposed"
 
