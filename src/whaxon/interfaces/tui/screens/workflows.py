@@ -57,6 +57,8 @@ class WorkflowScreen(Screen):
                 yield DataTable(id="workflow-missions", cursor_type="row")
                 yield Static("Plans")
                 yield DataTable(id="workflow-plans", cursor_type="row")
+                yield Static("Active or uncertain durable requests")
+                yield DataTable(id="workflow-requests", cursor_type="row")
             with Vertical():
                 yield Static("Tasks")
                 yield DataTable(id="workflow-tasks", cursor_type="row")
@@ -77,7 +79,27 @@ class WorkflowScreen(Screen):
         self.query_one("#workflow-tasks", DataTable).add_columns(
             "Task", "Capability", "Target", "Impact", "State",
         )
+        self.query_one("#workflow-requests", DataTable).add_columns(
+            "Request", "Plan", "State",
+        )
         self._load_missions()
+        self._load_active_requests()
+
+    def _load_active_requests(self) -> None:
+        table = self.query_one("#workflow-requests", DataTable)
+        table.clear()
+        try:
+            summary = self.app.core.workflow_run_queue_summary()
+            for request in summary.get("active_requests", []):
+                request_id = str(request.get("id", ""))
+                if not request_id:
+                    continue
+                table.add_row(
+                    request_id, str(request.get("plan_id", "")),
+                    str(request.get("status", "unknown")), key=request_id,
+                )
+        except (AttributeError, sqlite3.Error, TypeError, ValueError, RuntimeError) as exc:
+            self._say(f"Durable requests could not be reloaded: {exc}", error=True)
 
     def _load_missions(self) -> None:
         table = self.query_one("#workflow-missions", DataTable)
@@ -253,6 +275,21 @@ class WorkflowScreen(Screen):
         self.query_one("#workflow-submit", Button).disabled = not bool(plan.tasks)
         self._say("Plan loaded. Select a task to review its exact binding before approval.")
 
+    @on(DataTable.RowSelected, "#workflow-requests")
+    def _request_selected(self, event: DataTable.RowSelected) -> None:
+        self.run_request_id = str(event.row_key.value)
+        request = self.app.core.workflow_run_request(self.run_request_id)
+        if request is None:
+            self._say("The selected durable request is unavailable.", error=True)
+            return
+        self.plan_id = str(request["plan_id"])
+        self.query_one("#workflow-request-refresh", Button).disabled = False
+        self.query_one("#workflow-cancel", Button).disabled = request["status"] not in {
+            "queued", "running",
+        }
+        self._load_plan_details()
+        self._refresh_request_status()
+
     @on(DataTable.RowSelected, "#workflow-tasks")
     def _task_selected(self, event: DataTable.RowSelected) -> None:
         self.task_id = str(event.row_key.value)
@@ -262,7 +299,8 @@ class WorkflowScreen(Screen):
     @on(Button.Pressed, "#workflow-refresh")
     def _refresh(self) -> None:
         self._load_missions()
-        self._say("Mission list refreshed. Select a mission to reload its plans.")
+        self._load_active_requests()
+        self._say("Missions and active durable requests refreshed.")
 
     @on(Button.Pressed, "#workflow-approve")
     def _approve_task(self) -> None:
@@ -302,6 +340,7 @@ class WorkflowScreen(Screen):
                     raise ValueError(f"task {task.id} is not authorized and approved")
             request = self.app.core.enqueue_workflow_run(self.plan_id)
             self.run_request_id = request["id"]
+            self._load_active_requests()
             self.query_one("#workflow-request-refresh", Button).disabled = False
             self.query_one("#workflow-cancel", Button).disabled = False
             self._say(
@@ -328,6 +367,10 @@ class WorkflowScreen(Screen):
             f"Request {self.run_request_id}: {request['status']}. "
             "A running or uncertain request is not reported as completed."
         )
+        self._load_active_requests()
+        self.query_one("#workflow-cancel", Button).disabled = request["status"] not in {
+            "queued", "running",
+        }
 
     @on(Button.Pressed, "#workflow-cancel")
     def _cancel_request(self) -> None:
