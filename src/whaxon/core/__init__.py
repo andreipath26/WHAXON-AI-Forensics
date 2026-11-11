@@ -127,6 +127,7 @@ class Core:
             FindingVerificationProvider,
             SemanticOperationProvider,
         )
+        from .dns_full_v2 import DnsFullPostureProvider
         from .recon_v2 import PassiveDnsReconProvider
         self.capabilities = CapabilityRegistry(self.store)
         catalog_provider = CatalogAdapterProvider(
@@ -145,12 +146,16 @@ class Core:
         passive_dns_provider = PassiveDnsReconProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        dns_full_provider = DnsFullPostureProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
             verification_provider,
             lab_access_provider,
             passive_dns_provider,
+            dns_full_provider,
         ))
 
     def _wire_store(self) -> None:
