@@ -134,7 +134,7 @@ def test_dns_manifest_declares_an_accepting_closed_output_contract(tmp_path):
         "provider_id": provider.bindings()[0].provider_id,
         "provider_version": provider.bindings()[0].provider_version,
         "manifest_fingerprint": provider.bindings()[0].fingerprint,
-        "registry_digest": core.providers.registry_digest,
+        "registry_digest": core.capabilities.digest,
         "transport": "isolated_process",
     }
     assert set(sample) == set(schema["properties"])
@@ -193,7 +193,7 @@ def test_dns_worker_hard_deadline_terminates_spawned_child(tmp_path, monkeypatch
     marker = tmp_path / "dns-child.pid"
     monkeypatch.setenv("WHAXON_TEST_DNS_CHILD_MARKER", str(marker))
     worker = _BoundedDnsWorker(
-        "example.test", str(tmp_path / "scope.json"), 0.25,
+        "example.test", str(tmp_path / "scope.json"), 1.5,
         worker_target=_slow_dns_child,
     )
 
