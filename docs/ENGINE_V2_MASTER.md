@@ -1093,3 +1093,16 @@ CI. This closes one TUI dispatch path and one client reconnect gap only; web
 and GUI legacy dispatch, remaining CLI/AI/session/provider parity, recovery and
 release acceptance remain open.
 
+The Run & Orchestration page's primary action also now creates a V2 mission
+and pinned single-task plan from the selected installed V2 capability. The
+scope check is a preview only; the operator still reviews the immutable task,
+grants separate approval, and submits via the durable workflow endpoint. The
+page no longer calls `/api/run` or opens the legacy job stream/cancel controls.
+Its tool catalog is explicitly inventory-only. Browser regressions now cover
+plan-only behavior, out-of-scope refusal, single-flight authoring and absence
+of legacy dispatch. Local crosswalk/inventory tests passed (8), Ruff passed,
+and both inline scripts passed `node --check`; browser execution still awaits
+exact-head CI because Chromium is not installed locally. Other CLI, AI, GUI,
+session and server-side legacy callers remain open, as do full UI-03 behavior
+and E4 parity gates.
+
