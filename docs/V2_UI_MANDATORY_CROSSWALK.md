@@ -86,6 +86,14 @@ All templates live under `src/whaxon/interfaces/web/templates/`; browser tests l
 
 A page becomes `DEPLOYMENT_READY` **only when D1–D6 each have exact-source evidence and explicit approver sign-off**. No aggregate percentage or page route smoke closes any gate. UI readiness does **not** automatically approve E6 or full product deployment.
 
+### Emergency Halt Scan: legacy and Engine V2 cancellation boundary
+
+Every enabled V2 Emergency Halt Scan control discovers legacy active jobs from `GET /api/jobs/active` and durable V2 requests from `GET /api/v2/workflow-runs/summary`. Both responses must be successful and have the expected list shape before the UI offers cancellation; an unavailable or malformed source fails the operation closed. Only rows explicitly marked `engine_v2_owned: false` are treated as legacy jobs. V2-owned rows and rows without a boolean ownership marker are not sent to the legacy job cancellation route.
+
+After operator confirmation, the UI sends legacy job IDs only to `POST /api/jobs/<job_id>/cancel`, and durable request IDs from `active_requests[].id` only to `POST /api/v2/workflow-runs/<request_id>/cancel`. V2 active requests include `queued`, `running` and `uncertain` states. A successful response means cancellation was requested. It does **not** prove that an in-flight or uncertain provider/external effect stopped; the UI says so in its result. Partial failures report requested counts rather than claiming a complete stop.
+
+This shared contract is implemented for the 14 previously legacy-only handlers in Adapters, AI Gate, Approvals, Audit, BAS, Bug Bounty, Chains, Compliance, Diagnostics, Evidence, Monitoring, PTaaS, Retest and Threat Intelligence. Dashboard and Settings already queried both services; they also now omit V2-owned job rows from legacy cancellation. Run's plan-specific durable cancellation remains unchanged.
+
 ## Work queue and Dashboard-first checkpoint
 
 **Priority UI-01 Dashboard:** current template `ui_v2_dashboard.html`, route `/ui-v2`, browser suite `test_web_ui_v2_dashboard.py`, and supplied `web ui files and rendering/dashboard_engagement_hub_zero_state/`. Existing live functionality includes history/filters/JSON export, scope routing, job halt, Burp XML import, health/readiness labels. Known blocker: full approved screenshot and accessibility verification, complete per-control permission/malformed-response mapping, packaging/network asset policy.

@@ -95,7 +95,8 @@ def test_audit_header_new_and_logs_buttons_open_real_workspaces(page, live_serve
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_audit_header_halt_button_uses_live_job_history(page, live_server):
+def test_audit_header_halt_uses_active_workflow_apis(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2/audit")
     page.wait_for_function(
         "() => document.querySelector('#audit-status')?.textContent.includes('execution record(s)')"
@@ -104,7 +105,7 @@ def test_audit_header_halt_button_uses_live_job_history(page, live_server):
     )
     page.locator("header button").filter(has_text="Emergency Halt Scan").click()
     page.wait_for_function(
-        "() => document.querySelector('#audit-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#audit-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
 

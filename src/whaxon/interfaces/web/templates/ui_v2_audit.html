@@ -764,26 +764,75 @@
   wireRoute(buttons.find(button=>/\bNew\b|New Engagement/i.test(text(button))),"/ui-v2/scope");
   wireRoute(buttons.find(button=>/LOGS|Terminal Log/i.test(text(button))),"/ui-v2/run");
   const halt=buttons.find(button=>/HALT SCAN|Emergency Halt Scan/i.test(text(button)));
-  if(halt)halt.addEventListener("click",async event=>{
-    event.preventDefault();
-    const status=document.getElementById("audit-status");
-    try{
-      const response=await fetch("/api/history");
-      if(!response.ok)throw new Error("History HTTP "+response.status);
-      const history=await response.json();
-      const active=(Array.isArray(history)?history:[]).filter(job=>["running","queued","pending"].includes(String(job.status||"").toLowerCase()));
-      if(!active.length){if(status)status.textContent="No running or queued jobs were found. Nothing was cancelled.";return;}
-      if(!window.confirm("Cancel "+active.length+" active WHAXON job(s)? This cannot be undone."))return;
-      const results=await Promise.all(active.map(async job=>{
-        const id=job.id||job.job_id;if(!id)return false;
-        const result=await fetch("/api/jobs/"+encodeURIComponent(id)+"/cancel",{method:"POST"});
-        if(!result.ok)return false;
-        const body=await result.json().catch(()=>({}));
-        return body.ok===true;
-      }));
-      if(status)status.textContent="Cancellation requested for "+results.filter(Boolean).length+" of "+active.length+" active job(s).";
-    }catch(error){if(status)status.textContent="Emergency halt failed: "+error.message;}
-  });
+  let haltInFlight = false;
+  if(halt)  halt.addEventListener("click",async event => {
+      event.preventDefault();
+      if (haltInFlight) return;
+      haltInFlight = true;
+      const wasDisabled = halt.disabled;
+      halt.disabled = true;
+      const setHaltStatus = message => { {const node=document.getElementById("audit-status");if(node)node.textContent=message;} };
+      try {
+        const [jobsResponse, runsResponse] = await Promise.all([
+          fetch("/api/jobs/active"),
+          fetch("/api/v2/workflow-runs/summary")
+        ]);
+        if (!jobsResponse.ok) throw new Error("Active jobs HTTP " + jobsResponse.status);
+        if (!runsResponse.ok) throw new Error("Workflow queue HTTP " + runsResponse.status);
+        const jobsPayload = await jobsResponse.json();
+        const summary = await runsResponse.json();
+        if (!Array.isArray(jobsPayload) || !jobsPayload.every(job => job && typeof job === "object" && !Array.isArray(job))) {
+          throw new Error("Active jobs API returned an invalid response.");
+        }
+        if (!summary || !Array.isArray(summary.active_requests)
+            || !summary.active_requests.every(run => run && typeof run === "object" && !Array.isArray(run))) {
+          throw new Error("Workflow queue API returned an invalid active-request list.");
+        }
+        // Engine V2 owns cancellation by durable workflow request ID. Its job rows
+        // are represented by workflow requests and must not hit the legacy job API.
+        const legacyJobs = jobsPayload.filter(job => job.engine_v2_owned === false);
+        const activeRuns = summary.active_requests.filter(run =>
+          ["queued", "running", "uncertain"].includes(String(run.status || "").toLowerCase())
+        );
+        if (!legacyJobs.length && !activeRuns.length) {
+          setHaltStatus("No running legacy jobs or durable workflow requests were found. Nothing was cancelled.");
+          return;
+        }
+        if (!window.confirm("Request cancellation for " + legacyJobs.length + " legacy job(s) and "
+            + activeRuns.length + " durable workflow run(s)? A running or uncertain external effect may continue.")) return;
+        const [jobResults, workflowResults] = await Promise.all([
+          Promise.all(legacyJobs.map(async job => {
+            try {
+              const id = job.id || job.job_id;
+              if (typeof id !== "string" || !id.trim()) return false;
+              const response = await fetch("/api/jobs/" + encodeURIComponent(id) + "/cancel", {method: "POST"});
+              if (!response.ok) return false;
+              const result = await response.json();
+              return result && result.ok === true;
+            } catch (_) { return false; }
+          })),
+          Promise.all(activeRuns.map(async run => {
+            try {
+              if (typeof run.id !== "string" || !run.id.trim()) return false;
+              const response = await fetch("/api/v2/workflow-runs/" + encodeURIComponent(run.id) + "/cancel", {method: "POST"});
+              if (!response.ok) return false;
+              const result = await response.json();
+              return result && result.cancellation_requested === true;
+            } catch (_) { return false; }
+          }))
+        ]);
+        const requestedJobs = jobResults.filter(Boolean).length;
+        const requestedRuns = workflowResults.filter(Boolean).length;
+        setHaltStatus("Cancellation requested for " + requestedJobs + " of " + legacyJobs.length
+          + " legacy job(s) and " + requestedRuns + " of " + activeRuns.length
+          + " durable workflow run(s). A running or uncertain external effect is not confirmed stopped.");
+      } catch (error) {
+        setHaltStatus("Emergency halt failed: " + error.message);
+      } finally {
+        halt.disabled = wasDisabled;
+        haltInFlight = false;
+      }
+    });
 })();
 </script>
 </body></html>

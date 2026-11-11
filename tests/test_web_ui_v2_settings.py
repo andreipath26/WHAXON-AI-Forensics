@@ -97,7 +97,8 @@ def test_settings_header_logs_button_opens_the_run_workspace(page, live_server):
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_settings_header_halt_button_uses_live_job_history(page, live_server):
+def test_settings_header_halt_uses_active_workflow_apis(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2/settings")
     page.wait_for_function(
         "() => document.querySelector('#settings-status')?.textContent.includes('Settings loaded read-only')"
@@ -106,25 +107,17 @@ def test_settings_header_halt_button_uses_live_job_history(page, live_server):
     )
     page.get_by_role("button", name="HALT SCAN").click()
     page.wait_for_function(
-        "() => document.querySelector('#settings-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#settings-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
 
 
-def test_settings_emergency_halt_includes_durable_v2_run_requests(page, live_server):
+def test_settings_emergency_halt_includes_durable_v2_run_requests(page, live_server, workflow_halt_sources):
     calls = []
-    page.route(
-        "**/api/jobs/active",
-        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
-    )
-    page.route(
-        "**/api/v2/workflow-runs/summary",
-        lambda route: route.fulfill(
-            status=200, content_type="application/json",
-            body='{"active_requests":[{"id":"settings-v2-request","plan_id":"settings-plan",'
-                 '"status":"uncertain","submitted_at":1}]}',
-        ),
-    )
+    workflow_halt_sources(active_requests=[{
+        "id": "settings-v2-request", "plan_id": "settings-plan",
+        "status": "uncertain", "submitted_at": 1,
+    }])
     def cancel_run(route):
         calls.append(route.request.method)
         route.fulfill(

@@ -920,3 +920,16 @@ sealed Engine V2 source evidence and leave approval and submission as separate
 steps. Legacy APIs remain for older clients and legacy-owned records. No plan
 proposal approves or submits work.
 
+## V2 UI cancellation ownership — 2026-11-11
+
+The 14 remaining V2 Emergency Halt Scan handlers now discover active legacy
+jobs and durable V2 run requests separately. Legacy cancellation is sent only
+for rows explicitly marked `engine_v2_owned: false`; V2-owned runs are stopped
+through their persisted run-request ID and workflow cancellation barrier. The
+legacy job cancellation endpoint rejects V2-owned job IDs with HTTP 409. The
+Dashboard and Settings controls apply the same ownership filter. UI and
+crosswalk copy state that cancellation records a request and does not prove an
+already-dispatched external action stopped. Existing browser fixtures were
+aligned to the new API contract; tests were not run in this implementation
+batch, and exact-head CI remains pending.
+

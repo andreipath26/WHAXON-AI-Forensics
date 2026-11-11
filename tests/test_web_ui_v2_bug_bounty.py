@@ -18,7 +18,8 @@ def test_bug_bounty_workspace_uses_recorded_jobs_and_real_navigation(page, live_
     assert page.url.endswith("/ui-v2/run")
 
 
-def test_bug_bounty_halt_is_live_and_browser_simulation_controls_are_disabled(page, live_server):
+def test_bug_bounty_halt_uses_active_workflow_apis_and_disables_simulations(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.route(
         "**/api/history",
         lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
@@ -31,7 +32,7 @@ def test_bug_bounty_halt_is_live_and_browser_simulation_controls_are_disabled(pa
     )
     page.locator("header button").filter(has_text="HALT SCAN").click()
     page.wait_for_function(
-        "() => document.querySelector('#bounty-status')?.textContent.includes('No running or queued jobs were found')",
+        "() => document.querySelector('#bounty-status')?.textContent.includes('No running legacy jobs or durable workflow requests were found')",
         timeout=5000,
     )
     for button in page.locator("main button:visible").all():

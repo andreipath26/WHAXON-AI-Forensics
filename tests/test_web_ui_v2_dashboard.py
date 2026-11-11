@@ -58,15 +58,13 @@ def test_dashboard_exports_live_history_as_json(page, live_server):
 
 
 
-def test_dashboard_emergency_halt_uses_live_active_jobs_endpoint(page, live_server):
+def test_dashboard_emergency_halt_uses_live_active_jobs_endpoint(page, live_server, workflow_halt_sources):
     calls = []
 
-    def active_jobs(route):
-        route.fulfill(
-            status=200,
-            content_type="application/json",
-            body='[{"id":"running-job-1","tool":"nmap","target":"127.0.0.1","status":"running"}]',
-        )
+    workflow_halt_sources(jobs=[{
+        "id": "running-job-1", "tool": "nmap", "target": "127.0.0.1",
+        "status": "running", "engine_v2_owned": False,
+    }])
 
     def cancel_job(route):
         calls.append({"method": route.request.method, "url": route.request.url})
@@ -76,7 +74,6 @@ def test_dashboard_emergency_halt_uses_live_active_jobs_endpoint(page, live_serv
             body='{"ok":true,"job_id":"running-job-1"}',
         )
 
-    page.route("**/api/jobs/active", active_jobs)
     page.route("**/api/jobs/running-job-1/cancel", cancel_job)
     page.on("dialog", lambda dialog: dialog.accept())
     page.goto(f"{live_server}/ui-v2")
@@ -93,7 +90,8 @@ def test_dashboard_emergency_halt_uses_live_active_jobs_endpoint(page, live_serv
     assert calls[0]["method"] == "POST"
 
 
-def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_server):
+def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_server, workflow_halt_sources):
+    workflow_halt_sources()
     page.goto(f"{live_server}/ui-v2")
     page.wait_for_function(
         "() => document.querySelector('#dashboard-action-status') !== null",
@@ -106,20 +104,11 @@ def test_dashboard_emergency_halt_is_honest_when_no_jobs_are_active(page, live_s
     )
 
 
-def test_dashboard_emergency_halt_cancels_durable_v2_run_requests(page, live_server):
+def test_dashboard_emergency_halt_cancels_durable_v2_run_requests(page, live_server, workflow_halt_sources):
     calls = []
-    page.route(
-        "**/api/jobs/active",
-        lambda route: route.fulfill(status=200, content_type="application/json", body="[]"),
-    )
-    page.route(
-        "**/api/v2/workflow-runs/summary",
-        lambda route: route.fulfill(
-            status=200, content_type="application/json",
-            body='{"active_requests":[{"id":"v2-request-1","plan_id":"v2-plan",'
-                 '"status":"running","submitted_at":1}]}',
-        ),
-    )
+    workflow_halt_sources(active_requests=[{
+        "id": "v2-request-1", "plan_id": "v2-plan", "status": "running", "submitted_at": 1,
+    }])
     def cancel_run(route):
         calls.append({"method": route.request.method, "url": route.request.url})
         route.fulfill(
@@ -132,7 +121,7 @@ def test_dashboard_emergency_halt_cancels_durable_v2_run_requests(page, live_ser
     page.wait_for_selector("#dashboard-action-status", state="attached")
     page.get_by_role("button", name=re.compile(r"Emergency Halt Scan")).click()
     page.wait_for_function(
-        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('0 of 0 active job(s) and 1 of 1 durable workflow run(s)')",
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('0 of 0 legacy job(s) and 1 of 1 durable workflow run(s)')",
         timeout=8000,
     )
     status = page.locator("#dashboard-action-status").inner_text()
@@ -720,15 +709,12 @@ def test_dashboard_malformed_history_rows_do_not_crash_independent_panels(page, 
     assert page.locator("#dashboard-engine-state").inner_text() == "ENGINE ONLINE"
 
 
-def test_dashboard_emergency_halt_reports_partial_failures_and_continues(page, live_server):
+def test_dashboard_emergency_halt_reports_partial_failures_and_continues(page, live_server, workflow_halt_sources):
     calls = []
-    page.route(
-        "**/api/jobs/active",
-        lambda route: route.fulfill(
-            status=200, content_type="application/json",
-            body='[{"id":"good"},{"id":"bad"}]',
-        ),
-    )
+    workflow_halt_sources(jobs=[
+        {"id": "good", "engine_v2_owned": False},
+        {"id": "bad", "engine_v2_owned": False},
+    ])
     def cancel(route):
         calls.append(route.request.url)
         if route.request.url.endswith("/bad/cancel"):
@@ -893,16 +879,10 @@ def test_dashboard_mobile_menu_traps_keyboard_focus_and_escape_restores_button(p
     assert page.locator("body > aside").get_attribute("aria-hidden") == "true"
 
 
-def test_dashboard_halt_never_calls_cancel_with_untrusted_object_identity(page, live_server):
+def test_dashboard_halt_never_calls_cancel_with_untrusted_object_identity(page, live_server, workflow_halt_sources):
     """Malformed active-job IDs cannot turn into arbitrary cancellation paths."""
     calls = []
-    page.route(
-        "**/api/jobs/active",
-        lambda route: route.fulfill(
-            status=200, content_type="application/json",
-            body='[{"id":{"bad":"value"}}]',
-        ),
-    )
+    workflow_halt_sources(jobs=[{"id": {"bad": "value"}, "engine_v2_owned": False}])
     page.route(
         "**/api/jobs/*/cancel",
         lambda route: (calls.append(route.request.url), route.fulfill(
@@ -914,7 +894,7 @@ def test_dashboard_halt_never_calls_cancel_with_untrusted_object_identity(page, 
     page.wait_for_selector("#dashboard-action-status", state="attached")
     page.get_by_role("button", name=re.compile("Emergency Halt Scan")).click()
     page.wait_for_function(
-        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1')",
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1 legacy job(s)')",
         timeout=8000,
     )
     assert calls == []
@@ -1035,14 +1015,10 @@ def test_dashboard_all_visible_links_resolve_to_canonical_ui_pages(page, live_se
     assert all(link["href"] and link["href"].startswith("/ui-v2") for link in links)
 
 
-def test_dashboard_rejected_cancel_never_claims_halt_succeeded(page, live_server):
-    page.route(
-        "**/api/jobs/active",
-        lambda route: route.fulfill(
-            status=200, content_type="application/json",
-            body='[{"id":"restricted-job","status":"running"}]',
-        ),
-    )
+def test_dashboard_rejected_cancel_never_claims_halt_succeeded(page, live_server, workflow_halt_sources):
+    workflow_halt_sources(jobs=[{
+        "id": "restricted-job", "status": "running", "engine_v2_owned": False,
+    }])
     page.route(
         "**/api/jobs/restricted-job/cancel",
         lambda route: route.fulfill(
@@ -1055,7 +1031,7 @@ def test_dashboard_rejected_cancel_never_claims_halt_succeeded(page, live_server
     page.wait_for_selector("#dashboard-action-status", state="attached")
     page.get_by_role("button", name=re.compile("Emergency Halt Scan")).click()
     page.wait_for_function(
-        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1')",
+        "() => document.querySelector('#dashboard-action-status')?.textContent.includes('Cancellation requested for 0 of 1 legacy job(s)')",
         timeout=8000,
     )
     assert page.locator("#dashboard-action-status").get_attribute("role") == "alert"
