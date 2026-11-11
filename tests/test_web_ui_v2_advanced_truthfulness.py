@@ -100,7 +100,7 @@ def test_approvals_workspace_keeps_legacy_waiting_runs_read_only(page, live_serv
     page.goto(f"{live_server}/ui-v2/approvals")
     panel = page.locator("#whaxon-live-approvals")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('Legacy runs (read-only)')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('Legacy AI runs (read-only)')",
         timeout=10000,
     )
     assert "seed-ai-approval-ui" in panel.inner_text()

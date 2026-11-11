@@ -193,7 +193,7 @@ def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_se
     page.locator("#ai-goal").fill("Review the authorized local target")
     page.locator("#ai-run-form button[type=submit]").click()
     page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('No execution was submitted')",
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('V2 AI plan saved')",
         timeout=8000,
     )
     assert submitted["mission"] and submitted["mission"][0]["objective"] == "Review the authorized local target"
@@ -289,7 +289,7 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
     page.locator("#ai-goal").fill("Check scope refresh behavior")
     page.locator("#ai-run-form button[type=submit]").click()
     page.wait_for_function(
-        "() => document.querySelector('#ai-run-status')?.textContent.includes('No execution was submitted')",
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('V2 AI plan saved')",
         timeout=8000,
     )
     page.wait_for_function(

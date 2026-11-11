@@ -365,5 +365,6 @@ def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page,
     )
     page.locator("#whaxon-findings-list [data-finding-index]").first.click()
     with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
-        page.locator("#replay-btn").click()
+        page.locator("#replay-btn").focus()
+        page.keyboard.press("Enter")
     assert calls == []
