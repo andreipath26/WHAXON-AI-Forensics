@@ -561,3 +561,41 @@ to stop; it does not prove that an already-dispatched external effect stopped.
 The V2 request and its task outcomes may require reconciliation. This boundary
 covers cancellation ownership; it does not migrate the remaining legacy
 execution routes listed above.
+
+## Recon capability parity ledger — 2026-11-11
+
+`whaxon recon` is still a legacy execution boundary. It runs named protocol
+checks directly in `ReconRunner`, gates the target with `ScopeManager`, then
+publishes legacy `JobStarted`/`JobFindings` events. It does not create a V2
+workflow request, task lease, cancellation record, or sealed V2 evidence.
+These checks must be migrated individually; wrapping `ReconRunner.run()` as a
+single V2 provider would preserve internal threads and legacy event writes
+outside scheduler attempt ownership.
+
+| Legacy check | Current behavior / output contract | V2 capability overlap | Parity |
+| --- | --- | --- | --- |
+| `dns` | Queries A, AAAA, MX, NS, TXT and SOA through dnspython; emits `dns_record` findings and per-query errors. | `dns.records.query` (`dig`) and `dns.records.enumerate` (`dnsrecon`) are admitted fixed-argv catalog providers. Dedicated `dns.recon.passive` provider implemented with fixed inputs and a supervised child process. | Catalog tools remain partial. The dedicated provider preserves the query/finding contract in source, but is not yet test-qualified or wired into the legacy CLI; no recon parity is claimed. |
+| `ssl` | Connects to port 443, checks certificate validity, SANs and expiry; emits certificate/error findings. | No equivalent fixed V2 certificate-inspection provider. | Absent. |
+| `headers` | Fetches the target without following redirects and reports configured security headers missing from the response. | `web.server.audit` (`nikto`) may report overlapping issues. | Not equivalent; no stable header-only check/output contract. |
+| `tech` | Detects server/framework markers from HTTP headers and emits technology/port findings. | `web.server.audit` may expose server banners among broader findings. | Not equivalent; no fixed technology-detection contract. |
+| `robots` | Fetches at most 64 KiB from `robots.txt` and `sitemap.xml` without following redirects; emits disallowed paths, sitemap references and up to 100 sitemap URLs. | `web.server.audit` may report some robots/sitemap issues. | Not equivalent; there is no exact bounded parser/output contract. |
+| `security_txt` | Fetches `/.well-known/security.txt`, checks expected fields and expiry, and emits parsed contact/policy findings. | No equivalent fixed V2 provider. | Absent. |
+| `cookies` | Fetches the target and audits `Set-Cookie` flags (`Secure`, `HttpOnly`, `SameSite`). | `web.server.audit` may report some cookie issues. | Not equivalent; no stable cookie-only output contract. |
+| `redirects` | Manually follows at most 10 hops, records HTTPS-to-HTTP and cross-origin hops, and stops before contacting a new cross-origin destination. | Generic web providers may encounter redirects but do not expose this exact bounded chain contract. | Not equivalent. |
+| `waf` | Fingerprints known WAF/CDN signatures from response headers and cookies. | No equivalent fixed V2 provider. | Absent. |
+| `dns_full` | Checks CAA, DMARC and SPF posture and emits dedicated policy findings. | The `dig` and `dnsrecon` providers can query DNS but are not this policy analysis. | Partial data-source overlap; behavior and findings are absent. |
+
+The legacy HTTP helpers use short per-request socket timeouts, and the DNS
+resolver has a timeout setting. However, `ReconRunner` waits for its
+`ThreadPoolExecutor` context to close; a scheduler timeout cannot guarantee
+that a stuck Python thread has stopped. A V2 implementation therefore needs
+hard-bounded execution ownership (for example, a supervised worker process)
+before it can claim durable cancellation. The first code migration must select
+one check, pin its inputs and output schema, recheck scope through the V2
+workflow path, and record its result in attempt-linked sealed evidence. The
+two DNS catalog capabilities are partial overlap, not recon parity. The first
+`dns.recon.passive` implementation requires an explicit hostname scope rule
+when IP/CIDR rules are configured; Core preflight avoids uncancellable DNS
+resolution, then the provider repeats the full scope decision in its supervised
+child before querying. Static syntax checks passed; tests were not run, so
+runtime readiness, cancellation and evidence-seal behavior remain unqualified.
