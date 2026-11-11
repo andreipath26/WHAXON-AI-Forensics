@@ -548,7 +548,7 @@ Authorization: Bearer redacted_token_sess_089
  const heading=document.createElement("h2");heading.className="font-headline-lg text-headline-lg";heading.textContent="Loading live WHAXON data…";panel.append(heading);
  const status=document.createElement("p");status.className="mt-2 text-sm text-on-surface-variant";status.textContent="Fetching current backend state.";panel.append(status);
  const refreshButton=document.createElement("button");refreshButton.type="button";refreshButton.textContent="Refresh queue";refreshButton.className="mt-3 rounded bg-surface-container-high px-3 py-2 text-sm";panel.append(refreshButton);
- const list=document.createElement("div");list.className="mt-3 grid gap-3";panel.append(list);main.prepend(panel);
+ const list=document.createElement("div");list.className="mt-3 grid gap-3";panel.append(list);const legacyList=document.createElement("div");legacyList.id="whaxon-legacy-approval-readonly";legacyList.className="mt-3 grid gap-3";panel.append(legacyList);main.prepend(panel);
  const cardFor=(title,detail)=>{const c=document.createElement("article");c.className="rounded-lg border border-outline-variant/30 bg-surface-container p-space-md";const h=document.createElement("h3");h.className="font-headline-sm";h.textContent=String(title||"—");const p=document.createElement("p");p.className="mt-2 text-sm text-on-surface-variant";p.textContent=String(detail||"—");c.append(h,p);return c;};
  const hideUnsupported=/Deploy Mock|Launch Exploit|Execute Payload|Auto-Remediate|Browser Shell|Start Attack|Run Exploit|Approve All|Export Archive|Create Invoice|Send to Client|Generate Compliance Score|Mark Compliant/i;
  document.querySelectorAll("button").forEach(b=>{if(hideUnsupported.test((b.innerText||b.textContent||"").trim())){b.disabled=true;b.hidden=true;b.setAttribute("aria-hidden","true");}});
@@ -652,26 +652,27 @@ Authorization: Bearer redacted_token_sess_089
  const sample=/staging-api\.corp\.net|api\.internal\.corp|ENG-2026-X892|CVE-2023-38606|uid=0\(root\)|184,209|7f83b165/i;
  main.querySelectorAll("*").forEach(n=>{if(n.children.length)return;if(sample.test(n.textContent||"")){const c=n.closest(".rounded-xl, .rounded-lg, .bg-surface-container, .bg-surface-container-low");if(c)c.hidden=true;else n.textContent="Live data unavailable";}});
  async function loadLegacyPendingReadOnly(){
+  const title=document.createElement("h3");title.className="font-headline-md text-headline-md mt-4";title.textContent="Legacy AI runs (read-only)";legacyList.replaceChildren(title);
   try{
    const response=await fetch("/api/ai/pending");
    if(!response.ok)throw new Error("Legacy queue HTTP "+response.status);
    const payload=await response.json();
    const pending=Array.isArray(payload)?payload:(payload.items||payload.pending||[]);
-   const title=document.createElement("h3");title.className="font-headline-md text-headline-md mt-4";title.textContent="Legacy AI runs (read-only)";list.append(title);
-   if(!pending.length){const empty=document.createElement("p");empty.className="text-sm text-on-surface-variant";empty.textContent="No pending legacy AI runs.";list.append(empty);return;}
+   if(!pending.length){const empty=document.createElement("p");empty.className="text-sm text-on-surface-variant";empty.textContent="No pending legacy AI runs.";legacyList.append(empty);return;}
    pending.forEach(item=>{
     const runId=item.run_id||item.id||"Unknown run";
     const question=item.pending_question;
     const questionText=typeof question==="string"?question:(question&&typeof question==="object"?JSON.stringify(question):"");
     const card=cardFor(item.goal||item.title||runId,"Legacy run "+runId+" · Phase: "+(item.phase||"not recorded")+(questionText?" · Pending question: "+questionText:""));
-    const note=document.createElement("p");note.className="mt-2 text-sm text-on-surface-variant";note.textContent="Read-only in the V2 approvals queue. This record cannot grant a V2 task approval or resume its legacy executor.";card.append(note);list.append(card);
+    const note=document.createElement("p");note.className="mt-2 text-sm text-on-surface-variant";note.textContent="Read-only in the V2 approvals queue. This record cannot grant a V2 task approval or resume its legacy executor.";card.append(note);legacyList.append(card);
    });
   }catch(error){
-   const note=document.createElement("p");note.className="text-sm text-on-surface-variant";note.textContent="Legacy history unavailable: "+error.message;list.append(note);
+   const note=document.createElement("p");note.className="text-sm text-on-surface-variant";note.textContent="Legacy history unavailable: "+error.message;legacyList.append(note);
   }
  }
  async function loadApprovalQueue(){
   refreshButton.disabled=true;
+  void loadLegacyPendingReadOnly();
   try{
    const response=await fetch("/api/v2/approval-queue?limit=100");
    if(!response.ok)throw new Error("V2 approvals HTTP "+response.status);
@@ -709,7 +710,6 @@ Authorization: Bearer redacted_token_sess_089
     }
     list.append(card);
    });
-   await loadLegacyPendingReadOnly();
   }catch(error){heading.textContent="Live V2 approvals unavailable";status.textContent=error.message;list.replaceChildren();}
   finally{refreshButton.disabled=false;}
  }

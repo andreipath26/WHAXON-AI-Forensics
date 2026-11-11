@@ -81,7 +81,7 @@ def test_ai_strategy_gate_does_not_resume_legacy_pending_runs(page, live_server)
     )
     assert page.locator("#btn-authorize").is_disabled()
     assert "read-only" in page.locator("#ai-pending-list").inner_text().lower()
-    page.locator("#btn-authorize").click()
+    assert page.locator("#btn-authorize").is_disabled()
     assert calls == []
     assert pending_state["active"] is True
 
@@ -131,7 +131,7 @@ def test_ai_strategy_gate_disables_legacy_reject_action(page, live_server):
         timeout=8000,
     )
     assert page.locator("#btn-reject").is_disabled()
-    page.locator("#btn-reject").click()
+    assert page.locator("#btn-reject").is_disabled()
     assert calls == []
     assert pending_state["active"] is True
 
@@ -238,7 +238,7 @@ def test_ai_strategy_gate_hides_fake_wire_preview_and_disables_actions_without_p
     assert "50 req/sec" not in visible_text
     assert "Chain-of-Thought" not in visible_text
     assert "Engine V2 AI plan proposal" in visible_text
-    assert "No legacy AI run is awaiting a response" in visible_text
+    assert "No live proposal is awaiting operator input." in visible_text
     assert "AI Planner proposes spawning Nuclei" not in visible_text
     assert "LIVE PROPOSAL DETAILS" in visible_text
     assert "LIVE PROPOSAL DETAILS" in visible_text
@@ -276,6 +276,7 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
         lambda route: route.fulfill(status=200, content_type="application/json", body='{"status":"proposed","created":true,"plan_id":"scope-refresh-plan","digest":"scope-refresh-digest","approval_granted":false,"execution_submitted":false}'),
     )
 
+    page.add_init_script("const _setInterval = window.setInterval.bind(window); window.setInterval = (fn, delay, ...args) => _setInterval(fn, Math.max(delay, 60000), ...args);")
     page.goto(f"{live_server}/ui-v2/ai")
     page.wait_for_function(
         "() => document.documentElement.dataset.aiGateReady === 'true'",

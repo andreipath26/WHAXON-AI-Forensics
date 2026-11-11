@@ -364,5 +364,5 @@ def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page,
         timeout=5000,
     )
     with page.expect_navigation(url=f"{live_server}/ui-v2/retest"):
-        page.get_by_role("button", name="Open V2 Verification & Retest Studio").click()
+        page.locator("#replay-btn").click()
     assert calls == []
