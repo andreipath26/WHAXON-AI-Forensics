@@ -949,12 +949,10 @@ performs the full fresh scope check. Python syntax compilation passed; tests
 were not run, so runtime readiness, cancellation, and attempt-seal behavior
 remain unqualified.
 It remains separate from `dns_full` (CAA/DMARC/SPF policy analysis). Recon CLI
-default behavior is now plan-only: it starts no runtime and makes no network
-request. Direct `ReconRunner` dispatch requires `--legacy`; persisted approved
-V2 one-task plans remain executable with `--engine v2 --plan-id`. The V2 Run builder admits the provider when
+default behavior remains legacy. The V2 Run builder admits the provider when
 selected and installed, validates hostname-only targets, and previews scope
 with the DNS-specific policy. The headless CLI exposes
-`workflow plan propose-dns-recon`; proposal commands create only a
+`workflow plan propose-dns-recon`; both authoring paths create only a
 provider-pinned plan, leaving approval and dispatch as separate operator steps.
 No recon parity or runtime acceptance is claimed yet.
 
@@ -965,7 +963,7 @@ The dedicated `web.recon.redirect_observe` provider performs exactly one
 scope-pinned HTTPS GET to `/`, records the status and a redacted first-hop
 Location display, classifies cross-origin and HTTPS downgrade, and never follows
 Location. `workflow plan propose-redirect-recon` creates an unapproved,
-provider-pinned one-task plan; default `whaxon recon` remains plan-only. This is a
+provider-pinned one-task plan; default `whaxon recon` remains legacy. This is a
 bounded first-hop observation and does not provide full redirect-chain parity.
 Non-HTTP(S) Location values are displayed as unsupported-scheme markers and are
 not mislabeled as web-origin changes.
