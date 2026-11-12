@@ -332,7 +332,8 @@ jobs:
   test:
     # Keep package-install tests on the stable runner; newest Ubuntu release is exercised in dedicated smoke jobs.
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # The full xdist suite reached the previous 60-minute cap on Python 3.11/3.12.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
