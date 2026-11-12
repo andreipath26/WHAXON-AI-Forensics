@@ -1305,6 +1305,25 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                     "matched_rule": match.matched_rule}, 403
         if core.catalog.get(tool_id) is None:
             return {"error": f"unknown tool: {tool_id}"}, 404
+
+        legacy_tool_execution_enabled = os.environ.get(
+            "WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "false",
+        ).strip().lower() in ("1", "true", "yes")
+        if not legacy_tool_execution_enabled:
+            return {
+                "error": (
+                    "Legacy direct tool execution is disabled. Use the Engine V2 "
+                    "workflow UI or POST /api/v2/workflows to save a reviewable "
+                    "plan, then separately approve its exact task and submit it "
+                    "through POST /api/v2/workflows/<plan_id>/run."
+                ),
+                "legacy_execution_enabled": False,
+                "v2_plan_endpoint": "/api/v2/workflows",
+                "v2_run_endpoint": "/api/v2/workflows/<plan_id>/run",
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
+
         job_id = uuid.uuid4().hex[:12]
         registry.ensure(job_id)
         runner.submit(lambda: _run_job_blocking(core, registry, tool_id, target, job_id, extra_args))
