@@ -605,7 +605,13 @@ class ScopeManager:
                 address_text = resolved_address.compressed
                 if family == socket.AF_INET:
                     socket_address_v4: tuple[str, int] = (address_text, port)
-                    canonical_sockaddr = socket_address_v4
+                    pinned = PinnedSocketAddress(
+                        family, socket.SOCK_STREAM,
+                        int(proto or socket.IPPROTO_TCP), socket_address_v4,
+                    )
+                    socket_ip = address_text
+                    flowinfo = 0
+                    scope_id = 0
                 else:
                     flowinfo = int(sockaddr[2]) if len(sockaddr) > 2 else 0
                     scope_id = int(sockaddr[3]) if len(sockaddr) > 3 else 0
@@ -618,17 +624,19 @@ class ScopeManager:
                     socket_address_v6: tuple[str, int, int, int] = (
                         socket_ip, port, flowinfo, scope_id,
                     )
-                    canonical_sockaddr = socket_address_v6
+                    pinned = PinnedSocketAddress(
+                        family, socket.SOCK_STREAM,
+                        int(proto or socket.IPPROTO_TCP), socket_address_v6,
+                    )
                 canonical = (
                     family, socket.SOCK_STREAM,
-                    int(proto or socket.IPPROTO_TCP), canonical_sockaddr,
+                    int(proto or socket.IPPROTO_TCP), socket_ip,
+                    port, flowinfo, scope_id,
                 )
                 if canonical in seen:
                     continue
                 seen.add(canonical)
-                pinned_addresses.append(PinnedSocketAddress(
-                    canonical[0], canonical[1], canonical[2], canonical[3],
-                ))
+                pinned_addresses.append(pinned)
                 canonical_ips.append(address_text)
             except (IndexError, TypeError, ValueError, OverflowError):
                 continue
