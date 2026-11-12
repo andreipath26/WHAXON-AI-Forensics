@@ -141,3 +141,79 @@ def test_approval_queue_includes_low_impact_network_candidates_only(tmp_path):
     assert candidate_ids == {"permission-task", "effect-task"}
     assert len(core.workflow_approval_queue(limit=1)) == 1
     assert all("permissions_json" not in item and "plan_json" not in item for item in candidates)
+
+
+
+@pytest.mark.parametrize(
+    ("scope_mode", "expected_method"),
+    [
+        ("network", "check_for_execution"),
+        ("dns_query", "check_for_dns_query"),
+        ("pinned_network", "check_for_pinned_execution"),
+        ("unknown", None),
+    ],
+)
+def test_core_scope_preflight_uses_manifest_scope_mode(
+    tmp_path, scope_mode, expected_method,
+):
+    from types import SimpleNamespace
+
+    core = Core(tmp_path)
+    calls = []
+
+    class _Scope:
+        def load(self):
+            return None
+
+        def check_for_execution(self, target):
+            calls.append(("check_for_execution", target))
+            return SimpleNamespace(allowed=True)
+
+        def check_for_dns_query(self, target):
+            calls.append(("check_for_dns_query", target))
+            return SimpleNamespace(allowed=True)
+
+        def check_for_pinned_execution(self, target):
+            calls.append(("check_for_pinned_execution", target))
+            return SimpleNamespace(allowed=True)
+
+    core.scope = _Scope()
+    manifest = CapabilityManifest(
+        capability_id="fixture.scope_mode",
+        provider_id="fixture.scope_mode",
+        provider_version="1.0.0",
+        transports=("local_process",),
+        target_types=("hostname",),
+        permissions=("network.scan",),
+        impact="moderate",
+        scope_mode=scope_mode if scope_mode != "unknown" else "network",
+    )
+    if scope_mode == "unknown":
+        # Simulate malformed persisted/provider metadata reaching the policy
+        # boundary; normal manifest construction rejects this mode earlier.
+        manifest = SimpleNamespace(
+            capability_id=manifest.capability_id,
+            impact=manifest.impact,
+            permissions=manifest.permissions,
+            scope_mode="unknown",
+        )
+
+    class _Bindings:
+        def resolve_task(self, _task, *, require_installed):
+            assert require_installed is True
+            return SimpleNamespace(manifest=manifest)
+
+    core.providers = _Bindings()
+    task = WorkflowTask(
+        id="scope-mode-task",
+        capability_id="fixture.scope_mode",
+        target="example.test",
+        permissions=("network.scan",),
+        impact="moderate",
+    )
+
+    assert core.authorize_workflow_task(task) is (expected_method is not None)
+    if expected_method is None:
+        assert calls == []
+    else:
+        assert calls == [(expected_method, "example.test")]
