@@ -380,7 +380,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: python -m pytest tests/ -q -ra
+        run: python -m pytest tests/ -vv -ra
 
       - name: Build distributions and validate metadata
         run: |
