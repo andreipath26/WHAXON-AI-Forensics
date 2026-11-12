@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from whaxon.core.recon_v2 import CAPABILITY_ID
+from whaxon.core.tls_cert_v2 import CAPABILITY_ID as TLS_CERT_CAPABILITY_ID
 from whaxon.interfaces.cli import recon_cmd
 
 
@@ -118,13 +119,24 @@ def test_v2_recon_delegates_to_approved_workflow_and_prints_persisted_findings(
     assert "example.test A 192.0.2.1" in output
 
 
+@pytest.mark.parametrize("capability_id", [CAPABILITY_ID, TLS_CERT_CAPABILITY_ID])
 def test_v2_recon_unapproved_plan_remains_failed_by_workflow_engine(
-    monkeypatch, capsys,
+    monkeypatch, capsys, capability_id,
 ):
-    core = _FakeCore(result={
-        "complete": False,
-        "tasks": [{"id": "task-1", "status": "failed"}],
-    }, report={"findings": []})
+    core = _FakeCore(
+        tasks=[{
+            "id": "task-1",
+            "capability_id": capability_id,
+            "target": "example.test",
+            "inputs": {},
+            "depends_on": [],
+        }],
+        result={
+            "complete": False,
+            "tasks": [{"id": "task-1", "status": "failed"}],
+        },
+        report={"findings": []},
+    )
     monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
 
     status = recon_cmd.main([
