@@ -432,3 +432,67 @@ def test_approval_queue_paginates_past_irrelevant_pending_tasks(tmp_path, monkey
 
     assert [item["task_key"] for item in candidates] == ["older-network-task"]
 
+
+
+def test_approval_queue_stops_at_total_scan_budget(tmp_path, monkeypatch):
+    core = Core(tmp_path)
+    core.create_mission("queue-mission", "Exercise approval scan budget")
+    monkeypatch.setattr(store_module, "_APPROVAL_CANDIDATE_PAGE_SIZE", 2)
+    monkeypatch.setattr(store_module, "_APPROVAL_CANDIDATE_SCAN_BUDGET", 3)
+    safe_manifest = _queue_manifest(
+        "fixture.budget_safe", "fixture.budget_safe_provider", (),
+    )
+    network_manifest = _queue_manifest(
+        "fixture.budget_network", "fixture.budget_network_provider",
+        ("network_traffic",),
+    )
+    core.capabilities.register(safe_manifest)
+    core.capabilities.register(network_manifest)
+
+    for index in range(3):
+        task_id = f"safe-task-{index}"
+        _, plan = _queue_task(
+            task_id,
+            safe_manifest.capability_id,
+            metadata={"provider_bindings": {task_id: {
+                "provider_id": safe_manifest.provider_id,
+                "manifest_fingerprint": safe_manifest.fingerprint,
+            }}},
+        )
+        plan_id = f"plan-safe-{index}"
+        core.save_workflow_plan(plan_id, plan)
+    _, network_plan = _queue_task("budget-network-task", network_manifest.capability_id)
+    core.save_workflow_plan("plan-budget-network", network_plan)
+
+    conn = core.store._conn()
+    try:
+        for index in range(3):
+            conn.execute(
+                "UPDATE workflow_tasks SET created_at=? WHERE plan_id=?",
+                (float(4 - index), f"plan-safe-{index}"),
+            )
+        conn.execute(
+            "UPDATE workflow_tasks SET created_at=? WHERE plan_id=?",
+            (1.0, "plan-budget-network"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    statements = []
+    original_conn = core.store._conn
+
+    def traced_conn():
+        connection = original_conn()
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr(core.store, "_conn", traced_conn)
+    candidates = core.store.list_workflow_approval_candidates(limit=1)
+
+    task_page_queries = [
+        statement for statement in statements
+        if "FROM workflow_tasks t" in statement
+    ]
+    assert candidates == []
+    assert len(task_page_queries) == 2
