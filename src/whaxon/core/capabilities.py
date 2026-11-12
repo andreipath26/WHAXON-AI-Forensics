@@ -5,11 +5,11 @@ Authorization remains a separate policy decision at execution time.
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
 import hashlib
 import json
 import math
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
