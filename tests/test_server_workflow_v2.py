@@ -896,6 +896,7 @@ def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monk
 def test_legacy_validation_routes_refuse_engine_v2_evidence(tmp_path, monkeypatch):
     from whaxon.core.findings import Finding
 
+    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
     client, core = _client(tmp_path, monkeypatch)
     job_id = "0123456789ab"
     core.store.create(job_id)
