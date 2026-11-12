@@ -7,6 +7,7 @@ from pathlib import Path
 
 from whaxon.core import Core
 from whaxon.core.dns_full_v2 import CAPABILITY_ID as DNS_FULL_CAPABILITY_ID
+from whaxon.core.http_recon_v2 import CAPABILITY_ID as HTTPS_RECON_CAPABILITY_ID
 from whaxon.core.recon_v2 import CAPABILITY_ID
 from whaxon.core.tls_cert_v2 import CAPABILITY_ID as TLS_CERT_CAPABILITY_ID
 
@@ -94,7 +95,7 @@ def main(args: list[str] | None = None) -> int:
 
 
 def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
-    """Run only a matching persisted DNS or TLS task through Engine V2."""
+    """Run only a matching persisted DNS, TLS, or HTTPS task through Engine V2."""
     try:
         details = core.workflow_plan_details(plan_id)
     except (ValueError, TypeError, RuntimeError) as exc:
@@ -111,13 +112,14 @@ def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
     if (
         task.get("capability_id") not in {
             CAPABILITY_ID, DNS_FULL_CAPABILITY_ID, TLS_CERT_CAPABILITY_ID,
+            HTTPS_RECON_CAPABILITY_ID,
         }
         or task.get("target") != target
         or task.get("inputs") != {}
         or task.get("depends_on", []) != []
     ):
         print(
-            "V2 recon plan must contain one fixed DNS or TLS task matching the target",
+            "V2 recon plan must contain one fixed DNS, TLS, or HTTPS task matching the target",
             file=sys.stderr,
         )
         return EXIT_USAGE
@@ -163,8 +165,8 @@ def _usage() -> None:
         "Usage: whaxon recon <target> [--data DIR] [--checks a,b,c]\n"
         "       whaxon recon <target> --engine v2 --plan-id ID [--data DIR]\n"
         "\n"
-        "  Runs legacy passive checks or one fixed V2 DNS/TLS task against an in-scope target.\n"
-        "  V2 requires one persisted DNS or TLS plan with exact approval.\n"
+        "  Runs legacy passive checks or a fixed V2 DNS/TLS/HTTPS task against an in-scope target.\n"
+        "  V2 requires one persisted DNS, TLS, or HTTPS plan with exact approval.\n"
         "\n"
         "  Available checks:\n"
         "    dns        A/AAAA/MX/NS/TXT/SOA records\n"
