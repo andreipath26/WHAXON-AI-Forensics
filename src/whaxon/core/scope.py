@@ -480,8 +480,9 @@ class ScopeManager:
         """Perform a non-resolving preflight for a provider that pins its connect.
 
         A bounded child must still call :meth:`resolve_for_execution` before
-        connecting; this preflight only admits an explicit hostname rule (or
-        an in-scope IP literal) and never performs DNS on the scheduler thread.
+        connecting. This preflight admits explicit hostname rules, in-scope IP
+        literals, or hostname targets with positive IP scope rules for child-side
+        validation; it never performs DNS on the scheduler thread.
         """
         if (
             not isinstance(raw_target, str)
