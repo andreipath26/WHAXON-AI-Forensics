@@ -167,7 +167,7 @@ def test_v2_recon_cli_rejects_dynamic_https_paths_before_dispatch(monkeypatch, c
 
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "fixed DNS, TLS, or HTTPS task" in capsys.readouterr().err
+    assert "fixed DNS, TLS, HTTPS, headers, robots, or security.txt task" in capsys.readouterr().err
 
 
 

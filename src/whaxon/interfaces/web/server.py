@@ -50,6 +50,12 @@ def _legacy_ai_execution_enabled() -> bool:
     ).strip().lower() in ("1", "true", "yes")
 
 
+def _legacy_msf_execution_enabled() -> bool:
+    return os.environ.get(
+        "WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "false",
+    ).strip().lower() in ("1", "true", "yes")
+
+
 def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
     if isinstance(value, dict):
@@ -1750,6 +1756,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/msf/run")
     def msf_run():
+        if not _legacy_msf_execution_enabled():
+            return {
+                "error": (
+                    "Legacy Metasploit execution is disabled. Supported lab operations "
+                    "must use an approved Engine V2 plan."
+                ),
+                "legacy_execution_enabled": False,
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
         import re as _re
         import uuid as _uuid
         data = request.get_json(silent=True)
