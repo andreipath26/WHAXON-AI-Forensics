@@ -50,6 +50,7 @@ _MANIFEST = CapabilityManifest(
     provider_id=PROVIDER_ID,
     provider_version=PROVIDER_VERSION,
     transports=(TRANSPORT,),
+    scope_mode="dns_query",
     target_types=("hostname",),
     permissions=("network.scan",),
     side_effects=("dns_queries", "resolver_logs"),
