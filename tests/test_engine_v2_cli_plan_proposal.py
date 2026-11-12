@@ -90,6 +90,23 @@ def test_tool_proposal_allows_hostname_only_scope(tmp_path):
     assert proposal["status"] == "proposed"
 
 
+def test_tool_proposal_reloads_scope_after_external_revocation(tmp_path):
+    core = _Core()
+    scope_path = tmp_path / "scope.json"
+    _write_scope(scope_path, ["example.test"])
+    core.scope = ScopeManager(scope_path)
+    _write_scope(scope_path, [])
+
+    proposal = workflow_proposals.propose_tool_workflow_plan(
+        core, mission_id="mission-1", plan_id="plan-revoked-scope",
+        tool_id="nmap", target="example.test",
+    )
+
+    assert proposal["status"] == "blocked"
+    assert "outside current scope" in proposal["reason"]
+    assert core.resolved == []
+
+
 def test_tool_proposal_blocks_hostname_under_mixed_ip_cidr_scope(
     tmp_path, monkeypatch,
 ):
