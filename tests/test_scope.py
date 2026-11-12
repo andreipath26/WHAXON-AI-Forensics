@@ -350,3 +350,17 @@ def test_pinned_scheduler_preflight_is_non_resolving(scope_file, monkeypatch):
 
     assert result.allowed is True
     assert result.matched_rule == "scan.acme.test"
+
+
+@pytest.mark.parametrize("target", [" scan.acme.test", "scan.acme.test "])
+def test_pinned_preflight_rejects_whitespace_targets(scope_file, target):
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["scan.acme.test"], "out_of_scope": [],
+    }))
+
+    result = scope.check_for_pinned_execution(target)
+
+    assert result.allowed is False
+    assert "invalid pinned execution target" in result.reason
