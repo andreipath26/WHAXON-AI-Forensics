@@ -777,6 +777,7 @@ def test_evidence_download_rejects_path_traversal(tmp_path, monkeypatch):
     assert response.get_json()["error"] == "unsafe evidence path"
 
 def test_msf_session_exec_refuses_out_of_scope_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     monkeypatch.setattr(core.msf, "is_up", lambda: True)
     monkeypatch.setattr(core.msf, "sessions", lambda: {
@@ -797,6 +798,7 @@ def test_msf_session_exec_refuses_out_of_scope_session(tmp_path, monkeypatch):
 def test_msf_port_forward_refuses_out_of_scope_destination(tmp_path, monkeypatch):
     from whaxon.core import portfwd
 
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     monkeypatch.setattr(core.msf, "is_up", lambda: True)
     monkeypatch.setattr(core.msf, "sessions", lambda: {
@@ -815,6 +817,7 @@ def test_msf_port_forward_refuses_out_of_scope_destination(tmp_path, monkeypatch
 
 
 def test_msf_run_rejects_path_traversal_module_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     app, _ = _make_app(tmp_path, monkeypatch)
     response = app.test_client().post(
         "/api/msf/run",

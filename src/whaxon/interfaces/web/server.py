@@ -2395,6 +2395,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/msf/sessions/<session_id>/portfwd")
     def pf_add(session_id: str):
+        if not _legacy_msf_execution_enabled():
+            return {
+                "error": "Legacy Metasploit port-forward creation is disabled.",
+                "legacy_execution_enabled": False,
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
         from whaxon.core import portfwd as _pf
         data = request.get_json(silent=True)
         if not isinstance(data, dict):

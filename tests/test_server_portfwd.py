@@ -108,6 +108,7 @@ def test_pf_list_error_is_swallowed(tmp_path, monkeypatch):
 # ---------------------------------------------------------------- POST add
 
 def test_pf_add_missing_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     app, _ = _make_app(tmp_path, monkeypatch)
     r = app.test_client().post("/api/msf/sessions/1/portfwd", json={"lport": 8080})
     assert r.status_code == 400
@@ -115,6 +116,7 @@ def test_pf_add_missing_fields(tmp_path, monkeypatch):
 
 
 def test_pf_add_missing_rhost_only(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     app, _ = _make_app(tmp_path, monkeypatch)
     r = app.test_client().post("/api/msf/sessions/1/portfwd",
                                json={"lport": 8080, "rport": 80})
@@ -122,6 +124,7 @@ def test_pf_add_missing_rhost_only(tmp_path, monkeypatch):
 
 
 def test_pf_add_calls_add_forward_and_returns_dict(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     calls = []
 
     def fake_add(client, session_id, lport, rhost, rport, label):
@@ -155,6 +158,7 @@ def test_pf_add_calls_add_forward_and_returns_dict(tmp_path, monkeypatch):
 
 
 def test_pf_add_error_returns_500(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     def boom(*a, **kw):
         raise RuntimeError("socat not found on target")
     monkeypatch.setattr(_pf, "add_forward", boom)
@@ -163,6 +167,25 @@ def test_pf_add_error_returns_500(tmp_path, monkeypatch):
                                json={"lport": 8080, "rhost": "10.0.0.9", "rport": 80})
     assert r.status_code == 500
     assert "socat" in r.get_json()["error"]
+
+
+def test_pf_add_is_default_denied_without_creating_forward(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
+    calls = []
+    monkeypatch.setattr(_pf, "add_forward", lambda *args, **kwargs: calls.append(args))
+    app, _ = _make_app(tmp_path, monkeypatch)
+
+    response = app.test_client().post(
+        "/api/msf/sessions/7/portfwd",
+        json={"lport": 8080, "rhost": "10.0.0.9", "rport": 80},
+    )
+
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["legacy_execution_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_submitted"] is False
+    assert calls == []
 
 
 # ---------------------------------------------------------------- DELETE remove
