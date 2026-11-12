@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 16865)
-Total output lines: 613
-
 # Engine V2 legacy execution inventory
 
 This inventory records Python callsites that invoke `run_tool` or
@@ -205,7 +202,232 @@ boundaries; it does not claim to guard UI controls.
 A static decorator census currently finds 104 `/api/*` method/path bindings,
 22 distinct `/ui-v2/*` page handlers with 23 route aliases, and five other
 health/root/settings/favicon routes in `interfaces/web/server.py`. The matrix below covers consequential
-execution, authorization-state, cancellation and provisioning routes. This census makes every method/path/handle…6865 tokens truncated…from sdist; this is a checkout/source deployment path. |
+execution, authorization-state, cancellation and provisioning routes. This census makes every method/path/handler binding reviewable. It does not replace the handler-family semantics, persistence, access-control or test evidence mapped below; those remain bounded and are not inferred from route registration.
+The UI page/control inventory is frozen and is not being edited here.
+
+The UI route aliases below are recorded as an Engine V2 caller crosswalk; this
+is not UI acceptance or authorization to change the frozen pages.
+
+| Method | Exact route | Handler |
+| --- | --- | --- |
+| `GET` | `/ui-v2` | `ui_v2_home` |
+| `GET` | `/ui-v2/dashboard` | `ui_v2_home` |
+| `GET` | `/ui-v2/run` | `ui_v2_run` |
+| `GET` | `/ui-v2/findings` | `ui_v2_findings` |
+| `GET` | `/ui-v2/scope` | `ui_v2_scope` |
+| `GET` | `/ui-v2/report` | `ui_v2_report` |
+| `GET` | `/ui-v2/reports` | `ui_v2_reports` |
+| `GET` | `/ui-v2/history` | `ui_v2_history` |
+| `GET` | `/ui-v2/diagnostics` | `ui_v2_diagnostics` |
+| `GET` | `/ui-v2/evidence` | `ui_v2_evidence` |
+| `GET` | `/ui-v2/ai` | `ui_v2_ai` |
+| `GET` | `/ui-v2/retest` | `ui_v2_retest` |
+| `GET` | `/ui-v2/chains` | `ui_v2_chains` |
+| `GET` | `/ui-v2/adapters` | `ui_v2_adapters` |
+| `GET` | `/ui-v2/settings` | `ui_v2_settings` |
+| `GET` | `/ui-v2/audit` | `ui_v2_audit` |
+| `GET` | `/ui-v2/monitoring` | `ui_v2_monitoring` |
+| `GET` | `/ui-v2/bas` | `ui_v2_bas` |
+| `GET` | `/ui-v2/bug-bounty` | `ui_v2_bug_bounty` |
+| `GET` | `/ui-v2/compliance` | `ui_v2_compliance` |
+| `GET` | `/ui-v2/ptaas` | `ui_v2_ptaas` |
+| `GET` | `/ui-v2/threat-intel` | `ui_v2_threat_intel` |
+| `GET` | `/ui-v2/approvals` | `ui_v2_approvals` |
+
+#### Exact Flask API method/path/handler census
+
+The following index lists every one of the **105** `/api/*` decorator bindings
+from the AST guard. It is a binding census, not a security approval: GET routes
+are reads/status/exports; POST and DELETE routes may mutate state or dispatch
+work, as classified in the family tables below. Handler source and the cited
+test family remain authoritative for side effects and access-control limits.
+
+| Method | Exact path | Handler | Owning state/service |
+| --- | --- | --- | --- |
+| `GET` | `/api/ai/pending` | `ai_pending_list` | Legacy AI run state/executor |
+| `POST` | `/api/ai/run` | `ai_run` | Legacy AI run state/executor |
+| `GET` | `/api/ai/runs` | `ai_runs_list` | Legacy AI run state/executor |
+| `GET` | `/api/ai/runs/<run_id>` | `ai_run_get` | Legacy AI run state/executor |
+| `POST` | `/api/ai/runs/<run_id>/answer` | `ai_run_answer` | Legacy AI run state/executor |
+| `GET` | `/api/ai/runs/<run_id>/stream` | `ai_run_stream` | Legacy AI run state/executor |
+| `POST` | `/api/approvals/<job_id>/<int:seq>/resolve` | `api_approval_resolve` | Legacy finding review state |
+| `POST` | `/api/bounty/import` | `import_bounty_program` | Bounty import/review draft |
+| `GET` | `/api/coverage/<job_id>` | `api_coverage` | Legacy coverage records |
+| `GET` | `/api/dependencies` | `api_dependencies_get` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/audit` | `api_dependencies_audit_get` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/drift` | `api_dependencies_drift_get` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/history` | `api_dependencies_history_get` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/install` | `api_dependencies_install` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/install-batch` | `api_dependencies_install_batch` | Local dependency/readiness or installer service |
+| `GET` | `/api/dependencies/install/<operation_id>` | `api_dependencies_install_status` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/install/<operation_id>/cancel` | `api_dependencies_install_cancel` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/plan` | `api_dependencies_plan` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/snapshots` | `api_dependencies_snapshot_post` | Local dependency/readiness or installer service |
+| `POST` | `/api/dependencies/verify` | `api_dependencies_verify_post` | Local dependency/readiness or installer service |
+| `GET` | `/api/health` | `health_probe` | Runtime diagnostics |
+| `GET` | `/api/health/simple` | `health_simple` | Runtime diagnostics |
+| `GET` | `/api/history` | `list_history` | Legacy job history |
+| `POST` | `/api/import/burp` | `import_burp` | Legacy imported finding/evidence store |
+| `GET` | `/api/jobs/<job_id>` | `get_job` | Legacy JobStore, evidence and job registry |
+| `POST` | `/api/jobs/<job_id>/cancel` | `cancel_job` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/evidence` | `list_evidence` | Legacy JobStore, evidence and job registry |
+| `POST` | `/api/jobs/<job_id>/evidence` | `add_evidence` | Legacy JobStore, evidence and job registry |
+| `DELETE` | `/api/jobs/<job_id>/evidence/<int:seq>` | `delete_evidence` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/evidence/<int:seq>/download` | `download_evidence` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/findings` | `get_job_findings` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/findings.csv` | `download_findings_csv` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/findings.json` | `download_findings_json` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/output.txt` | `download_output_txt` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/report` | `get_report` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/<job_id>/stream` | `stream_job` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/jobs/active` | `list_active_jobs` | Legacy JobStore, evidence and job registry |
+| `GET` | `/api/loot` | `api_loot` | Legacy report, finding or loot view |
+| `GET` | `/api/msf/modules/<module_type>` | `msf_list_modules` | Legacy Metasploit RPC/session service |
+| `POST` | `/api/msf/run` | `msf_run` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/sessions` | `msf_sessions` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/sessions/<session_id>` | `msf_session_info` | Legacy Metasploit RPC/session service |
+| `POST` | `/api/msf/sessions/<session_id>/exec` | `msf_session_exec` | Legacy Metasploit RPC/session service |
+| `DELETE` | `/api/msf/sessions/<session_id>/portfwd` | `pf_del` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/sessions/<session_id>/portfwd` | `pf_list` | Legacy Metasploit RPC/session service |
+| `POST` | `/api/msf/sessions/<session_id>/portfwd` | `pf_add` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/msf/status` | `msf_status` | Legacy Metasploit RPC/session service |
+| `GET` | `/api/pivot/candidates` | `api_pivot_candidates` | Legacy pivot/session graph |
+| `GET` | `/api/pivot/graph` | `api_pivot_graph` | Legacy pivot/session graph |
+| `GET` | `/api/pivot/sessions/<session_id>/chain` | `api_pivot_chain` | Legacy pivot/session graph |
+| `GET` | `/api/report` | `api_report` | Legacy report, finding or loot view |
+| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
+| `POST` | `/api/run` | `run_tool` | Legacy ToolRunner and JobStore |
+| `GET` | `/api/scope` | `get_scope` | Scope policy service/configuration |
+| `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
+| `POST` | `/api/scope/check` | `check_scope` | Scope policy service/configuration |
+| `POST` | `/api/scope/override` | `log_override` | Scope policy service/configuration |
+| `POST` | `/api/v2/scope/check` | `check_v2_authoring_scope` | Capability-aware authoring scope preview; scheduler rechecks before execution |
+| `GET` | `/api/settings` | `api_settings_get` | Application settings store |
+| `POST` | `/api/settings` | `api_settings_post` | Application settings store |
+| `GET` | `/api/status` | `api_status` | Runtime diagnostics |
+| `GET` | `/api/tools` | `list_tools` | Packaged catalog advertisement |
+| `GET` | `/api/tree` | `get_tree` | Legacy report, finding or loot view |
+| `GET` | `/api/ui-v2/findings` | `api_ui_v2_findings` | Legacy finding/evidence API adapter |
+| `GET` | `/api/v2/capabilities` | `workflow_v2_capabilities` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/ai/proposals` | `workflow_v2_ai_proposal` | AI Action to V2 workflow proposal; optional immutable plan persistence; no approval or execution |
+| `POST` | `/api/v2/workflow-proposals` | `workflow_v2_workflow_proposal` | Fixed-argument tool or evidence-bound verification plan proposal; optional immutable plan persistence; no approval or execution |
+| `GET` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions` | `workflow_v2_missions` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/budget` | `workflow_v2_mission_budget` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/budget` | `workflow_v2_mission_budget` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/cost` | `workflow_v2_mission_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/cost` | `workflow_v2_mission_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/deadline` | `workflow_v2_mission_deadline` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/plans` | `workflow_v2_mission_plans` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/report` | `workflow_v2_mission_report` | Ordered mission-level, evidence-bound report; partial status is preserved |
+| `GET` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/providers` | `workflow_v2_providers` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/providers/portfolio-audit` | `workflow_v2_portfolio_audit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflow-runs/<request_id>` | `workflow_v2_run_request_status` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflow-runs/<request_id>/cancel` | `workflow_v2_cancel_run_request` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflow-runs/<request_id>/snapshot` | `workflow_v2_run_snapshot` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflow-runs/summary` | `workflow_v2_run_queue_summary` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows` | `workflow_v2_save_plan` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>` | `workflow_v2_plan_details` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/approvals` | `workflow_v2_approvals` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/approval-queue` | `workflow_v2_approval_queue` | Bounded pending/blocked moderate+ V2 tasks with exact approval state for the V2 Approvals UI |
+| `POST` | `/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke` | `workflow_v2_revoke_approval` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/followups` | `workflow_v2_followups` | Evidence-sealed, scope-checked follow-up proposal; optional plan persistence without approval or execution |
+| `POST` | `/api/v2/workflows/<plan_id>/deadline` | `workflow_v2_set_deadline` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/event-ack` | `workflow_v2_event_ack` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/event-inbox` | `workflow_v2_event_inbox` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/events` | `workflow_v2_events` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/evidence` | `workflow_v2_evidence` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_limits` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_set_limits` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/progress` | `workflow_v2_progress` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/rate-limit` | `workflow_v2_set_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/report` | `workflow_v2_plan_report` | Evidence-scoped persisted plan report; never implies release approval |
+| `GET` | `/api/v2/workflows/<plan_id>/audit-snapshot` | `workflow_v2_audit_snapshot` | Read-only lifecycle digest; not an independent anchor |
+| `GET` | `/api/v2/workflows/<plan_id>/readiness` | `workflow_v2_readiness` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/audit-verify` | `workflow_v2_audit_verify` | Compare caller-retained digest without claiming third-party anchoring |
+| `POST` | `/api/v2/workflows/<plan_id>/reconcile` | `workflow_v2_reconcile` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/reconciliation` | `workflow_v2_reconciliation` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
+
+| Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
+| --- | --- | --- | --- |
+| V2 capability and lifecycle | `GET /api/v2/capabilities`, `/providers`, `/providers/portfolio-audit`; `POST /api/v2/workflows`; `POST /api/v2/workflows/<plan_id>/run`; `POST /api/v2/workflow-runs/<request_id>/cancel` | Core capability registry, workflow contracts, approvals and durable request queue. A run submission is persisted work, not a success result. | Shared Core path; see `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, and `test_workflow.py`. |
+| Legacy tool and AI dispatch | `POST /api/run` → `_run_job_blocking`; `POST /api/ai/run` → legacy AI executor/bridge | Scope and input checks apply at the route, with legacy job or AI-run state. They do not create V2 plan-bound task attempts. | Legacy path; see `test_server.py`, `test_server_ai.py`, runner and AI bridge tests. |
+| Legacy Metasploit | `POST /api/msf/run`; `POST /api/msf/sessions/<session_id>/exec` | Module path validates inputs and scope before worker dispatch. Session command checks live session scope before RPC. | Legacy job/session paths; no V2 task/attempt lifecycle. |
+| Metasploit pivot forwarding | `GET`, `POST`, and `DELETE /api/msf/sessions/<session_id>/portfwd` | Every operation checks the session host against current scope. Creation separately checks the destination and writes a pivot edge; removal calls the legacy forward manager. | Network/pivot side effects remain outside V2 task ownership. See `test_server_portfwd.py` and scope-denial cases in `test_server.py`. |
+| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest default-deny before finding reads, replay or mutation unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; with opt-in, they recheck current target scope and retest requires existing verified status. V2-owned evidence remains rejected before replay. The separate resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
+| V2 authoring scope preview | `POST /api/v2/scope/check` | Uses the selected capability's target policy for authoring feedback; passive DNS requires a hostname and DNS-query scope. This preview does not authorize or dispatch a task. | Core scheduler and the supervised DNS child recheck current scope before execution. |
+| Scope policy | `GET`, `POST /api/scope`; `POST /api/scope/check`; `POST /api/scope/override` | Scope POST persists rules and requires explicit confirmation to disable enforcement. Scope check evaluates a target. Override only writes a legacy audit-style record; it does not authorize dispatch. | Scope configuration feeds shared Core checks, but the legacy override record is not a V2 approval. See `test_web_scope.py`, `test_scope_failclosed.py`, and `test_server.py`. |
+| Legacy job cancellation | `POST /api/jobs/<job_id>/cancel` | Calls `_cancel_job_blocking` for a legacy job process/event state. | Separate from durable V2 run-request and plan cancellation endpoints. Route-level lifecycle parity remains open under G05. |
+| Dependency provisioning | `POST /api/dependencies/install`, `/install-batch`; `POST /api/dependencies/install/<operation_id>/cancel` | Runs only from a current approved install plan and uses separate OS/package-manager authority; this is system provisioning, not target assessment. | Outside workflow task dispatch. See `test_dependencies.py`, `test_dependency_installer.py`, and dependency server tests. |
+
+The legacy `/api/tools` catalog and `/api/v2/capabilities` registry are different
+advertisements: catalog presence is not V2 admission, and provider installation
+does not prove smoke, lab, end-to-end or authorization acceptance.
+
+### Read, status and export API semantics
+
+The remaining HTTP GET surfaces are mapped by handler class below. Exact route
+and handler names are pinned by the 104-binding AST guard; this table records
+which state each family reads and what it cannot establish.
+
+| API family | Handlers/routes | Data owner and truth limit | Existing evidence |
+| --- | --- | --- | --- |
+| V2 capabilities and providers | `/api/v2/capabilities`, `/providers`, `/portfolio-audit` | Core registries and inventory; registered, bound, installed and executable are distinct from smoke/lab/end-to-end acceptance. | `test_server_workflow_v2.py`, `test_providers.py` |
+| V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit` | Core mission, plan, budget and rate-limit records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
+| V2 run and plan state | `/api/v2/workflow-runs/summary`, `/workflow-runs/<id>`, `/snapshot`, `/workflows/<id>` | Durable run request, queue and workflow store. Queued, active, terminal and successful remain distinct; snapshots are not atomic cross-table reads. | `test_workflow_run_requests.py`, `test_server_workflow_v2.py` |
+| V2 approval, attempts and proof | `/api/v2/workflows/<id>/approvals`, `/attempts`, `/audit`, `/event-inbox`, `/events`, `/evidence`, `/limits`, `/progress`, `/readiness`, `/reconciliation`, `/resources` | Core store and workflow integrity/readiness services; only persisted attempts/evidence count, unavailable cost/worker signals are not inferred. | `test_server_workflow_v2.py`, `test_workflow.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
+| Health and advertised tools | `/api/health`, `/api/health/simple`, `/api/status`, `/api/tools` | Health checks database/data-dir writability and optional MSF status. Catalog rows and health do not prove V2 admission or worker liveness. | `test_server.py`, `test_server_workflow_v2.py` |
+| Legacy AI, jobs and history | `/api/ai/pending`, `/api/ai/runs*`, `/api/jobs/active`, `/api/jobs/<id>`, `/history`, `/jobs/<id>/stream` | Legacy AI run records, JobRegistry, event bus and JobStore. These are not V2 plan/request status. | `test_server_ai.py`, `test_server.py` |
+| Legacy findings, evidence and exports | `/api/coverage/<id>`, `/api/jobs/<id>/evidence*`, `/findings`, `/findings.csv`, `/findings.json`, `/output.txt`, `/report`, `/api/report`, `/api/loot`, `/api/tree`, `/api/ui-v2/findings` | Legacy finding/evidence/report stores and export serializers. Their presence does not establish V2 evidence-seal provenance or complete coverage. | `test_server.py`, `test_coverage.py`, `test_report.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
+| MSF and pivot inspection | `/api/msf/status`, `/sessions`, `/sessions/<id>`, `/modules/<type>`, `/api/pivot/graph`, `/pivot/candidates`, `/pivot/sessions/<id>/chain` | Live RPC inventory and stored pivot graph. Session/module visibility is legacy capability discovery; derived pivot edges are not proof a path is executable or authorized. | `test_server_msf.py`, `test_server_portfwd.py`, `test_server.py` |
+| Dependency readiness | `/api/dependencies`, `/audit`, `/history`, `/drift`, `/install/<operation_id>` | Local dependency report, snapshots and install-operation records. They do not establish target capability or Engine V2 workflow readiness. | `test_dependencies.py`, `test_dependency_installer.py`, dependency server tests |
+| Scope and settings | `/api/scope`, `/api/settings` | Core scope and settings records. Scope configuration is policy input; settings output must preserve secret redaction. | `test_web_scope.py`, `test_scope_failclosed.py`, `test_server.py` |
+
+The static inventory contains 40 V2 and 64 legacy `/api/*` method/path
+bindings. The API remains mixed during migration: route presence does not imply
+that the route delegates to V2, and legacy exports must not be presented as
+V2-owned evidence.
+
+### Remaining API mutations
+
+| Mutation group | Paths and persisted state | Authority/truth limitation | Evidence |
+| --- | --- | --- | --- |
+| V2 mission and plan controls | Mission create, budget/cost/rate/deadline writes; plan approval grant/revoke, cancellation, reconciliation, event acknowledgement, attempt cost and plan limit/deadline/rate writes all delegate to Core workflow services and durable stores. | Approval `actor` and attempt-cost `source` are accepted from the request body; route tests establish binding and validation, not an authenticated principal or provider-origin proof. Reconciliation fences stale attempts as uncertain; it does not prove external work stopped or recovered. | `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, `test_workflow.py` |
+| Legacy AI answer | `POST /api/ai/runs/<run_id>/answer` writes the operator response to legacy AI-run state and may resume the legacy executor. | Not a V2 plan/task approval. The route ignores a client-supplied user identity and records its local actor behavior. | `test_server_ai.py::test_ai_run_answer_records_operator_response` |
+| Legacy evidence mutation | `POST`/`DELETE /api/jobs/<job_id>/evidence[/<seq>]` writes/removes files and JobStore evidence rows. | Legacy job evidence, not V2 attempt-sealed evidence. | `test_server.py`, `test_server_ai.py` evidence note/delete cases |
+| Bounty program import | `POST /api/bounty/import` fetches or parses source and returns a disabled review-required draft. | Ingestion only; draft is not persisted as authorization and does not activate testing. | `test_web_bounty_ingest.py`, `test_bounty_ingest.py` |
+| Burp report import | `POST /api/import/burp` parses uploaded XML, creates a legacy job and persists imported findings. | User-supplied evidence import; no target dispatch and no V2 attempt/evidence seal. | `test_server.py::test_burp_import_route_persists_imported_findings`, plus invalid-upload cases |
+| Dependency checks and local config | `POST /api/dependencies/verify`, `/snapshots`, `/plan` run bounded local checks, save a local snapshot, or create a remediation preview; `POST /api/settings` persists application settings. | Not target assessment or V2 capability execution. Settings are configuration state, not target authorization. | `test_dependencies.py`, `test_dependency_installer.py`, `test_server.py` settings/dependency cases |
+
+The V2 and legacy mutations above have different actor, persistence and
+evidence contracts. V2 approval and attempt-reconciliation routes derive their
+audit actor from the local peer identity or the username on a Basic-auth request
+that has passed the shared request gate; legacy `actor` body fields are ignored
+for compatibility. A remote username identifies the configured authenticated
+account, not a distinct role or independent approver. Attempt-cost `source`
+remains caller-supplied metadata and is not provider-origin proof. The route map
+is source/test traceability; unresolved trust and authorization acceptance
+remains open under the relevant later gates and must not be inferred from route
+registration alone.
+
+### Deployment entry points and readiness semantics
+
+| Entry point or report | Current source behavior | G01 limit |
+| --- | --- | --- |
+| `whaxon web` | `server.main` starts Flask's development server. | Development path; not the production serving mode. |
+| `whaxon serve` | `interfaces/web/serve.py` starts Waitress in foreground; `--daemon` uses `os.fork` double-fork. | Daemon mode is Unix-specific in source; do not infer native Windows support from OS documentation. |
+| systemd | `whaxon.service` uses Gunicorn with `create_app_factory()`; paired worker unit runs durable request polling. | Unit contract and CI are not a successful supported-host install or live worker verification. |
+| `docker-compose.e5.yml` | Repository-source web and dedicated worker share `/data`; host-published port `5001` is bound to `127.0.0.1` (the app listens on `0.0.0.0` inside the container). | Distinct from root `docker-compose.yml`, which is the vulnerable lab target. Docker assets are excluded from sdist; this is a checkout/source deployment path. |
 | Wheel/package | `pyproject.toml` exposes `whaxon`, `whaxon-tui`, and `whaxon-gui` and packages systemd units. | Installed TUI/GUI data directory behavior has not been reconciled with `WHAXON_DATA`; GUI startup also launches `whaxon serve --daemon`. Installed-wheel GUI/TUI acceptance remains unverified. |
 | `/api/health` | `core_ready` means SQLite responds and the data directory is writable; Metasploit is reported as optional degraded state. | Does not prove worker liveness, scanner readiness, workflow readiness, or assessment success. |
 | `whaxon workflow providers`, `/api/v2/providers` | `executable=true` means local manifest/catalog binding plus installed binary. `smoke_tested`, `lab_validated`, and `end_to_end_verified` remain separate fields and currently false. | “Executable” does not mean authorized, smoke-tested, lab-validated, end-to-end verified, or production-ready. |
