@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 _APPROVAL_CANDIDATE_PAGE_SIZE = 256
+_APPROVAL_CANDIDATE_SCAN_BUDGET = 10_000
 
 SCHEMA = """
 -- The engine that owns a job is durable, not a process-local event hint.
@@ -1244,14 +1245,15 @@ class JobStore:
 
         Candidates include moderate+ impact tasks and lower-impact tasks whose
         permission or exactly bound provider manifest declares a network effect.
-        Pending tasks are scanned in stable keyset batches so irrelevant rows
-        cannot starve older approval candidates.
+        Pending tasks are scanned in stable keyset batches, up to a fixed scan
+        budget, so irrelevant rows cannot starve older candidates indefinitely.
         """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("approval queue limit must be between 1 and 1000")
         from .capabilities import requires_network_approval
 
         page_size = _APPROVAL_CANDIDATE_PAGE_SIZE
+        scan_budget = _APPROVAL_CANDIDATE_SCAN_BUDGET
         c = self._conn()
 
         def manifest_has_network_effect(manifest_row) -> bool:
@@ -1332,7 +1334,8 @@ class JobStore:
         try:
             candidates = []
             cursor = None
-            while len(candidates) < limit:
+            scanned = 0
+            while len(candidates) < limit and scanned < scan_budget:
                 cursor_clause = ""
                 parameters = []
                 if cursor is not None:
@@ -1345,7 +1348,8 @@ class JobStore:
                     parameters.extend((
                         created_at, created_at, plan_id, plan_id, task_key,
                     ))
-                parameters.append(page_size)
+                page_limit = min(page_size, scan_budget - scanned)
+                parameters.append(page_limit)
                 rows = c.execute(
                     "SELECT t.plan_id, t.task_key, t.capability_id, t.target, t.impact, "
                     "t.permissions_json, t.status AS task_status, p.status AS plan_status, "
@@ -1361,6 +1365,7 @@ class JobStore:
                 ).fetchall()
                 if not rows:
                     break
+                scanned += len(rows)
                 for row in rows:
                     cursor = (row["created_at"], row["plan_id"], row["task_key"])
                     if not has_network_effect(row):
@@ -1372,7 +1377,7 @@ class JobStore:
                     candidates.append(candidate)
                     if len(candidates) >= limit:
                         break
-                if len(rows) < page_size:
+                if len(rows) < page_limit:
                     break
             return candidates
         finally:
