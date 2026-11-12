@@ -76,8 +76,6 @@ The shared-service/headless phase has **bounded engineering acceptance**, suppor
 
 **Work still underway:** migrating the remaining legacy CLI/web/AI/session execution paths into one V2 lifecycle; completing provider/transport and cross-interface parity; finishing supplied UI control wiring; validating audit/evidence integrity and authorized external-tool failure recovery; and completing security, accessibility, deployment and rollback acceptance. The current beta is **not production-approved**.
 
-Legacy HTTP finding verification and retest routes (`POST /api/validate/...` and `POST /api/retest/...`) are disabled by default. Set `WHAXON_LEGACY_VALIDATION_ENABLED=true` only when a legacy client still needs those routes. Engine V2 findings must use plan-bound verification or retest workflows and remain rejected by the legacy routes even when this flag is enabled.
-
 For the technical implementation and acceptance boundaries, see [Engine V2](docs/ENGINE_V2_MASTER.md) and the [master roadmap](WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md).
 
 ## Where we're going
