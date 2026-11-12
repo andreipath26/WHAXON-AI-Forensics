@@ -392,3 +392,31 @@ def test_pinned_resolution_checks_every_answer_under_ip_only_scope(
     assert result.allowed is True
     assert len(result.addresses) == 2
     assert {item.sockaddr[0] for item in result.addresses} == {"10.1.2.3", "10.9.8.7"}
+
+
+def test_pinned_resolution_rejects_cidr_only_mixed_answers(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["10.0.0.0/8"], "out_of_scope": [],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append(host)
+        return [_pinned_answer("10.1.2.3", port), _pinned_answer("192.0.2.9", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    preflight = scope.check_for_pinned_execution("scan.acme.test")
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert preflight.allowed is True
+    assert "child-side" in preflight.reason
+    assert calls == ["scan.acme.test"]
+    assert result.allowed is False
+    assert "not every resolved address" in result.reason
+    assert result.addresses == ()
