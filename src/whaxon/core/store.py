@@ -1245,8 +1245,8 @@ class JobStore:
 
         Candidates include moderate+ impact tasks and lower-impact tasks whose
         permission or exactly bound provider manifest declares a network effect.
-        Pending tasks are scanned in stable keyset batches, up to a fixed scan
-        budget, so irrelevant rows cannot starve older candidates indefinitely.
+        Pending tasks are scanned in stable keyset batches up to a fixed budget.
+        Older candidates beyond that budget may wait until earlier rows change.
         """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("approval queue limit must be between 1 and 1000")
