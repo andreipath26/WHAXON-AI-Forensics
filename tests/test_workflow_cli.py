@@ -167,6 +167,51 @@ class _FakeCore:
         }
 
 
+
+def test_tls_proposal_cli_persists_only_when_requested(monkeypatch, capsys):
+    import whaxon.core.workflow_proposals as proposals
+
+    core = _FakeCore(data_dir=None)
+    monkeypatch.setattr(workflow_cmd, "Core", lambda _data_dir: core)
+    proposal_plan = {
+        "mission_id": "mission-1",
+        "tasks": [{
+            "id": "task-1", "capability_id": "tls.certificate.inspect",
+            "target": "example.test", "permissions": ["network.scan"],
+            "impact": "moderate",
+        }],
+    }
+    calls = []
+    monkeypatch.setattr(
+        proposals, "propose_tls_certificate_plan",
+        lambda _core, **kwargs: (
+            calls.append(kwargs) or {
+                "status": "proposed", "plan_id": kwargs["plan_id"],
+                "plan": proposal_plan, "approval_granted": False,
+            }
+        ),
+    )
+
+    args = [
+        "plan", "propose-tls-recon", "--mission-id", "mission-1",
+        "--id", "tls-plan", "--target", "example.test",
+    ]
+    assert workflow_cmd.main(args) == 0
+    dry_result = json.loads(capsys.readouterr().out)
+    assert dry_result["created"] is False
+    assert core.saved is None
+
+    assert workflow_cmd.main([*args, "--save"]) == 0
+    saved_result = json.loads(capsys.readouterr().out)
+    assert saved_result["created"] is True
+    assert saved_result["approval_granted"] is False
+    assert core.saved[0] == "tls-plan"
+    assert calls == [
+        {"mission_id": "mission-1", "plan_id": "tls-plan", "target": "example.test"},
+        {"mission_id": "mission-1", "plan_id": "tls-plan", "target": "example.test"},
+    ]
+    assert core.initialized_with_drain is None
+
 def test_workflow_cli_creates_mission(monkeypatch, capsys):
     monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
     assert workflow_cmd.main([
