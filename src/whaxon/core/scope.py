@@ -565,7 +565,9 @@ class ScopeManager:
             )
         except (OSError, UnicodeError, ValueError) as exc:
             return ScopeResolution(ScopeMatch(
-                False, f"hostname resolution failed; scope cannot be confirmed ({type(exc).__name__})",
+                False,
+                "hostname resolution failed; scope cannot be confirmed "
+                f"({type(exc).__name__})",
                 host,
             ))
         pinned_addresses: list[PinnedSocketAddress] = []
@@ -602,7 +604,10 @@ class ScopeManager:
                         continue
                     socket_ip = canonical_ip + (f"%{zone}" if separator else "")
                     canonical_sockaddr = (socket_ip, port, flowinfo, scope_id)
-                canonical = (family, socket.SOCK_STREAM, int(proto or socket.IPPROTO_TCP), canonical_sockaddr)
+                canonical = (
+                    family, socket.SOCK_STREAM,
+                    int(proto or socket.IPPROTO_TCP), canonical_sockaddr,
+                )
                 if canonical in seen:
                     continue
                 seen.add(canonical)
