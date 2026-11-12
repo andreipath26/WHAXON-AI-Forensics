@@ -273,6 +273,8 @@ def test_core_dns_and_pinned_preflights_do_not_resolve_hostname(
     )
 
     assert core.authorize_workflow_task(task) is True
+
+
 def _queue_manifest(capability_id, provider_id, side_effects):
     return CapabilityManifest(
         capability_id=capability_id,
