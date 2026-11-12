@@ -108,3 +108,24 @@ def test_retest_cli_refuses_to_mutate_engine_v2_evidence(tmp_path, monkeypatch, 
     assert rc == retest_cmd.EXIT_V2_WORKFLOW_REQUIRED
     assert "plan propose-verification" in capsys.readouterr().err
     assert core.store.get_findings("0123456789ab")[0]["verification_status"] == "verified"
+
+def test_retest_cli_blocks_legacy_execution_by_default(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    from whaxon.core import Core
+    from whaxon.interfaces.cli import retest_cmd
+
+    core = Core(tmp_path / "data")
+    asyncio.run(core.initialize(drain=False))
+    core.store.create("job1")
+    core.store.set_started("job1", "sqlmap", "127.0.0.1:80")
+    finding = Finding(kind="sqli", severity="high", source="test",
+                      data={"parameter": "id"}, raw_line="test")
+    core.store.append_finding("job1", finding, 1)
+    core.store.update_verification("job1", 1, "verified", by="test", reason="seed")
+
+    rc = retest_cmd.main(["job1", "1"])
+
+    assert rc == retest_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    assert "no request was sent" in capsys.readouterr().err
+    assert core.store.get_findings("job1")[0]["verification_status"] == "verified"
+

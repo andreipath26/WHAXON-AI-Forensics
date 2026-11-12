@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 
 from whaxon.core import Core
-from whaxon.core.findings import Finding
-from whaxon.core.validator import Validator
 
 EXIT_OK = 0
 EXIT_NOT_FOUND = 1
@@ -20,7 +18,6 @@ EXIT_V2_WORKFLOW_REQUIRED = 5
 def main(args: list[str] | None = None) -> int:
     args = list(args or [])
     data_dir = Path("data")
-    verbose = False
     positional: list[str] = []
     i = 0
     while i < len(args):
@@ -28,7 +25,7 @@ def main(args: list[str] | None = None) -> int:
         if a == "--data" and i + 1 < len(args):
             data_dir = Path(args[i + 1]); i += 2
         elif a == "--verbose":
-            verbose = True; i += 1
+            i += 1
         elif a in ("-h", "--help"):
             print("Usage: whaxon retest <job_id> <seq> [--data DIR] [--verbose]", file=sys.stderr)
             return EXIT_OK
@@ -111,27 +108,9 @@ def main(args: list[str] | None = None) -> int:
         )
         return EXIT_SCOPE_BLOCKED
 
-    f_obj = Finding(
-        kind=target_f["kind"],
-        severity=target_f["severity"],
-        source=target_f["source"],
-        data=target_f["data"],
-        raw_line=target_f["raw_line"],
-        request_context=target_f.get("request_context") or {},
+    print(
+        "Legacy finding retest is disabled in Engine V2 mode; no request was sent. "
+        "Use a V2 workflow with sealed finding evidence and exact operator approval.",
+        file=sys.stderr,
     )
-
-    if verbose:
-        print(f"[verbose] target_url={target_url!r}", file=sys.stderr)
-        print(f"[verbose] finding kind={f_obj.kind!r} data={f_obj.data!r}", file=sys.stderr)
-
-    pkg_payloads = Path(__file__).resolve().parent.parent.parent / "data" / "payloads"
-    validator = Validator(pkg_payloads)
-    status, reason = validator.revalidate(f_obj, target_url=target_url)
-
-    if verbose:
-        print(f"[verbose] result status={status!r} reason={reason!r}", file=sys.stderr)
-
-    core.store.update_verification(job_id, seq, status, reason=reason)
-    print(f"[=] Retest status: {status.upper()}")
-    print(f"    Reason: {reason}")
-    return EXIT_OK
+    return EXIT_V2_WORKFLOW_REQUIRED

@@ -20,10 +20,10 @@ from whaxon.interfaces.cli import coverage_cmd, recon_cmd, retest_cmd, validate_
     [
         (coverage_cmd, "normal", 0),
         (coverage_cmd, "missing", 1),
-        (validate_cmd, "normal", 0),
+        (validate_cmd, "normal", validate_cmd.EXIT_V2_WORKFLOW_REQUIRED),
         (validate_cmd, "missing", 1),
         (validate_cmd, "blocked", 4),
-        (retest_cmd, "normal", 0),
+        (retest_cmd, "normal", retest_cmd.EXIT_V2_WORKFLOW_REQUIRED),
         (retest_cmd, "missing", 1),
         (retest_cmd, "blocked", 4),
         (retest_cmd, "ineligible", 3),
