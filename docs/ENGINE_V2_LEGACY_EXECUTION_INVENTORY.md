@@ -190,7 +190,7 @@ execution evidence; deployment-host readiness remains unverified.
 
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
-| CLI workflow | `whaxon run`, default `whaxon ai`, `recon --engine v2 --plan-id`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, default `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. Recon defaults to the direct `ReconRunner` path; its V2 workflow path is opt-in through `--engine v2 --plan-id`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_recon_v2_cli.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| CLI workflow | `whaxon run`, default `whaxon ai`, `recon` plan-only mode, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` and `recon --engine v2 --plan-id` submit approved saved plans | `whaxon run --legacy`, `whaxon ai --legacy`, `recon --legacy`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` and recon `--legacy` require explicit legacy opt-in; recon with no plan performs no check and constructs no runtime. Reusable recon proposals are created with `whaxon workflow plan propose-*`; V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`. The command exposes only provider capabilities already implemented; unsupported legacy checks remain absent. See `test_run_cmd.py`, `test_recon_v2_cli.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
 | HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/msf/sessions/<id>/exec`, `POST /api/msf/sessions/<id>/portfwd`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients; gates are route-specific | `/api/run` and legacy AI execution/answer routes are default-denied unless respectively `WHAXON_LEGACY_TOOL_EXECUTION_ENABLED=true` and `WHAXON_LEGACY_AI_EXECUTION_ENABLED=true`. MSF module launch, session commands, and port-forward creation require `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; port-forward DELETE remains available for cleanup. Validate/retest are gated by `WHAXON_LEGACY_VALIDATION_ENABLED=true` for legacy evidence and still reject V2-owned evidence before replay. V2 clients do not call legacy executor, answer, validation or retest mutations; proposals and approvals remain separate from submission. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
@@ -582,13 +582,12 @@ execution routes listed above.
 
 ## Recon capability parity ledger — 2026-11-12
 
-`whaxon recon` defaults to the legacy execution boundary: it runs named protocol
-checks directly in `ReconRunner`, gates the target with `ScopeManager`, then
-publishes legacy `JobStarted`/`JobFindings` events. The `--engine v2 --plan-id`
-route accepts only one matching fixed task and dispatches it through an approved
-workflow plan. V2 providers are migrated individually; wrapping `ReconRunner.run()`
-as a single V2 provider would preserve internal threads and legacy event writes
-outside scheduler attempt ownership.
+`whaxon recon` defaults to plan-only mode and makes no network request. A saved
+V2 plan is submitted with `--engine v2 --plan-id` and must carry exact approval.
+Direct `ReconRunner` work and legacy `JobStarted`/`JobFindings` publication
+require the explicit `--legacy` flag. V2 providers are migrated individually;
+wrapping `ReconRunner.run()` as a single V2 provider would preserve internal
+threads and legacy event writes outside scheduler attempt ownership.
 
 | Legacy check | Current behavior / output contract | V2 capability overlap | Parity |
 | --- | --- | --- | --- |

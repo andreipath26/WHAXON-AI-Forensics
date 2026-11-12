@@ -26,7 +26,8 @@ def main(args: list[str] | None = None) -> int:
     data_dir = Path("data")
     checks: list[str] | None = None
     verbose = False
-    engine = "legacy"
+    engine = "v2"
+    legacy = False
     plan_id: str | None = None
     positional: list[str] = []
     i = 0
@@ -39,6 +40,8 @@ def main(args: list[str] | None = None) -> int:
             i += 2
         elif a == "--engine" and i + 1 < len(args):
             engine = args[i + 1]; i += 2
+        elif a == "--legacy":
+            legacy = True; i += 1
         elif a == "--plan-id" and i + 1 < len(args):
             plan_id = args[i + 1]; i += 2
         elif a in ("-v", "--verbose"):
@@ -49,14 +52,24 @@ def main(args: list[str] | None = None) -> int:
         else:
             positional.append(a); i += 1
 
-    if len(positional) != 1 or engine not in {"legacy", "v2"}:
+    if len(positional) != 1 or engine != "v2":
         _usage()
         return EXIT_USAGE
-    if (engine == "v2" and (not plan_id or checks is not None)) or (
-        engine == "legacy" and plan_id is not None
-    ):
+    if (legacy and plan_id is not None) or (not legacy and checks is not None):
         _usage()
         return EXIT_USAGE
+
+    if not legacy and plan_id is None:
+        print(
+            "No recon checks were run. Recon is plan-only by default. "
+            "Create a reviewable V2 plan with `whaxon workflow plan propose-*`; "
+            "then grant exact task approval before submitting it. "
+            "Use `whaxon recon <target> --engine v2 --plan-id ID` to submit "
+            "an already approved one-task plan. Add `--legacy` only for the "
+            "legacy ReconRunner compatibility path.",
+            file=sys.stderr,
+        )
+        return EXIT_OK
 
     target = positional[0]
     core = Core(data_dir)
@@ -67,7 +80,7 @@ def main(args: list[str] | None = None) -> int:
         print(f"[recon] checks={checks or 'all'}", file=sys.stderr)
         print(f"[recon] engine={engine}", file=sys.stderr)
 
-    if engine == "v2":
+    if not legacy:
         return _run_v2(core, target, plan_id or "", verbose=verbose)
 
     asyncio.run(core.initialize(drain=False))
@@ -169,11 +182,12 @@ def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
 
 def _usage() -> None:
     print(
-        "Usage: whaxon recon <target> [--data DIR] [--checks a,b,c]\n"
+        "Usage: whaxon recon <target> [--data DIR]  (plan-only; no network activity)\n"
         "       whaxon recon <target> --engine v2 --plan-id ID [--data DIR]\n"
+        "       whaxon recon <target> --legacy [--checks a,b,c] [--data DIR]\n"
         "\n"
-        "  Runs legacy passive checks or one fixed V2 DNS/TLS/HTTPS/headers/redirects/robots/security.txt task against an in-scope target.\n"
-        "  V2 requires one persisted plan with exact approval.\n"
+        "  Default: prepare no checks and perform no network activity; use `whaxon workflow plan propose-*` to author a reviewable V2 plan.\n"
+        "  V2 submission requires one persisted plan with exact approval. Legacy ReconRunner dispatch requires --legacy.\n"
         "\n"
         "  Available checks:\n"
         "    dns        A/AAAA/MX/NS/TXT/SOA records\n"
