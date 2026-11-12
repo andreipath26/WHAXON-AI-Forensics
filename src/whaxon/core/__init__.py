@@ -889,10 +889,7 @@ class Core:
         from .capabilities import CapabilityUnavailable
 
         try:
-            from .capabilities import (
-                CapabilityRequirements,
-                requires_network_approval,
-            )
+            from .capabilities import CapabilityRequirements
             from .providers import _target_type
 
             bound = getattr(self, "providers", None)
