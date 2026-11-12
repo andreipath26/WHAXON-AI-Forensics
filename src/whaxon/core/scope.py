@@ -562,7 +562,11 @@ class ScopeManager:
                 family, socktype, proto, _canonname, sockaddr = answer
                 if family not in (socket.AF_INET, socket.AF_INET6):
                     continue
-                if socktype not in (0, socket.SOCK_STREAM) or not isinstance(sockaddr, tuple):
+                if (
+                    socktype not in (0, socket.SOCK_STREAM)
+                    or proto not in (0, socket.IPPROTO_TCP)
+                    or not isinstance(sockaddr, tuple)
+                ):
                     continue
                 if len(sockaddr) < 2 or int(sockaddr[1]) != port:
                     continue
