@@ -210,15 +210,25 @@ class Core:
         for item in candidates:
             plan_id = item["plan_id"]
             if plan_id not in approvals_by_plan:
-                approvals_by_plan[plan_id] = self.store.list_workflow_approvals(plan_id)
+                try:
+                    approvals_by_plan[plan_id] = self.store.list_workflow_approvals(plan_id)
+                except Exception:
+                    # Corrupt approval bindings must not hide other review
+                    # candidates or be presented as valid consent.
+                    approvals_by_plan[plan_id] = []
             approvals = approvals_by_plan[plan_id]
             task_approvals = [
                 row for row in approvals if row["task_key"] == item["task_key"]
             ]
             item["current_approval"] = task_approvals[-1] if task_approvals else None
-            item["approval_valid"] = self.store.has_valid_workflow_approval(
-                plan_id, item["task_key"],
-            ) is True
+            try:
+                item["approval_valid"] = self.store.has_valid_workflow_approval(
+                    plan_id, item["task_key"],
+                ) is True
+            except Exception:
+                # Malformed plan or approval data remains visible for review,
+                # but cannot be treated as an authorization.
+                item["approval_valid"] = False
         return candidates
 
     def configure_workflow_rate_limit(self, plan_id: str, *, min_spacing_s: float):

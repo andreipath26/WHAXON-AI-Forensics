@@ -23,8 +23,9 @@ _READINESS = {
 }
 _IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
 _NETWORK_EFFECT_MARKERS = (
-    "network", "dns", "resolver", "http", "socket",
-    "remote_shell", "target_service", "tcp", "udp",
+    "network", "dns", "resolver", "http", "web_request", "socket",
+    "outbound", "external_api", "internet", "remote_service", "remote_shell",
+    "target_service", "tcp", "udp", "icmp",
 )
 
 
