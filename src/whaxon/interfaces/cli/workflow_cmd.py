@@ -188,6 +188,17 @@ def _parser() -> argparse.ArgumentParser:
     tls_propose.add_argument("--target", required=True, help="hostname in pinned network scope")
     tls_propose.add_argument("--save", action="store_true",
                              help="persist only; exact approval is required before execution")
+    https_propose = plan_commands.add_parser(
+        "propose-https-recon",
+        help="prepare a fixed scope-pinned HTTPS header reconnaissance plan for review",
+    )
+    https_propose.add_argument("--mission-id", required=True)
+    https_propose.add_argument("--id", required=True, help="immutable workflow plan ID")
+    https_propose.add_argument("--target", required=True, help="bare hostname or IP in pinned scope")
+    https_propose.add_argument(
+        "--save", action="store_true",
+        help="persist only; approval and execution remain separate",
+    )
     verify_propose = plan_commands.add_parser(
         "propose-verification", help="prepare a sealed-finding V2 verification or retest plan",
     )
@@ -503,6 +514,23 @@ def main(args: list[str] | None = None) -> int:
             from whaxon.core.workflow_proposals import propose_tls_certificate_plan
 
             proposal = propose_tls_certificate_plan(
+                core,
+                mission_id=options.mission_id,
+                plan_id=options.id,
+                target=options.target,
+            )
+            created = False
+            if options.save and proposal.get("status") == "proposed":
+                created = core.save_workflow_plan(
+                    options.id, WorkflowPlan.from_dict(proposal["plan"]),
+                )
+            print(json.dumps({**proposal, "created": bool(created)},
+                             indent=2, sort_keys=True))
+            return 0 if proposal.get("status") == "proposed" else 1
+        if options.command == "plan" and options.plan_command == "propose-https-recon":
+            from whaxon.core.workflow_proposals import propose_passive_https_recon_plan
+
+            proposal = propose_passive_https_recon_plan(
                 core,
                 mission_id=options.mission_id,
                 plan_id=options.id,
