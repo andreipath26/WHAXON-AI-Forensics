@@ -420,3 +420,30 @@ def test_pinned_resolution_rejects_cidr_only_mixed_answers(
     assert result.allowed is False
     assert "not every resolved address" in result.reason
     assert result.addresses == ()
+
+
+def test_pinned_resolution_checks_ipv4_mapped_ipv6_against_ipv4_denies(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["scan.acme.test"],
+        "out_of_scope": ["10.9.0.0/16"],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append(host)
+        return [_pinned_answer("::ffff:10.9.1.2", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert calls == ["scan.acme.test"]
+    assert result.allowed is False
+    assert "out-of-scope" in result.reason
+    assert result.addresses == ()
