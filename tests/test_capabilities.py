@@ -244,3 +244,26 @@ def test_registry_digest_changes_only_for_new_persisted_manifests(tmp_path):
     registry.register(_manifest("provider.two"))
     assert registry.digest != digest
     assert CapabilityRegistry(store).digest == registry.digest
+
+
+
+def test_scope_mode_round_trip_and_default_fingerprint_compatibility():
+    manifest = _manifest("provider.scope_mode")
+    legacy_payload = manifest.to_dict()
+
+    assert "scope_mode" not in legacy_payload
+    assert CapabilityManifest.from_dict(legacy_payload).fingerprint == manifest.fingerprint
+
+    for scope_mode in ("dns_query", "pinned_network"):
+        explicit = _manifest("provider.scope_mode", scope_mode=scope_mode)
+        restored = CapabilityManifest.from_dict(explicit.to_dict())
+        assert restored.scope_mode == scope_mode
+        assert restored.fingerprint == explicit.fingerprint
+        assert explicit.fingerprint != manifest.fingerprint
+
+
+def test_scope_mode_rejects_unknown_values():
+    import pytest
+
+    with pytest.raises(ValueError, match="scope mode"):
+        _manifest("provider.invalid_scope_mode", scope_mode="resolve_then_connect")
