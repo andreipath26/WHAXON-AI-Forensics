@@ -129,6 +129,7 @@ class Core:
             SemanticOperationProvider,
         )
         from .recon_v2 import PassiveDnsReconProvider
+        from .tls_cert_v2 import TlsCertificateProvider
         self.capabilities = CapabilityRegistry(self.store)
         catalog_provider = CatalogAdapterProvider(
             catalog=self.catalog,
@@ -149,6 +150,9 @@ class Core:
         dns_full_provider = DnsFullPostureProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        tls_certificate_provider = TlsCertificateProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
@@ -156,6 +160,7 @@ class Core:
             lab_access_provider,
             passive_dns_provider,
             dns_full_provider,
+            tls_certificate_provider,
         ))
 
     def _wire_store(self) -> None:
