@@ -53,7 +53,7 @@ def propose_passive_dns_plan(
         manifest.impact != "moderate"
         or manifest.target_types != ("hostname",)
         or manifest.input_schema.get("properties") != {}
-        or manifest.input_schema.get("required", []) != []
+        or bool(manifest.input_schema.get("required"))
         or manifest.input_schema.get("additionalProperties") is not False
     ):
         return {"status": "blocked", "reason": "passive-DNS provider contract differs from the reviewed fixed operation"}
@@ -145,7 +145,7 @@ def propose_tls_certificate_plan(
         or manifest.impact != "moderate"
         or manifest.target_types != ("hostname",)
         or manifest.input_schema.get("properties") != {}
-        or manifest.input_schema.get("required", []) != []
+        or bool(manifest.input_schema.get("required"))
         or manifest.input_schema.get("additionalProperties") is not False
     ):
         return {"status": "blocked", "reason": "TLS certificate provider contract differs from the reviewed operation"}
@@ -243,7 +243,7 @@ def propose_passive_https_recon_plan(
         or manifest.impact != "moderate"
         or target_type not in manifest.target_types
         or manifest.input_schema.get("properties") != {}
-        or manifest.input_schema.get("required", []) != []
+        or bool(manifest.input_schema.get("required"))
         or manifest.input_schema.get("additionalProperties") is not False
     ):
         return {"status": "blocked", "reason": "HTTPS-recon provider contract differs from the reviewed fixed operation"}
@@ -361,7 +361,7 @@ def propose_dns_full_posture_plan(
         or manifest.impact != "moderate"
         or manifest.target_types != ("hostname",)
         or manifest.input_schema.get("properties") != {}
-        or manifest.input_schema.get("required", []) != []
+        or bool(manifest.input_schema.get("required"))
         or manifest.input_schema.get("additionalProperties") is not False
     ):
         return {
@@ -479,7 +479,7 @@ def propose_tool_workflow_plan(
     if (
         manifest.impact != "moderate"
         or manifest.input_schema.get("properties") != {}
-        or manifest.input_schema.get("required", []) != []
+        or bool(manifest.input_schema.get("required"))
         or manifest.input_schema.get("additionalProperties") is not False
     ):
         return {

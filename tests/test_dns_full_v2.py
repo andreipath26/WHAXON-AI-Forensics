@@ -153,6 +153,9 @@ def test_dns_full_child_denies_unscoped_dmarc_name_before_resolver_query(tmp_pat
         def send_bytes(self, encoded: bytes) -> None:
             self.payload = json.loads(encoded.decode("utf-8"))
 
+        def close(self) -> None:
+            pass
+
     monkeypatch.setattr(
         "whaxon.core.recon_checks.check_dns_full",
         lambda _target: pytest.fail("DNS lookup ran outside the explicitly scoped hostname set"),
@@ -209,8 +212,8 @@ def test_dns_full_workflow_persists_sealed_findings_and_requires_approval(tmp_pa
     )
 
     denied = asyncio.run(core.run_workflow_plan("dns-full-unapproved"))
-    assert denied["complete"] is False
-    assert denied["tasks"][0]["status"] != "succeeded"
+    assert denied["complete"] is True
+    assert denied["tasks"][0]["status"] == "blocked"
 
     approved = propose_dns_full_posture_plan(
         core, mission_id="dns-full-mission", plan_id="dns-full-plan",

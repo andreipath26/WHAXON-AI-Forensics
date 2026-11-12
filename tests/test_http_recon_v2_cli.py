@@ -142,7 +142,7 @@ def test_v2_recon_cli_rejects_dynamic_https_paths_before_dispatch(monkeypatch, c
     class _ExecutionCore:
         run_calls = []
 
-        def __init__(self, _data_dir):
+        def __init__(self, _data_dir=None):
             pass
 
         def workflow_plan_details(self, _plan_id):
@@ -167,7 +167,7 @@ def test_v2_recon_cli_rejects_dynamic_https_paths_before_dispatch(monkeypatch, c
 
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "fixed DNS or HTTPS task" in capsys.readouterr().err
+    assert "fixed DNS, TLS, or HTTPS task" in capsys.readouterr().err
 
 
 
