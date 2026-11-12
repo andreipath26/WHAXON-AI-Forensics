@@ -488,6 +488,70 @@ def test_auth_skipped_for_loopback(tmp_path, monkeypatch):
     r = client.get("/api/tools")  # no Authorization header
     assert r.status_code == 200
 
+def test_run_defaults_to_v2_plan_response_and_ignores_json_opt_in(tmp_path, monkeypatch):
+    """A request body cannot re-enable the legacy direct ToolRunner route."""
+    from types import SimpleNamespace
+
+    app, core = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    submitted = []
+    monkeypatch.setattr(
+        core.scope,
+        "check",
+        lambda target: SimpleNamespace(allowed=True, reason="", matched_rule="loopback"),
+    )
+    monkeypatch.setattr(core.catalog, "get", lambda tool_id: object())
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, task: submitted.append(task))
+
+    before = core.store.history()
+    response = client.post(
+        "/api/run",
+        json={
+            "tool_id": "echo",
+            "target": "127.0.0.1",
+            "legacy_execution_enabled": True,
+            "allow_legacy_execution": True,
+        },
+    )
+
+    assert response.status_code == 410
+    payload = response.get_json()
+    assert payload["legacy_execution_enabled"] is False
+    assert payload["v2_plan_endpoint"] == "/api/v2/workflows"
+    assert payload["v2_run_endpoint"] == "/api/v2/workflows/<plan_id>/run"
+    assert payload["approval_granted"] is False
+    assert payload["execution_submitted"] is False
+    assert "reviewable plan" in payload["error"]
+    assert core.store.history() == before
+    assert submitted == []
+
+
+def test_run_legacy_execution_requires_server_operator_opt_in(tmp_path, monkeypatch):
+    """Only the server-side operator setting can retain the compatibility path."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "true")
+    app, core = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    submitted = []
+    monkeypatch.setattr(
+        core.scope,
+        "check",
+        lambda target: SimpleNamespace(allowed=True, reason="", matched_rule="loopback"),
+    )
+    monkeypatch.setattr(core.catalog, "get", lambda tool_id: object())
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, task: submitted.append(task))
+
+    response = client.post(
+        "/api/run",
+        json={"tool_id": "echo", "target": "127.0.0.1"},
+    )
+
+    assert response.status_code == 202
+    assert response.get_json()["job_id"]
+    assert len(submitted) == 1
+
+
 def test_run_refuses_to_start_when_scope_check_raises(tmp_path, monkeypatch):
     """A scope-check failure must fail closed and must not enqueue a scan."""
     app, core = _make_app(tmp_path, monkeypatch)
