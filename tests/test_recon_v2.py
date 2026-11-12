@@ -271,7 +271,11 @@ def test_passive_dns_child_rechecks_revoked_scope_before_query(tmp_path, monkeyp
         nonlocal checks
         decision = original(target)
         checks += 1
-        if checks == 1:
+        # The scheduler authorizes once while claiming the task, then repeats
+        # the check at the consequential dispatch boundary. Revoke scope just
+        # after that second authorization so the child must recheck persisted
+        # scope before making any DNS query.
+        if checks == 2:
             _write_scope(core, ["other.test"], ["example.test"])
         return decision
 
@@ -279,7 +283,7 @@ def test_passive_dns_child_rechecks_revoked_scope_before_query(tmp_path, monkeyp
     result = asyncio.run(core.run_workflow_plan("dns-scope-race"))
 
     assert result["tasks"][0]["status"] == "uncertain"
-    assert checks == 1
+    assert checks == 2
     assert core.store.history(limit=10)[0]["status"] == "failed"
     assert core.workflow_evidence("dns-scope-race")["all_evidence_recorded"] is False
 
@@ -323,6 +327,6 @@ def test_passive_dns_dispatch_cancellation_terminates_child_and_records_failure(
 
     failed = next(
         item for item in core.store.history(limit=20)
-        if item["tool_id"] == CAPABILITY_ID and item["target"] == "example.test"
+        if item["tool"] == CAPABILITY_ID and item["target"] == "example.test"
     )
     assert failed["status"] == "failed"

@@ -172,7 +172,7 @@ def test_tls_proposal_cli_persists_only_when_requested(monkeypatch, capsys):
     import whaxon.core.workflow_proposals as proposals
 
     core = _FakeCore(data_dir=None)
-    monkeypatch.setattr(workflow_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setattr(workflow_cmd, "Core", lambda *, data_dir: core)
     proposal_plan = {
         "mission_id": "mission-1",
         "tasks": [{
