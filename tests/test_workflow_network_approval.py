@@ -5,6 +5,7 @@ import time
 
 import pytest
 
+import whaxon.core.store as store_module
 from whaxon.core import Core
 from whaxon.core.capabilities import CapabilityManifest
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
