@@ -591,6 +591,17 @@ class ScopeManager:
                 address = ipaddress.ip_address(ip_text)
                 if (family == socket.AF_INET) != (address.version == 4):
                     continue
+                mapped_ipv4 = (
+                    address.ipv4_mapped
+                    if isinstance(address, ipaddress.IPv6Address)
+                    else None
+                )
+                if mapped_ipv4 is not None:
+                    # An IPv4-mapped IPv6 sockaddr reaches the corresponding
+                    # IPv4 host; evaluate it against IPv4 rules and return an
+                    # IPv4 sockaddr so the scope check matches the socket peer.
+                    address = mapped_ipv4
+                    family = socket.AF_INET
                 canonical_ip = address.compressed
                 if family == socket.AF_INET:
                     canonical_sockaddr = (canonical_ip, port)
