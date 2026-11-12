@@ -1241,55 +1241,136 @@ class JobStore:
         """Return bounded pending tasks requiring operator consent.
 
         Candidates include moderate+ impact tasks and lower-impact tasks whose
-        permission or bound provider manifest declares a network effect.
+        permission or exactly bound provider manifest declares a network effect.
+        Pending tasks are scanned in stable keyset batches so irrelevant rows
+        cannot starve older approval candidates.
         """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("approval queue limit must be between 1 and 1000")
         from .capabilities import requires_network_approval
 
-        scan_limit = min(10_000, max(limit * 10, 100))
+        page_size = 256
         c = self._conn()
+
+        def manifest_has_network_effect(manifest_row) -> bool:
+            if manifest_row is None:
+                return True
+            try:
+                manifest = json.loads(manifest_row["manifest_json"])
+            except (TypeError, ValueError):
+                return True
+            if not isinstance(manifest, dict):
+                return True
+            side_effects = manifest.get("side_effects")
+            if not isinstance(side_effects, list):
+                return True
+            return requires_network_approval((), side_effects)
+
+        def has_network_effect(row) -> bool:
+            if row["impact"] in ("moderate", "high", "critical"):
+                return True
+            try:
+                permissions = json.loads(row["permissions_json"])
+            except (TypeError, ValueError):
+                return True
+            if not isinstance(permissions, list) or any(
+                not isinstance(item, str) for item in permissions
+            ):
+                return True
+            if requires_network_approval(permissions, ()):
+                return True
+
+            try:
+                plan = json.loads(row["plan_json"])
+            except (TypeError, ValueError):
+                return True
+            if not isinstance(plan, dict):
+                return True
+            metadata = plan.get("metadata")
+            if not isinstance(metadata, dict):
+                return True
+
+            if "provider_bindings" not in metadata:
+                bindings = None
+            else:
+                bindings = metadata["provider_bindings"]
+                if not isinstance(bindings, dict):
+                    return True
+
+            binding = bindings.get(row["task_key"]) if bindings is not None else None
+            if binding is None:
+                # A historical/unpinned task may still run through the one
+                # trusted provider. Inspect every persisted provider manifest
+                # for this capability rather than silently treating it as local.
+                manifest_rows = c.execute(
+                    "SELECT manifest_json FROM capability_manifests "
+                    "WHERE capability_id=?",
+                    (row["capability_id"],),
+                ).fetchall()
+                if not manifest_rows:
+                    return True
+                return any(manifest_has_network_effect(item) for item in manifest_rows)
+
+            if not isinstance(binding, dict):
+                return True
+            provider_id = binding.get("provider_id")
+            fingerprint = binding.get("manifest_fingerprint")
+            if (
+                not isinstance(provider_id, str) or not provider_id
+                or not isinstance(fingerprint, str) or not fingerprint
+            ):
+                return True
+            manifest_row = c.execute(
+                "SELECT manifest_json FROM capability_manifests "
+                "WHERE capability_id=? AND provider_id=? AND fingerprint=?",
+                (row["capability_id"], provider_id, fingerprint),
+            ).fetchone()
+            return manifest_has_network_effect(manifest_row)
+
         try:
-            rows = c.execute(
-                "SELECT t.plan_id, t.task_key, t.capability_id, t.target, t.impact, "
-                "t.permissions_json, t.status AS task_status, p.status AS plan_status, "
-                "p.digest, p.plan_json, m.id AS mission_id, m.objective "
-                "FROM workflow_tasks t "
-                "JOIN workflow_plans p ON p.id=t.plan_id "
-                "JOIN missions m ON m.id=p.mission_id "
-                "WHERE t.status IN ('pending','blocked') "
-                "AND p.status!='cancel_requested' "
-                "ORDER BY t.created_at DESC, t.task_key LIMIT ?",
-                (scan_limit,),
-            )
             candidates = []
-            for row in rows:
-                if row["impact"] not in ("moderate", "high", "critical"):
-                    permissions = json.loads(row["permissions_json"])
-                    side_effects = ()
-                    if not requires_network_approval(permissions, side_effects):
-                        plan = json.loads(row["plan_json"])
-                        metadata = plan.get("metadata", {})
-                        bindings = metadata.get("provider_bindings", {})
-                        binding = bindings.get(row["task_key"], {})
-                        provider_id = binding.get("provider_id")
-                        fingerprint = binding.get("manifest_fingerprint")
-                        if isinstance(provider_id, str) and isinstance(fingerprint, str):
-                            manifest_row = c.execute(
-                                "SELECT manifest_json FROM capability_manifests "
-                                "WHERE capability_id=? AND provider_id=? AND fingerprint=?",
-                                (row["capability_id"], provider_id, fingerprint),
-                            ).fetchone()
-                            if manifest_row is not None:
-                                manifest = json.loads(manifest_row["manifest_json"])
-                                side_effects = manifest.get("side_effects", ())
-                    if not requires_network_approval(permissions, side_effects):
+            cursor = None
+            while len(candidates) < limit:
+                cursor_clause = ""
+                parameters = []
+                if cursor is not None:
+                    created_at, plan_id, task_key = cursor
+                    cursor_clause = (
+                        "AND (t.created_at < ? OR "
+                        "(t.created_at = ? AND (t.plan_id > ? OR "
+                        "(t.plan_id = ? AND t.task_key > ?)))) "
+                    )
+                    parameters.extend((
+                        created_at, created_at, plan_id, plan_id, task_key,
+                    ))
+                parameters.append(page_size)
+                rows = c.execute(
+                    "SELECT t.plan_id, t.task_key, t.capability_id, t.target, t.impact, "
+                    "t.permissions_json, t.status AS task_status, p.status AS plan_status, "
+                    "p.digest, p.plan_json, m.id AS mission_id, m.objective, t.created_at "
+                    "FROM workflow_tasks t "
+                    "JOIN workflow_plans p ON p.id=t.plan_id "
+                    "JOIN missions m ON m.id=p.mission_id "
+                    "WHERE t.status IN ('pending','blocked') "
+                    "AND p.status!='cancel_requested' "
+                    f"{cursor_clause}"
+                    "ORDER BY t.created_at DESC, t.plan_id, t.task_key LIMIT ?",
+                    tuple(parameters),
+                ).fetchall()
+                if not rows:
+                    break
+                for row in rows:
+                    cursor = (row["created_at"], row["plan_id"], row["task_key"])
+                    if not has_network_effect(row):
                         continue
-                candidate = dict(row)
-                candidate.pop("permissions_json", None)
-                candidate.pop("plan_json", None)
-                candidates.append(candidate)
-                if len(candidates) >= limit:
+                    candidate = dict(row)
+                    candidate.pop("permissions_json", None)
+                    candidate.pop("plan_json", None)
+                    candidate.pop("created_at", None)
+                    candidates.append(candidate)
+                    if len(candidates) >= limit:
+                        break
+                if len(rows) < page_size:
                     break
             return candidates
         finally:
