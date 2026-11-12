@@ -656,17 +656,18 @@ class ScopeManager:
             host_rule = next(
                 (rule for rule in self._in if _rule_matches_host(rule, host)), "",
             )
+            ip_rules = [rule for rule in self._in if _is_ip_rule(rule)]
+            # An explicit hostname rule must not widen configured address bounds.
+            if ip_rules and not all(
+                any(_rule_matches_ip(rule, address_text) for rule in ip_rules)
+                for address_text in canonical_ips
+            ):
+                return ScopeResolution(ScopeMatch(
+                    False,
+                    "not every resolved address matches an in-scope rule",
+                    host,
+                ))
             if not host_rule:
-                ip_rules = [rule for rule in self._in if _is_ip_rule(rule)]
-                if not all(
-                    any(_rule_matches_ip(rule, address_text) for rule in ip_rules)
-                    for address_text in canonical_ips
-                ):
-                    return ScopeResolution(ScopeMatch(
-                        False,
-                        "not every resolved address matches an in-scope rule",
-                        host,
-                    ))
                 host_rule = next(
                     (rule for rule in ip_rules
                      if any(_rule_matches_ip(rule, address_text) for address_text in canonical_ips)),
