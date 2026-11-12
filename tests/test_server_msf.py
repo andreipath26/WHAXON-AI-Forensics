@@ -187,6 +187,7 @@ def test_msf_session_info_when_down(tmp_path, monkeypatch):
 # ---------------------------------------------------------------- /api/msf/sessions/<id>/exec
 
 def test_msf_exec_no_command(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/sessions/1/exec", json={})
@@ -195,6 +196,7 @@ def test_msf_exec_no_command(tmp_path, monkeypatch):
 
 
 def test_msf_exec_when_down(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=False)
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/sessions/1/exec", json={"command": "whoami"})
@@ -202,6 +204,7 @@ def test_msf_exec_when_down(tmp_path, monkeypatch):
 
 
 def test_msf_exec_success(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     fake._sessions = {"1": {"target_host": "10.0.0.9", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
@@ -319,6 +322,7 @@ def test_msf_run_accepts_in_scope(tmp_path, monkeypatch):
 # ---------------------------------------------------------------- persisted identity binding
 
 def test_msf_exec_rejects_live_session_host_drift(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
@@ -333,6 +337,7 @@ def test_msf_exec_rejects_live_session_host_drift(tmp_path, monkeypatch):
 
 
 def test_msf_exec_rejects_session_without_persisted_identity(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
     app, core = _make_app(tmp_path, monkeypatch, fake)
@@ -345,6 +350,7 @@ def test_msf_exec_rejects_session_without_persisted_identity(tmp_path, monkeypat
 
 
 def test_msf_exec_accepts_matching_persisted_identity(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
@@ -355,7 +361,26 @@ def test_msf_exec_accepts_matching_persisted_identity(tmp_path, monkeypatch):
     assert fake.exec_calls == [("1", "id", 15.0)]
 
 
+def test_msf_exec_is_default_denied_without_invoking_session_command(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
+    fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
+    app, _core = _make_app(tmp_path, monkeypatch, fake)
+
+    response = app.test_client().post(
+        "/api/msf/sessions/1/exec", json={"command": "id"},
+    )
+
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["legacy_execution_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_submitted"] is False
+    assert fake.exec_calls == []
+
+
 def test_msf_exec_rejects_session_type_drift(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
