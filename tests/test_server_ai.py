@@ -140,6 +140,7 @@ def test_ai_run_fails_closed_when_scope_check_raises(tmp_path, monkeypatch):
 
 
 def test_ai_run_answer_records_operator_response(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     core.store.create_ai_run("ai-waiting", "review an authorized target")
     core.store.set_ai_run_waiting(
@@ -160,6 +161,29 @@ def test_ai_run_answer_records_operator_response(tmp_path, monkeypatch):
     assert len(approvals) == 1
     assert approvals[0]["answer"] == "yes"
     assert approvals[0]["user"] == "local"  # JSON-supplied identity is not trusted
+
+
+def test_ai_run_answer_is_default_denied_without_mutating_waiting_run(tmp_path, monkeypatch):
+    app, core = _make_app(tmp_path, monkeypatch)
+    core.store.create_ai_run("ai-waiting", "review an authorized target")
+    core.store.set_ai_run_waiting(
+        "ai-waiting",
+        json.dumps({"rationale": "Confirm next phase", "proposed_phase": "enum"}),
+    )
+    before = core.store.get_ai_run("ai-waiting")
+
+    response = app.test_client().post(
+        "/api/ai/runs/ai-waiting/answer",
+        json={"answer": "yes", "user": "operator", "note": "Approved in UI"},
+    )
+
+    assert response.status_code == 410
+    assert response.get_json()["legacy_execution_enabled"] is False
+    assert response.get_json()["approval_granted"] is False
+    after = core.store.get_ai_run("ai-waiting")
+    assert after["status"] == before["status"] == "waiting"
+    assert after["pending_question"] == before["pending_question"]
+    assert core.store.list_approvals("ai-waiting") == []
 
 
 def test_ai_run_waits_for_real_operator_answer_with_operator_opt_in(tmp_path, monkeypatch):

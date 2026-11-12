@@ -44,6 +44,12 @@ def _request_actor() -> str:
     return auth.username if auth and auth.username else "authenticated-operator"
 
 
+def _legacy_ai_execution_enabled() -> bool:
+    return os.environ.get(
+        "WHAXON_LEGACY_AI_EXECUTION_ENABLED", "false",
+    ).strip().lower() in ("1", "true", "yes")
+
+
 def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
     if isinstance(value, dict):
@@ -1372,10 +1378,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 "matched_rule": getattr(match, "matched_rule", None),
             }, 403
 
-        legacy_ai_enabled = os.environ.get(
-            "WHAXON_LEGACY_AI_EXECUTION_ENABLED", "false",
-        ).strip().lower() in ("1", "true", "yes")
-        if not legacy_ai_enabled:
+        if not _legacy_ai_execution_enabled():
             return {
                 "error": (
                     "Legacy AI execution is disabled. Use the V2 AI proposal "
@@ -1441,6 +1444,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/ai/runs/<run_id>/answer")
     def ai_run_answer(run_id: str):
+        if not _legacy_ai_execution_enabled():
+            return {
+                "error": (
+                    "Legacy AI execution is disabled. Pending legacy runs are "
+                    "read-only; use the V2 proposal, approval, and durable run flow."
+                ),
+                "legacy_execution_enabled": False,
+                "v2_proposal_endpoint": "/api/v2/ai/proposals",
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
         data = request.get_json(silent=True) or {}
         answer = (data.get("answer") or "").strip()
         if not answer:
