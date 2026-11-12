@@ -227,6 +227,8 @@ def test_pinned_resolution_resolves_once_and_returns_numeric_socket_address(
 
     from whaxon.core.scope import ScopeManager
 
+    # Without IP/CIDR bounds, the explicit hostname continues to authorize
+    # its resolved numeric address.
     scope = ScopeManager(scope_file({
         "enabled": True, "in_scope": ["scan.acme.test"], "out_of_scope": [],
     }))
@@ -245,6 +247,31 @@ def test_pinned_resolution_resolves_once_and_returns_numeric_socket_address(
     assert len(result.addresses) == 1
     assert result.addresses[0].sockaddr == ("192.0.2.12", 443)
     assert result.addresses[0].family == socket.AF_INET
+
+
+@pytest.mark.parametrize("ip", ["127.0.0.1", "8.8.8.8"])
+def test_pinned_resolution_enforces_ip_bounds_even_for_allowed_hostname(
+    scope_file, monkeypatch, ip,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["scan.acme.test", "10.0.0.0/8"],
+        "out_of_scope": [],
+    }))
+    monkeypatch.setattr(
+        socket, "getaddrinfo",
+        lambda _host, port, **_kwargs: [_pinned_answer(ip, port)],
+    )
+
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert result.allowed is False
+    assert "not every resolved address" in result.reason
+    assert result.addresses == ()
 
 
 def test_pinned_resolution_rejects_mixed_allowed_and_denied_answers(
