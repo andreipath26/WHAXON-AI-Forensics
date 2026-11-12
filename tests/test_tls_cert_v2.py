@@ -295,7 +295,7 @@ def test_tls_dispatch_persists_sealed_evidence_and_marks_job_v2(tmp_path, monkey
     assert result["exit_code"] == 0
     assert [finding["kind"] for finding in stored] == ["ssl_cert", "recon_discovered_host"]
     assert job is not None
-    assert job.get("engine_v2_execution") is True
+    assert core.store.is_engine_v2_execution_job(result["job_id"]) is True
 
 
 def test_tls_dispatch_timeout_marks_job_failed(tmp_path, monkeypatch) -> None:
