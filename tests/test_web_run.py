@@ -67,7 +67,10 @@ def test_scope_pill_hidden_by_default(page, live_server):
     assert visible is False
 
 
-def test_run_echo_produces_output(page, live_server):
+def test_run_echo_produces_output(page, live_server, monkeypatch):
+    # This legacy page exercises the compatibility path only under explicit
+    # server-side operator opt-in; the shipped UI v2 path is covered separately.
+    monkeypatch.setenv("WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "true")
     _open_run(page, live_server)
     # pick the echo tool from the catalog
     echo_item = page.locator('#run-catalog .tool-item[data-tool-id="echo"]')
