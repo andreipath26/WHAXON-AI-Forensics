@@ -71,7 +71,29 @@ _MANIFEST = CapabilityManifest(
             "target": {"type": "string", "minLength": 1},
             "exit_code": {"type": "integer"},
             "duration_s": {"type": "number", "minimum": 0},
-            "findings": {"type": "array", "maxItems": 16, "items": {"type": "object"}},
+            "findings": {
+                "type": "array",
+                "maxItems": 16,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"enum": ["ssl_cert", "ssl_cert_invalid", "recon_discovered_host"]},
+                        "severity": {"enum": ["info", "medium"]},
+                        "source": {"const": "recon:ssl"},
+                        "data": {"type": "object"},
+                        "raw_line": {"type": "string", "maxLength": MAX_TEXT},
+                        "remediation": {"type": "string", "maxLength": MAX_TEXT},
+                        "impact": {"type": "string", "maxLength": MAX_TEXT},
+                        "cvss": {"type": ["number", "null"]},
+                        "cwe": {"type": "string", "maxLength": MAX_TEXT},
+                        "references": {"type": "array", "items": {"type": "string", "maxLength": MAX_TEXT}},
+                        "lookup_hint": {"type": "string", "maxLength": MAX_TEXT},
+                        "request_context": {"type": "object"},
+                    },
+                    "required": sorted(_FINDING_KEYS),
+                    "additionalProperties": False,
+                },
+            },
             "provider_id": {"const": PROVIDER_ID},
             "provider_version": {"const": PROVIDER_VERSION},
             "manifest_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -205,7 +227,7 @@ def _certificate_findings(
         sanitized_sans.append([kind, value])
         if kind == "DNS" and _valid_hostname(value):
             hostname = value.lower().rstrip(".")
-            if hostname != target and hostname not in discovered_hosts:
+            if hostname != target and hostname not in discovered_hosts and len(discovered_hosts) < 12:
                 discovered_hosts.append(hostname)
     data = {
         "host": target,
