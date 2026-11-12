@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 16687)
-Total output lines: 613
-
 # Engine V2 legacy execution inventory
 
 This inventory records Python callsites that invoke `run_tool` or
@@ -191,7 +188,7 @@ execution evidence; deployment-host readiness remains unverified.
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
 | CLI workflow | `whaxon run`, default `whaxon ai`, `recon --engine v2 --plan-id`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, default `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. Recon defaults to the direct `ReconRunner` path; its V2 workflow path is opt-in through `--engine v2 --plan-id`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_recon_v2_cli.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
-| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients | V2 AI/Findings/BAS/Retest/Approvals clients do not call legacy executor, answer, validation or retest mutations. Their legacy history is read-only; proposals and approvals remain separate from submission. Legacy APIs stay available to older clients and are not V2 request/task-owned. |
+| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients; legacy AI execution and `/api/msf/run` require explicit environment opt-in | V2 AI/Findings/BAS/Retest/Approvals clients do not call legacy executor, answer, validation or retest mutations. Their legacy history is read-only; proposals and approvals remain separate from submission. The legacy MSF exploit route is default-denied and separate from V2 lab plan approval; other legacy APIs remain outside V2 request/task ownership. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
 
@@ -339,7 +336,27 @@ test family remain authoritative for side effects and access-control limits.
 | `POST` | `/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke` | `workflow_v2_revoke_approval` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core w…687 tokens truncated…eq>` | `api_validate` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
+| `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/followups` | `workflow_v2_followups` | Evidence-sealed, scope-checked follow-up proposal; optional plan persistence without approval or execution |
+| `POST` | `/api/v2/workflows/<plan_id>/deadline` | `workflow_v2_set_deadline` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/event-ack` | `workflow_v2_event_ack` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/event-inbox` | `workflow_v2_event_inbox` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/events` | `workflow_v2_events` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/evidence` | `workflow_v2_evidence` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_limits` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_set_limits` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/progress` | `workflow_v2_progress` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/rate-limit` | `workflow_v2_set_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/report` | `workflow_v2_plan_report` | Evidence-scoped persisted plan report; never implies release approval |
+| `GET` | `/api/v2/workflows/<plan_id>/audit-snapshot` | `workflow_v2_audit_snapshot` | Read-only lifecycle digest; not an independent anchor |
+| `GET` | `/api/v2/workflows/<plan_id>/readiness` | `workflow_v2_readiness` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/audit-verify` | `workflow_v2_audit_verify` | Compare caller-retained digest without claiming third-party anchoring |
+| `POST` | `/api/v2/workflows/<plan_id>/reconcile` | `workflow_v2_reconcile` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/reconciliation` | `workflow_v2_reconciliation` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |

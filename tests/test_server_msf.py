@@ -242,7 +242,29 @@ def test_msf_modules_when_down(tmp_path, monkeypatch):
 
 # ---------------------------------------------------------------- /api/msf/run (validation only)
 
+def test_msf_run_is_default_denied_without_creating_job(tmp_path, monkeypatch):
+    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
+    fake = FakeMSF(up=True)
+    app, core = _make_app(tmp_path, monkeypatch, fake)
+    before = core.store.history()
+
+    response = app.test_client().post("/api/msf/run", json={
+        "module_type": "exploit",
+        "module_path": "multi/samba/usermap_script",
+        "target": "127.0.0.1",
+        "options": {"RHOSTS": "127.0.0.1"},
+    })
+
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["legacy_execution_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_submitted"] is False
+    assert core.store.history() == before
+
+
 def test_msf_run_missing_module_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/run", json={"module_type": "exploit"})
@@ -251,6 +273,7 @@ def test_msf_run_missing_module_path(tmp_path, monkeypatch):
 
 
 def test_msf_run_bad_module_type(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/run", json={
@@ -262,6 +285,7 @@ def test_msf_run_bad_module_type(tmp_path, monkeypatch):
 
 
 def test_msf_run_out_of_scope_target(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/run", json={
@@ -278,6 +302,7 @@ def test_msf_run_out_of_scope_target(tmp_path, monkeypatch):
 
 def test_msf_run_accepts_in_scope(tmp_path, monkeypatch):
     """Full request accepted. We do not wait for the background thread."""
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     app, _core = _make_app(tmp_path, monkeypatch, fake)
     r = app.test_client().post("/api/msf/run", json={
