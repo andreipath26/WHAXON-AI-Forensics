@@ -7,6 +7,8 @@ import threading
 import time
 from pathlib import Path
 
+_APPROVAL_CANDIDATE_PAGE_SIZE = 256
+
 SCHEMA = """
 -- The engine that owns a job is durable, not a process-local event hint.
 -- Registered V2 jobs must never be dispatched by legacy follow-up rules.
@@ -1249,7 +1251,7 @@ class JobStore:
             raise ValueError("approval queue limit must be between 1 and 1000")
         from .capabilities import requires_network_approval
 
-        page_size = 256
+        page_size = _APPROVAL_CANDIDATE_PAGE_SIZE
         c = self._conn()
 
         def manifest_has_network_effect(manifest_row) -> bool:
