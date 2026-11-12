@@ -121,6 +121,7 @@ class Core:
         # fixed-target lab provider have separate approval-bound contracts.
         from .capabilities import CapabilityRegistry
         from .dns_full_v2 import DnsFullPostureProvider
+        from .headers_v2 import HeadersReconProvider
         from .http_recon_v2 import PassiveHttpsReconProvider
         from .lab_access import MetasploitableLabAccessProvider
         from .providers import (
@@ -131,6 +132,7 @@ class Core:
         )
         from .recon_v2 import PassiveDnsReconProvider
         from .robots_recon_v2 import RobotsReconProvider
+        from .security_txt_v2 import SecurityTxtReconProvider
         from .tls_cert_v2 import TlsCertificateProvider
         self.capabilities = CapabilityRegistry(self.store)
         catalog_provider = CatalogAdapterProvider(
@@ -152,10 +154,16 @@ class Core:
         dns_full_provider = DnsFullPostureProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        headers_recon_provider = HeadersReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         https_recon_provider = PassiveHttpsReconProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
         robots_recon_provider = RobotsReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
+        security_txt_provider = SecurityTxtReconProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
         tls_certificate_provider = TlsCertificateProvider(
@@ -168,8 +176,10 @@ class Core:
             lab_access_provider,
             passive_dns_provider,
             dns_full_provider,
+            headers_recon_provider,
             https_recon_provider,
             robots_recon_provider,
+            security_txt_provider,
             tls_certificate_provider,
         ))
 

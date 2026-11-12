@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 16687)
+Total output lines: 613
+
 # Engine V2 legacy execution inventory
 
 This inventory records Python callsites that invoke `run_tool` or
@@ -45,7 +48,10 @@ reviews, approves, and submits it. Target preview uses the DNS-query scope
 policy and accepts hostnames only; generic target checks retain the stricter
 execution policy. The CLI also provides
 `whaxon workflow plan propose-dns-recon --mission-id M --id P --target HOST`
-with optional `--save`. Neither authoring path dispatches DNS queries.
+with optional `--save`. The recon providers expose fixed-plan proposals for
+headers, robots and `security.txt`; `propose-headers-recon` and
+`propose-security-txt-recon` create pinned, unapproved plans for one fixed HTTPS
+request each. Proposal creation never dispatches network work.
 
 Additional execution actions need their own semantic inventory. CLI passive
 recon and legacy-job CLI/API validate/retest callers still use dedicated legacy
@@ -184,7 +190,7 @@ execution evidence; deployment-host readiness remains unverified.
 
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
-| CLI workflow | `whaxon run`, default `whaxon ai`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| CLI workflow | `whaxon run`, default `whaxon ai`, `recon --engine v2 --plan-id`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, default `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. Recon defaults to the direct `ReconRunner` path; its V2 workflow path is opt-in through `--engine v2 --plan-id`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_recon_v2_cli.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
 | HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients | V2 AI/Findings/BAS/Retest/Approvals clients do not call legacy executor, answer, validation or retest mutations. Their legacy history is read-only; proposals and approvals remain separate from submission. Legacy APIs stay available to older clients and are not V2 request/task-owned. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
@@ -333,27 +339,7 @@ test family remain authoritative for side effects and access-control limits.
 | `POST` | `/api/v2/workflows/<plan_id>/approvals/<approval_id>/revoke` | `workflow_v2_revoke_approval` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/attempts` | `workflow_v2_attempts` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflows/<plan_id>/audit` | `workflow_v2_audit` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/followups` | `workflow_v2_followups` | Evidence-sealed, scope-checked follow-up proposal; optional plan persistence without approval or execution |
-| `POST` | `/api/v2/workflows/<plan_id>/deadline` | `workflow_v2_set_deadline` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/event-ack` | `workflow_v2_event_ack` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/event-inbox` | `workflow_v2_event_inbox` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/events` | `workflow_v2_events` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/evidence` | `workflow_v2_evidence` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_limits` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/limits` | `workflow_v2_set_limits` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/progress` | `workflow_v2_progress` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/rate-limit` | `workflow_v2_set_rate_limit` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/report` | `workflow_v2_plan_report` | Evidence-scoped persisted plan report; never implies release approval |
-| `GET` | `/api/v2/workflows/<plan_id>/audit-snapshot` | `workflow_v2_audit_snapshot` | Read-only lifecycle digest; not an independent anchor |
-| `GET` | `/api/v2/workflows/<plan_id>/readiness` | `workflow_v2_readiness` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/audit-verify` | `workflow_v2_audit_verify` | Compare caller-retained digest without claiming third-party anchoring |
-| `POST` | `/api/v2/workflows/<plan_id>/reconcile` | `workflow_v2_reconcile` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/reconciliation` | `workflow_v2_reconciliation` | Core workflow registry, stores and lifecycle services |
-| `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
+| `POST` | `/api/v2/workflows/<plan_id>/cancel` | `workflow_v2_cancel` | Core w…687 tokens truncated…eq>` | `api_validate` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
@@ -468,7 +454,8 @@ uses the V2 scheduler/policy/provider path synchronously; `workflow plan
 submit-run` plus `serve-requests` uses the durable request queue and supervised
 worker; `whaxon run <tool> <target>` creates a saved plan but does not execute;
 explicit `whaxon run --legacy`, `ai`, `recon`, `validate`, and `retest` remain
-outside V2 task/request ownership. `workflow plan run` is not a legacy runner
+outside V2 task/request ownership. Recon defaults to its direct legacy runner; its V2 path
+requires `--engine v2 --plan-id ID`. `workflow plan run` is not a legacy runner
 dispatch, although it bypasses the durable run-request queue. The top-level
 help omission for `recon` was corrected and is guarded by
 `test_engine_v2_cli_surface.py`.
@@ -573,38 +560,35 @@ The V2 request and its task outcomes may require reconciliation. This boundary
 covers cancellation ownership; it does not migrate the remaining legacy
 execution routes listed above.
 
-## Recon capability parity ledger — 2026-11-11
+## Recon capability parity ledger — 2026-11-12
 
-`whaxon recon` is still a legacy execution boundary. It runs named protocol
+`whaxon recon` defaults to the legacy execution boundary: it runs named protocol
 checks directly in `ReconRunner`, gates the target with `ScopeManager`, then
-publishes legacy `JobStarted`/`JobFindings` events. It does not create a V2
-workflow request, task lease, cancellation record, or sealed V2 evidence.
-These checks must be migrated individually; wrapping `ReconRunner.run()` as a
-single V2 provider would preserve internal threads and legacy event writes
+publishes legacy `JobStarted`/`JobFindings` events. The `--engine v2 --plan-id`
+route accepts only one matching fixed task and dispatches it through an approved
+workflow plan. V2 providers are migrated individually; wrapping `ReconRunner.run()`
+as a single V2 provider would preserve internal threads and legacy event writes
 outside scheduler attempt ownership.
 
 | Legacy check | Current behavior / output contract | V2 capability overlap | Parity |
 | --- | --- | --- | --- |
 | `dns` | Queries A, AAAA, MX, NS, TXT and SOA through dnspython; emits `dns_record` findings and per-query errors. | `dns.records.query` (`dig`) and `dns.records.enumerate` (`dnsrecon`) are admitted fixed-argv catalog providers. Dedicated `dns.recon.passive` provider implemented with fixed inputs and a supervised child process. | Catalog tools remain partial. The dedicated provider preserves the query/finding contract in source, but is not yet test-qualified or wired into the legacy CLI; no recon parity is claimed. |
 | `ssl` | Connects to port 443, checks certificate validity, SANs and expiry; emits certificate/error findings. | No equivalent fixed V2 certificate-inspection provider. | Absent. |
-| `headers` | Fetches the target without following redirects and reports configured security headers missing from the response. | `web.server.audit` (`nikto`) may report overlapping issues. | Not equivalent; no stable header-only check/output contract. |
+| `headers` | Fetches the target (HTTPS first, HTTP fallback) and reports configured security headers missing from the response. | Dedicated `web.recon.headers` provider makes one root-path HTTPS GET, checks pinned scope inside a supervised child, reads only bounded response headers, and persists attempt-linked evidence. | Bounded HTTPS header observations are implemented and covered by focused tests; HTTP fallback and complete legacy parity/release qualification remain open. |
 | `tech` | Detects server/framework markers from HTTP headers and emits technology/port findings. | `web.server.audit` may expose server banners among broader findings. | Not equivalent; no fixed technology-detection contract. |
-| `robots` | Fetches at most 64 KiB from `robots.txt` and `sitemap.xml` without following redirects; emits disallowed paths, sitemap references and up to 100 sitemap URLs. | `web.server.audit` may report some robots/sitemap issues. | Not equivalent; there is no exact bounded parser/output contract. |
-| `security_txt` | Fetches `/.well-known/security.txt`, checks expected fields and expiry, and emits parsed contact/policy findings. | No equivalent fixed V2 provider. | Absent. |
+| `robots` | Fetches at most 64 KiB from `robots.txt` and `sitemap.xml` without following redirects; emits disallowed paths, sitemap references and up to 100 sitemap URLs. | Dedicated `web.recon.robots` V2 provider makes only two fixed HTTPS GETs, checks pinned scope inside a supervised child, bounds parsing/output, and persists attempt-linked evidence. | Bounded provider is implemented and covered by source/tests; full legacy parity/release qualification remains open. |
+| `security_txt` | Fetches `/.well-known/security.txt`, parses recognized RFC 9116 fields, and emits field observations or an informational missing/no-recognized-fields finding; it does not validate `Expires`. | Dedicated `web.recon.security_txt` V2 provider makes one fixed HTTPS GET, checks pinned scope inside a supervised child, bounds headers/body/output, and persists attempt-linked evidence. | Bounded provider is implemented and covered by focused tests; full legacy parity/release qualification remains open. |
 | `cookies` | Fetches the target and audits `Set-Cookie` flags (`Secure`, `HttpOnly`, `SameSite`). | `web.server.audit` may report some cookie issues. | Not equivalent; no stable cookie-only output contract. |
 | `redirects` | Manually follows at most 10 hops, records HTTPS-to-HTTP and cross-origin hops, and stops before contacting a new cross-origin destination. | Generic web providers may encounter redirects but do not expose this exact bounded chain contract. | Not equivalent. |
 | `waf` | Fingerprints known WAF/CDN signatures from response headers and cookies. | No equivalent fixed V2 provider. | Absent. |
-| `dns_full` | Checks CAA, DMARC and SPF posture and emits dedicated policy findings. | The `dig` and `dnsrecon` providers can query DNS but are not this policy analysis. | Partial data-source overlap; behavior and findings are absent. |
+| `dns_full` | Checks CAA, DMARC and SPF posture and emits dedicated policy findings. | Dedicated `dns.recon.full` V2 provider makes only fixed CAA(host), TXT(_dmarc.host), and TXT(host) queries with DNS-query scope checks and bounded child execution. | Bounded provider is implemented and covered by focused tests; complete legacy parity/release qualification remains open. |
 
 The legacy HTTP helpers use short per-request socket timeouts, and the DNS
 resolver has a timeout setting. However, `ReconRunner` waits for its
 `ThreadPoolExecutor` context to close; a scheduler timeout cannot guarantee
 that a stuck Python thread has stopped. A V2 implementation therefore needs
 hard-bounded execution ownership (for example, a supervised worker process)
-before it can claim durable cancellation. The first code migration must select
-one check, pin its inputs and output schema, recheck scope through the V2
-workflow path, and record its result in attempt-linked sealed evidence. The
-two DNS catalog capabilities are partial overlap, not recon parity. The first
+before it can claim durable cancellation. The implemented headers, robots, security.txt, and dns_full providers select fixed inputs, recheck scope in supervised workers, and record results in attempt-linked evidence. Their broader release qualification remains open; absent checks still require separate migrations. The two DNS catalog capabilities are partial overlap, not recon parity. The first
 `dns.recon.passive` implementation requires an explicit hostname scope rule
 when IP/CIDR rules are configured; Core preflight avoids uncancellable DNS
 resolution, then the provider repeats the full scope decision in its supervised

@@ -173,4 +173,4 @@ def test_v2_recon_cli_rejects_robots_plan_with_dynamic_inputs_before_dispatch(
 
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "fixed DNS, TLS, or HTTPS task" in capsys.readouterr().err
+    assert "fixed DNS, TLS, HTTPS, headers, robots, or security.txt task" in capsys.readouterr().err
