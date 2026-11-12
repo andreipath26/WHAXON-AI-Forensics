@@ -67,26 +67,21 @@ def test_scope_pill_hidden_by_default(page, live_server):
     assert visible is False
 
 
-def test_run_echo_produces_output(page, live_server, monkeypatch):
-    # This legacy page exercises the compatibility path only under explicit
-    # server-side operator opt-in; the shipped UI v2 path is covered separately.
-    monkeypatch.setenv("WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "true")
+def test_legacy_run_page_shows_v2_migration_guidance(page, live_server):
     _open_run(page, live_server)
-    # pick the echo tool from the catalog
     echo_item = page.locator('#run-catalog .tool-item[data-tool-id="echo"]')
     assert echo_item.count() == 1, "echo tool not in catalog"
     echo_item.click()
     page.fill("#run-target", "127.0.0.1")
     page.click("#run-btn")
-    # the SSE stream should produce at least one line, then finish
     page.wait_for_function(
-        "() => document.getElementById('run-output').textContent.includes('finished')",
-        timeout=15000,
+        "() => document.getElementById('run-output').textContent.includes('/api/v2/workflows')",
+        timeout=8000,
     )
     output = page.locator("#run-output").text_content()
-    assert len(output) > 0
-    # job id should be populated
-    assert "Job" in page.locator("#run-job-id").text_content()
+    assert "Legacy direct tool execution is disabled" in output
+    assert "/api/v2/workflows/<plan_id>/run" in output
+    assert "No job running" in page.locator("#run-job-id").text_content()
 
 
 def test_run_out_of_scope_shows_error(page, live_server):
