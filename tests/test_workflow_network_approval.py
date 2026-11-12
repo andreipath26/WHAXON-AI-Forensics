@@ -256,12 +256,12 @@ def test_core_dns_and_pinned_preflights_do_not_resolve_hostname(
         scope_mode=scope_mode,
     )
 
+    from types import SimpleNamespace
+
     class _Bindings:
         def resolve_task(self, _task, *, require_installed):
             assert require_installed is True
             return SimpleNamespace(manifest=manifest)
-
-    from types import SimpleNamespace
 
     core.providers = _Bindings()
     task = WorkflowTask(
