@@ -508,10 +508,21 @@ class ScopeManager:
         for rule in self._in:
             if _rule_matches_host(rule, host):
                 return ScopeMatch(True, "matches explicit in-scope hostname rule", rule)
-        if any(_is_ip_rule(rule) for rule in (*self._in, *self._out)):
+        ip_in_rules = [rule for rule in self._in if _is_ip_rule(rule)]
+        if ip_in_rules:
+            # This is only a scheduler preflight. The supervised provider
+            # must call resolve_for_execution and prove that every returned
+            # numeric address matches these rules before connecting.
+            return ScopeMatch(
+                True,
+                "hostname requires child-side pinned address scope validation",
+                host,
+                overridable=False,
+            )
+        if any(_is_ip_rule(rule) for rule in self._out):
             return ScopeMatch(
                 False,
-                "pinned hostname execution requires an explicit hostname scope rule",
+                "pinned hostname execution requires an in-scope hostname or IP rule",
                 host,
                 overridable=False,
             )
