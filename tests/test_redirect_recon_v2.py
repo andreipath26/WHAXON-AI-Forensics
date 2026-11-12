@@ -117,6 +117,16 @@ def test_worker_reports_same_origin_first_hop_without_following(monkeypatch):
     assert "private" not in json.dumps(finding)
 
 
+def test_equivalent_ipv6_text_forms_are_same_origin():
+    finding = redirects._make_observation(
+        "2001:db8::1", 302,
+        "https://[2001:0db8:0000:0000:0000:0000:0000:0001]/next",
+    ).to_dict()
+    assert finding["data"]["cross_origin"] is False
+    assert finding["data"]["https_downgrade"] is False
+    assert redirects._decode([finding], "2001:db8::1")[0].kind == "redirect_observation"
+
+
 def test_non_redirect_location_is_observed_but_not_classified(monkeypatch):
     response = _Response(200, [("Location", "http://outside.test/next?secret=1")])
     _scope, connection, payloads = _run_worker(monkeypatch, response)

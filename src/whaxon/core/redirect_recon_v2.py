@@ -57,7 +57,10 @@ _MANIFEST = CapabilityManifest(
     scope_mode="pinned_network",
     target_types=("hostname", "ip"),
     permissions=("network.scan",),
-    side_effects=("https_requests", "network_traffic", "target_service_logs"),
+    side_effects=(
+        "dns_queries", "resolver_logs", "https_requests",
+        "network_traffic", "target_service_logs",
+    ),
     impact="moderate",
     readiness="registered",
     timeout_s=PROCESS_TIMEOUT_S,
@@ -111,7 +114,12 @@ def _origin(scheme: str, host: str, port: int | None) -> tuple[str, str, int]:
     normalized_scheme = scheme.lower()
     if port is None:
         port = 443 if normalized_scheme == "https" else 80
-    return normalized_scheme, host.rstrip(".").lower(), port
+    normalized_host = host.rstrip(".").lower()
+    try:
+        normalized_host = ipaddress.ip_address(host).compressed
+    except ValueError:
+        pass
+    return normalized_scheme, normalized_host, port
 
 
 def _display_location(root_url: str, raw_location: str) -> tuple[str, bool, bool]:
