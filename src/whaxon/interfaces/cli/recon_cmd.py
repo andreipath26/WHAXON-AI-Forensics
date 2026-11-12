@@ -7,6 +7,7 @@ from pathlib import Path
 
 from whaxon.core import Core
 from whaxon.core.dns_full_v2 import CAPABILITY_ID as DNS_FULL_CAPABILITY_ID
+from whaxon.core.http_recon_v2 import CAPABILITY_ID as HTTPS_RECON_CAPABILITY_ID
 from whaxon.core.recon_v2 import CAPABILITY_ID
 
 EXIT_OK = 0
@@ -108,13 +109,15 @@ def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
 
     task = tasks[0]
     if (
-        task.get("capability_id") not in {CAPABILITY_ID, DNS_FULL_CAPABILITY_ID}
+        task.get("capability_id") not in {
+            CAPABILITY_ID, DNS_FULL_CAPABILITY_ID, HTTPS_RECON_CAPABILITY_ID,
+        }
         or task.get("target") != target
         or task.get("inputs") != {}
         or task.get("depends_on", []) != []
     ):
         print(
-            "V2 recon plan must contain one fixed DNS task matching the target",
+            "V2 recon plan must contain one fixed DNS or HTTPS task matching the target",
             file=sys.stderr,
         )
         return EXIT_USAGE
@@ -161,7 +164,7 @@ def _usage() -> None:
         "       whaxon recon <target> --engine v2 --plan-id ID [--data DIR]\n"
         "\n"
         "  Runs passive recon checks against <target>. Target must be in scope.\n"
-        "  V2 requires one persisted passive-DNS plan with exact approval.\n"
+        "  V2 requires one persisted fixed DNS or HTTPS-recon plan with exact approval.\n"
         "\n"
         "  Available checks:\n"
         "    dns        A/AAAA/MX/NS/TXT/SOA records\n"

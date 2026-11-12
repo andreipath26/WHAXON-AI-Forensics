@@ -121,6 +121,7 @@ class Core:
         # fixed-target lab provider have separate approval-bound contracts.
         from .capabilities import CapabilityRegistry
         from .dns_full_v2 import DnsFullPostureProvider
+        from .http_recon_v2 import PassiveHttpsReconProvider
         from .lab_access import MetasploitableLabAccessProvider
         from .providers import (
             BoundProviderRouter,
@@ -149,6 +150,9 @@ class Core:
         dns_full_provider = DnsFullPostureProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        https_recon_provider = PassiveHttpsReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
@@ -156,6 +160,7 @@ class Core:
             lab_access_provider,
             passive_dns_provider,
             dns_full_provider,
+            https_recon_provider,
         ))
 
     def _wire_store(self) -> None:
