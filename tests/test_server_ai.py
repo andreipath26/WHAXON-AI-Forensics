@@ -62,17 +62,22 @@ def test_ai_run_missing_goal(tmp_path, monkeypatch):
     assert "goal required" in r.get_json()["error"]
 
 
-def test_ai_run_accepts_goal(tmp_path, monkeypatch):
+def test_ai_run_requires_operator_opt_in_and_points_to_v2(tmp_path, monkeypatch):
     app, core = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().post("/api/ai/run", json={"goal": "scan 127.0.0.1"})
-    assert r.status_code == 202
-    data = r.get_json()
-    assert "run_id" in data
-    assert data["run_id"].startswith("ai-")
-    # The store should have the run registered.
-    stored = core.store.get_ai_run(data["run_id"])
-    assert stored is not None
-    assert stored["goal"] == "scan 127.0.0.1"
+    response = app.test_client().post(
+        "/api/ai/run", json={
+            "goal": "scan 127.0.0.1",
+            "legacy_execution_enabled": True,
+        },
+    )
+    assert response.status_code == 410
+    data = response.get_json()
+    assert data["legacy_execution_enabled"] is False
+    assert data["v2_proposal_endpoint"] == "/api/v2/ai/proposals"
+    assert data["approval_granted"] is False
+    assert data["execution_submitted"] is False
+    assert "mission_id" in data["error"] and "exact target" in data["error"]
+    assert core.store.list_ai_runs() == []
 
 def test_ai_run_requires_a_resolvable_target(tmp_path, monkeypatch):
     app, core = _make_app(tmp_path, monkeypatch)
@@ -157,7 +162,8 @@ def test_ai_run_answer_records_operator_response(tmp_path, monkeypatch):
     assert approvals[0]["user"] == "local"  # JSON-supplied identity is not trusted
 
 
-def test_ai_run_waits_for_real_operator_answer(tmp_path, monkeypatch):
+def test_ai_run_waits_for_real_operator_answer_with_operator_opt_in(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
 
     class FakeExecutor:
