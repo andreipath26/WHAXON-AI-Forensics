@@ -366,6 +366,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[tui,web,dev]"
+          python -m pip install pytest-timeout
 
       - name: Install Playwright Chromium
         run: python -m playwright install --with-deps chromium
@@ -380,7 +381,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: python -m pytest tests/ -vv -ra
+        run: python -m pytest tests/ -vv -ra --timeout=300
 
       - name: Build distributions and validate metadata
         run: |
