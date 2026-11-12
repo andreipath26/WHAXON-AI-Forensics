@@ -889,7 +889,10 @@ class Core:
         from .capabilities import CapabilityUnavailable
 
         try:
-            from .capabilities import CapabilityRequirements
+            from .capabilities import (
+                CapabilityRequirements,
+                requires_network_approval,
+            )
             from .providers import _target_type
 
             bound = getattr(self, "providers", None)
@@ -965,6 +968,7 @@ class Core:
         An approval is never a substitute for scope/provider policy. Revocation,
         expiry, changed task bindings and missing approval all fail closed.
         """
+        from .capabilities import CapabilityManifest, requires_network_approval
         from .workflow import WorkflowPlan, WorkflowTask
 
         # Never authorize an unpersisted or modified task using approval/scope
@@ -988,34 +992,29 @@ class Core:
             if not self.authorize_workflow_task(task):
                 return False
             manifest_lookup = getattr(provider, "manifest_for", None)
+            manifests: tuple[CapabilityManifest, ...]
             if callable(manifest_lookup):
-                manifests = (manifest_lookup(task.capability_id),)
+                manifest = manifest_lookup(task.capability_id)
+                if not isinstance(manifest, CapabilityManifest):
+                    return False
+                manifests = (manifest,)
             else:
                 manifests = tuple(self.capabilities.list(task.capability_id))
             if not manifests or any(
                 manifest.capability_id != task.capability_id for manifest in manifests
             ):
                 return False
-            network_permissions = any(
-                isinstance(permission, str)
-                and permission.partition(".")[0].casefold() == "network"
-                for permission in task.permissions
-            )
-            network_side_effects = any(
-                any(
-                    marker in effect.casefold()
-                    for marker in (
-                        "network", "dns", "resolver", "http", "socket",
-                        "remote_shell", "target_service", "tcp", "udp",
-                    )
-                )
-                for manifest in manifests
-                for effect in manifest.side_effects
+            network_effect = requires_network_approval(
+                task.permissions,
+                (
+                    effect
+                    for manifest in manifests
+                    for effect in manifest.side_effects
+                ),
             )
             approval_required = (
                 task.impact in ("moderate", "high", "critical")
-                or network_permissions
-                or network_side_effects
+                or network_effect
             )
             if approval_required:
                 return self.store.has_valid_workflow_approval(plan_id, task.id) is True

@@ -91,3 +91,52 @@ def test_non_network_read_only_plan_remains_auto_authorized(tmp_path, monkeypatc
     )
 
     assert core.authorize_workflow_task_for_plan("approval-plan", task) is True
+
+
+def test_approval_queue_includes_low_impact_network_candidates_only(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("queue-mission", "Exercise the backend approval candidate service")
+
+    cases = (
+        ("permission-task", "fixture.network_permission", ("network.scan",), (), "low"),
+        ("effect-task", "fixture.network_effect", (), ("network_traffic",), "low"),
+        ("read-only-task", "fixture.read_only", (), (), "read_only"),
+    )
+    for task_id, capability_id, permissions, side_effects, impact in cases:
+        manifest = CapabilityManifest(
+            capability_id=capability_id,
+            provider_id="fixture.approval-queue",
+            provider_version="1.0.0",
+            transports=("local_process",),
+            target_types=("hostname",),
+            permissions=permissions,
+            side_effects=side_effects,
+            impact=impact,
+        )
+        core.capabilities.register(manifest)
+        task = WorkflowTask(
+            id=task_id,
+            capability_id=capability_id,
+            target="example.test",
+            permissions=permissions,
+            impact=impact,
+        )
+        plan = WorkflowPlan(
+            "queue-mission",
+            (task,),
+            metadata={
+                "provider_bindings": {
+                    task_id: {
+                        "provider_id": manifest.provider_id,
+                        "manifest_fingerprint": manifest.fingerprint,
+                    },
+                },
+            },
+        )
+        core.save_workflow_plan(f"plan-{task_id}", plan)
+
+    candidates = core.workflow_approval_queue()
+    candidate_ids = {item["task_key"] for item in candidates}
+
+    assert candidate_ids == {"permission-task", "effect-task"}
+    assert all("permissions_json" not in item and "plan_json" not in item for item in candidates)

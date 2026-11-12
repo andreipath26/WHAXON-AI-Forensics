@@ -1238,25 +1238,58 @@ class JobStore:
             c.close()
 
     def list_workflow_approval_candidates(self, *, limit=100):
-        """Return bounded pending moderate+ tasks for the V2 approval UI."""
+        """Return bounded pending tasks requiring operator consent.
+
+        Candidates include moderate+ impact tasks and lower-impact tasks whose
+        permission or bound provider manifest declares a network effect.
+        """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("approval queue limit must be between 1 and 1000")
+        from .capabilities import requires_network_approval
+
         c = self._conn()
         try:
             rows = c.execute(
                 "SELECT t.plan_id, t.task_key, t.capability_id, t.target, t.impact, "
-                "t.status AS task_status, p.status AS plan_status, p.digest, "
-                "m.id AS mission_id, m.objective "
+                "t.permissions_json, t.status AS task_status, p.status AS plan_status, "
+                "p.digest, p.plan_json, m.id AS mission_id, m.objective "
                 "FROM workflow_tasks t "
                 "JOIN workflow_plans p ON p.id=t.plan_id "
                 "JOIN missions m ON m.id=p.mission_id "
-                "WHERE t.impact IN ('moderate','high','critical') "
-                "AND t.status IN ('pending','blocked') "
+                "WHERE t.status IN ('pending','blocked') "
                 "AND p.status!='cancel_requested' "
-                "ORDER BY t.created_at DESC, t.task_key LIMIT ?",
-                (limit,),
-            ).fetchall()
-            return [dict(row) for row in rows]
+                "ORDER BY t.created_at DESC, t.task_key"
+            )
+            candidates = []
+            for row in rows:
+                if row["impact"] not in ("moderate", "high", "critical"):
+                    permissions = json.loads(row["permissions_json"])
+                    side_effects = ()
+                    if not requires_network_approval(permissions, side_effects):
+                        plan = json.loads(row["plan_json"])
+                        metadata = plan.get("metadata", {})
+                        bindings = metadata.get("provider_bindings", {})
+                        binding = bindings.get(row["task_key"], {})
+                        provider_id = binding.get("provider_id")
+                        fingerprint = binding.get("manifest_fingerprint")
+                        if isinstance(provider_id, str) and isinstance(fingerprint, str):
+                            manifest_row = c.execute(
+                                "SELECT manifest_json FROM capability_manifests "
+                                "WHERE capability_id=? AND provider_id=? AND fingerprint=?",
+                                (row["capability_id"], provider_id, fingerprint),
+                            ).fetchone()
+                            if manifest_row is not None:
+                                manifest = json.loads(manifest_row["manifest_json"])
+                                side_effects = manifest.get("side_effects", ())
+                    if not requires_network_approval(permissions, side_effects):
+                        continue
+                candidate = dict(row)
+                candidate.pop("permissions_json", None)
+                candidate.pop("plan_json", None)
+                candidates.append(candidate)
+                if len(candidates) >= limit:
+                    break
+            return candidates
         finally:
             c.close()
 

@@ -5,6 +5,7 @@ Authorization remains a separate policy decision at execution time.
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 import hashlib
 import json
 import math
@@ -21,6 +22,34 @@ _READINESS = {
     "end_to_end_verified": 4,
 }
 _IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,127}$")
+_NETWORK_EFFECT_MARKERS = (
+    "network", "dns", "resolver", "http", "socket",
+    "remote_shell", "target_service", "tcp", "udp",
+)
+
+
+def requires_network_approval(
+    permissions: Iterable[str], side_effects: Iterable[str],
+) -> bool:
+    """Return whether task metadata includes network access or effects."""
+    if isinstance(permissions, str) or isinstance(side_effects, str):
+        return True
+    try:
+        permission_values = tuple(permissions)
+        effect_values = tuple(side_effects)
+    except TypeError:
+        return True
+    if any(not isinstance(value, str) for value in (*permission_values, *effect_values)):
+        return True
+    return any(
+        permission.partition(".")[0].casefold() == "network"
+        for permission in permission_values
+    ) or any(
+        marker in effect.casefold()
+        for effect in effect_values
+        for marker in _NETWORK_EFFECT_MARKERS
+    )
+
 
 
 class _FrozenDict(dict):
