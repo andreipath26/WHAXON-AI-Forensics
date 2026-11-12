@@ -122,6 +122,7 @@ class Core:
         from .capabilities import CapabilityRegistry
         from .dns_full_v2 import DnsFullPostureProvider
         from .http_recon_v2 import PassiveHttpsReconProvider
+        from .robots_recon_v2 import RobotsReconProvider
         from .lab_access import MetasploitableLabAccessProvider
         from .providers import (
             BoundProviderRouter,
@@ -153,6 +154,9 @@ class Core:
         https_recon_provider = PassiveHttpsReconProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        robots_recon_provider = RobotsReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         self.providers = BoundProviderRouter((
             catalog_provider,
             SemanticOperationProvider(catalog_provider, self.capabilities),
@@ -161,6 +165,7 @@ class Core:
             passive_dns_provider,
             dns_full_provider,
             https_recon_provider,
+            robots_recon_provider,
         ))
 
     def _wire_store(self) -> None:
