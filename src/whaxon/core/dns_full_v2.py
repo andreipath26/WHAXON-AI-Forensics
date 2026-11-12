@@ -29,7 +29,7 @@ from .workflow import WorkflowTask
 
 CAPABILITY_ID = "dns.recon.full"
 PROVIDER_ID = "whaxon.recon.dns_full"
-PROVIDER_VERSION = "1.0.0"
+PROVIDER_VERSION = "1.0.1"
 PROCESS_TIMEOUT_S = 40.0
 _FINDING_KEYS = {
     "kind", "severity", "source", "data", "raw_line", "remediation",
@@ -45,6 +45,7 @@ _MANIFEST = CapabilityManifest(
     provider_id=PROVIDER_ID,
     provider_version=PROVIDER_VERSION,
     transports=(TRANSPORT,),
+    scope_mode="dns_query",
     target_types=("hostname",),
     permissions=("network.scan",),
     side_effects=("dns_queries", "resolver_logs"),

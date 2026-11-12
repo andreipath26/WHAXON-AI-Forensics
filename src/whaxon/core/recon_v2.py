@@ -32,7 +32,7 @@ from .workflow import WorkflowTask
 
 CAPABILITY_ID = "dns.recon.passive"
 PROVIDER_ID = "whaxon.recon.dns"
-PROVIDER_VERSION = "1.0.1"
+PROVIDER_VERSION = "1.0.2"
 TRANSPORT = "isolated_process"
 RECORD_TYPES = ("A", "AAAA", "MX", "NS", "TXT", "SOA")
 PROCESS_TIMEOUT_S = 40.0
@@ -50,6 +50,7 @@ _MANIFEST = CapabilityManifest(
     provider_id=PROVIDER_ID,
     provider_version=PROVIDER_VERSION,
     transports=(TRANSPORT,),
+    scope_mode="dns_query",
     target_types=("hostname",),
     permissions=("network.scan",),
     side_effects=("dns_queries", "resolver_logs"),
