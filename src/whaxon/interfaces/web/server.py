@@ -1353,6 +1353,23 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 "matched_rule": getattr(match, "matched_rule", None),
             }, 403
 
+        legacy_ai_enabled = os.environ.get(
+            "WHAXON_LEGACY_AI_EXECUTION_ENABLED", "false",
+        ).strip().lower() in ("1", "true", "yes")
+        if not legacy_ai_enabled:
+            return {
+                "error": (
+                    "Legacy AI execution is disabled. Use the V2 AI proposal "
+                    "flow at POST /api/v2/ai/proposals; proposals require an "
+                    "operator-supplied mission_id, plan id, goal, and exact target, "
+                    "then separate review, task approval, and durable submission."
+                ),
+                "legacy_execution_enabled": False,
+                "v2_proposal_endpoint": "/api/v2/ai/proposals",
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
+
         run_id = "ai-" + uuid.uuid4().hex[:12]
         core.store.create_ai_run(run_id, goal)
 
