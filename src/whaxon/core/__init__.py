@@ -960,11 +960,12 @@ class Core:
             return False
 
     def authorize_workflow_task_for_plan(self, plan_id: str, task) -> bool:
-        """Enforce exact consent for moderate-impact tasks in persisted plans.
+        """Require exact consent for moderate-impact or network-effect tasks.
 
         An approval is never a substitute for scope/provider policy. Revocation,
         expiry, changed task bindings and missing approval all fail closed.
         """
+        from .capabilities import CapabilityManifest, requires_network_approval
         from .workflow import WorkflowPlan, WorkflowTask
 
         # Never authorize an unpersisted or modified task using approval/scope
@@ -987,7 +988,32 @@ class Core:
                 return False
             if not self.authorize_workflow_task(task):
                 return False
-            if task.impact in ("moderate", "high", "critical"):
+            manifest_lookup = getattr(provider, "manifest_for", None)
+            manifests: tuple[CapabilityManifest, ...]
+            if callable(manifest_lookup):
+                manifest = manifest_lookup(task.capability_id)
+                if not isinstance(manifest, CapabilityManifest):
+                    return False
+                manifests = (manifest,)
+            else:
+                manifests = tuple(self.capabilities.list(task.capability_id))
+            if not manifests or any(
+                manifest.capability_id != task.capability_id for manifest in manifests
+            ):
+                return False
+            network_effect = requires_network_approval(
+                task.permissions,
+                (
+                    effect
+                    for manifest in manifests
+                    for effect in manifest.side_effects
+                ),
+            )
+            approval_required = (
+                task.impact in ("moderate", "high", "critical")
+                or network_effect
+            )
+            if approval_required:
                 return self.store.has_valid_workflow_approval(plan_id, task.id) is True
             return True
         except (ValueError, TypeError, RuntimeError, KeyError):
