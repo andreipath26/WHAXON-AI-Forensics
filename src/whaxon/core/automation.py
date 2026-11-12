@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import threading
 
-from .events import EventBus, JobFindings
+from .events import EventBus, JobFailed, JobFinished, JobFindings
 
 _WEB_SERVICES = {'http', 'http-proxy', 'http-alt', 'https', 'ssl', 'https-alt'}
 _WEB_PORTS = {80, 443, 8000, 8080, 8188, 8180, 8443, 8888, 9000}
@@ -33,6 +33,8 @@ class Automator:
         self.store = store
         self.runner = runner
         self._inflight: set[tuple[str, int]] = set()
+        self._followups_by_source: dict[str, set[str]] = {}
+        self._source_by_followup: dict[str, str] = {}
         self._lock = threading.Lock()
         # V2 ownership is persisted in JobStore, never a bounded in-memory
         # flag that is consumed on the first findings event.
@@ -43,6 +45,8 @@ class Automator:
 
     def attach(self) -> None:
         self.bus.subscribe(JobFindings, self._on_findings)
+        self.bus.subscribe(JobFinished, self._on_followup_terminal)
+        self.bus.subscribe(JobFailed, self._on_followup_terminal)
 
     def _on_findings(self, e: JobFindings) -> None:
         # Missing durable ownership metadata must not be guessed from a
@@ -85,7 +89,27 @@ class Automator:
                 if self._already_ran_nikto(tgt, port):
                     continue
                 self._inflight.add(key)
-            self._queue_nikto(tgt, port, svc)
+            self._queue_nikto(tgt, port, svc, source_job_id=e.job_id)
+
+    def _on_followup_terminal(self, event: JobFinished | JobFailed) -> None:
+        """Drop source tracking once a queued follow-up reaches a terminal state."""
+        with self._lock:
+            source_job_id = self._source_by_followup.pop(event.job_id, None)
+            if source_job_id is None:
+                return
+            followups = self._followups_by_source.get(source_job_id)
+            if followups is not None:
+                followups.discard(event.job_id)
+                if not followups:
+                    self._followups_by_source.pop(source_job_id, None)
+
+    def take_queued_followups(self, source_job_id: str) -> set[str]:
+        """Return and clear pending follow-ups caused by one source job."""
+        with self._lock:
+            followups = self._followups_by_source.pop(source_job_id, set())
+            for followup_id in followups:
+                self._source_by_followup.pop(followup_id, None)
+            return followups
 
     def _already_ran_nikto(self, target: str, port: int) -> bool:
         """True if a nikto job already ran against target:port."""
@@ -98,7 +122,9 @@ class Automator:
             return False
         return False
 
-    def _queue_nikto(self, target: str, port: int, service: str) -> None:
+    def _queue_nikto(
+        self, target: str, port: int, service: str, *, source_job_id: str = "",
+    ) -> str | None:
         """Queue a nikto job as a durable pending row against target:port.
 
         The row survives process exit. A worker (started by any long-lived
@@ -108,10 +134,27 @@ class Automator:
         """
         try:
             if not self.runner.has_tool('nikto'):
-                return
+                return None
         except Exception:
-            return
+            return None
         import uuid
         job_id = uuid.uuid4().hex[:12]
-        self.store.create_pending(job_id, 'nikto', f'{target}:{port}')
+        # Register provenance while holding the same lock used by terminal
+        # cleanup. A fast worker may finish as soon as the durable row exists.
+        with self._lock:
+            if source_job_id:
+                self._followups_by_source.setdefault(source_job_id, set()).add(job_id)
+                self._source_by_followup[job_id] = source_job_id
+            try:
+                self.store.create_pending(job_id, 'nikto', f'{target}:{port}')
+            except Exception:
+                if source_job_id:
+                    self._source_by_followup.pop(job_id, None)
+                    followups = self._followups_by_source.get(source_job_id)
+                    if followups is not None:
+                        followups.discard(job_id)
+                        if not followups:
+                            self._followups_by_source.pop(source_job_id, None)
+                raise
+        return job_id
 
