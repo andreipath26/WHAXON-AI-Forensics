@@ -588,23 +588,24 @@ class ScopeManager:
                     continue
                 raw_ip = str(sockaddr[0])
                 ip_text, separator, zone = raw_ip.partition("%")
-                address = ipaddress.ip_address(ip_text)
-                if (family == socket.AF_INET) != (address.version == 4):
+                resolved_address = ipaddress.ip_address(ip_text)
+                if (family == socket.AF_INET) != (resolved_address.version == 4):
                     continue
                 mapped_ipv4 = (
-                    address.ipv4_mapped
-                    if isinstance(address, ipaddress.IPv6Address)
+                    resolved_address.ipv4_mapped
+                    if isinstance(resolved_address, ipaddress.IPv6Address)
                     else None
                 )
                 if mapped_ipv4 is not None:
                     # An IPv4-mapped IPv6 sockaddr reaches the corresponding
                     # IPv4 host; evaluate it against IPv4 rules and return an
                     # IPv4 sockaddr so the scope check matches the socket peer.
-                    address = mapped_ipv4
+                    resolved_address = mapped_ipv4
                     family = socket.AF_INET
-                canonical_ip = address.compressed
+                address_text = resolved_address.compressed
                 if family == socket.AF_INET:
-                    canonical_sockaddr = (canonical_ip, port)
+                    socket_address_v4: tuple[str, int] = (address_text, port)
+                    canonical_sockaddr = socket_address_v4
                 else:
                     flowinfo = int(sockaddr[2]) if len(sockaddr) > 2 else 0
                     scope_id = int(sockaddr[3]) if len(sockaddr) > 3 else 0
@@ -613,8 +614,11 @@ class ScopeManager:
                         # than its numeric index; never return an unresolved
                         # zone token as a supposedly pinned socket address.
                         continue
-                    socket_ip = canonical_ip + (f"%{zone}" if separator else "")
-                    canonical_sockaddr = (socket_ip, port, flowinfo, scope_id)
+                    socket_ip = address_text + (f"%{zone}" if separator else "")
+                    socket_address_v6: tuple[str, int, int, int] = (
+                        socket_ip, port, flowinfo, scope_id,
+                    )
+                    canonical_sockaddr = socket_address_v6
                 canonical = (
                     family, socket.SOCK_STREAM,
                     int(proto or socket.IPPROTO_TCP), canonical_sockaddr,
@@ -622,8 +626,10 @@ class ScopeManager:
                 if canonical in seen:
                     continue
                 seen.add(canonical)
-                pinned_addresses.append(PinnedSocketAddress(*canonical[:3], canonical[3]))
-                canonical_ips.append(canonical_ip)
+                pinned_addresses.append(PinnedSocketAddress(
+                    canonical[0], canonical[1], canonical[2], canonical[3],
+                ))
+                canonical_ips.append(address_text)
             except (IndexError, TypeError, ValueError, OverflowError):
                 continue
 
@@ -634,8 +640,8 @@ class ScopeManager:
             ))
         if self._enabled:
             for rule in self._out:
-                for address in canonical_ips:
-                    if _rule_matches_ip(rule, address):
+                for address_text in canonical_ips:
+                    if _rule_matches_ip(rule, address_text):
                         return ScopeResolution(ScopeMatch(
                             False, "resolved address matches out-of-scope rule", rule,
                         ))
@@ -645,8 +651,8 @@ class ScopeManager:
             if not host_rule:
                 ip_rules = [rule for rule in self._in if _is_ip_rule(rule)]
                 if not all(
-                    any(_rule_matches_ip(rule, address) for rule in ip_rules)
-                    for address in canonical_ips
+                    any(_rule_matches_ip(rule, address_text) for rule in ip_rules)
+                    for address_text in canonical_ips
                 ):
                     return ScopeResolution(ScopeMatch(
                         False,
@@ -655,7 +661,7 @@ class ScopeManager:
                     ))
                 host_rule = next(
                     (rule for rule in ip_rules
-                     if any(_rule_matches_ip(rule, address) for address in canonical_ips)),
+                     if any(_rule_matches_ip(rule, address_text) for address_text in canonical_ips)),
                     "",
                 )
             match = ScopeMatch(True, "all pinned addresses match scope", host_rule)
