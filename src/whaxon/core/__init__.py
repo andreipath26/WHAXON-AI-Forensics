@@ -130,6 +130,7 @@ class Core:
             SemanticOperationProvider,
         )
         from .recon_v2 import PassiveDnsReconProvider
+        from .robots_recon_v2 import RobotsReconProvider
         from .tls_cert_v2 import TlsCertificateProvider
         self.capabilities = CapabilityRegistry(self.store)
         catalog_provider = CatalogAdapterProvider(
@@ -154,6 +155,9 @@ class Core:
         https_recon_provider = PassiveHttpsReconProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
+        robots_recon_provider = RobotsReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
         tls_certificate_provider = TlsCertificateProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
@@ -165,6 +169,7 @@ class Core:
             passive_dns_provider,
             dns_full_provider,
             https_recon_provider,
+            robots_recon_provider,
             tls_certificate_provider,
         ))
 
