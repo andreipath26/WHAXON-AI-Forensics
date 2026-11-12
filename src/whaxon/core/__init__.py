@@ -131,6 +131,7 @@ class Core:
             SemanticOperationProvider,
         )
         from .recon_v2 import PassiveDnsReconProvider
+        from .redirect_recon_v2 import RedirectObservationProvider
         from .robots_recon_v2 import RobotsReconProvider
         from .security_txt_v2 import SecurityTxtReconProvider
         from .tls_cert_v2 import TlsCertificateProvider
@@ -149,6 +150,9 @@ class Core:
             store=self.store, registry=self.capabilities, scope=self.scope, msf=self.msf,
         )
         passive_dns_provider = PassiveDnsReconProvider(
+            store=self.store, registry=self.capabilities, scope=self.scope,
+        )
+        redirect_observation_provider = RedirectObservationProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
         )
         dns_full_provider = DnsFullPostureProvider(
@@ -175,6 +179,7 @@ class Core:
             verification_provider,
             lab_access_provider,
             passive_dns_provider,
+            redirect_observation_provider,
             dns_full_provider,
             headers_recon_provider,
             https_recon_provider,
