@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 import threading
 
-from .events import EventBus, JobFailed, JobFinished, JobFindings
+from .events import EventBus, JobFailed, JobFindings, JobFinished
 
 _WEB_SERVICES = {'http', 'http-proxy', 'http-alt', 'https', 'ssl', 'https-alt'}
 _WEB_PORTS = {80, 443, 8000, 8080, 8188, 8180, 8443, 8888, 9000}

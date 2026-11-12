@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from whaxon.core.automation import Automator
-from whaxon.core.events import EventBus, JobFailed, JobFinished, JobFindings
+from whaxon.core.events import EventBus, JobFailed, JobFindings, JobFinished
 from whaxon.core.store import JobStore
 
 
