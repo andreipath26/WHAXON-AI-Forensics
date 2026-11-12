@@ -115,10 +115,13 @@ class CapabilityManifest:
     output_schema: dict[str, Any] = field(default_factory=dict)
     limitations: tuple[str, ...] = ()
     schema_version: str = CAPABILITY_SCHEMA_VERSION
+    scope_mode: str = "network"
 
     def __post_init__(self) -> None:
         if self.schema_version != CAPABILITY_SCHEMA_VERSION:
             raise ValueError(f"unsupported capability schema: {self.schema_version}")
+        if not isinstance(self.scope_mode, str) or self.scope_mode not in {"network", "dns_query", "pinned_network"}:
+            raise ValueError(f"unsupported scope mode: {self.scope_mode!r}")
         for name, value in (
             ("capability_id", self.capability_id),
             ("provider_id", self.provider_id),
@@ -152,6 +155,9 @@ class CapabilityManifest:
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
+        # Keep legacy manifest fingerprints stable while the default remains network.
+        if self.scope_mode == "network":
+            value.pop("scope_mode")
         value["input_schema"] = _thaw(self.input_schema)
         value["output_schema"] = _thaw(self.output_schema)
         for name in (
