@@ -248,7 +248,20 @@ def propose_tool_workflow_plan(
         return {"status": "blocked", "reason": f"unknown catalog tool: {tool_id}"}
 
     try:
-        scope = core.scope.check(target)
+        reload_scope = getattr(core.scope, "load", None)
+        if not callable(reload_scope):
+            return {
+                "status": "blocked",
+                "reason": "scope refresh is unavailable; no plan was created",
+            }
+        reload_scope()
+        execution_check = getattr(core.scope, "check_for_execution", None)
+        if not callable(execution_check):
+            return {
+                "status": "blocked",
+                "reason": "execution scope check is unavailable; no plan was created",
+            }
+        scope = execution_check(target)
     except Exception:
         return {"status": "blocked", "reason": "scope evaluation failed; no plan was created"}
     if not getattr(scope, "allowed", False):

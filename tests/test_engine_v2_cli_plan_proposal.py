@@ -1,6 +1,9 @@
+import json
+import socket
 from types import SimpleNamespace
 
-from whaxon.core import workflow_proposals
+from whaxon.core import Core, workflow_proposals
+from whaxon.core.scope import ScopeManager
 from whaxon.core.workflow import WorkflowPlan
 from whaxon.interfaces.cli import workflow_cmd
 
@@ -11,18 +14,26 @@ class _Core:
         self.resolved = []
         self.store = SimpleNamespace(get_mission=lambda mission_id: {"id": mission_id})
         self.catalog = SimpleNamespace(get=lambda tool_id: {"id": tool_id})
-        self.scope = SimpleNamespace(check=lambda target: SimpleNamespace(
-            allowed=allowed, reason="blocked by scope",
-        ))
+        self.scope = SimpleNamespace(
+            load=lambda: None,
+            check=lambda target: SimpleNamespace(allowed=allowed, reason="blocked by scope"),
+            check_for_execution=lambda target: SimpleNamespace(
+                allowed=allowed, reason="blocked by scope",
+            ),
+        )
         self.manifest = SimpleNamespace(
             capability_id="network.services.discover", provider_id="whaxon.local.nmap",
             fingerprint="manifest-sha256", impact="moderate",
             input_schema={"properties": {}, "required": [], "additionalProperties": False},
             permissions=("network.scan",), timeout_s=90,
         )
+        def resolve_task(task, **kwargs):
+            self.resolved.append((task, kwargs))
+            return SimpleNamespace(manifest=self.manifest)
+
         self.providers = SimpleNamespace(
             manifest_for=lambda capability_id: self.manifest,
-            resolve_task=lambda task, **kwargs: self.resolved.append((task, kwargs)),
+            resolve_task=resolve_task,
         )
         self.capability_inventory = lambda: [{
             "capability_id": "network.services.discover", "provider_id": "whaxon.local.nmap",
@@ -53,6 +64,101 @@ def test_tool_proposal_is_fixed_argument_and_provider_pinned():
     }
     assert len(core.resolved) == 1
     assert core.saved == []
+
+
+def _write_scope(path, in_scope, out_scope=()):
+    path.write_text(json.dumps({
+        "engagement": "proposal-scope-test",
+        "enabled": True,
+        "in_scope": in_scope,
+        "out_of_scope": list(out_scope),
+        "notes": "",
+    }), encoding="utf-8")
+
+
+def test_tool_proposal_allows_hostname_only_scope(tmp_path):
+    core = _Core()
+    scope_path = tmp_path / "scope.json"
+    _write_scope(scope_path, ["example.test"])
+    core.scope = ScopeManager(scope_path)
+
+    proposal = workflow_proposals.propose_tool_workflow_plan(
+        core, mission_id="mission-1", plan_id="plan-hostname",
+        tool_id="nmap", target="example.test",
+    )
+
+    assert proposal["status"] == "proposed"
+
+
+def test_tool_proposal_reloads_scope_after_external_revocation(tmp_path):
+    core = _Core()
+    scope_path = tmp_path / "scope.json"
+    _write_scope(scope_path, ["example.test"])
+    core.scope = ScopeManager(scope_path)
+    _write_scope(scope_path, [])
+
+    proposal = workflow_proposals.propose_tool_workflow_plan(
+        core, mission_id="mission-1", plan_id="plan-revoked-scope",
+        tool_id="nmap", target="example.test",
+    )
+
+    assert proposal["status"] == "blocked"
+    assert "outside current scope" in proposal["reason"]
+    assert core.resolved == []
+
+
+def test_tool_proposal_blocks_hostname_under_mixed_ip_cidr_scope(
+    tmp_path, monkeypatch,
+):
+    core = _Core()
+    scope_path = tmp_path / "scope.json"
+    _write_scope(scope_path, ["example.test", "192.0.2.0/24"])
+    core.scope = ScopeManager(scope_path)
+    monkeypatch.setattr(
+        "whaxon.core.scope.socket.getaddrinfo",
+        lambda *_args, **_kwargs: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.10", 0)),
+        ],
+    )
+
+    proposal = workflow_proposals.propose_tool_workflow_plan(
+        core, mission_id="mission-1", plan_id="plan-mixed-scope",
+        tool_id="nmap", target="example.test",
+    )
+
+    assert proposal["status"] == "blocked"
+    assert "cannot be safely DNS-pinned" in proposal["reason"]
+    assert core.resolved == []
+
+
+def test_tool_proposal_allows_in_scope_ip_literal(tmp_path):
+    core = _Core()
+    scope_path = tmp_path / "scope.json"
+    _write_scope(scope_path, ["192.0.2.0/24"])
+    core.scope = ScopeManager(scope_path)
+
+    proposal = workflow_proposals.propose_tool_workflow_plan(
+        core, mission_id="mission-1", plan_id="plan-ip",
+        tool_id="nmap", target="192.0.2.10",
+    )
+
+    assert proposal["status"] == "proposed"
+
+
+def test_workflow_authorization_reloads_scope_revoked_after_proposal(tmp_path):
+    core = _Core()
+    scope_path = tmp_path / "scope.json"
+    _write_scope(scope_path, ["192.0.2.10"])
+    core.scope = ScopeManager(scope_path)
+    proposal = workflow_proposals.propose_tool_workflow_plan(
+        core, mission_id="mission-1", plan_id="plan-revoked",
+        tool_id="nmap", target="192.0.2.10",
+    )
+    assert proposal["status"] == "proposed"
+    task = WorkflowPlan.from_dict(proposal["plan"]).tasks[0]
+
+    _write_scope(scope_path, [])
+    assert Core.authorize_workflow_task(core, task) is False
 
 
 def test_tool_proposal_blocks_out_of_scope_target():
