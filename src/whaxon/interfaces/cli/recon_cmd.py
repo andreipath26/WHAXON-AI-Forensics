@@ -7,9 +7,9 @@ from pathlib import Path
 
 from whaxon.core import Core
 from whaxon.core.dns_full_v2 import CAPABILITY_ID as DNS_FULL_CAPABILITY_ID
+from whaxon.core.http_recon_v2 import CAPABILITY_ID as HTTPS_RECON_CAPABILITY_ID
 from whaxon.core.recon_v2 import CAPABILITY_ID
 from whaxon.core.tls_cert_v2 import CAPABILITY_ID as TLS_CERT_CAPABILITY_ID
-from whaxon.core.http_recon_v2 import CAPABILITY_ID as HTTPS_RECON_CAPABILITY_ID
 
 EXIT_OK = 0
 EXIT_OUT_OF_SCOPE = 1
