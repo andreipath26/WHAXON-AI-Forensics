@@ -1247,6 +1247,7 @@ class JobStore:
             raise ValueError("approval queue limit must be between 1 and 1000")
         from .capabilities import requires_network_approval
 
+        scan_limit = min(10_000, max(limit * 10, 100))
         c = self._conn()
         try:
             rows = c.execute(
@@ -1258,7 +1259,8 @@ class JobStore:
                 "JOIN missions m ON m.id=p.mission_id "
                 "WHERE t.status IN ('pending','blocked') "
                 "AND p.status!='cancel_requested' "
-                "ORDER BY t.created_at DESC, t.task_key"
+                "ORDER BY t.created_at DESC, t.task_key LIMIT ?",
+                (scan_limit,),
             )
             candidates = []
             for row in rows:

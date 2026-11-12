@@ -135,8 +135,9 @@ def test_approval_queue_includes_low_impact_network_candidates_only(tmp_path):
         )
         core.save_workflow_plan(f"plan-{task_id}", plan)
 
-    candidates = core.workflow_approval_queue()
+    candidates = core.workflow_approval_queue(limit=2)
     candidate_ids = {item["task_key"] for item in candidates}
 
     assert candidate_ids == {"permission-task", "effect-task"}
+    assert len(core.workflow_approval_queue(limit=1)) == 1
     assert all("permissions_json" not in item and "plan_json" not in item for item in candidates)
