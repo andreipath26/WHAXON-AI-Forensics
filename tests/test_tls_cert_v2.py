@@ -176,6 +176,43 @@ def test_tls_worker_denies_mixed_scope_resolution_before_any_socket(monkeypatch,
     assert captured.payload["status"] == "scope_denied"
 
 
+
+def test_real_scope_rejects_mixed_in_and_out_of_scope_dns_answers_before_connect(
+    tmp_path, monkeypatch,
+) -> None:
+    from whaxon.core.scope import ScopeManager
+
+    scope_path = tmp_path / "scope.json"
+    scope_path.write_text(json.dumps({
+        "engagement": "mixed-dns-test",
+        "enabled": True,
+        "in_scope": [HOST, "192.0.2.0/24"],
+        "out_of_scope": ["198.51.100.0/24"],
+        "notes": "",
+    }), encoding="utf-8")
+    answers = [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("192.0.2.10", 443)),
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("198.51.100.20", 443)),
+    ]
+    resolve_calls = []
+    monkeypatch.setattr(
+        "whaxon.core.scope.socket.getaddrinfo",
+        lambda *args, **kwargs: (resolve_calls.append((args, kwargs)) or answers),
+    )
+    monkeypatch.setattr(
+        "whaxon.core.tls_cert_v2.socket.socket",
+        lambda *_args: pytest.fail("socket opened after one DNS answer was out of scope"),
+    )
+    captured = _Capture()
+
+    _tls_cert_worker(captured, HOST, str(scope_path))
+
+    assert len(resolve_calls) == 1
+    assert resolve_calls[0][0][0] == HOST
+    assert resolve_calls[0][0][1] == 443
+    assert captured.payload["status"] == "scope_denied"
+
+
 def test_tls_hostname_verification_failure_retries_same_pinned_ip_and_sni(monkeypatch) -> None:
     connects: list[tuple[str, int]] = []
     sni: list[str] = []
@@ -192,6 +229,9 @@ def test_tls_hostname_verification_failure_retries_same_pinned_ip_and_sni(monkey
             pass
 
     class _VerifiedContext:
+        check_hostname = True
+        verify_mode = ssl.CERT_REQUIRED
+
         def wrap_socket(self, _raw, *, server_hostname: str):
             sni.append(server_hostname)
             raise ssl.SSLCertVerificationError("hostname mismatch")
@@ -294,7 +334,7 @@ def test_tls_dispatch_persists_sealed_evidence_and_marks_job_v2(tmp_path, monkey
 
     assert result["exit_code"] == 0
     assert [finding["kind"] for finding in stored] == ["ssl_cert", "recon_discovered_host"]
-    assert job is not None
+    assert job is not None and job["status"] == "finished"
     assert core.store.is_engine_v2_execution_job(result["job_id"]) is True
 
 
