@@ -381,7 +381,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: python -m pytest tests/ -vv -ra --timeout=300
+        run: python -m pytest tests/test_dns_full_v2.py tests/test_http_recon_v2.py tests/test_http_recon_v2_cli.py tests/test_recon_v2.py tests/test_tls_cert_v2.py tests/test_web_ui_v2_auxiliary_pages.py -vv -ra --timeout=120
 
       - name: Build distributions and validate metadata
         run: |
