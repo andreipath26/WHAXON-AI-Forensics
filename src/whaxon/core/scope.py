@@ -47,7 +47,6 @@ class ScopeMatch:
                 "matched_rule": self.matched_rule}
 
 
-
 @dataclass(frozen=True)
 class PinnedSocketAddress:
     """One numeric socket destination, with no hostname left to re-resolve."""
@@ -477,7 +476,6 @@ class ScopeManager:
             )
         return checked
 
-
     def check_for_pinned_execution(self, raw_target: str) -> ScopeMatch:
         """Perform a non-resolving preflight for a provider that pins its connect.
 
@@ -485,7 +483,11 @@ class ScopeManager:
         connecting; this preflight only admits an explicit hostname rule (or
         an in-scope IP literal) and never performs DNS on the scheduler thread.
         """
-        if not isinstance(raw_target, str) or not raw_target:
+        if (
+            not isinstance(raw_target, str)
+            or not raw_target
+            or raw_target != raw_target.strip()
+        ):
             return ScopeMatch(False, "invalid pinned execution target")
         host, kind = _normalize_target(raw_target)
         if not host or kind not in {"host", "ip"}:
@@ -632,7 +634,6 @@ class ScopeManager:
         else:
             match = ScopeMatch(True, "scope disabled")
         return ScopeResolution(match, tuple(pinned_addresses))
-
 
     def check_for_dns_query(self, raw_target: str) -> ScopeMatch:
         """Preflight a passive DNS query without resolving the name here.
