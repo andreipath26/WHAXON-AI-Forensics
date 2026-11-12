@@ -47,6 +47,36 @@ class ScopeMatch:
                 "matched_rule": self.matched_rule}
 
 
+@dataclass(frozen=True)
+class PinnedSocketAddress:
+    """One numeric socket destination, with no hostname left to re-resolve."""
+
+    family: int
+    socktype: int
+    proto: int
+    sockaddr: tuple
+
+
+@dataclass(frozen=True)
+class ScopeResolution:
+    """Scope decision and canonical numeric destinations for a pinned connect."""
+
+    match: ScopeMatch
+    addresses: tuple[PinnedSocketAddress, ...] = ()
+
+    @property
+    def allowed(self) -> bool:
+        return self.match.allowed
+
+    @property
+    def reason(self) -> str:
+        return self.match.reason
+
+    @property
+    def matched_rule(self) -> str:
+        return self.match.matched_rule
+
+
 class OutOfScopeError(RuntimeError):
     """Raised when a target is outside the declared scope and no override was given."""
     def __init__(
@@ -445,6 +475,207 @@ class ScopeManager:
                 overridable=False,
             )
         return checked
+
+    def check_for_pinned_execution(self, raw_target: str) -> ScopeMatch:
+        """Perform a non-resolving preflight for a provider that pins its connect.
+
+        A bounded child must still call :meth:`resolve_for_execution` before
+        connecting. This preflight admits explicit hostname rules, in-scope IP
+        literals, or hostname targets with positive IP scope rules for child-side
+        validation; it never performs DNS on the scheduler thread.
+        """
+        if (
+            not isinstance(raw_target, str)
+            or not raw_target
+            or raw_target != raw_target.strip()
+        ):
+            return ScopeMatch(False, "invalid pinned execution target")
+        host, kind = _normalize_target(raw_target)
+        if not host or kind not in {"host", "ip"}:
+            return ScopeMatch(False, "pinned execution requires a bare hostname or IP")
+        if kind == "host" and raw_target.strip().lower().rstrip(".") != host:
+            return ScopeMatch(False, "pinned execution requires a bare hostname")
+        if kind == "ip" and raw_target.strip() != host:
+            return ScopeMatch(False, "pinned execution requires a bare IP literal")
+        if not self._enabled:
+            return ScopeMatch(True, "scope disabled")
+        for rule in self._out:
+            if _rule_matches_host(rule, host) or (
+                kind == "ip" and _rule_matches_ip(rule, host)
+            ):
+                return ScopeMatch(False, "matches out-of-scope rule", rule)
+        if kind == "ip":
+            return self.check(raw_target)
+        for rule in self._in:
+            if _rule_matches_host(rule, host):
+                return ScopeMatch(True, "matches explicit in-scope hostname rule", rule)
+        ip_in_rules = [rule for rule in self._in if _is_ip_rule(rule)]
+        if ip_in_rules:
+            # This is only a scheduler preflight. The supervised provider
+            # must call resolve_for_execution and prove that every returned
+            # numeric address matches these rules before connecting.
+            return ScopeMatch(
+                True,
+                "hostname requires child-side pinned address scope validation",
+                host,
+                overridable=False,
+            )
+        if any(_is_ip_rule(rule) for rule in self._out):
+            return ScopeMatch(
+                False,
+                "pinned hostname execution requires an in-scope hostname or IP rule",
+                host,
+                overridable=False,
+            )
+        return ScopeMatch(False, "no matching in-scope hostname rule", host)
+
+    def resolve_for_execution(
+        self, raw_target: str, *, port: int,
+    ) -> ScopeResolution:
+        """Resolve once, scope-check every answer, and return numeric socket targets.
+
+        Call this inside the provider's supervised child immediately before a
+        network connection. The returned sockaddr values contain numeric IPs,
+        so the caller can connect without asking the resolver a second time.
+        """
+        if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+            return ScopeResolution(ScopeMatch(False, "pinned execution port is invalid"))
+        preflight = self.check_for_pinned_execution(raw_target)
+        if not preflight.allowed:
+            return ScopeResolution(preflight)
+        host, kind = _normalize_target(raw_target)
+        if kind == "ip":
+            address = ipaddress.ip_address(host)
+            if address.version == 4:
+                pinned = PinnedSocketAddress(
+                    socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP,
+                    (address.compressed, port),
+                )
+            else:
+                pinned = PinnedSocketAddress(
+                    socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP,
+                    (address.compressed, port, 0, 0),
+                )
+            return ScopeResolution(preflight, (pinned,))
+
+        try:
+            answers = socket.getaddrinfo(
+                host, port, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM,
+                proto=socket.IPPROTO_TCP,
+            )
+        except (OSError, UnicodeError, ValueError) as exc:
+            return ScopeResolution(ScopeMatch(
+                False,
+                "hostname resolution failed; scope cannot be confirmed "
+                f"({type(exc).__name__})",
+                host,
+            ))
+        pinned_addresses: list[PinnedSocketAddress] = []
+        canonical_ips: list[str] = []
+        seen: set[tuple] = set()
+        for answer in answers:
+            try:
+                family, socktype, proto, _canonname, sockaddr = answer
+                if family not in (socket.AF_INET, socket.AF_INET6):
+                    continue
+                if (
+                    socktype not in (0, socket.SOCK_STREAM)
+                    or proto not in (0, socket.IPPROTO_TCP)
+                    or not isinstance(sockaddr, tuple)
+                ):
+                    continue
+                if len(sockaddr) < 2 or int(sockaddr[1]) != port:
+                    continue
+                raw_ip = str(sockaddr[0])
+                ip_text, separator, zone = raw_ip.partition("%")
+                resolved_address = ipaddress.ip_address(ip_text)
+                if (family == socket.AF_INET) != (resolved_address.version == 4):
+                    continue
+                mapped_ipv4 = (
+                    resolved_address.ipv4_mapped
+                    if isinstance(resolved_address, ipaddress.IPv6Address)
+                    else None
+                )
+                if mapped_ipv4 is not None:
+                    # An IPv4-mapped IPv6 sockaddr reaches the corresponding
+                    # IPv4 host; evaluate it against IPv4 rules and return an
+                    # IPv4 sockaddr so the scope check matches the socket peer.
+                    resolved_address = mapped_ipv4
+                    family = socket.AF_INET
+                address_text = resolved_address.compressed
+                if family == socket.AF_INET:
+                    socket_address_v4: tuple[str, int] = (address_text, port)
+                    pinned = PinnedSocketAddress(
+                        family, socket.SOCK_STREAM,
+                        int(proto or socket.IPPROTO_TCP), socket_address_v4,
+                    )
+                    socket_ip = address_text
+                    flowinfo = 0
+                    scope_id = 0
+                else:
+                    flowinfo = int(sockaddr[2]) if len(sockaddr) > 2 else 0
+                    scope_id = int(sockaddr[3]) if len(sockaddr) > 3 else 0
+                    if separator and not scope_id:
+                        # getaddrinfo may preserve an interface name rather
+                        # than its numeric index; never return an unresolved
+                        # zone token as a supposedly pinned socket address.
+                        continue
+                    socket_ip = address_text + (f"%{zone}" if separator else "")
+                    socket_address_v6: tuple[str, int, int, int] = (
+                        socket_ip, port, flowinfo, scope_id,
+                    )
+                    pinned = PinnedSocketAddress(
+                        family, socket.SOCK_STREAM,
+                        int(proto or socket.IPPROTO_TCP), socket_address_v6,
+                    )
+                canonical = (
+                    family, socket.SOCK_STREAM,
+                    int(proto or socket.IPPROTO_TCP), socket_ip,
+                    port, flowinfo, scope_id,
+                )
+                if canonical in seen:
+                    continue
+                seen.add(canonical)
+                pinned_addresses.append(pinned)
+                canonical_ips.append(address_text)
+            except (IndexError, TypeError, ValueError, OverflowError):
+                continue
+
+        if not pinned_addresses:
+            return ScopeResolution(ScopeMatch(
+                False, "hostname resolved to no usable socket addresses; scope cannot be confirmed",
+                host,
+            ))
+        if self._enabled:
+            for rule in self._out:
+                for address_text in canonical_ips:
+                    if _rule_matches_ip(rule, address_text):
+                        return ScopeResolution(ScopeMatch(
+                            False, "resolved address matches out-of-scope rule", rule,
+                        ))
+            host_rule = next(
+                (rule for rule in self._in if _rule_matches_host(rule, host)), "",
+            )
+            if not host_rule:
+                ip_rules = [rule for rule in self._in if _is_ip_rule(rule)]
+                if not all(
+                    any(_rule_matches_ip(rule, address_text) for rule in ip_rules)
+                    for address_text in canonical_ips
+                ):
+                    return ScopeResolution(ScopeMatch(
+                        False,
+                        "not every resolved address matches an in-scope rule",
+                        host,
+                    ))
+                host_rule = next(
+                    (rule for rule in ip_rules
+                     if any(_rule_matches_ip(rule, address_text) for address_text in canonical_ips)),
+                    "",
+                )
+            match = ScopeMatch(True, "all pinned addresses match scope", host_rule)
+        else:
+            match = ScopeMatch(True, "scope disabled")
+        return ScopeResolution(match, tuple(pinned_addresses))
 
     def check_for_dns_query(self, raw_target: str) -> ScopeMatch:
         """Preflight a passive DNS query without resolving the name here.

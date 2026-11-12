@@ -210,3 +210,240 @@ def test_dns_pinning_execution_block_cannot_be_overridden(scope_file, monkeypatc
             )
         )
     assert error.value.overridable is False
+
+
+def _pinned_answer(ip, port=443):
+    import socket
+
+    family = socket.AF_INET6 if ":" in ip else socket.AF_INET
+    sockaddr = (ip, port, 0, 0) if family == socket.AF_INET6 else (ip, port)
+    return (family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", sockaddr)
+
+
+def test_pinned_resolution_resolves_once_and_returns_numeric_socket_address(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["scan.acme.test"], "out_of_scope": [],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append((host, port, kwargs))
+        return [_pinned_answer("192.0.2.12", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    result = scope.resolve_for_execution("SCAN.Acme.Test.", port=443)
+
+    assert result.allowed is True
+    assert len(calls) == 1
+    assert calls[0][0:2] == ("scan.acme.test", 443)
+    assert len(result.addresses) == 1
+    assert result.addresses[0].sockaddr == ("192.0.2.12", 443)
+    assert result.addresses[0].family == socket.AF_INET
+
+
+def test_pinned_resolution_rejects_mixed_allowed_and_denied_answers(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["*.acme.test", "10.0.0.0/8"],
+        "out_of_scope": ["10.9.0.0/16"],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append(host)
+        return [_pinned_answer("10.1.2.3", port), _pinned_answer("10.9.1.2", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert calls == ["scan.acme.test"]
+    assert result.allowed is False
+    assert "out-of-scope" in result.reason
+    assert result.addresses == ()
+
+
+def test_pinned_resolution_denies_out_of_scope_hostname_before_dns(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["*.acme.test"],
+        "out_of_scope": ["prod.acme.test"],
+    }))
+
+    def unexpected_resolution(*_args, **_kwargs):
+        pytest.fail("out-of-scope hostname must be rejected before DNS")
+
+    monkeypatch.setattr(socket, "getaddrinfo", unexpected_resolution)
+    result = scope.resolve_for_execution("prod.acme.test", port=443)
+
+    assert result.allowed is False
+    assert result.addresses == ()
+
+
+@pytest.mark.parametrize(
+    ("resolver_result", "resolver_error", "reason"),
+    [
+        (None, OSError("resolver unavailable"), "resolution failed"),
+        ([], None, "no usable socket addresses"),
+    ],
+)
+def test_pinned_resolution_denies_resolution_failure_or_empty_answer(
+    scope_file, monkeypatch, resolver_result, resolver_error, reason,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["scan.acme.test"], "out_of_scope": [],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append((host, port))
+        if resolver_error is not None:
+            raise resolver_error
+        return resolver_result
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert calls == [("scan.acme.test", 443)]
+    assert result.allowed is False
+    assert reason in result.reason
+    assert result.addresses == ()
+
+
+def test_pinned_scheduler_preflight_is_non_resolving(scope_file, monkeypatch):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["scan.acme.test", "10.0.0.0/8"],
+        "out_of_scope": ["10.9.0.0/16"],
+    }))
+
+    def unexpected_resolution(*_args, **_kwargs):
+        pytest.fail("scheduler preflight must not resolve hostnames")
+
+    monkeypatch.setattr(socket, "getaddrinfo", unexpected_resolution)
+    result = scope.check_for_pinned_execution("scan.acme.test")
+
+    assert result.allowed is True
+    assert result.matched_rule == "scan.acme.test"
+
+
+@pytest.mark.parametrize("target", [" scan.acme.test", "scan.acme.test "])
+def test_pinned_preflight_rejects_whitespace_targets(scope_file, target):
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["scan.acme.test"], "out_of_scope": [],
+    }))
+
+    result = scope.check_for_pinned_execution(target)
+
+    assert result.allowed is False
+    assert "invalid pinned execution target" in result.reason
+
+
+def test_pinned_resolution_checks_every_answer_under_ip_only_scope(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["10.0.0.0/8"], "out_of_scope": [],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append(host)
+        return [_pinned_answer("10.1.2.3", port), _pinned_answer("10.9.8.7", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    preflight = scope.check_for_pinned_execution("scan.acme.test")
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert preflight.allowed is True
+    assert "child-side" in preflight.reason
+    assert calls == ["scan.acme.test"]
+    assert result.allowed is True
+    assert len(result.addresses) == 2
+    assert {item.sockaddr[0] for item in result.addresses} == {"10.1.2.3", "10.9.8.7"}
+
+
+def test_pinned_resolution_rejects_cidr_only_mixed_answers(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True, "in_scope": ["10.0.0.0/8"], "out_of_scope": [],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append(host)
+        return [_pinned_answer("10.1.2.3", port), _pinned_answer("192.0.2.9", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    preflight = scope.check_for_pinned_execution("scan.acme.test")
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert preflight.allowed is True
+    assert "child-side" in preflight.reason
+    assert calls == ["scan.acme.test"]
+    assert result.allowed is False
+    assert "not every resolved address" in result.reason
+    assert result.addresses == ()
+
+
+def test_pinned_resolution_checks_ipv4_mapped_ipv6_against_ipv4_denies(
+    scope_file, monkeypatch,
+):
+    import socket
+
+    from whaxon.core.scope import ScopeManager
+
+    scope = ScopeManager(scope_file({
+        "enabled": True,
+        "in_scope": ["scan.acme.test"],
+        "out_of_scope": ["10.9.0.0/16"],
+    }))
+    calls = []
+
+    def resolve(host, port, **kwargs):
+        calls.append(host)
+        return [_pinned_answer("::ffff:10.9.1.2", port)]
+
+    monkeypatch.setattr(socket, "getaddrinfo", resolve)
+    result = scope.resolve_for_execution("scan.acme.test", port=443)
+
+    assert calls == ["scan.acme.test"]
+    assert result.allowed is False
+    assert "out-of-scope" in result.reason
+    assert result.addresses == ()
