@@ -66,8 +66,6 @@ def test_tool_proposal_is_fixed_argument_and_provider_pinned():
     assert core.saved == []
 
 
-
-
 def _write_scope(path, in_scope, out_scope=()):
     path.write_text(json.dumps({
         "engagement": "proposal-scope-test",
