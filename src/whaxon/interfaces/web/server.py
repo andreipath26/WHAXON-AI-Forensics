@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 33939)
-Total output lines: 3144
-
 """Minimal Flask server for WHAXON. Stage 1: JSON API only."""
 from __future__ import annotations
 
@@ -1161,7 +1158,882 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not isinstance(payload, dict) or "min_spacing_s" not in payload:
             return jsonify({"error": "min_spacing_s required"}), 400
         try:
-            core.configure_workflow_rate_limit(plan_id, min_spaci…9939 tokens truncated…          rule = item.strip()
+            core.configure_workflow_rate_limit(plan_id, min_spacing_s=payload["min_spacing_s"])
+            return jsonify({"plan_id": plan_id, "rate_limit_configured": True})
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.get("/api/v2/workflows/<plan_id>/progress")
+    def workflow_v2_progress(plan_id):
+        try:
+            return jsonify(core.workflow_progress(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/events")
+    def workflow_v2_events(plan_id):
+        try:
+            after_id = int(request.args.get("after_id", "0"))
+            limit = int(request.args.get("limit", "100"))
+            return jsonify(core.workflow_events(plan_id, after_id=after_id, limit=limit))
+        except (ValueError, TypeError) as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    @app.get("/api/v2/workflows/<plan_id>/report")
+    def workflow_v2_plan_report(plan_id):
+        """Return persisted, evidence-scoped workflow report without side effects."""
+        raw_limit = request.args.get("limit", "100")
+        if (
+            len(raw_limit) > 4 or not raw_limit.isascii()
+            or not raw_limit.isdecimal() or not 1 <= int(raw_limit) <= 1000
+        ):
+            return jsonify({"error": "limit must be an integer in 1..1000"}), 400
+        try:
+            return jsonify(core.workflow_report(plan_id, limit=int(raw_limit)))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404 if "unknown" in str(exc) else 400
+
+    @app.get("/api/v2/workflows/<plan_id>/audit-snapshot")
+    def workflow_v2_audit_snapshot(plan_id):
+        """Expose a digest for an external operator-held integrity anchor."""
+        try:
+            return jsonify(core.workflow_audit_snapshot(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.post("/api/v2/workflows/<plan_id>/audit-verify")
+    def workflow_v2_audit_verify(plan_id):
+        """Compare against a caller-held digest; never claim third-party anchoring."""
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or set(payload) != {"expected_digest"}:
+            return jsonify({"error": "expected_digest is required"}), 400
+        try:
+            matched = core.verify_workflow_audit_snapshot(
+                plan_id, payload["expected_digest"],
+            )
+            return jsonify({
+                "plan_id": plan_id,
+                "digest_matches": bool(matched),
+                "independent_anchor_verified": False,
+            })
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), (
+                404 if "unknown workflow plan" in str(exc) else 400
+            )
+
+    @app.get("/api/v2/workflows/<plan_id>/readiness")
+    def workflow_v2_readiness(plan_id):
+        try:
+            return jsonify(core.workflow_readiness(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/v2/workflows/<plan_id>/reconciliation")
+    def workflow_v2_reconciliation(plan_id):
+        try:
+            return jsonify(core.workflow_dispatch_reconciliation(plan_id))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+
+    @app.get("/api/tools")
+    def list_tools():
+        import shutil
+
+        from whaxon.adapters import get_adapter
+
+        result = []
+        for tool in core.catalog.list():
+            try:
+                adapter_available = get_adapter(tool.id) is not None
+            except Exception:
+                app.logger.exception("Adapter lookup failed for catalog tool %s", tool.id)
+                adapter_available = False
+            binary_available = bool(
+                tool.binary
+                and (
+                    shutil.which(tool.binary)
+                    or (
+                        os.path.isabs(tool.binary)
+                        and os.path.isfile(tool.binary)
+                        and os.access(tool.binary, os.X_OK)
+                    )
+                )
+            )
+            result.append({
+                "binary_available": binary_available,
+                "transport": tool.transport,
+                "id": tool.id,
+                "name": tool.name,
+                "category": tool.category,
+                "binary": tool.binary,
+                "description": tool.description,
+                "available": bool(tool.available),
+                "package": tool.package or "",
+                "adapter_available": adapter_available,
+            })
+        return jsonify(result)
+
+    @app.post("/api/run")
+    @limiter.limit("30 per minute")
+    def run_tool():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
+        tool_id = data.get("tool_id")
+        target = data.get("target")
+        extra_args = data.get("extra_args", "")
+        if not isinstance(tool_id, str) or not tool_id.strip():
+            return {"error": "tool_id must be a non-empty string"}, 400
+        if not isinstance(target, str) or not target.strip():
+            return {"error": "target must be a non-empty string"}, 400
+        tool_id = tool_id.strip()
+        target = target.strip()
+        if len(tool_id) > 128 or len(target) > 2048 or "\x00" in target:
+            return {"error": "tool_id or target exceeds allowed limits"}, 400
+        if extra_args is None:
+            extra_args = ""
+        # The web runner intentionally does not accept arbitrary command-line
+        # arguments from clients. The current runner path does not implement a
+        # safe per-tool argument allowlist, so reject rather than silently ignore.
+        if not isinstance(extra_args, str) or extra_args.strip():
+            return {"error": "extra_args are not supported by the web runner"}, 400
+
+        # Scope enforcement is mandatory. Web out-of-scope overrides are
+        # disabled until an operator-confirmed, target-bound audit flow exists.
+        try:
+            match = _check_execution_scope(registry.core.scope, target)
+        except Exception:
+            # Authorization must fail closed: a broken scope engine must never
+            # turn a target into an implicitly authorized one.
+            app.logger.exception("Scope evaluation failed for tool run")
+            return {"error": "scope evaluation failed; no job was started"}, 503
+        if match is None:
+            return {"error": "target could not be confirmed in scope; no job was started"}, 403
+        if not match.allowed:
+            # Do not accept a client-supplied flag as authorization. A safe,
+            # auditable, operator-confirmed override flow must be implemented
+            # before web requests can run out-of-scope targets.
+            return {"error": f"target out of scope: {match.reason}",
+                    "matched_rule": match.matched_rule}, 403
+        if core.catalog.get(tool_id) is None:
+            return {"error": f"unknown tool: {tool_id}"}, 404
+
+        legacy_tool_execution_enabled = os.environ.get(
+            "WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "false",
+        ).strip().lower() in ("1", "true", "yes")
+        if not legacy_tool_execution_enabled:
+            return {
+                "error": (
+                    "Legacy direct tool execution is disabled. Use the Engine V2 "
+                    "workflow UI or POST /api/v2/workflows to save a reviewable "
+                    "plan, then separately approve its exact task and submit it "
+                    "through POST /api/v2/workflows/<plan_id>/run."
+                ),
+                "legacy_execution_enabled": False,
+                "v2_plan_endpoint": "/api/v2/workflows",
+                "v2_run_endpoint": "/api/v2/workflows/<plan_id>/run",
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
+
+        job_id = uuid.uuid4().hex[:12]
+        registry.ensure(job_id)
+        runner.submit(lambda: _run_job_blocking(core, registry, tool_id, target, job_id, extra_args))
+        return {"job_id": job_id}, 202
+
+
+
+    @app.post("/api/ai/run")
+    @limiter.limit("10 per minute")
+    def ai_run():
+        import json as _json
+        import time as _time
+
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object; AI run was not started"}, 400
+        goal_value = data.get("goal")
+        if not isinstance(goal_value, str) or not goal_value.strip():
+            return {"error": "goal required; AI run was not started"}, 400
+        goal = goal_value.strip()
+        target_value = data.get("target", "")
+        if target_value is None:
+            target_value = ""
+        if not isinstance(target_value, str):
+            return {"error": "target must be a string; AI run was not started"}, 400
+        target = target_value.strip() or None
+        if len(goal) > 10000 or (target is not None and (len(target) > 2048 or "\x00" in target)):
+            return {"error": "goal or target exceeds allowed limits; AI run was not started"}, 400
+        if target is None:
+            try:
+                from whaxon.core.targets import extract_target
+                target = extract_target(goal)
+            except Exception:
+                target = None
+        if not target:
+            return {"error": "target required; AI run was not started"}, 400
+        try:
+            match = _check_execution_scope(registry.core.scope, target)
+        except Exception:
+            app.logger.exception("Scope evaluation failed before AI run")
+            return {"error": "scope evaluation failed; AI run was not started"}, 503
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
+            return {
+                "error": f"target out of scope: {reason}; AI run was not started",
+                "matched_rule": getattr(match, "matched_rule", None),
+            }, 403
+
+        if not _legacy_ai_execution_enabled():
+            return {
+                "error": (
+                    "Legacy AI execution is disabled. Use the V2 AI proposal "
+                    "flow at POST /api/v2/ai/proposals; proposals require an "
+                    "operator-supplied mission_id, plan id, goal, and exact target, "
+                    "then separate review, task approval, and durable submission."
+                ),
+                "legacy_execution_enabled": False,
+                "v2_proposal_endpoint": "/api/v2/ai/proposals",
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
+
+        run_id = "ai-" + uuid.uuid4().hex[:12]
+        core.store.create_ai_run(run_id, goal)
+
+        async def ask_human(action):
+            # Persist the exact pending action and pause until the operator
+            # answers through /api/ai/runs/<run_id>/answer.
+            question = {
+                "run_id": run_id,
+                "kind": action.kind,
+                "rationale": action.rationale,
+                "tool_id": action.tool_id,
+                "target": action.target or target,
+                "extra_args": action.extra_args,
+                "confidence": action.confidence,
+                "proposed_phase": action.proposed_phase,
+            }
+            store = registry.core.store
+            store.set_ai_run_waiting(run_id, _json.dumps(question))
+            current = store.get_ai_run(run_id) or {}
+            answer_seq = len(current.get("steps") or []) + 1
+            deadline = _time.monotonic() + 1800
+            while _time.monotonic() < deadline:
+                for approval in store.list_approvals(run_id):
+                    if int(approval.get("seq", -1)) == answer_seq:
+                        return str(approval.get("answer") or "")
+                await asyncio.sleep(0.25)
+            raise TimeoutError("operator approval timed out; AI run stopped")
+
+        def _factory():
+            from whaxon.core.ai_bridge import build_executor
+            return build_executor(
+                core,
+                target_lock=target,
+                ai_run_id=run_id,
+                ask_human=ask_human,
+            )
+
+        runner.submit(lambda: _ai_run_blocking(core, _factory, run_id, goal, core.store))
+        return {"run_id": run_id}, 202
+
+    @app.get("/api/ai/runs")
+    def ai_runs_list():
+        limit = int(request.args.get("limit", "50"))
+        return core.store.list_ai_runs(limit=limit)
+
+    @app.get("/api/ai/pending")
+    def ai_pending_list():
+        owner = request.args.get("owner") or None
+        return core.store.list_pending_runs(owner=owner)
+
+    @app.post("/api/ai/runs/<run_id>/answer")
+    def ai_run_answer(run_id: str):
+        if not _legacy_ai_execution_enabled():
+            return {
+                "error": (
+                    "Legacy AI execution is disabled. Pending legacy runs are "
+                    "read-only; use the V2 proposal, approval, and durable run flow."
+                ),
+                "legacy_execution_enabled": False,
+                "v2_proposal_endpoint": "/api/v2/ai/proposals",
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
+        data = request.get_json(silent=True) or {}
+        answer = (data.get("answer") or "").strip()
+        if not answer:
+            return {"error": "answer required"}, 400
+        # Never trust an operator identity supplied in the JSON body or
+        # an unvalidated Basic header on the loopback bypass path. Remote
+        # requests have passed _auth_gate before this handler runs.
+        user = _request_actor()
+        note = (data.get("note") or "")
+        run = core.store.get_ai_run(run_id)
+        if run is None:
+            return {"error": "run not found"}, 404
+        if run.get("status") != "waiting":
+            return {"error": "run is not waiting"}, 409
+        next_seq = len(run.get("steps") or []) + 1
+        core.store.add_approval(run_id, next_seq, user, answer, note)
+        return {"ok": True, "run_id": run_id, "seq": next_seq}
+
+    @app.get("/api/ai/runs/<run_id>")
+    def ai_run_get(run_id: str):
+        run = core.store.get_ai_run(run_id)
+        if run is None:
+            return {"error": "run not found"}, 404
+        return run
+
+    @app.get("/api/ai/runs/<run_id>/stream")
+    def ai_run_stream(run_id: str):
+        import json as _json
+        import time as _t
+
+        from flask import Response
+
+        if core.store.get_ai_run(run_id) is None:
+            return {"error": "run not found"}, 404
+
+        def generate():
+            last_seq = 0
+            deadline = _t.monotonic() + 600.0
+            while _t.monotonic() < deadline:
+                run = core.store.get_ai_run(run_id)
+                if run is None:
+                    return
+                for step in run.get("steps", []):
+                    seq = step.get("seq", 0)
+                    if seq <= last_seq:
+                        continue
+                    last_seq = seq
+                    payload = {"type": "step", "seq": seq,
+                               "action": step.get("action"),
+                               "result": step.get("result")}
+                    yield "data: %s\n\n" % _json.dumps(payload)
+                if run.get("status") in ("done", "failed", "error"):
+                    yield "data: %s\n\n" % _json.dumps(
+                        {"type": "finished", "status": run.get("status"),
+                         "error": run.get("error", "")})
+                    return
+                _t.sleep(1.0)
+                yield ": ping\n\n"
+
+        return Response(generate(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache",
+                                 "X-Accel-Buffering": "no"})
+
+    @app.get("/api/jobs/<job_id>/stream")
+    def stream_job(job_id: str):
+        import json as _json
+
+        from flask import Response
+
+        if registry.get(job_id) is None:
+            return {"error": "unknown job"}, 404
+
+        def generate():
+            q = registry.subscribe(job_id)
+            try:
+                current = registry.get(job_id)
+                if current:
+                    yield f"data: {_json.dumps({'type': 'status', 'status': current['status']})}\n\n"
+                    for line in current["lines"]:
+                        yield f"data: {_json.dumps({'type': 'line', **line})}\n\n"
+                    if current["status"] == "finished":
+                        yield f"data: {_json.dumps({'type': 'finished', 'exit_code': current['exit_code']})}\n\n"
+                        return
+                    if current["status"] == "failed":
+                        yield f"data: {_json.dumps({'type': 'failed', 'error': current['error']})}\n\n"
+                        return
+                while True:
+                    try:
+                        item = q.get(timeout=30)
+                    except queue.Empty:
+                        yield ": ping\n\n"
+                        continue
+                    if item is None:
+                        return
+                    yield f"data: {_json.dumps(item)}\n\n"
+            finally:
+                registry.unsubscribe(job_id, q)
+
+        return Response(generate(), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    @app.get("/api/history")
+    def list_history():
+        return jsonify(registry.history())
+
+    @app.get("/api/jobs/active")
+    def list_active_jobs():
+        """Return currently running jobs for operational status and cancellation."""
+        return jsonify(registry.core.store.active_jobs())
+
+    @app.get("/api/jobs/<job_id>/evidence")
+    def list_evidence(job_id: str):
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
+        items = registry.core.store.list_evidence(job_id)
+        return jsonify(items)
+
+    @app.post("/api/jobs/<job_id>/evidence")
+    def add_evidence(job_id: str):
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
+        data = request.get_json(silent=True)
+        if data and (data.get("note") or data.get("kind") == "note"):
+            note = data.get("note", "")
+            name = data.get("name", "note")
+            if not isinstance(note, str) or len(note) > 10000:
+                return {"error": "note must be a string of at most 10000 characters"}, 400
+            if not isinstance(name, str) or len(name) > 200:
+                return {"error": "name must be a string of at most 200 characters"}, 400
+            seq = registry.core.store.add_evidence(
+                job_id, "note", name, note=note)
+            return {"seq": seq}, 201
+        f = request.files.get("file")
+        if f is None:
+            return {"error": "provide file (multipart) or {note: ...} JSON"}, 400
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(f.filename or "")
+        if not safe_name:
+            return {"error": "filename is empty or invalid"}, 400
+        try:
+            target_dir = _evidence_dir(registry.core, job_id)
+        except ValueError as exc:
+            return {"error": str(exc)}, 400
+        import uuid as _uuid
+        disk_name = f"{_uuid.uuid4().hex[:12]}-{safe_name}"
+        dest = target_dir / disk_name
+        try:
+            f.save(str(dest))
+            relative_path = str(dest.resolve().relative_to(Path(registry.core.data_dir).resolve()))
+            seq = registry.core.store.add_evidence(
+                job_id, "file", safe_name,
+                path=relative_path,
+                note=request.form.get("note", "")[:10000])
+        except Exception:
+            try:
+                dest.unlink(missing_ok=True)
+            except OSError:
+                app.logger.exception("Failed to clean up partial evidence upload")
+            app.logger.exception("Evidence upload failed for job %s", job_id)
+            return {"error": "evidence upload failed"}, 500
+        return {"seq": seq, "name": safe_name}, 201
+
+    @app.delete("/api/jobs/<job_id>/evidence/<int:seq>")
+    def delete_evidence(job_id: str, seq: int):
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
+        items = registry.core.store.list_evidence(job_id)
+        item = next((x for x in items if x["seq"] == seq), None)
+        if item is None:
+            return {"ok": False}, 404
+        if item.get("path"):
+            try:
+                full = _resolve_evidence_path(registry.core, item["path"])
+            except ValueError:
+                app.logger.error("Refusing to delete evidence with unsafe path for job %s", job_id)
+                return {"error": "unsafe evidence path"}, 403
+            try:
+                full.unlink(missing_ok=True)
+            except OSError:
+                app.logger.exception("Failed to remove evidence file for job %s", job_id)
+                return {"error": "failed to remove evidence file"}, 500
+        ok = registry.core.store.remove_evidence(job_id, seq)
+        return {"ok": ok}, (200 if ok else 404)
+
+    @app.get("/api/jobs/<job_id>/evidence/<int:seq>/download")
+    def download_evidence(job_id: str, seq: int):
+        from flask import send_file
+        if not registry.core.store.get(job_id):
+            return {"error": "job not found"}, 404
+        items = registry.core.store.list_evidence(job_id)
+        item = next((x for x in items if x["seq"] == seq), None)
+        if not item or not item.get("path"):
+            return {"error": "not a file"}, 404
+        try:
+            full = _resolve_evidence_path(registry.core, item["path"])
+        except ValueError:
+            app.logger.error("Refusing to download evidence with unsafe path for job %s", job_id)
+            return {"error": "unsafe evidence path"}, 403
+        if not full.is_file():
+            return {"error": "file missing"}, 404
+        return send_file(str(full), as_attachment=True, download_name=item["name"])
+
+    def _msf_session_scope_error(session_id: str):
+        """Require a live, persisted-identity-matching session in current scope."""
+        client = registry.core.msf
+        if not client.is_up():
+            return {"error": "msf not reachable; session scope cannot be verified"}, 503
+        try:
+            live = client.sessions()
+        except Exception:
+            app.logger.exception("Could not read Metasploit sessions for scope check")
+            return {"error": "could not verify session scope"}, 503
+        info = live.get(str(session_id))
+        if info is None:
+            return {"error": "session not found"}, 404
+        if not isinstance(info, dict):
+            return {"error": "session details are invalid; refusing to act"}, 503
+        host = (
+            info.get("target_host") or info.get("session_host")
+            or info.get("tunnel_peer") or info.get("peer_host") or info.get("host")
+        )
+        if not host:
+            return {"error": "session host is unknown; refusing out-of-scope-capable action"}, 403
+
+        # Session IDs are reusable by Metasploit. Never authorize a live session
+        # solely from its current host: bind it to the identity first persisted
+        # by the tracker, and reject missing/closed records or host drift.
+        try:
+            stored = registry.core.store.get_session(str(session_id))
+        except Exception:
+            app.logger.exception("Could not read persisted Metasploit session identity")
+            return {"error": "could not verify persisted session identity"}, 503
+        if not isinstance(stored, dict) or stored.get("status") != "open":
+            return {"error": "session has no active persisted identity; refusing to act"}, 403
+        stored_host = stored.get("host")
+        if not stored_host or str(stored_host).strip() in {"", "?"}:
+            return {"error": "persisted session host is unknown; refusing to act"}, 403
+        from whaxon.core.runner import ToolRunner
+        live_identity = ToolRunner._canonical_session_host(host)
+        stored_identity = ToolRunner._canonical_session_host(stored_host)
+        if not live_identity or live_identity != stored_identity:
+            return {
+                "error": "Metasploit session identity changed since it was persisted; refusing to act",
+                "persisted_host": str(stored_host),
+                "live_host": str(host),
+            }, 409
+        stored_type = str(stored.get("type") or "").strip().lower()
+        live_type = str(info.get("type") or "").strip().lower()
+        if stored_type and live_type and stored_type != live_type:
+            return {
+                "error": "Metasploit session type changed since it was persisted; refusing to act",
+                "persisted_type": stored_type,
+                "live_type": live_type,
+            }, 409
+
+        try:
+            match = _check_execution_scope(registry.core.scope, str(host))
+        except Exception:
+            app.logger.exception("Scope evaluation failed for Metasploit session host")
+            return {"error": "scope evaluation failed; action was not performed"}, 503
+        if match is None or not getattr(match, "allowed", False):
+            reason = getattr(match, "reason", "target could not be confirmed in scope")
+            return {
+                "error": f"session host out of scope: {reason}",
+                "target": str(host),
+                "matched_rule": getattr(match, "matched_rule", None),
+            }, 403
+        return None
+
+    @app.get("/api/msf/status")
+    def msf_status():
+        client = registry.core.msf
+        up = client.is_up()
+        payload = {"up": up, "config": client.config.display()}
+        if up:
+            try:
+                payload["version"] = client.version()
+                payload["modules"] = client.module_counts()
+            except Exception as e:
+                payload["error"] = str(e)
+        return jsonify(payload)
+
+    @app.get("/api/msf/sessions")
+    def msf_sessions():
+        client = registry.core.msf
+        stored = registry.core.store.list_sessions(include_closed=True)
+        live = client.sessions() if client.is_up() else {}
+        return jsonify({
+            "stored": stored,
+            "live": live,
+            "live_count": len(live),
+        })
+
+    @app.post("/api/msf/run")
+    def msf_run():
+        if not _legacy_msf_execution_enabled():
+            return {
+                "error": (
+                    "Legacy Metasploit execution is disabled. Supported lab operations "
+                    "must use an approved Engine V2 plan."
+                ),
+                "legacy_execution_enabled": False,
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
+        import re as _re
+        import uuid as _uuid
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
+        module_type = data.get("module_type", "exploit")
+        module_path = data.get("module_path", "")
+        options = data.get("options") or {}
+        target_value = data.get("target") or ""
+        if not isinstance(module_type, str) or not isinstance(module_path, str):
+            return {"error": "module_type and module_path must be strings"}, 400
+        if not isinstance(options, dict):
+            return {"error": "options must be a JSON object"}, 400
+        module_type = module_type.strip()
+        module_path = module_path.strip()
+        if not module_path:
+            return {"error": "module_path required"}, 400
+        if module_type not in ("exploit", "auxiliary", "post"):
+            return {"error": f"bad module_type: {module_type}"}, 400
+        if (
+            module_path.startswith("/")
+            or any(part in {"", ".", ".."} for part in module_path.split("/"))
+            or not _re.fullmatch(r"[A-Za-z0-9_/-]+", module_path)
+        ):
+            return {"error": "invalid Metasploit module path"}, 400
+        if not isinstance(target_value, str):
+            return {"error": "target must be a string"}, 400
+        for key, value in options.items():
+            if not isinstance(key, str) or not _re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,63}", key):
+                return {"error": "invalid Metasploit option name"}, 400
+            if value is None or isinstance(value, (dict, list, tuple)):
+                return {"error": f"option {key} must be a scalar value"}, 400
+            value_text = str(value)
+            if len(value_text) > 2048 or any(ch in value_text for ch in ("\r", "\n", "\x00")):
+                return {"error": f"option {key} contains invalid or oversized data"}, 400
+        for key in ("RHOSTS", "RHOST"):
+            if options.get(key) is not None and not isinstance(options[key], str):
+                return {"error": f"{key} must be a string"}, 400
+
+        target = target_value.strip() or str(options.get("RHOSTS") or options.get("RHOST") or "").strip()
+        session_host = ""
+        if module_type == "post":
+            session_id = options.get("SESSION")
+            if session_id is None or not str(session_id).strip():
+                return {"error": "post modules require a SESSION option"}, 400
+            session_error = _msf_session_scope_error(str(session_id).strip())
+            if session_error:
+                return session_error
+            try:
+                session_info = registry.core.msf.sessions().get(str(session_id).strip()) or {}
+            except Exception:
+                app.logger.exception("Could not read Metasploit session for post module")
+                return {"error": "could not verify post-module session"}, 503
+            session_host = str(session_info.get("target_host") or session_info.get("tunnel_peer") or "").strip()
+            if not session_host:
+                return {"error": "post-module session host is unknown"}, 403
+            if not target:
+                target = session_host
+
+        # Scope enforcement is server-side and cannot be disabled by request data.
+        candidates = []
+        if target:
+            candidates.extend(h.strip() for h in target.split(",") if h.strip())
+        rhosts = options.get("RHOSTS") or options.get("RHOST") or ""
+        if rhosts:
+            for host in rhosts.split(","):
+                host = host.strip()
+                if host and host not in candidates:
+                    candidates.append(host)
+        if not candidates:
+            return {"error": "an explicit in-scope target (RHOST/RHOSTS) is required"}, 400
+        for cand in candidates:
+            try:
+                match = _check_execution_scope(registry.core.scope, cand)
+            except Exception:
+                app.logger.exception("Scope evaluation failed for Metasploit target")
+                return {"error": "scope evaluation failed; no job was started"}, 503
+            if match is None or not getattr(match, "allowed", False):
+                reason = getattr(match, "reason", "target could not be confirmed in scope")
+                matched_rule = getattr(match, "matched_rule", None)
+                return {"error": f"target out of scope: {reason}",
+                        "matched_rule": matched_rule,
+                        "target": cand}, 403
+
+        # Build the extra args
+        extra_parts = [f"{k}={v}" for k, v in options.items()]
+        extra_args = " ".join(extra_parts)
+
+        from whaxon.adapters import get_adapter
+        adapter = get_adapter("msf")
+        if adapter is None:
+            return {"error": "msf adapter not registered"}, 500
+
+        job_id = _uuid.uuid4().hex[:12]
+        registry.core.store.create(job_id)
+        registry.core.store.set_started(job_id, "msf", target or "?")
+
+        # Run in a thread, publish findings like the runner does
+        def _do_run():
+            import traceback
+
+            from whaxon.core.events import JobFailed, JobFinished
+            try:
+                tool_id = f"msf:{module_type}:{module_path}"
+                registry.core.store.append_line(job_id, "stdout",
+                    f"running {tool_id} with {extra_args}")
+                findings = adapter.run_module(tool_id, extra_args, ctx={"target": target, "store": registry.core.store, "job_id": job_id})
+                for f in findings:
+                    if f.kind == "msf_module_started" or f.kind == "msf_session":
+                        registry.core.store.append_line(job_id, "stdout", f.raw_line)
+                    elif f.kind == "msf_error":
+                        registry.core.store.append_line(job_id, "stderr", f.raw_line)
+                if findings:
+                    registry.core.store.set_finished(job_id, 0, 0.0)
+                    registry.core.bus.publish(JobFindings(
+                        job_id=job_id,
+                        findings=tuple(f.to_dict() for f in findings),
+                    ))
+                else:
+                    registry.core.store.set_finished(job_id, 0, 0.0)
+                registry.core.bus.publish(JobFinished(
+                    job_id=job_id, exit_code=0, duration_s=0.0,
+                ))
+            except Exception as e:
+                traceback.print_exc()
+                registry.core.store.set_failed(job_id, str(e))
+                registry.core.bus.publish(JobFailed(job_id=job_id, error=str(e)))
+
+        import threading as _t
+        _t.Thread(target=_do_run, daemon=True).start()
+
+        return {"job_id": job_id}, 202
+
+    @app.post("/api/msf/sessions/<session_id>/exec")
+    def msf_session_exec(session_id: str):
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "request body must be a JSON object"}, 400
+        command = data.get("command", "")
+        if not isinstance(command, str) or not command.strip():
+            return {"error": "command required"}, 400
+        command = command.strip()
+        if len(command) > 4096 or "\x00" in command:
+            return {"error": "command must be at most 4096 characters and contain no NUL"}, 400
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
+
+        client = registry.core.msf
+        try:
+            output = client.session_exec(session_id, command, timeout=15.0)
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+        return jsonify({
+            "session_id": session_id,
+            "command": command,
+            "output": output,
+        })
+
+    @app.get("/api/msf/sessions/<session_id>")
+    def msf_session_info(session_id: str):
+        session_error = _msf_session_scope_error(session_id)
+        if session_error:
+            return session_error
+        client = registry.core.msf
+        try:
+            live = client.sessions()
+            info = live.get(str(session_id))
+            if info is None:
+                return {"error": "session not found"}, 404
+            return jsonify({"id": session_id, "info": info})
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+    @app.get("/api/msf/modules/<module_type>")
+    def msf_list_modules(module_type: str):
+        client = registry.core.msf
+        if not client.is_up():
+            return {"error": "msf not reachable"}, 503
+        try:
+            c = client.connect()
+            if module_type == "exploit":
+                return jsonify(c.modules.exploits[:200])
+            if module_type == "auxiliary":
+                return jsonify(c.modules.auxiliary[:200])
+            if module_type == "post":
+                return jsonify(c.modules.post[:200])
+            return {"error": f"bad type: {module_type}"}, 400
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+    @app.get("/api/tree")
+    def get_tree():
+        limit = request.args.get("limit", type=int) or 50
+        return jsonify({"targets": registry.core.store.findings_by_target(limit=limit)})
+
+    @app.get("/api/scope")
+    def get_scope():
+        return jsonify(registry.core.scope.summary())
+
+    @app.post("/api/bounty/import")
+    @limiter.limit("10 per minute")
+    def import_bounty_program():
+        """Return an unapproved YesWeHack policy draft; never persist or execute it."""
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "JSON object required"}, 400
+        url = data.get("url")
+        pasted_text = data.get("text")
+        source_url = data.get("source_url", "")
+        if url is not None and pasted_text is not None:
+            return {"error": "provide either url or text, not both"}, 400
+        if url is None and pasted_text is None:
+            return {"error": "provide a public YesWeHack url or pasted program text"}, 400
+        if url is not None and (not isinstance(url, str) or not url.strip()):
+            return {"error": "url must be a non-empty string"}, 400
+        if pasted_text is not None and not isinstance(pasted_text, str):
+            return {"error": "text must be a string"}, 400
+        if not isinstance(source_url, str):
+            return {"error": "source_url must be a string"}, 400
+        from whaxon.core.bounty_ingest import (
+            IngestionError,
+            ingest_yeswehack_text,
+            ingest_yeswehack_url,
+        )
+        try:
+            if url is not None:
+                result = ingest_yeswehack_url(url.strip())
+            else:
+                result = ingest_yeswehack_text(pasted_text, source_url=source_url.strip())
+        except IngestionError as exc:
+            return {"error": str(exc)}, 400
+        return jsonify(result), 200
+
+    @app.post("/api/scope")
+    def save_scope():
+        """Validate and persist an operator-edited scope definition."""
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return {"error": "JSON object required"}, 400
+        enabled = data.get("enabled", True)
+        if type(enabled) is not bool:
+            return {"error": "'enabled' must be a JSON boolean"}, 400
+        current_scope = registry.core.scope.summary()
+        if (
+            enabled is False
+            and current_scope.get("enabled", True) is not False
+            and data.get("confirm_disable") is not True
+        ):
+            return {"error": "confirm_disable=true is required to disable scope enforcement"}, 400
+        engagement = data.get("engagement", "")
+        notes = data.get("notes", "")
+        if not isinstance(engagement, str) or len(engagement) > 200:
+            return {"error": "engagement must be a string of at most 200 characters"}, 400
+        if not isinstance(notes, str) or len(notes) > 5000:
+            return {"error": "notes must be a string of at most 5000 characters"}, 400
+        from whaxon.core.scope import _validate_scope_rule
+        rules = {}
+        for key in ("in_scope", "out_of_scope"):
+            value = data.get(key, [])
+            if not isinstance(value, list) or len(value) > 500:
+                return {"error": f"'{key}' must be a list with at most 500 rules"}, 400
+            normalized = []
+            for item in value:
+                if not isinstance(item, str) or not item.strip() or len(item.strip()) > 253:
+                    return {"error": f"invalid rule in '{key}'"}, 400
+                rule = item.strip()
                 if not _validate_scope_rule(rule):
                     return {"error": f"invalid scope rule: {rule}"}, 400
                 if rule not in normalized:
