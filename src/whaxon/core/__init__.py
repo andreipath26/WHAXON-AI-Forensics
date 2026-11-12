@@ -944,14 +944,19 @@ class Core:
             reload_scope = getattr(self.scope, "load", None)
             if callable(reload_scope):
                 reload_scope()
-            if task.capability_id in {"dns.recon.passive", "dns.recon.full"}:
-                # These fixed DNS operations query the configured resolver and
-                # never connect to a target-resolved address. Avoid an
-                # uncancellable getaddrinfo call on this scheduler thread.
-                # Each provider repeats all query-name checks inside its
-                # bounded child process; DNS-full checks its _dmarc subdomain
-                # separately before querying it.
+            scope_mode = getattr(manifest, "scope_mode", "network")
+            if scope_mode == "dns_query":
+                # DNS query providers authorize the query name without
+                # connecting to its resolved address. Providers repeat query
+                # name checks inside their bounded child process.
                 return self.scope.check_for_dns_query(task.target).allowed is True
+            if scope_mode == "pinned_network":
+                pinned_check = getattr(self.scope, "check_for_pinned_execution", None)
+                if not callable(pinned_check):
+                    return False
+                return pinned_check(task.target).allowed is True
+            if scope_mode != "network":
+                return False
             execution_check = getattr(self.scope, "check_for_execution", None)
             if not callable(execution_check):
                 execution_check = self.scope.check
