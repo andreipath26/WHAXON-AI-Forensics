@@ -273,3 +273,159 @@ def test_core_dns_and_pinned_preflights_do_not_resolve_hostname(
     )
 
     assert core.authorize_workflow_task(task) is True
+def _queue_manifest(capability_id, provider_id, side_effects):
+    return CapabilityManifest(
+        capability_id=capability_id,
+        provider_id=provider_id,
+        provider_version="1.0.0",
+        transports=("local_process",),
+        target_types=("hostname",),
+        permissions=(),
+        side_effects=side_effects,
+        impact="low",
+    )
+
+
+def _queue_task(task_id, capability_id, *, metadata=None):
+    task = WorkflowTask(
+        id=task_id,
+        capability_id=capability_id,
+        target="example.test",
+        permissions=(),
+        impact="low",
+    )
+    plan = WorkflowPlan("queue-mission", (task,), metadata=metadata or {})
+    return task, plan
+
+
+def test_approval_queue_surfaces_unpinned_and_malformed_network_tasks(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("queue-mission", "Exercise malformed approval metadata")
+    manifest = _queue_manifest(
+        "fixture.queue_network", "fixture.queue_network_provider", ("network_traffic",),
+    )
+    core.capabilities.register(manifest)
+
+    _, unpinned_plan = _queue_task("unpinned-task", manifest.capability_id)
+    core.save_workflow_plan("plan-unpinned", unpinned_plan)
+    _, malformed_shape_plan = _queue_task(
+        "malformed-shape-task",
+        manifest.capability_id,
+        metadata={"provider_bindings": ["not", "a", "mapping"]},
+    )
+    core.save_workflow_plan("plan-malformed-shape", malformed_shape_plan)
+    _, malformed_null_plan = _queue_task(
+        "malformed-null-task",
+        manifest.capability_id,
+        metadata={"provider_bindings": {"malformed-null-task": None}},
+    )
+    core.save_workflow_plan("plan-malformed-null", malformed_null_plan)
+    _, malformed_json_plan = _queue_task("malformed-json-task", manifest.capability_id)
+    core.save_workflow_plan("plan-malformed-json", malformed_json_plan)
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_plans SET plan_json=? WHERE id=?",
+            ("{", "plan-malformed-json"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    candidates = core.workflow_approval_queue(limit=10)
+    candidate_ids = {item["task_key"] for item in candidates}
+
+    assert candidate_ids == {
+        "unpinned-task", "malformed-shape-task", "malformed-null-task",
+        "malformed-json-task",
+    }
+    malformed_json = next(
+        item for item in candidates if item["task_key"] == "malformed-json-task"
+    )
+    assert malformed_json["approval_valid"] is False
+
+
+def test_approval_queue_uses_exact_provider_binding_and_fallback_for_unpinned(
+    tmp_path,
+):
+    core = Core(tmp_path)
+    core.create_mission("queue-mission", "Exercise exact provider bindings")
+    capability_id = "fixture.multi_provider"
+    network_manifest = _queue_manifest(
+        capability_id, "fixture.network_provider", ("network_traffic",),
+    )
+    safe_manifest = _queue_manifest(
+        capability_id, "fixture.safe_provider", (),
+    )
+    core.capabilities.register(network_manifest)
+    core.capabilities.register(safe_manifest)
+
+    _, pinned_safe_plan = _queue_task(
+        "pinned-safe-task",
+        capability_id,
+        metadata={"provider_bindings": {"pinned-safe-task": {
+            "provider_id": safe_manifest.provider_id,
+            "manifest_fingerprint": safe_manifest.fingerprint,
+        }}},
+    )
+    core.save_workflow_plan("plan-pinned-safe", pinned_safe_plan)
+    _, unpinned_plan = _queue_task("unpinned-network-task", capability_id)
+    core.save_workflow_plan("plan-unpinned-network", unpinned_plan)
+
+    candidates = core.store.list_workflow_approval_candidates(limit=10)
+
+    assert [item["task_key"] for item in candidates] == ["unpinned-network-task"]
+
+
+def test_approval_queue_paginates_past_irrelevant_pending_tasks(tmp_path, monkeypatch):
+    core = Core(tmp_path)
+    core.create_mission("queue-mission", "Exercise approval candidate pagination")
+    monkeypatch.setattr(store_module, "_APPROVAL_CANDIDATE_PAGE_SIZE", 2)
+    network_manifest = _queue_manifest(
+        "fixture.old_network", "fixture.old_network_provider", ("network_traffic",),
+    )
+    safe_manifest = _queue_manifest(
+        "fixture.recent_safe", "fixture.recent_safe_provider", (),
+    )
+    core.capabilities.register(network_manifest)
+    core.capabilities.register(safe_manifest)
+
+    _, network_plan = _queue_task("older-network-task", network_manifest.capability_id)
+    core.save_workflow_plan("plan-older-network", network_plan)
+    for task_id, plan_id in (
+        ("newer-safe-task-1", "plan-newer-safe-1"),
+        ("newer-safe-task-2", "plan-newer-safe-2"),
+    ):
+        _, safe_plan = _queue_task(
+            task_id,
+            safe_manifest.capability_id,
+            metadata={"provider_bindings": {task_id: {
+                "provider_id": safe_manifest.provider_id,
+                "manifest_fingerprint": safe_manifest.fingerprint,
+            }}},
+        )
+        core.save_workflow_plan(plan_id, safe_plan)
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_tasks SET created_at=? WHERE plan_id=?",
+            (1.0, "plan-older-network"),
+        )
+        conn.execute(
+            "UPDATE workflow_tasks SET created_at=? WHERE plan_id=?",
+            (2.0, "plan-newer-safe-1"),
+        )
+        conn.execute(
+            "UPDATE workflow_tasks SET created_at=? WHERE plan_id=?",
+            (3.0, "plan-newer-safe-2"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    candidates = core.store.list_workflow_approval_candidates(limit=1)
+
+    assert [item["task_key"] for item in candidates] == ["older-network-task"]
+
