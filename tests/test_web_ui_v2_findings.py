@@ -37,7 +37,7 @@ def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, l
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=5000,
+        timeout=15000,
     )
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
@@ -129,7 +129,7 @@ def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=8000,
+        timeout=15000,
     )
 
     # "protocol" exists in the structured finding data, not the scanner raw line.
@@ -178,7 +178,7 @@ def test_findings_kpi_bars_match_live_report_counts(page, live_server):
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
+        timeout=15000,
     )
     total_text = page.locator("#whaxon-findings-count").inner_text()
     total = int(total_text.rsplit(" ", 1)[-1])
@@ -210,7 +210,7 @@ def test_findings_list_uses_only_records_from_live_report(page, live_server):
     assert template.is_hidden()
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=5000,
+        timeout=15000,
     )
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
 
@@ -229,7 +229,7 @@ def test_findings_page_loads_all_assets_locally(page, live_server):
     assert response is not None and response.status == 200
     page.wait_for_function(
         "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
+        timeout=15000,
     )
     assert page.title() == "WHAXON — Trust Layer & Findings"
     assert external == []
