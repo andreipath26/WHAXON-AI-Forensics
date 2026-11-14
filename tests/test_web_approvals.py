@@ -49,12 +49,14 @@ def test_owner_filter_narrows_results(page, live_server):
     )
 
 
-def test_answering_removes_run_from_queue(page, live_server):
+def test_legacy_answer_is_blocked_and_keeps_run_visible(page, live_server):
     _open_approvals(page, live_server)
     card = page.locator('#approvals-list .card[data-run="seed-ai-run"]')
     card.locator('[data-answer-input]').fill("y")
     card.locator('[data-answer-btn]').click()
-    page.wait_for_function(
-        "() => !document.querySelector('#approvals-list .card[data-run=\"seed-ai-run\"]')",
-        timeout=5000,
-    )
+    notice = card.locator('[role="status"]')
+    notice.wait_for(timeout=5000)
+    assert "Legacy AI execution is disabled" in notice.text_content()
+    assert card.is_visible()
+    assert card.locator('[data-answer-btn]').is_disabled()
+
