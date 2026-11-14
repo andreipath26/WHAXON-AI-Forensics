@@ -1,6 +1,8 @@
 """Browser coverage for the live adapter manager."""
 from __future__ import annotations
 
+import re
+
 
 def test_adapter_manager_uses_live_tool_catalog(page, live_server):
     response = page.goto(f"{live_server}/ui-v2/adapters")
@@ -13,6 +15,29 @@ def test_adapter_manager_uses_live_tool_catalog(page, live_server):
     refresh.click()
     page.wait_for_function("() => !document.querySelector('#adapter-status')?.textContent.includes('Loading live')")
     assert page.locator("#adapter-status").get_attribute("aria-live") == "polite"
+
+
+def test_adapter_reference_controls_are_disabled_in_initial_markup(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/adapters")
+    assert response is not None and response.status == 200
+    html = response.text()
+    for control_id in (
+        "btn-sync", "btn-reload", "btn-register", "adapter-search",
+        "status-select", "close-drawer", "add-flag-input", "btn-mock-test",
+        "btn-resign", "btn-save-conf",
+    ):
+        match = re.search(
+            rf"<(?:button|input|select|textarea)\b[^>]*\bid=\"{re.escape(control_id)}\"[^>]*>",
+            html,
+        )
+        assert match is not None, f"Missing adapter reference control {control_id}"
+        assert re.search(r"\sdisabled(?:\s|=|>)", match.group(0)), (
+            f"Adapter reference control {control_id} is enabled in server HTML"
+        )
+        assert 'aria-disabled="true"' in match.group(0)
+    assert "Mock execution successful" not in html
+    assert "Signature re-computed and signed" not in html
+    assert "Configuration saved to /etc/whaxon/adapters.d" not in html
 
 
 def test_dashboard_links_to_adapter_manager(page, live_server):
