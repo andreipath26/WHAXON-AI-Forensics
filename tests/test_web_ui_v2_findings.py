@@ -5,51 +5,77 @@ import json
 import re
 
 
-def test_canonical_findings_page_loads_live_report(page, live_server):
+def _stable_report_payload():
+    return {
+        "jobs": [{
+            "job": {"id": "stable-findings-job", "target": "127.0.0.1", "tool": "nuclei"},
+            "findings": [
+                {
+                    "seq": 0, "title": "Stable high severity finding",
+                    "severity": "high", "source": "nuclei",
+                    "verification_status": "candidate",
+                    "data": {"message": "Deterministic browser fixture"},
+                },
+                {
+                    "seq": 1, "title": "Stable medium severity finding",
+                    "severity": "medium", "source": "nuclei",
+                    "verification_status": "candidate", "data": {},
+                },
+                {
+                    "seq": 2, "title": "Stable low severity finding",
+                    "severity": "low", "source": "nuclei",
+                    "verification_status": "candidate", "data": {},
+                },
+            ],
+        }],
+    }
+
+
+def _serve_stable_report(route):
+    route.fulfill(
+        status=200,
+        content_type="application/json",
+        body=json.dumps(_stable_report_payload()),
+    )
+
+
+def test_canonical_findings_page_renders_report_api_data(page, live_server):
+    page.route("**/api/report?format=json", _serve_stable_report)
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
-        "() => { const el = document.querySelector('#whaxon-findings-count'); "
-        "return el && !el.textContent.includes('Loading'); }",
-        timeout=15000,
+        "() => document.querySelector('#whaxon-findings-count')?.textContent === 'Live findings: 3'",
+        timeout=5000,
     )
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
-    assert page.locator("#whaxon-findings-list").inner_text().find(
-        "SQLi: Time-based Blind"
-    ) == -1
-
-
-def test_canonical_findings_page_inspects_real_finding(page, live_server):
+    assert "SQLi: Time-based Blind" not in page.locator("#whaxon-findings-list").inner_text()
+def test_canonical_findings_page_inspects_report_finding(page, live_server):
+    page.route("**/api/report?format=json", _serve_stable_report)
     page.goto(f"{live_server}/ui-v2/findings")
-    # The asynchronous seeded finding list can take longer under CI xdist
-    # contention. Keep the same real-data assertion before interacting.
     page.wait_for_function(
-        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=15000,
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
+        timeout=5000,
     )
     page.locator("#whaxon-findings-list [data-finding-index]").first.click()
     detail = page.locator("#whaxon-detail")
     assert detail.is_visible()
-    assert detail.locator("#selected-finding-title").text_content().strip() != "Loading live finding…"
+    assert detail.locator("#selected-finding-title").text_content().strip() == "Stable high severity finding"
+    assert detail.locator("#selected-finding-target").text_content().strip() == "127.0.0.1"
     assert "staging-api.corp.net" not in detail.locator("#curl-proof-payload").text_content()
-
-
 def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, live_server):
+    page.route("**/api/report?format=json", _serve_stable_report)
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
-        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=15000,
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
+        timeout=5000,
     )
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
     assert page.locator('a[data-path="scope-and-targets"]').get_attribute("href") == "/ui-v2/scope"
     assert page.locator('a[data-path="run-and-orchestration"]').is_visible()
     assert page.locator('a[data-path="run-and-orchestration"]').get_attribute("href") == "/ui-v2/run"
-    # Reports are now part of the integrated UI, so navigation must lead to the real report route.
     reports = page.locator('a[data-path="ptes-coverage-and-reports"]')
     assert reports.is_visible()
     assert reports.get_attribute("href") == "/ui-v2/report"
-
-
 def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
     response = page.goto(f"{live_server}/ui-v2/findings")
     assert response is not None
@@ -275,7 +301,11 @@ def test_findings_reject_malformed_report_and_retry(page, live_server):
                 body='{"jobs":"not-an-array"}',
             )
         else:
-            route.continue_()
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(_stable_report_payload()),
+            )
 
     page.route("**/api/report**", malformed_once)
     page.goto(f"{live_server}/ui-v2/findings")
