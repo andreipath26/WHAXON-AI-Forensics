@@ -956,3 +956,28 @@ with the DNS-specific policy. The headless CLI exposes
 provider-pinned plan, leaving approval and dispatch as separate operator steps.
 No recon parity or runtime acceptance is claimed yet.
 
+
+## Redirect observation and legacy route gates — 2026-11-12
+
+The dedicated `web.recon.redirect_observe` provider performs exactly one
+scope-pinned HTTPS GET to `/`, records the status and a redacted first-hop
+Location display, classifies cross-origin and HTTPS downgrade, and never follows
+Location. `workflow plan propose-redirect-recon` creates an unapproved,
+provider-pinned one-task plan; default `whaxon recon` remains legacy. This is a
+bounded first-hop observation and does not provide full redirect-chain parity.
+Non-HTTP(S) Location values are displayed as unsupported-scheme markers and are
+not mislabeled as web-origin changes.
+Hostname scope resolution may produce one DNS query and a resolver log; those
+are declared provider side effects.
+Focused runtime qualification is tracked with the recon inventory.
+
+The route inventory now records current legacy opt-in gates and ordering:
+`/api/run` validates request fields, extra arguments, scope and catalog before
+checking its opt-in; `/api/ai/run` validates goal/target and scope first, while
+the AI answer route checks its opt-in before parsing the answer. `/api/run` uses
+`WHAXON_LEGACY_TOOL_EXECUTION_ENABLED=true`; legacy AI run and answer/resume
+routes use `WHAXON_LEGACY_AI_EXECUTION_ENABLED=true`; MSF module/session
+commands and port-forward creation use `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`;
+legacy validate/retest use `WHAXON_LEGACY_VALIDATION_ENABLED=true`. V2-owned
+validation evidence remains rejected by legacy validate/retest routes, and
+port-forward deletion remains available for cleanup.

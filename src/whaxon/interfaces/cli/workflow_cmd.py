@@ -232,6 +232,17 @@ def _parser() -> argparse.ArgumentParser:
         "--save", action="store_true",
         help="persist only; approval and execution remain separate",
     )
+    redirects_propose = plan_commands.add_parser(
+        "propose-redirect-recon",
+        help="prepare one first-hop HTTPS redirect observation for review; never follow Location",
+    )
+    redirects_propose.add_argument("--mission-id", required=True)
+    redirects_propose.add_argument("--id", required=True, help="immutable workflow plan ID")
+    redirects_propose.add_argument("--target", required=True, help="bare hostname or IP in pinned scope")
+    redirects_propose.add_argument(
+        "--save", action="store_true",
+        help="persist only; approval and execution remain separate",
+    )
     verify_propose = plan_commands.add_parser(
         "propose-verification", help="prepare a sealed-finding V2 verification or retest plan",
     )
@@ -603,6 +614,23 @@ def main(args: list[str] | None = None) -> int:
             from whaxon.core.workflow_proposals import propose_passive_robots_recon_plan
 
             proposal = propose_passive_robots_recon_plan(
+                core,
+                mission_id=options.mission_id,
+                plan_id=options.id,
+                target=options.target,
+            )
+            created = False
+            if options.save and proposal.get("status") == "proposed":
+                created = core.save_workflow_plan(
+                    options.id, WorkflowPlan.from_dict(proposal["plan"]),
+                )
+            print(json.dumps({**proposal, "created": bool(created)},
+                             indent=2, sort_keys=True))
+            return 0 if proposal.get("status") == "proposed" else 1
+        if options.command == "plan" and options.plan_command == "propose-redirect-recon":
+            from whaxon.core.workflow_proposals import propose_passive_redirect_observation_plan
+
+            proposal = propose_passive_redirect_observation_plan(
                 core,
                 mission_id=options.mission_id,
                 plan_id=options.id,
