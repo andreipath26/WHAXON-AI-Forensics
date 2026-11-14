@@ -1059,7 +1059,7 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
               notice.className = 'card-sub';
               notice.setAttribute('role', 'status');
               notice.textContent = body.error || 'Legacy AI answers are disabled.';
-              actions.after(notice);
+              card.appendChild(notice);
             } else {
               btn.disabled = false;
             }
