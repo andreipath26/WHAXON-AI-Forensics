@@ -11,10 +11,13 @@ from __future__ import annotations
 def _open_findings(page, live_server):
     page.goto(f"{live_server}/ui")
     page.click('.sb-item[data-page="findings"]')
-    # Wait for the table to populate.
+    # The server-rendered table contains reference rows before the live report
+    # arrives. Wait for the summary and live rows, not merely any table row.
     page.wait_for_function(
-        "() => document.querySelectorAll('#findings-tbody tr').length > 0",
-        timeout=5000,
+        "() => { const summary = document.querySelector('#findings-summary')?.textContent || ''; "
+        "return /^\\d+ findings across \\d+ jobs$/.test(summary) "
+        "&& document.querySelectorAll('#findings-tbody tr[data-severity]').length > 0; }",
+        timeout=10000,
     )
 
 
