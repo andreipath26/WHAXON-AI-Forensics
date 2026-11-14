@@ -381,7 +381,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: python -m pytest tests/ -x -vv -ra
+        run: python -m pytest tests/ -x -vv -ra -o faulthandler_timeout=60
 
       - name: Build distributions and validate metadata
         run: |
