@@ -278,9 +278,6 @@ def main(args: list[str] | None = None) -> None:
 
     async def _go():
         await core.initialize(drain=False)
-        # Preserve queued work from earlier CLI invocations; this command only
-        # owns jobs newly enqueued by findings from its initial execution.
-        state["pending_before"] = {row["id"] for row in core.store.list_pending()}
         if verbose:
             try:
                 match = core.scope.check(target) if core.scope else None
@@ -318,10 +315,17 @@ def main(args: list[str] | None = None) -> None:
         await asyncio.sleep(0)
         state["primary_job_id"] = state.get("job_id")
         state["primary_findings"] = list(state.get("findings") or [])
-        # Drain on the same live loop so worker events are delivered normally.
+        # Drain only follow-ups caused by this source job. Global queue draining
+        # here could claim unrelated work enqueued by another producer mid-run.
+        automator = getattr(core, "automator", None)
+        take_followups = getattr(automator, "take_queued_followups", None)
+        followup_ids = (
+            take_followups(state["primary_job_id"])
+            if callable(take_followups) and state["primary_job_id"] else set()
+        )
         from whaxon.core.worker import drain_async
         state["drained_jobs"] = await drain_async(
-            core.store, core.runner, exclude_ids=state.get("pending_before", set())
+            core.store, core.runner, include_ids=followup_ids,
         )
         return result
 

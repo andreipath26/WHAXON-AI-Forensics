@@ -426,19 +426,26 @@ class JobStore:
         finally:
             c.close()
 
-    def claim_pending(self, *, exclude_ids=None, worker_id=None):
+    def claim_pending(self, *, exclude_ids=None, include_ids=None, worker_id=None):
         """Atomically lease one pending job and return its fencing token."""
         import secrets
 
         excluded = tuple(exclude_ids or ())
+        included = None if include_ids is None else tuple(dict.fromkeys(include_ids))
         owner = str(worker_id or "worker")
         token = secrets.token_urlsafe(32)
         now = time.time()
+        if included == ():
+            return None
         with self._lock:
             c = self._conn()
             try:
                 where = "status='pending'"
                 params = []
+                if included is not None:
+                    placeholders = ",".join("?" for _ in included)
+                    where += f" AND id IN ({placeholders})"
+                    params.extend(included)
                 if excluded:
                     placeholders = ",".join("?" for _ in excluded)
                     where += f" AND id NOT IN ({placeholders})"
