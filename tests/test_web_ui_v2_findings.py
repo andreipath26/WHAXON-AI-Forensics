@@ -84,6 +84,25 @@ def test_verified_finding_action_routes_to_v2_retest_studio(page, live_server):
 
 
 def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, live_server):
+    payload = {
+        "jobs": [{
+            "job": {"id": "filter-fixture", "target": "127.0.0.1", "tool": "nmap"},
+            "findings": [
+                {"seq": 0, "title": "Verified finding", "severity": "high",
+                 "source": "nmap", "verification_status": "verified", "data": {}},
+                {"seq": 1, "title": "Candidate finding one", "severity": "medium",
+                 "source": "nmap", "verification_status": "candidate", "data": {}},
+                {"seq": 2, "title": "Candidate finding two", "severity": "low",
+                 "source": "nmap", "verification_status": "candidate", "data": {}},
+            ],
+        }],
+    }
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(payload),
+        ),
+    )
     page.goto(f"{live_server}/ui-v2/findings")
     # The live report is loaded asynchronously; allow for the shared-server
     # contention seen in the full xdist suite before asserting filter behavior.
