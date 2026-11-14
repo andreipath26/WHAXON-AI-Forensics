@@ -71,3 +71,44 @@ def test_reports_reference_configuration_is_disabled_and_evidence_availability_i
     assert "Reference layout only; this selection is not applied to live exports." in page.locator("body").inner_text()
     assert page.get_by_role("button", name="Export JSON", exact=True).is_enabled()
     assert page.get_by_role("button", name="Download Markdown", exact=True).is_enabled()
+
+
+def test_reports_unavailable_state_hides_samples_and_disables_exports(page, live_server):
+    page.route(
+        "**/api/report**",
+        lambda route: route.fulfill(
+            status=503,
+            content_type="application/json",
+            body='{"error":"report service unavailable"}',
+        ),
+    )
+    response = page.goto(f"{live_server}/ui-v2/reports")
+    assert response is not None and response.status == 200
+    page.wait_for_function(
+        "() => document.querySelector('#live-report-summary')?.textContent.includes('could not be loaded')",
+        timeout=5000,
+    )
+
+    for control in (
+        page.locator("#live-report-json"),
+        page.locator("#live-report-md"),
+        page.get_by_role("button", name="Export Findings (.json)"),
+        page.get_by_role("button", name="Download Full Report (.pdf)"),
+    ):
+        assert control.is_disabled()
+
+    assert page.get_by_role("button", name="All Gaps", exact=False).count() == 0
+    raw_links = page.locator('a[href="#"]').filter(has_text="Raw")
+    assert raw_links.count() == 4
+    assert all(raw_links.nth(index).is_hidden() for index in range(raw_links.count()))
+    visible = page.locator("body").inner_text()
+    for marker in (
+        "api.internal.corp",
+        "ENG-2026-X892",
+        "FINDING-SQLI-001",
+        "raw_nmap_syn_scan",
+        "sqlmap_session_dump",
+        "burp_traffic_proxy",
+        "Sample Deterministic Proof",
+    ):
+        assert marker not in visible, f"Illustrative evidence appeared while live reporting was unavailable: {marker}"
