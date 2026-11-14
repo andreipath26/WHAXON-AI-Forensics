@@ -429,11 +429,11 @@
 <span class="material-symbols-outlined text-sm">visibility</span>
 <span>Preview Markdown</span>
 </button>
-<button class="flex items-center gap-space-xs px-space-md py-1.5 bg-surface-container-highest hover:bg-surface-variant text-on-surface font-code-sm text-code-sm rounded transition-colors" type="button">
+<button class="flex items-center gap-space-xs px-space-md py-1.5 bg-surface-container-highest hover:bg-surface-variant text-on-surface font-code-sm text-code-sm rounded transition-colors" disabled aria-disabled="true" title="Live report data has not loaded." type="button">
 <span class="material-symbols-outlined text-sm text-secondary">data_object</span>
 <span>Export Findings (.json)</span>
 </button>
-<button class="flex items-center gap-space-xs px-space-md py-1.5 bg-primary hover:bg-primary/90 text-on-primary font-code-sm text-code-sm font-semibold rounded shadow-md transition-colors" type="button">
+<button class="flex items-center gap-space-xs px-space-md py-1.5 bg-primary hover:bg-primary/90 text-on-primary font-code-sm text-code-sm font-semibold rounded shadow-md transition-colors" disabled aria-disabled="true" title="Live report data has not loaded." type="button">
 <span class="material-symbols-outlined text-sm">download</span>
 <span>Download Full Report (.pdf)</span>
 </button>
@@ -662,12 +662,44 @@
     const card=document.createElement("section");
     card.id="whaxon-live-report";
     card.className="mx-gutter-lg my-space-lg rounded-xl bg-surface-container-low p-margin shadow-md";
-    card.innerHTML='<div class="flex flex-wrap items-start justify-between gap-space-md"><div><span class="font-label-sm text-label-sm uppercase text-primary">LIVE WHAXON DATA</span><h2 class="font-headline-lg text-headline-lg text-on-surface mt-1">Assessment report</h2><p id="live-report-summary" class="font-body-sm text-body-sm text-on-surface-variant mt-1">Loading report data…</p></div><div class="flex flex-wrap gap-space-sm"><button id="live-report-preview" class="px-space-md py-1.5 bg-surface-container-highest text-on-surface rounded font-code-sm">Preview Markdown</button><button id="live-report-json" class="px-space-md py-1.5 bg-surface-container-highest text-on-surface rounded font-code-sm">Export JSON</button><button id="live-report-md" class="px-space-md py-1.5 bg-primary text-on-primary rounded font-code-sm font-semibold">Download Markdown</button></div></div><div class="grid grid-cols-2 md:grid-cols-4 gap-space-md mt-space-lg"><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Jobs</span><div id="live-report-jobs" class="font-headline-lg text-headline-lg mt-1">—</div></div><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Findings</span><div id="live-report-findings" class="font-headline-lg text-headline-lg mt-1">—</div></div><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Verified</span><div id="live-report-verified" class="font-headline-lg text-headline-lg mt-1">—</div></div><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Critical / High</span><div id="live-report-severe" class="font-headline-lg text-headline-lg mt-1">—</div></div></div><pre id="live-report-error" class="hidden mt-space-md p-space-md rounded bg-error-container/20 text-error font-code-sm"></pre>';
+    card.innerHTML='<div class="flex flex-wrap items-start justify-between gap-space-md"><div><span class="font-label-sm text-label-sm uppercase text-primary">LIVE WHAXON DATA</span><h2 class="font-headline-lg text-headline-lg text-on-surface mt-1">Assessment report</h2><p id="live-report-summary" class="font-body-sm text-body-sm text-on-surface-variant mt-1">Loading report data…</p></div><div class="flex flex-wrap gap-space-sm"><button id="live-report-preview" class="px-space-md py-1.5 bg-surface-container-highest text-on-surface rounded font-code-sm">Preview Markdown</button><button id="live-report-json" disabled aria-disabled="true" title="Live report data has not loaded." class="px-space-md py-1.5 bg-surface-container-highest text-on-surface rounded font-code-sm">Export JSON</button><button id="live-report-md" disabled aria-disabled="true" title="Live report data has not loaded." class="px-space-md py-1.5 bg-primary text-on-primary rounded font-code-sm font-semibold">Download Markdown</button></div></div><div class="grid grid-cols-2 md:grid-cols-4 gap-space-md mt-space-lg"><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Jobs</span><div id="live-report-jobs" class="font-headline-lg text-headline-lg mt-1">—</div></div><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Findings</span><div id="live-report-findings" class="font-headline-lg text-headline-lg mt-1">—</div></div><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Verified</span><div id="live-report-verified" class="font-headline-lg text-headline-lg mt-1">—</div></div><div class="rounded-lg bg-surface-container p-space-md"><span class="font-label-sm text-label-sm text-outline uppercase">Critical / High</span><div id="live-report-severe" class="font-headline-lg text-headline-lg mt-1">—</div></div></div><pre id="live-report-error" class="hidden mt-space-md p-space-md rounded bg-error-container/20 text-error font-code-sm"></pre>';
     main.prepend(card);
   };
   addLiveCard();
   livePreviewButton=document.getElementById("live-report-preview");
   livePreviewButton?.addEventListener("click",()=>{if(preview)preview.textContent=liveMarkdown || "Live report is loading. If no report data is recorded, this preview will remain empty.";if(modal){modal.classList.remove("hidden");modal.classList.add("flex");modal.scrollIntoView({behavior:"smooth",block:"nearest"});}});
+  // Remove supplied sample records and inert controls before either report request can fail.
+  function hideStaticReferences(){
+  // Never display example evidence, hashes, hosts, or invented coverage as live data.
+  document.querySelectorAll("main *").forEach(node=>{
+    if(node.children.length)return;
+    const value=(node.textContent||"").trim();
+    if(/api\.internal\.corp|ENG-2026-X892|FINDING-SQLI-001|raw_nmap_syn_scan|sqlmap_session_dump|burp_traffic_proxy|deterministic_proof_log|sha256:|7f83b165|PostgreSQL 15\.4|8 Subdomains|43 Ports Map|41 Scans|17 Findings|6 Confirmed|100%|92%|85%|70%/.test(value)){
+      const previewModal=node.closest("#previewModal");
+      if(previewModal){node.textContent="Live data is loaded when the preview opens";return;}
+      const card=node.closest(".bg-surface-container")||node.closest(".bg-surface-container-low")||node.closest(".rounded-xl");
+      if(card&&card.id!=="whaxon-live-report"&&!card.querySelector("#previewModal"))card.style.display="none";
+      else node.textContent="Live evidence not recorded";
+    }
+  });
+  document.querySelectorAll('a[href="#"]').forEach(a=>{if(/Raw/.test(a.textContent)){a.style.display="none";a.setAttribute("aria-hidden","true");}});
+  // Gap filters and the proof accordion are static mock controls, not live filters/evidence.
+  document.querySelectorAll("button").forEach(button => {
+    if (/^(?:All Gaps|Policy|Safety)\b/i.test((button.textContent || "").trim())) {
+      button.style.display = "none";
+      button.disabled = true;
+      button.setAttribute("aria-hidden", "true");
+    }
+  });
+  document.querySelectorAll("main *").forEach(node => {
+    if (node.children.length) return;
+    if (/Sample Deterministic Proof|FINDING-SQLI-001|raw_nmap_syn_scan|sqlmap_session_dump|burp_traffic_proxy/i.test((node.textContent || "").trim())) {
+      const sample = node.closest(".bg-surface-container-lowest");
+      if (sample && !sample.closest("#whaxon-live-report")) sample.style.display = "none";
+    }
+  });
+  }
+  hideStaticReferences();
   async function loadReport(){
     const summary=document.getElementById("live-report-summary");
     try{
@@ -684,42 +716,16 @@
       document.getElementById("live-report-verified").textContent=String(verified);
       document.getElementById("live-report-severe").textContent=String(severe);
       summary.textContent="Generated from the current WHAXON report API. Counts reflect recorded data; absent phase coverage and evidence-file metadata are not inferred.";
+      const liveJson=document.getElementById("live-report-json"),liveMarkdownButton=document.getElementById("live-report-md");
+      for(const button of [liveJson,liveMarkdownButton])if(button){button.disabled=false;button.removeAttribute("aria-disabled");button.removeAttribute("title");}
       document.getElementById("live-report-json")?.addEventListener("click",()=>download("whaxon-report.json",JSON.stringify(data,null,2),"application/json"));
       document.getElementById("live-report-md")?.addEventListener("click",()=>download("whaxon-report.md",markdown,"text/markdown;charset=utf-8"));
       if(preview)preview.textContent=markdown;
       if(previewBtn)previewBtn.addEventListener("click",()=>{if(modal){modal.classList.remove("hidden");modal.classList.add("flex");}if(preview)preview.textContent=markdown;});
-      // Never display example evidence, hashes, hosts, or invented coverage as live data.
-      document.querySelectorAll("main *").forEach(node=>{
-        if(node.children.length)return;
-        const value=(node.textContent||"").trim();
-        if(/api\.internal\.corp|ENG-2026-X892|FINDING-SQLI-001|raw_nmap_syn_scan|sqlmap_session_dump|burp_traffic_proxy|deterministic_proof_log|sha256:|7f83b165|PostgreSQL 15\.4|8 Subdomains|43 Ports Map|41 Scans|17 Findings|6 Confirmed|100%|92%|85%|70%/.test(value)){
-          const previewModal=node.closest("#previewModal");
-          if(previewModal){node.textContent="Live data is loaded when the preview opens";return;}
-          const card=node.closest(".bg-surface-container")||node.closest(".bg-surface-container-low")||node.closest(".rounded-xl");
-          if(card&&card.id!=="whaxon-live-report"&&!card.querySelector("#previewModal"))card.style.display="none";
-          else node.textContent="Live evidence not recorded";
-        }
-      });
-      document.querySelectorAll('a[href="#"]').forEach(a=>{if(/Raw/.test(a.textContent)){a.style.display="none";a.setAttribute("aria-hidden","true");}});
-      // Gap filters and the proof accordion are static mock controls, not live filters/evidence.
-      document.querySelectorAll("button").forEach(button => {
-        if (/^(?:All Gaps|Policy|Safety)\b/i.test((button.textContent || "").trim())) {
-          button.style.display = "none";
-          button.disabled = true;
-          button.setAttribute("aria-hidden", "true");
-        }
-      });
-      document.querySelectorAll("main *").forEach(node => {
-        if (node.children.length) return;
-        if (/Sample Deterministic Proof|FINDING-SQLI-001|raw_nmap_syn_scan|sqlmap_session_dump|burp_traffic_proxy/i.test((node.textContent || "").trim())) {
-          const sample = node.closest(".bg-surface-container-lowest");
-          if (sample && !sample.closest("#whaxon-live-report")) sample.style.display = "none";
-        }
-      });
       const downloadButtons=[...document.querySelectorAll("button")].filter(b=>(b.textContent||"").includes("Download Full Report (.pdf)"));
-      downloadButtons.forEach(b=>{b.querySelector("span:last-child").textContent="Download Report (.md)";b.addEventListener("click",()=>download("whaxon-report.md",markdown,"text/markdown;charset=utf-8"));});
+      downloadButtons.forEach(b=>{b.querySelector("span:last-child").textContent="Download Report (.md)";b.disabled=false;b.removeAttribute("aria-disabled");b.removeAttribute("title");b.addEventListener("click",()=>download("whaxon-report.md",markdown,"text/markdown;charset=utf-8"));});
       const jsonButtons=[...document.querySelectorAll("button")].filter(b=>(b.textContent||"").includes("Export Findings (.json)"));
-      jsonButtons.forEach(b=>b.addEventListener("click",()=>download("whaxon-report.json",JSON.stringify(data,null,2),"application/json")));
+      jsonButtons.forEach(b=>{b.disabled=false;b.removeAttribute("aria-disabled");b.removeAttribute("title");b.addEventListener("click",()=>download("whaxon-report.json",JSON.stringify(data,null,2),"application/json"));});
     }catch(error){summary.textContent="Live report data could not be loaded.";const err=document.getElementById("live-report-error");if(err){err.textContent=error.message;err.classList.remove("hidden");}}
   }
   loadReport();
