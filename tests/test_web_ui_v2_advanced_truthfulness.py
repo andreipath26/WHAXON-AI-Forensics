@@ -96,7 +96,14 @@ def test_approvals_workspace_loads_real_queue_and_disables_demo_decisions(page, 
 
 def test_approvals_workspace_keeps_legacy_waiting_runs_read_only(page, live_server):
     legacy_writes = []
-    page.route("**/api/ai/runs/**", lambda route: legacy_writes.append(route.request.url))
+    def guard_legacy_writes(route):
+        if route.request.method.upper() in {"GET", "HEAD"}:
+            route.continue_()
+        else:
+            legacy_writes.append(route.request.url)
+            route.abort()
+
+    page.route("**/api/ai/runs/**", guard_legacy_writes)
     page.goto(f"{live_server}/ui-v2/approvals")
     panel = page.locator("#whaxon-live-approvals")
     page.wait_for_function(
