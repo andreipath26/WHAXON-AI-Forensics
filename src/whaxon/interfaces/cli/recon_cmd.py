@@ -200,7 +200,7 @@ def _propose_v2(
 
 
 def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
-    """Run only one matching persisted fixed recon task through Engine V2."""
+    """Submit one matching persisted fixed recon plan to the V2 worker queue."""
     try:
         details = core.workflow_plan_details(plan_id)
     except (ValueError, TypeError, RuntimeError) as exc:
@@ -234,45 +234,28 @@ def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
         return EXIT_USAGE
 
     try:
-        async def execute():
+        async def submit():
             await core.initialize(drain=False)
-            return await core.run_workflow_plan(plan_id)
+            return core.enqueue_workflow_run(plan_id)
 
-        result = asyncio.run(execute())
-        report = core.workflow_report(plan_id)
+        request = asyncio.run(submit())
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
-        print(f"V2 recon workflow failed: {exc}", file=sys.stderr)
+        print(f"V2 recon request failed: {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-    findings = report.get("findings", []) if isinstance(report, dict) else []
-    result_tasks = result.get("tasks", [])
-    statuses = [
-        item.get("status", "unknown") for item in result_tasks
-        if isinstance(item, dict)
-    ] if isinstance(result_tasks, list) else []
-    status = (
-        statuses[0] if len(statuses) == 1
-        else "succeeded" if statuses and all(s == "succeeded" for s in statuses)
-        else "partial"
-    )
+    if not isinstance(request, dict) or not isinstance(request.get("id"), str):
+        print("V2 recon request was not persisted; no action was dispatched", file=sys.stderr)
+        return EXIT_ERROR
+    request_status = request.get("status", "unknown")
     print(
-        f"recon: {target}  (plan {plan_id}, {status}, {len(findings)} findings, "
-        f"{len(statuses)} tasks)"
+        f"recon: {target}  (plan {plan_id}, request {request['id']}, "
+        f"{request_status}; queued for the supervised V2 worker)"
     )
-    for finding in findings:
-        print(
-            f"  [{finding.get('severity', 'info'):8s}] "
-            f"{finding.get('kind', 'finding'):28s} "
-            f"{finding.get('raw_line', '')[:90]}"
-        )
+    print(f"  inspect: whaxon workflow plan run-snapshot --id {request['id']}")
+    print("  worker: whaxon workflow plan serve-requests")
     if verbose:
-        print(f"V2 workflow complete={result.get('complete', False)}", file=sys.stderr)
-    return (
-        EXIT_OK
-        if result.get("complete") and status == "succeeded"
-        and report.get("status") == "complete"
-        else EXIT_ERROR
-    )
+        print(f"V2 run request status={request_status}", file=sys.stderr)
+    return EXIT_OK
 
 
 def _usage() -> None:
