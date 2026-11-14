@@ -145,6 +145,10 @@ def _propose_v2(
     plan_id = plan_id or f"recon-plan-{uuid.uuid4().hex[:12]}"
     try:
         asyncio.run(core.initialize(drain=False))
+        scope = core.scope.check(target)
+        if not scope.allowed:
+            print(f"Out of scope: {target} ({scope.reason})", file=sys.stderr)
+            return EXIT_OUT_OF_SCOPE
         if core.store.get_mission(mission_id) is None:
             core.create_mission(mission_id, f"Passive reconnaissance of {target}")
         proposal = propose_passive_recon_plan(
