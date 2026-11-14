@@ -52,7 +52,7 @@
 <span class="font-label-sm text-label-sm px-space-sm py-1 rounded bg-surface-container text-on-surface-variant font-code-sm">
           PTES: ENUM_ACTIVE
         </span>
-<button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-high hover:bg-surface-variant text-primary font-code-sm text-code-sm rounded transition-colors shadow-sm" id="toggle-planner-gate">
+<button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container-high hover:bg-surface-variant text-primary font-code-sm text-code-sm rounded transition-colors shadow-sm" id="toggle-planner-gate" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-base">tune</span>
 <span>Approval Gate: Active</span>
 </button>
@@ -103,43 +103,43 @@
 </div>
 <div class="grid grid-cols-2 gap-1.5 pt-0.5 text-code-sm">
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">DNS (A/AAAA/MX/NS/SOA)</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">SSL Cert &amp; SAN Discovery</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">HTTP Security Headers</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">Tech Stack Detection</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">Robots.txt &amp; Sitemap</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">RFC 9116 security.txt</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">Set-Cookie Flag Audit</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">Redirect Chains (HTTPS-&gt;HTTP)</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">WAF/CDN Fingerprinting</span>
 </label>
 <label class="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded cursor-pointer hover:bg-surface-container-high transition-colors text-on-surface select-none">
-<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox"/>
+<input checked="" class="accent-secondary h-3 w-3 rounded" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <span class="truncate font-mono text-xs">DNS Full (CAA/DMARC/SPF)</span>
 </label>
 </div>
@@ -227,7 +227,7 @@
 </div>
 </div>
 <label class="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
-<input checked="" class="sr-only peer" id="ai-planner-toggle" type="checkbox"/>
+<input checked="" class="sr-only peer" id="ai-planner-toggle" type="checkbox" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
 <div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-surface peer-checked:bg-primary-container after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-on-primary after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
 </label>
 </div>
@@ -263,14 +263,14 @@
 <span class="material-symbols-outlined text-sm text-primary">check_circle</span>
 <span>12 services found (80/tcp, 443/tcp, 8080/tcp, 5001/tcp...)</span>
 </div>
-<button class="text-secondary hover:underline font-code-sm text-code-sm flex items-center gap-0.5" onclick="showNmapStdout()" type="button">
+<button class="text-secondary hover:underline font-code-sm text-code-sm flex items-center gap-0.5" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span>View stdout</span>
 <span class="material-symbols-outlined text-xs">open_in_new</span>
 </button>
 </div>
 <div class="flex items-center justify-between text-body-sm text-on-surface-variant pt-0.5">
 <span class="font-code-sm text-code-sm">Flags: -sV -sC -Pn --top-ports 1000</span>
-<button class="px-space-sm py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button">
+<button class="px-space-sm py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
             Re-run
           </button>
 </div>
@@ -318,10 +318,10 @@
 <div class="flex items-center justify-between pt-0.5">
 <span class="font-code-sm text-code-sm text-on-surface-variant truncate">PID: 28491 | Target: /api/v2/*</span>
 <div class="flex items-center gap-space-xs">
-<button class="px-space-sm py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button">
+<button class="px-space-sm py-0.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
               Pause
             </button>
-<button class="px-space-sm py-0.5 rounded bg-error-container hover:bg-error/30 text-error font-code-sm text-code-sm" type="button">
+<button class="px-space-sm py-0.5 rounded bg-error-container hover:bg-error/30 text-error font-code-sm text-code-sm" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
               Abort
             </button>
 </div>
@@ -375,7 +375,7 @@
 <span class="material-symbols-outlined text-sm text-tertiary">shield</span>
 <span class="truncate">Params: `id`, `tenant_uuid` (Replay via Trust Layer)</span>
 </div>
-<button class="px-space-sm py-0.5 rounded bg-primary-container text-on-primary font-code-sm text-code-sm shrink-0 hover:bg-primary transition-colors" type="button">
+<button class="px-space-sm py-0.5 rounded bg-primary-container text-on-primary font-code-sm text-code-sm shrink-0 hover:bg-primary transition-colors" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
             Engage Replay
           </button>
 </div>
@@ -387,15 +387,15 @@
 <span class="font-code-sm text-code-sm text-primary font-mono">whaxon://cli-pipeline</span>
 </div>
 <div class="grid grid-cols-3 gap-space-sm pt-space-xs">
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-xs bg-surface-container hover:bg-surface-container-high rounded text-on-surface font-code-sm text-code-sm transition-colors" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-xs bg-surface-container hover:bg-surface-container-high rounded text-on-surface font-code-sm text-code-sm transition-colors" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-sm text-secondary">explore</span>
 <span>WhatWeb</span>
 </button>
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-xs bg-surface-container hover:bg-surface-container-high rounded text-on-surface font-code-sm text-code-sm transition-colors" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-xs bg-surface-container hover:bg-surface-container-high rounded text-on-surface font-code-sm text-code-sm transition-colors" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-sm text-secondary">folder_zip</span>
 <span>Gobuster</span>
 </button>
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-xs bg-surface-container hover:bg-surface-container-high rounded text-on-surface font-code-sm text-code-sm transition-colors" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-xs bg-surface-container hover:bg-surface-container-high rounded text-on-surface font-code-sm text-code-sm transition-colors" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-sm text-secondary">security</span>
 <span>WPScan</span>
 </button>
@@ -525,8 +525,8 @@
 <!-- Terminal Command Injection Line -->
 <div class="mt-space-md pt-space-sm border-t border-outline-variant/30 flex items-center gap-space-sm">
 <span class="font-code-sm text-code-sm text-primary font-bold">whaxon(WX-8492)&gt;</span>
-<input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface placeholder:text-outline/50 px-space-sm py-1 rounded focus:outline-none focus:ring-1 focus:ring-secondary transition-all" id="cli-input" placeholder="Type command (e.g. validate --id=F-104, pause, resume, replay)..." type="text"/>
-<button class="px-space-md py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface font-code-sm text-code-sm rounded transition-colors" onclick="sendManualCommand()" type="button">
+<input class="flex-1 bg-surface-container font-code-sm text-code-sm text-on-surface placeholder:text-outline/50 px-space-sm py-1 rounded focus:outline-none focus:ring-1 focus:ring-secondary transition-all" id="cli-input" placeholder="Type command (e.g. validate --id=F-104, pause, resume, replay)..." type="text" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow."/>
+<button class="px-space-md py-1 bg-surface-container-high hover:bg-surface-variant text-on-surface font-code-sm text-code-sm rounded transition-colors" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
             Execute
           </button>
 </div>
@@ -534,22 +534,22 @@
 <!-- Bottom Interactive Pipeline Controls -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-space-sm">
 <!-- Pause Pipeline -->
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" id="btn-pause" onclick="togglePipelinePause()" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" id="btn-pause" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-base text-tertiary">pause_circle</span>
 <span id="btn-pause-text">Pause Pipeline</span>
 </button>
 <!-- Inject Payload Parameter -->
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" onclick="injectPayloadPrompt()" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-base text-secondary">input</span>
 <span>Inject Payload</span>
 </button>
 <!-- Spawn Sub-Tool -->
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" onclick="spawnSubtoolModal()" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-base text-primary">add_circle</span>
 <span>Spawn Sub-tool</span>
 </button>
 <!-- Emergency Scope Abort -->
-<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-error-container hover:bg-error/30 text-error font-code-sm text-code-sm transition-colors shadow-sm" onclick="emergencyAbort()" type="button">
+<button class="flex items-center justify-center gap-space-xs py-space-sm px-space-md rounded bg-error-container hover:bg-error/30 text-error font-code-sm text-code-sm transition-colors shadow-sm" type="button" disabled aria-disabled="true" title="Reference control: this action is not connected to a live Engine V2 workflow.">
 <span class="material-symbols-outlined text-base">emergency_home</span>
 <span>Emergency Abort</span>
 </button>
