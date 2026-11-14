@@ -64,7 +64,7 @@ def test_headless_worker_stops_before_claiming_when_signalled(tmp_path):
     assert core.workflow_run_request(request["id"])["status"] == "queued"
 
 
-def test_worker_recovery_failure_never_advertises_ready(tmp_path, monkeypatch):
+async def test_worker_recovery_failure_never_advertises_ready(tmp_path, monkeypatch):
     core = _core(tmp_path)
 
     async def fail_initialize(*, drain=False):
@@ -72,7 +72,7 @@ def test_worker_recovery_failure_never_advertises_ready(tmp_path, monkeypatch):
 
     monkeypatch.setattr(core, "initialize", fail_initialize)
     with pytest.raises(RuntimeError, match="workflow recovery failed"):
-        asyncio.run(core.serve_workflow_run_requests(threading.Event()))
+        await core.serve_workflow_run_requests(threading.Event())
     assert not core.workflow_requests.worker_is_ready()
 
 
