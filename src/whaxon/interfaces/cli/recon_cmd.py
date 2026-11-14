@@ -138,8 +138,8 @@ def _propose_v2(
     verbose: bool,
 ) -> int:
     """Persist a fixed recon proposal; approval and dispatch stay separate."""
-    from whaxon.core.workflow_proposals import propose_passive_recon_plan
     from whaxon.core.workflow import WorkflowPlan
+    from whaxon.core.workflow_proposals import propose_passive_recon_plan
 
     mission_id = mission_id or f"recon-mission-{uuid.uuid4().hex[:12]}"
     plan_id = plan_id or f"recon-plan-{uuid.uuid4().hex[:12]}"
