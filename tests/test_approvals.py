@@ -110,6 +110,7 @@ def test_api_pending_filter_by_owner(tmp_path, monkeypatch) -> None:
 
 
 def test_api_answer_requires_body(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     core.store.create_ai_run("ai-a", "g")
     core.store.set_ai_run_waiting("ai-a", "{}")
