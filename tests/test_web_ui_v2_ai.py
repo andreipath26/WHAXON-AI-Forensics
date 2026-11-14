@@ -26,6 +26,7 @@ def test_ai_strategy_gate_hides_unverified_demo_state_until_live_data_is_loaded(
         "element => getComputedStyle(element).visibility"
     ) == "hidden"
     assert no_script_page.locator("aside nav").is_visible()
+    assert no_script_page.locator("#ai-runtime-status").inner_text() == "AI STATE PENDING"
     context.close()
 
 
