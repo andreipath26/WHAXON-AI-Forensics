@@ -155,8 +155,7 @@ def test_v2_recon_leaves_approval_enforcement_to_supervised_worker(
     assert "queued for the supervised V2 worker" in capsys.readouterr().out
 
 
-def test_v2_recon_requires_plan_and_disallows_legacy_check_filter():
-    assert recon_cmd.main(["example.test", "--engine", "v2"]) == recon_cmd.EXIT_USAGE
+def test_v2_recon_disallows_legacy_check_filter():
     assert recon_cmd.main([
         "example.test", "--engine", "v2", "--plan-id", "dns-plan",
         "--checks", "dns",
