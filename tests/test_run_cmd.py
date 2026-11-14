@@ -138,6 +138,11 @@ def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch
                     "data": {"port": 80, "service": "http"},
                     "raw_line": "80/tcp open http",
                 },)))
+                # Simulate another producer queueing work between the primary
+                # run and this invocation's causal follow-up drain.
+                self.store.create_pending(
+                    "late-unrelated-job", "echo", "unrelated.example.com",
+                )
             self.bus.publish(JobFinished(job_id=job_id, exit_code=0, duration_s=0.01))
             return job_id
 
@@ -185,6 +190,7 @@ def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch
     assert by_target["burpbountylab.com:80"]["tool"] == "nikto"
     assert by_target["burpbountylab.com:80"]["status"] == "finished"
     assert core.store.get("older-pending-job")["status"] == "pending"
+    assert core.store.get("late-unrelated-job")["status"] == "pending"
     assert [item[0] for item in core.runner.executed] == ["nmap", "nikto"]
     output = capsys.readouterr().out
     assert "job: initial-nmap-job" in output

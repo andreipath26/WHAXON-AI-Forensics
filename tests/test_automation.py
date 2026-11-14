@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from whaxon.core.automation import Automator
-from whaxon.core.events import EventBus, JobFindings
+from whaxon.core.events import EventBus, JobFailed, JobFindings, JobFinished
 from whaxon.core.store import JobStore
 
 
@@ -178,3 +178,37 @@ def test_legacy_autochain_fails_closed_when_provenance_cannot_be_read(tmp_path, 
         'data': {'port': 443, 'service': 'https'}, 'raw_line': '',
     },)))
     assert store.list_pending() == []
+
+
+def test_terminal_followup_releases_source_tracking(tmp_path):
+    auto, bus, store, _runner = _mk_automator(tmp_path)
+    store.create('nmapjob')
+    store.set_started('nmapjob', 'nmap', '127.0.0.1')
+    bus.publish(JobFindings(job_id='nmapjob', findings=({
+        'kind': 'open_port', 'severity': 'info', 'source': 'nmap',
+        'data': {'port': 8080, 'service': 'http'}, 'raw_line': '',
+    },)))
+    followup_id = store.list_pending()[0]['id']
+
+    bus.publish(JobFinished(job_id=followup_id, exit_code=0, duration_s=0.1))
+
+    assert auto.take_queued_followups('nmapjob') == set()
+    assert auto._followups_by_source == {}
+    assert auto._source_by_followup == {}
+
+
+def test_failed_followup_releases_source_tracking(tmp_path):
+    auto, bus, store, _runner = _mk_automator(tmp_path)
+    store.create('nmapjob')
+    store.set_started('nmapjob', 'nmap', '127.0.0.1')
+    bus.publish(JobFindings(job_id='nmapjob', findings=({
+        'kind': 'open_port', 'severity': 'info', 'source': 'nmap',
+        'data': {'port': 8443, 'service': 'https'}, 'raw_line': '',
+    },)))
+    followup_id = store.list_pending()[0]['id']
+
+    bus.publish(JobFailed(job_id=followup_id, error='worker failed'))
+
+    assert auto.take_queued_followups('nmapjob') == set()
+    assert auto._followups_by_source == {}
+    assert auto._source_by_followup == {}

@@ -28,7 +28,7 @@ async def _renew_lease(store, runner, job_id: str, token: str, interval_s: float
 
 
 async def drain_async(
-    store, runner, *, max_jobs: int = 50, exclude_ids=None,
+    store, runner, *, max_jobs: int = 50, exclude_ids=None, include_ids=None,
     lease_ttl_s: float = _DEFAULT_LEASE_TTL_S, worker_id: str | None = None,
 ) -> int:
     """Claim and await jobs, renewing each lease until execution completes."""
@@ -37,7 +37,9 @@ async def drain_async(
     owner = worker_id or f"whaxon-{uuid.uuid4().hex}"
     ran = 0
     for _ in range(max_jobs):
-        row = store.claim_pending(exclude_ids=exclude_ids, worker_id=owner)
+        row = store.claim_pending(
+            exclude_ids=exclude_ids, include_ids=include_ids, worker_id=owner,
+        )
         if row is None:
             break
         job_id = row["id"]

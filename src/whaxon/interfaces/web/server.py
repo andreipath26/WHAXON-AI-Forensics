@@ -56,6 +56,12 @@ def _legacy_msf_execution_enabled() -> bool:
     ).strip().lower() in ("1", "true", "yes")
 
 
+def _legacy_validation_enabled() -> bool:
+    return os.environ.get(
+        "WHAXON_LEGACY_VALIDATION_ENABLED", "false",
+    ).strip().lower() in ("1", "true", "yes")
+
+
 def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
     if isinstance(value, dict):
@@ -2144,6 +2150,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/validate/<job_id>/<int:seq>")
     def api_validate(job_id: str, seq: int):
+        if not _legacy_validation_enabled():
+            return {
+                "error": (
+                    "Legacy finding validation is disabled. Use the Engine V2 "
+                    "plan-bound verification workflow for V2 evidence."
+                ),
+                "legacy_validation_enabled": False,
+                "approval_granted": False,
+                "replay_attempted": False,
+            }, 410
         from whaxon.core.findings import Finding
         from whaxon.core.validator import Validator
         findings = registry.core.store.get_findings(job_id) or []
@@ -2178,6 +2194,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/retest/<job_id>/<int:seq>")
     def api_retest(job_id: str, seq: int):
+        if not _legacy_validation_enabled():
+            return {
+                "error": (
+                    "Legacy finding retest is disabled. Use the Engine V2 "
+                    "plan-bound retest workflow for V2 evidence."
+                ),
+                "legacy_validation_enabled": False,
+                "approval_granted": False,
+                "replay_attempted": False,
+            }, 410
         from whaxon.core.findings import Finding
         from whaxon.core.validator import Validator
         findings = registry.core.store.get_findings(job_id) or []
