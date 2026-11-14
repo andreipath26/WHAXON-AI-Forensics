@@ -80,8 +80,8 @@ def test_one_shot_preserves_unrelated_pending_jobs(
     assert core.store.get("unrelated")["status"] == "pending"
 
 
-def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
-    tmp_path, monkeypatch,
+def test_v2_recon_cli_queues_unapproved_plan_without_draining_unrelated_jobs(
+    tmp_path, monkeypatch, capsys,
 ):
     monkeypatch.chdir(tmp_path)
     data = tmp_path / "data"
@@ -142,7 +142,9 @@ def test_v2_recon_cli_never_drains_unrelated_jobs_or_dispatches_unapproved_plan(
         "--data", str(data),
     ])
 
-    assert status == recon_cmd.EXIT_ERROR
+    assert status == recon_cmd.EXIT_OK
+    assert "queued for the supervised V2 worker" in capsys.readouterr().out
+    assert core.workflow_run_queue_summary()["counts"]["queued"] == 1
     assert tool_dispatches == []
     assert provider_dispatches == []
     assert core.store.list_pending() == [
