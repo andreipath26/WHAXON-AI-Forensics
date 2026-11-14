@@ -222,7 +222,7 @@ def test_dns_worker_hard_deadline_terminates_spawned_child(tmp_path, monkeypatch
     with pytest.raises(TimeoutError, match="hard deadline"):
         worker.run()
 
-    pid = int(marker.read_text(encoding="ascii"))
+    pid = int(child_pid)
     deadline = time.monotonic() + 3
     while _pid_alive(pid) and time.monotonic() < deadline:
         time.sleep(0.02)
@@ -310,9 +310,16 @@ def test_passive_dns_dispatch_cancellation_terminates_child_and_records_failure(
     async def cancel_after_child_start() -> None:
         operation = asyncio.create_task(provider.dispatch(task))
         deadline = time.monotonic() + 5
-        while not marker.exists() and time.monotonic() < deadline:
+        child_pid = ""
+        while time.monotonic() < deadline:
+            try:
+                child_pid = marker.read_text(encoding="ascii").strip()
+            except FileNotFoundError:
+                pass
+            if child_pid:
+                break
             await asyncio.sleep(0.02)
-        assert marker.exists(), "spawned DNS worker did not start"
+        assert child_pid, "spawned DNS worker did not publish its pid"
         operation.cancel()
         with pytest.raises(asyncio.CancelledError):
             await operation
