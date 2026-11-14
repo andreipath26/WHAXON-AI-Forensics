@@ -1047,8 +1047,22 @@ function whaxonRenderMessageRow(container, colspan, message, tone) {
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({answer: answer, user: owner || 'web'})
             });
-            if (r.ok || r.status === 409) { await loadApprovals(); }
-            else { btn.disabled = false; }
+            if (r.ok || r.status === 409) {
+              await loadApprovals();
+            } else if (r.status === 410) {
+              let body = {};
+              try { body = await r.json(); } catch (_e) {}
+              input.disabled = true;
+              btn.disabled = true;
+              btn.textContent = 'Legacy answer disabled';
+              const notice = document.createElement('div');
+              notice.className = 'card-sub';
+              notice.setAttribute('role', 'status');
+              notice.textContent = body.error || 'Legacy AI answers are disabled.';
+              actions.after(notice);
+            } else {
+              btn.disabled = false;
+            }
           } catch (_e) { btn.disabled = false; }
         });
       });
