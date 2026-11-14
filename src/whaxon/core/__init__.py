@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any
 
@@ -888,22 +889,46 @@ class Core:
             raise ValueError("max_runs_per_batch must be in range 1..100")
         if not callable(getattr(stop_event, "is_set", None)):
             raise TypeError("stop_event must expose is_set()")
-        await self.initialize(drain=False)
+        self.workflow_requests.set_worker_status("starting")
+        try:
+            await self.initialize(drain=False)
+        except Exception:
+            self.workflow_requests.set_worker_status("stopped")
+            raise
+        self.workflow_requests.set_worker_status("ready")
         total = 0
-        while not stop_event.is_set():
-            total += await self.drain_workflow_run_requests(
-                max_runs=max_runs_per_batch, initialized=True,
-                stop_event=stop_event,
-            )
-            # Poll deadlines use a monotonic clock: repeated fractional
-            # subtraction can drift under scheduler pauses and postpone new
-            # durable requests. A stop signal remains responsive.
-            deadline = asyncio.get_running_loop().time() + float(poll_interval_s)
+        loop = asyncio.get_running_loop()
+
+        async def refresh_worker_heartbeat():
             while not stop_event.is_set():
-                remaining = deadline - asyncio.get_running_loop().time()
-                if remaining <= 0:
-                    break
-                await asyncio.sleep(min(remaining, 0.25))
+                await asyncio.sleep(2.0)
+                if not stop_event.is_set():
+                    self.workflow_requests.set_worker_status("ready")
+
+        heartbeat = asyncio.create_task(refresh_worker_heartbeat())
+        try:
+            while not stop_event.is_set():
+                total += await self.drain_workflow_run_requests(
+                    max_runs=max_runs_per_batch, initialized=True,
+                    stop_event=stop_event,
+                )
+                # Poll deadlines use a monotonic clock: repeated fractional
+                # subtraction can drift under scheduler pauses and postpone new
+                # durable requests. A stop signal remains responsive.
+                deadline = loop.time() + float(poll_interval_s)
+                while not stop_event.is_set():
+                    now = loop.time()
+                    remaining = deadline - now
+                    if remaining <= 0:
+                        break
+                    await asyncio.sleep(min(remaining, 0.25))
+        finally:
+            heartbeat.cancel()
+            try:
+                await heartbeat
+            except asyncio.CancelledError:
+                pass
+            self.workflow_requests.set_worker_status("stopped")
         return total
 
     def propose_workflow_followups(self, source_plan_id: str, *, max_tasks: int = 16):
@@ -1127,28 +1152,30 @@ class Core:
     async def initialize(self, drain: bool = True) -> None:
         """Called once by any interface. Awaitable inside a splash screen.
 
-        drain=True (default): long-lived hosts. Drains queued jobs after
-        reconciling stale rows. drain=False: one-shot CLI commands, which
-        must not silently execute jobs a previous process queued.
+        drain=True (default): long-lived hosts reconcile stale rows. Legacy
+        JobStore rows are drained only when
+        WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true is explicitly configured.
+        Engine V2 requests are serviced by their dedicated durable worker.
+        drain=False: one-shot CLI commands never drain prior legacy jobs.
         """
         self.bus.bind_loop(asyncio.get_running_loop())
         if self.catalog.path.exists():
             self.catalog.load()
-        # Recover from a prior process that died mid-job, then run any
-        # jobs a previous process queued (the durable auto-chain).
+        # Reconcile work left by a prior process before the host reports ready.
         try:
             self.store.reconcile_stale()
-        except Exception:
-            pass
-        try:
             # Do not steal a live worker's attempt when another CLI/daemon
             # process starts. Workflow workers renew this lease while executing.
             self.store.reconcile_workflow_attempts(stale_after_s=60.0)
-        except Exception:
-            # Startup remains available, but an unreconciled workflow task
-            # cannot be reclaimed by the scheduler; operators can inspect it.
-            pass
-        if drain:
+        except Exception as exc:
+            # Recovery is part of the durable execution boundary. Starting
+            # after silently skipping it can strand claims or report false
+            # readiness, so fail closed and let the supervisor retry.
+            raise RuntimeError("workflow recovery failed; execution is not ready") from exc
+        legacy_drain_enabled = os.environ.get(
+            "WHAXON_LEGACY_QUEUE_DRAIN_ENABLED", "false",
+        ).strip().lower() in {"1", "true", "yes"}
+        if drain and legacy_drain_enabled:
             try:
                 from .worker import drain_async
                 await drain_async(self.store, self.runner)

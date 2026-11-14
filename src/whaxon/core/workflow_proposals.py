@@ -969,3 +969,156 @@ def propose_passive_headers_recon_plan(
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id, "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False}
+
+
+def propose_passive_recon_plan(
+    core,
+    *,
+    mission_id: str,
+    plan_id: str,
+    target: str,
+    checks: list[str] | None = None,
+) -> dict:
+    """Build one reviewable plan from the fixed V2 recon providers available.
+
+    No provider is dispatched. If checks are omitted, unimplemented or
+    unavailable checks are reported as omissions. If checks are explicit, any
+    unsupported or unavailable check blocks the whole proposal.
+    """
+    from .workflow import WorkflowPlan, WorkflowTask
+
+    builders = {
+        "dns": propose_passive_dns_plan,
+        "dns_full": propose_dns_full_posture_plan,
+        "ssl": propose_tls_certificate_plan,
+        "https": propose_passive_https_recon_plan,
+        "headers": propose_passive_headers_recon_plan,
+        "redirects": propose_passive_redirect_observation_plan,
+        "robots": propose_passive_robots_recon_plan,
+        "security_txt": propose_passive_security_txt_recon_plan,
+    }
+    legacy_only = ("tech", "cookies", "waf")
+    for name, value in (("mission_id", mission_id), ("plan_id", plan_id), ("target", target)):
+        if not isinstance(value, str) or not value.strip() or value != value.strip():
+            return {"status": "blocked", "reason": f"{name} must be normalized non-empty text"}
+    if checks is not None and (
+        not isinstance(checks, list)
+        or any(not isinstance(name, str) or not name or name != name.strip() for name in checks)
+    ):
+        return {"status": "blocked", "reason": "recon checks must be normalized strings"}
+    requested = tuple(checks) if checks is not None else tuple(builders) + legacy_only
+    explicit = checks is not None
+    if not requested or len(set(requested)) != len(requested):
+        return {"status": "blocked", "reason": "recon checks must be a non-empty unique list"}
+    unsupported = [name for name in requested if name not in builders]
+    if any(name not in legacy_only for name in unsupported) or (explicit and unsupported):
+        return {
+            "status": "blocked",
+            "reason": f"no V2 recon provider is admitted for checks: {', '.join(unsupported)}",
+            "execution_submitted": False,
+            "approval_granted": False,
+        }
+    if core.store.get_mission(mission_id) is None:
+        return {"status": "blocked", "reason": f"unknown mission: {mission_id}"}
+
+    tasks: list[WorkflowTask] = []
+    provider_bindings: dict[str, dict[str, str]] = {}
+    included: list[str] = []
+    omitted: list[dict[str, str]] = [
+        {"check": name, "reason": "legacy-only; no admitted V2 provider"}
+        for name in unsupported
+    ]
+    for check in requested:
+        builder = builders.get(check)
+        if builder is None:
+            continue
+        proposal = builder(
+            core, mission_id=mission_id,
+            plan_id=f"{plan_id}-{check}", target=target,
+        )
+        if not isinstance(proposal, dict) or proposal.get("status") != "proposed":
+            reason = (
+                proposal.get("reason", "provider proposal was malformed")
+                if isinstance(proposal, dict) else "provider proposal was malformed"
+            )
+            if explicit:
+                return {
+                    "status": "blocked",
+                    "reason": f"requested {check} check is unavailable: {reason}",
+                    "execution_submitted": False,
+                    "approval_granted": False,
+                }
+            omitted.append({"check": check, "reason": str(reason)[:512]})
+            continue
+        child_plan = proposal.get("plan")
+        child_tasks = child_plan.get("tasks") if isinstance(child_plan, dict) else None
+        metadata = child_plan.get("metadata") if isinstance(child_plan, dict) else None
+        bindings = metadata.get("provider_bindings") if isinstance(metadata, dict) else None
+        if not isinstance(child_tasks, list) or len(child_tasks) != 1 or not isinstance(bindings, dict):
+            return {
+                "status": "blocked",
+                "reason": f"{check} provider returned a malformed fixed plan",
+                "execution_submitted": False,
+                "approval_granted": False,
+            }
+        source_task = child_tasks[0]
+        source_id = source_task.get("id") if isinstance(source_task, dict) else None
+        binding = bindings.get(source_id) if isinstance(source_id, str) else None
+        if (
+            not isinstance(binding, dict)
+            or not isinstance(binding.get("provider_id"), str)
+            or not isinstance(binding.get("manifest_fingerprint"), str)
+        ):
+            return {
+                "status": "blocked",
+                "reason": f"{check} provider returned an incomplete manifest binding",
+                "execution_submitted": False,
+                "approval_granted": False,
+            }
+        task_id = f"task-{check}"
+        try:
+            task = WorkflowTask.from_dict({**source_task, "id": task_id})
+        except (TypeError, ValueError, KeyError) as exc:
+            return {
+                "status": "blocked",
+                "reason": f"{check} provider returned an invalid task: {exc}",
+                "execution_submitted": False,
+                "approval_granted": False,
+            }
+        tasks.append(task)
+        provider_bindings[task_id] = {
+            "provider_id": binding["provider_id"],
+            "manifest_fingerprint": binding["manifest_fingerprint"],
+        }
+        included.append(check)
+
+    if not tasks:
+        return {
+            "status": "blocked",
+            "reason": "no requested recon checks have a ready V2 provider",
+            "included_checks": [],
+            "omitted_checks": omitted,
+            "execution_submitted": False,
+            "approval_granted": False,
+        }
+    plan = WorkflowPlan(
+        mission_id=mission_id,
+        tasks=tuple(tasks),
+        metadata={
+            "proposal_type": "passive_recon",
+            "provider_bindings": provider_bindings,
+            "requested_checks": list(requested),
+            "included_checks": included,
+            "omitted_checks": omitted,
+        },
+    )
+    return {
+        "status": "proposed",
+        "plan_id": plan_id,
+        "plan": plan.to_dict(),
+        "digest": plan.digest,
+        "included_checks": included,
+        "omitted_checks": omitted,
+        "execution_submitted": False,
+        "approval_granted": False,
+    }

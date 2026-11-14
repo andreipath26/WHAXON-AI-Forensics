@@ -368,7 +368,9 @@ def _parser() -> argparse.ArgumentParser:
         "cancel-request", help="persist cancellation for a durable run request",
     )
     cancel_request.add_argument("--id", required=True)
-    run = plan_commands.add_parser("run", help="execute a plan through scoped Core providers")
+    run = plan_commands.add_parser(
+        "run", help="persist a run request for the supervised V2 worker",
+    )
     run.add_argument("--id", required=True)
     run.add_argument("--max-tasks", type=int, default=100)
     run.add_argument("--max-attempts", type=int, default=2)
@@ -871,19 +873,27 @@ def main(args: list[str] | None = None) -> int:
                 print("--max-tasks, --max-attempts and --max-concurrency must be positive", file=sys.stderr)
                 return 2
 
-            async def execute():
-                await core.initialize(drain=False)
-                return await core.run_workflow_plan(
-                    options.id, max_tasks=options.max_tasks,
-                    max_attempts=options.max_attempts,
-                    max_concurrency=options.max_concurrency,
-                )
-
-            workflow_result = _run_async(execute())
-            print(json.dumps(workflow_result, indent=2, sort_keys=True))
-            return 0 if workflow_result["complete"] and all(
-                task["status"] == "succeeded" for task in workflow_result["tasks"]
-            ) else 1
+            awaitable = core.initialize(drain=False)
+            _run_async(awaitable)
+            request = core.enqueue_workflow_run(
+                options.id, max_tasks=options.max_tasks,
+                max_attempts=options.max_attempts,
+                max_concurrency=options.max_concurrency,
+            )
+            command_prefix = (
+                f"whaxon workflow --data-dir {options.data_dir} plan"
+            )
+            print(json.dumps({
+                "status": "queued",
+                "execution_started": False,
+                "worker_required": True,
+                "run_request": request,
+                "next": [
+                    f"{command_prefix} run-snapshot --id {request['id']}",
+                    f"{command_prefix} serve-requests",
+                ],
+            }, indent=2, sort_keys=True))
+            return 0
         return 2
     except (OSError, ValueError, TypeError, RuntimeError) as exc:
         print(f"workflow command failed: {exc}", file=sys.stderr)

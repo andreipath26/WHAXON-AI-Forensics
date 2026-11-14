@@ -156,7 +156,60 @@ def test_v2_recon_requires_plan_and_disallows_legacy_check_filter():
     ]) == recon_cmd.EXIT_USAGE
 
 
-def test_legacy_recon_default_remains_available(monkeypatch, capsys):
+def test_recon_default_only_proposes_v2_plan(monkeypatch):
+    core = _FakeCore()
+    proposals = []
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setattr(
+        recon_cmd, "_propose_v2",
+        lambda _core, target, **kwargs: proposals.append((target, kwargs)) or 0,
+    )
+
+    status = recon_cmd.main(["example.test"])
+
+    assert status == recon_cmd.EXIT_OK
+    assert proposals == [("example.test", {
+        "checks": None, "mission_id": None, "plan_id": None, "verbose": False,
+    })]
+
+
+def test_recon_mission_and_plan_ids_select_proposal_mode(monkeypatch):
+    core = _FakeCore()
+    proposals = []
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setattr(
+        recon_cmd, "_propose_v2",
+        lambda _core, target, **kwargs: proposals.append((target, kwargs)) or 0,
+    )
+
+    status = recon_cmd.main([
+        "example.test", "--mission-id", "mission-1", "--plan-id", "plan-1",
+    ])
+
+    assert status == recon_cmd.EXIT_OK
+    assert proposals == [("example.test", {
+        "checks": None, "mission_id": "mission-1", "plan_id": "plan-1", "verbose": False,
+    })]
+
+
+def test_legacy_recon_requires_explicit_flag_and_opt_in(monkeypatch, capsys):
+    core = _FakeCore()
+    core.scope = type("Scope", (), {"check": lambda *_args: None})()
+    core.recon = type("Recon", (), {
+        "run": lambda *_args, **_kwargs: pytest.fail("legacy dispatch must stay blocked"),
+    })()
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.delenv("WHAXON_LEGACY_RECON_ENABLED", raising=False)
+
+    status = recon_cmd.main(["example.test", "--legacy"])
+
+    assert status == recon_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    error = capsys.readouterr().err.lower()
+    assert "disabled" in error
+    assert "no request" not in error
+
+
+def test_legacy_recon_runs_only_with_explicit_flag_and_opt_in(monkeypatch, capsys):
     core = _FakeCore()
     core.scope = type("Scope", (), {
         "check": lambda _self, _target: type("Decision", (), {
@@ -166,12 +219,11 @@ def test_legacy_recon_default_remains_available(monkeypatch, capsys):
     core.recon = type("Recon", (), {
         "run": lambda _self, target, checks=None: "legacy-job",
     })()
-    core.store = type("Store", (), {
-        "get_findings": lambda _self, _job_id: [],
-    })()
+    core.store = type("Store", (), {"get_findings": lambda _self, _job_id: []})()
     monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setenv("WHAXON_LEGACY_RECON_ENABLED", "true")
 
-    status = recon_cmd.main(["example.test"])
+    status = recon_cmd.main(["example.test", "--legacy"])
 
     assert status == recon_cmd.EXIT_OK
     assert "legacy-job" in capsys.readouterr().out

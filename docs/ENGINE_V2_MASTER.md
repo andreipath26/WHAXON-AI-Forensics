@@ -863,12 +863,13 @@ and E4 parity gates.
 The default `whaxon run <tool> <target>` path now saves a scoped, provider-pinned
 Engine V2 review plan and stops before approval or execution. Its task uses the
 stable semantic operation ID for admitted catalog providers. `whaxon run
---v2-plan <id>` remains the separate approved-plan execution path; direct legacy
-dispatch and its session/extra-argument behavior require an explicit `--legacy`
-flag. The command reports the mission, plan, digest, provider, and next review
-commands. README, CLI mode and legacy execution inventories now describe the
-cutover. Existing direct-dispatch CLI callsites remain visible behind the
-explicit compatibility flag. The AI-to-plan proposal helper now uses the same
+--v2-plan <id>` submits a durable request for the approved plan to the
+supervised worker; direct legacy dispatch and its session/extra-argument
+behavior require an explicit `--legacy` flag. The proposal command reports the
+mission, plan, digest, provider, and next review commands. README, CLI mode and
+legacy execution inventories now describe the cutover. Existing direct-
+dispatch CLI callsites remain visible behind the explicit compatibility flag.
+The AI-to-plan proposal helper now uses the same
 stable operation IDs for admitted catalog tools while preserving provider
 bindings. This does not migrate the separate autonomous AI executor, which
 remains a legacy direct-dispatch path. Exact-head CI is pending; this is not a
@@ -948,8 +949,9 @@ present, this operation requires an explicit hostname rule before its child
 performs the full fresh scope check. Python syntax compilation passed; tests
 were not run, so runtime readiness, cancellation, and attempt-seal behavior
 remain unqualified.
-It remains separate from `dns_full` (CAA/DMARC/SPF policy analysis). Recon CLI
-default behavior remains legacy. The V2 Run builder admits the provider when
+It remains separate from `dns_full` (CAA/DMARC/SPF policy analysis). At this
+2026-11-11 snapshot the recon CLI default remained legacy; the newer
+plan-only-default cutover is recorded below. The V2 Run builder admits the provider when
 selected and installed, validates hostname-only targets, and previews scope
 with the DNS-specific policy. The headless CLI exposes
 `workflow plan propose-dns-recon`; both authoring paths create only a
@@ -981,3 +983,43 @@ commands and port-forward creation use `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true
 legacy validate/retest use `WHAXON_LEGACY_VALIDATION_ENABLED=true`. V2-owned
 validation evidence remains rejected by legacy validate/retest routes, and
 port-forward deletion remains available for cleanup.
+
+## Recon CLI default plan handoff — 2026-11-14
+
+`whaxon recon <target>` now builds and saves a single reviewable plan from the
+available fixed V2 recon providers. The plan proposal itself never approves or
+dispatches tasks. An explicit `--checks` selection is all-or-nothing: an
+unsupported or unavailable requested provider blocks the proposal. The default
+proposal lists omitted legacy-only or unavailable checks so partial coverage is
+visible; `tech`, `cookies`, and `waf` are not claimed as migrated. The legacy
+runner requires both `--legacy` and
+`WHAXON_LEGACY_RECON_ENABLED=true`. An approved saved plan can still be run via
+`--engine v2 --plan-id`, which accepts only fixed recon capabilities against
+the requested target. New proposal and CLI regressions cover the aggregation,
+omission, fail-closed selection, default plan-only behavior and explicit
+compatibility gate. This is a CLI cutover, not legacy recon parity or release
+acceptance; exact-head CI remains required.
+
+## Legacy queue startup gate — 2026-11-14
+
+Long-lived `Core.initialize(drain=True)` no longer dispatches pending legacy
+`JobStore` work by default. The compatibility worker runs only when
+`WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true` is explicitly set; the V2 request
+queue remains serviced through its dedicated durable worker. One-shot CLI
+initialization never drains prior legacy work, even when the compatibility
+setting is enabled. This closes the startup auto-dispatch path for the legacy
+Automator queue; legacy direct commands and route opt-ins remain separately
+inventoried. Regressions cover default preservation, explicit opt-in, and the
+one-shot boundary. Exact-head CI is required before acceptance.
+
+## Supervised V2 run requests and fail-closed recovery — 2026-11-14
+
+`whaxon workflow plan run` and the `whaxon run --v2-plan` bridge persist a
+durable run request and return without dispatching providers inline. The
+supervised V2 worker owns execution and reconnect-safe status is available via
+`plan run-snapshot`. Startup recovery errors now stop initialization with a
+sanitized error. The worker refreshes a durable liveness record after recovery;
+when `WHAXON_V2_EXTERNAL_WORKER=1`, `/api/health` and `/api/health/simple`
+report unready until that heartbeat is fresh. This establishes queue ownership,
+recovery, and paired-service readiness behavior; exact-head CI and independent
+deployment qualification remain required.

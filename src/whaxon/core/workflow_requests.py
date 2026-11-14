@@ -40,9 +40,49 @@ class WorkflowRunQueue:
                       WHERE status IN ('queued','running','uncertain');
                     CREATE INDEX IF NOT EXISTS idx_workflow_run_queue
                       ON workflow_run_requests(status,submitted_at);
+                    CREATE TABLE IF NOT EXISTS workflow_worker_liveness (
+                        id INTEGER PRIMARY KEY CHECK (id=1),
+                        status TEXT NOT NULL,
+                        heartbeat_at REAL NOT NULL
+                    );
+                    INSERT OR IGNORE INTO workflow_worker_liveness
+                      (id,status,heartbeat_at) VALUES (1,'stopped',0);
                 """)
             finally:
                 conn.close()
+
+    def set_worker_status(self, status: str) -> None:
+        if status not in {"starting", "ready", "stopped"}:
+            raise ValueError("invalid workflow worker status")
+        with self.store._lock:
+            conn = self.store._conn()
+            try:
+                conn.execute(
+                    "UPDATE workflow_worker_liveness SET status=?,heartbeat_at=? WHERE id=1",
+                    (status, time.time()),
+                )
+            finally:
+                conn.close()
+
+    def worker_is_ready(self, *, max_age_s: float = 10.0) -> bool:
+        if (
+            isinstance(max_age_s, bool)
+            or not isinstance(max_age_s, (int, float))
+            or max_age_s <= 0
+        ):
+            raise ValueError("worker heartbeat age must be positive")
+        with self.store._lock:
+            conn = self.store._conn()
+            try:
+                row = conn.execute(
+                    "SELECT status,heartbeat_at FROM workflow_worker_liveness WHERE id=1",
+                ).fetchone()
+            finally:
+                conn.close()
+        return bool(
+            row is not None and row["status"] == "ready"
+            and time.time() - float(row["heartbeat_at"]) <= max_age_s
+        )
 
     @staticmethod
     def _check_limits(limits):

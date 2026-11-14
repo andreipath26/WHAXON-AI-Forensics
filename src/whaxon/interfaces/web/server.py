@@ -533,6 +533,15 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             checks["msf"] = "unavailable"
 
         ready = checks["database"] == "ready" and checks["data"] == "writable"
+        if _v2_worker_externally_supervised():
+            try:
+                checks["v2_worker"] = (
+                    "ready" if core.workflow_requests.worker_is_ready()
+                    else "unavailable"
+                )
+            except Exception:
+                checks["v2_worker"] = "unavailable"
+            ready = ready and checks["v2_worker"] == "ready"
         optional_degraded = ["msf"] if checks["msf"] != "up" else []
         return jsonify({
             "status": "ok" if ready else "degraded",

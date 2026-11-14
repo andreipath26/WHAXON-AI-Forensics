@@ -26,6 +26,32 @@ def test_e5_optional_msf_outage_does_not_mark_durable_core_unready(tmp_path):
     assert state["optional_degraded"] == ["msf"]
 
 
+def test_e5_external_worker_is_a_readiness_gate(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_V2_EXTERNAL_WORKER", "1")
+    client, core = _client(tmp_path)
+    core.msf = SimpleNamespace(is_up=lambda: True)
+
+    unavailable = client.get("/api/health")
+    assert unavailable.status_code == 503
+    assert unavailable.get_json()["checks"]["v2_worker"] == "unavailable"
+
+    core.workflow_requests.set_worker_status("ready")
+    connection = core.store._conn()
+    try:
+        connection.execute(
+            "UPDATE workflow_worker_liveness SET heartbeat_at=0 WHERE id=1",
+        )
+    finally:
+        connection.close()
+    stale = client.get("/api/health")
+    assert stale.status_code == 503
+
+    core.workflow_requests.set_worker_status("ready")
+    ready = client.get("/api/health")
+    assert ready.status_code == 200
+    assert ready.get_json()["checks"]["v2_worker"] == "ready"
+
+
 def test_e5_health_tests_core_data_dir_not_unrelated_environment_path(
     tmp_path, monkeypatch,
 ):
