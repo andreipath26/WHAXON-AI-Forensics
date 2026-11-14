@@ -310,6 +310,7 @@ def test_passive_dns_dispatch_cancellation_terminates_child_and_records_failure(
     async def cancel_after_child_start() -> str:
         operation = asyncio.create_task(provider.dispatch(task))
         deadline = time.monotonic() + 5
+        # File creation can precede the child's PID write by a scheduling tick.
         child_pid = ""
         while time.monotonic() < deadline:
             try:
