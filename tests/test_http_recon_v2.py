@@ -4,6 +4,7 @@ import asyncio
 import json
 import multiprocessing
 import socket
+import ssl
 import time
 import unicodedata
 from pathlib import Path
@@ -79,6 +80,9 @@ def test_https_transport_connects_only_to_scope_returned_numeric_address(
             pass
 
     class _Context:
+        verify_mode = ssl.CERT_REQUIRED
+        check_hostname = True
+
         def wrap_socket(self, raw, *, server_hostname):
             tls_names.append(server_hostname)
             return raw

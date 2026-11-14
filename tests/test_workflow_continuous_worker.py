@@ -49,6 +49,7 @@ def test_headless_worker_polls_for_later_arrivals(tmp_path):
     assert processed == 1
     assert submitter.workflow_run_request(request["id"])["status"] == "completed"
     assert submitter.workflow_progress("p")["counts"]["blocked"] == 1
+    assert not worker.workflow_requests.worker_is_ready()
 
 
 def test_headless_worker_stops_before_claiming_when_signalled(tmp_path):
@@ -61,6 +62,22 @@ def test_headless_worker_stops_before_claiming_when_signalled(tmp_path):
             core.serve_workflow_run_requests(stop, poll_interval_s=0.05),
         )).result(timeout=5) == 0
     assert core.workflow_run_request(request["id"])["status"] == "queued"
+
+
+def test_worker_recovery_failure_never_advertises_ready(tmp_path, monkeypatch):
+    core = _core(tmp_path)
+
+    async def fail_initialize(*, drain=False):
+        raise RuntimeError("workflow recovery failed")
+
+    monkeypatch.setattr(core, "initialize", fail_initialize)
+    with ThreadPoolExecutor(max_workers=1) as pool, pytest.raises(
+        RuntimeError, match="workflow recovery failed",
+    ):
+        pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(threading.Event()),
+        )).result(timeout=5)
+    assert not core.workflow_requests.worker_is_ready()
 
 
 @pytest.mark.parametrize("interval", [0, -1, float("nan"), float("inf"), True, 3601])

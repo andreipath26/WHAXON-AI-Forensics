@@ -96,6 +96,7 @@ def test_v2_recon_cli_executes_matching_robots_plan_and_renders_evidence(
     class _ExecutionCore:
         def __init__(self):
             self.run_calls = []
+            self.direct_calls = []
 
         def workflow_plan_details(self, plan_id):
             assert plan_id == "robots-plan"
@@ -105,7 +106,7 @@ def test_v2_recon_cli_executes_matching_robots_plan_and_renders_evidence(
             assert drain is False
 
         async def run_workflow_plan(self, plan_id):
-            self.run_calls.append(plan_id)
+            self.direct_calls.append(plan_id)
             return {
                 "complete": True,
                 "tasks": [{"id": "robots-1", "status": "succeeded"}],
@@ -122,6 +123,10 @@ def test_v2_recon_cli_executes_matching_robots_plan_and_renders_evidence(
                 }],
             }
 
+        def enqueue_workflow_run(self, plan_id):
+            self.run_calls.append(plan_id)
+            return {"id": "request-1", "status": "queued"}
+
     core = _ExecutionCore()
     monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
 
@@ -131,9 +136,9 @@ def test_v2_recon_cli_executes_matching_robots_plan_and_renders_evidence(
 
     assert status == recon_cmd.EXIT_OK
     assert core.run_calls == ["robots-plan"]
+    assert core.direct_calls == []
     output = capsys.readouterr().out
-    assert "robots_disallow" in output
-    assert "Disallow /admin" in output
+    assert "request request-1, queued" in output
 
 
 def test_v2_recon_cli_rejects_robots_plan_with_dynamic_inputs_before_dispatch(
@@ -173,4 +178,4 @@ def test_v2_recon_cli_rejects_robots_plan_with_dynamic_inputs_before_dispatch(
 
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "fixed DNS, TLS, HTTPS, headers, robots, or security.txt task" in capsys.readouterr().err
+    assert "must contain only fixed DNS, TLS, HTTPS, headers, redirects, robots, or security.txt tasks" in capsys.readouterr().err

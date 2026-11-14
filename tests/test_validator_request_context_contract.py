@@ -111,92 +111,50 @@ def test_store_round_trips_canonical_request_context(tmp_path):
     assert saved[0]["request_context"] == context
 
 
-def test_cli_validate_restores_request_context(tmp_path, monkeypatch):
+def test_cli_validate_legacy_execution_stops_before_network(tmp_path, monkeypatch, capsys):
     from types import SimpleNamespace
 
     from whaxon.interfaces.cli import validate_cmd
 
-    context = {"url": "https://example.test/item?id=1", "method": "GET", "parameter": "id"}
-    finding_row = {
-        "seq": 0,
-        "kind": "sqli",
-        "severity": "high",
-        "source": "sqlmap",
-        "data": {"parameter": "id"},
-        "raw_line": "SQL injection",
-        "request_context": context,
-    }
     store = SimpleNamespace(
-        is_engine_v2_execution_job=lambda job_id: False,
-        get_findings=lambda job_id: [finding_row],
-        get=lambda job_id: {"target": "https://example.test"},
-        update_verification=lambda *args, **kwargs: None,
-        set_proof=lambda *args, **kwargs: None,
+        is_engine_v2_execution_job=lambda _job_id: False,
+        get_findings=lambda _job_id: [{"seq": 0}],
+        get=lambda _job_id: {"target": "https://example.test"},
     )
     core = SimpleNamespace(
         initialize=_async_noop,
         store=store,
-        scope=SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True, reason="")),
+        scope=SimpleNamespace(check=lambda _target: SimpleNamespace(allowed=True, reason="")),
     )
-    monkeypatch.setattr(validate_cmd, "Core", lambda data_dir: core)
-    seen = {}
+    monkeypatch.setattr(validate_cmd, "Core", lambda _data_dir: core)
 
-    class FakeValidator:
-        def __init__(self, payload_dir):
-            pass
-
-        def validate(self, finding, target_url=None):
-            seen["context"] = finding.request_context
-            return "candidate", "test"
-
-    monkeypatch.setattr(validate_cmd, "Validator", FakeValidator)
-
-    assert validate_cmd.main(["job-cli", "0", "--data", str(tmp_path)]) == validate_cmd.EXIT_OK
-    assert seen["context"] == context
+    assert validate_cmd.main(["job-cli", "0", "--data", str(tmp_path)]) == (
+        validate_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    )
+    assert "no request was sent" in capsys.readouterr().err
 
 
-def test_cli_retest_restores_request_context(tmp_path, monkeypatch):
+def test_cli_retest_legacy_execution_stops_before_network(tmp_path, monkeypatch, capsys):
     from types import SimpleNamespace
 
     from whaxon.interfaces.cli import retest_cmd
 
-    context = {"url": "https://example.test/item?id=1", "method": "GET", "parameter": "id"}
-    finding_row = {
-        "seq": 0,
-        "kind": "sqli",
-        "severity": "high",
-        "source": "sqlmap",
-        "data": {"parameter": "id"},
-        "raw_line": "SQL injection",
-        "verification_status": "verified",
-        "request_context": context,
-    }
     store = SimpleNamespace(
-        is_engine_v2_execution_job=lambda job_id: False,
-        get_findings=lambda job_id: [finding_row],
-        get=lambda job_id: {"target": "https://example.test"},
-        update_verification=lambda *args, **kwargs: None,
+        is_engine_v2_execution_job=lambda _job_id: False,
+        get_findings=lambda _job_id: [{"seq": 0, "verification_status": "verified"}],
+        get=lambda _job_id: {"target": "https://example.test"},
     )
     core = SimpleNamespace(
         initialize=_async_noop,
         store=store,
-        scope=SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True, reason="")),
+        scope=SimpleNamespace(check=lambda _target: SimpleNamespace(allowed=True, reason="")),
     )
-    monkeypatch.setattr(retest_cmd, "Core", lambda data_dir: core)
-    seen = {}
+    monkeypatch.setattr(retest_cmd, "Core", lambda _data_dir: core)
 
-    class FakeValidator:
-        def __init__(self, payload_dir):
-            pass
-
-        def revalidate(self, finding, target_url=None):
-            seen["context"] = finding.request_context
-            return "inconclusive", "test"
-
-    monkeypatch.setattr(retest_cmd, "Validator", FakeValidator)
-
-    assert retest_cmd.main(["job-cli", "0", "--data", str(tmp_path)]) == retest_cmd.EXIT_OK
-    assert seen["context"] == context
+    assert retest_cmd.main(["job-cli", "0", "--data", str(tmp_path)]) == (
+        retest_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    )
+    assert "no request was sent" in capsys.readouterr().err
 
 
 async def _async_noop(*, drain):

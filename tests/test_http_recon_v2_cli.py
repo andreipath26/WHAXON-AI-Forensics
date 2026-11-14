@@ -92,6 +92,7 @@ def test_v2_recon_cli_executes_only_matching_fixed_https_plan(monkeypatch, capsy
     class _ExecutionCore:
         def __init__(self):
             self.run_calls = []
+            self.direct_calls = []
 
         def workflow_plan_details(self, plan_id):
             assert plan_id == "https-plan"
@@ -101,7 +102,7 @@ def test_v2_recon_cli_executes_only_matching_fixed_https_plan(monkeypatch, capsy
             assert drain is False
 
         async def run_workflow_plan(self, plan_id):
-            self.run_calls.append(plan_id)
+            self.direct_calls.append(plan_id)
             return {
                 "complete": True,
                 "tasks": [{"id": "task-1", "status": "succeeded"}],
@@ -118,6 +119,10 @@ def test_v2_recon_cli_executes_only_matching_fixed_https_plan(monkeypatch, capsy
                 }],
             }
 
+        def enqueue_workflow_run(self, plan_id):
+            self.run_calls.append(plan_id)
+            return {"id": "request-1", "status": "queued"}
+
     core = _ExecutionCore()
     monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
 
@@ -127,7 +132,8 @@ def test_v2_recon_cli_executes_only_matching_fixed_https_plan(monkeypatch, capsy
 
     assert status == recon_cmd.EXIT_OK
     assert core.run_calls == ["https-plan"]
-    assert "missing strict-transport-security" in capsys.readouterr().out
+    assert core.direct_calls == []
+    assert "request request-1, queued" in capsys.readouterr().out
 
 
 def test_v2_recon_cli_rejects_dynamic_https_paths_before_dispatch(monkeypatch, capsys):
@@ -167,11 +173,11 @@ def test_v2_recon_cli_rejects_dynamic_https_paths_before_dispatch(monkeypatch, c
 
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "fixed DNS, TLS, HTTPS, headers, robots, or security.txt task" in capsys.readouterr().err
+    assert "fixed DNS, TLS, HTTPS, headers, redirects, robots, or security.txt task" in capsys.readouterr().err
 
 
 
-def test_v2_recon_cli_prints_server_control_characters_as_visible_escapes(
+def test_v2_recon_cli_queues_without_rendering_provider_output(
     monkeypatch, capsys,
 ):
     findings = [
@@ -191,6 +197,9 @@ def test_v2_recon_cli_prints_server_control_characters_as_visible_escapes(
     }
 
     class _ExecutionCore:
+        def __init__(self):
+            self.run_calls = []
+
         def workflow_plan_details(self, _plan_id):
             return {"plan": {"tasks": [task]}}
 
@@ -203,10 +212,15 @@ def test_v2_recon_cli_prints_server_control_characters_as_visible_escapes(
                 "tasks": [{"id": "task-1", "status": "succeeded"}],
             }
 
+        def enqueue_workflow_run(self, plan_id):
+            self.run_calls.append(plan_id)
+            return {"id": "request-1", "status": "queued"}
+
         def workflow_report(self, _plan_id):
             return {"status": "complete", "findings": findings}
 
-    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: _ExecutionCore())
+    core = _ExecutionCore()
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
 
     status = recon_cmd.main([
         "api.acme.test", "--engine", "v2", "--plan-id", "safe-output-plan",
@@ -214,7 +228,7 @@ def test_v2_recon_cli_prints_server_control_characters_as_visible_escapes(
 
     output = capsys.readouterr().out
     assert status == recon_cmd.EXIT_OK
+    assert core.run_calls == ["safe-output-plan"]
     assert "\x1b" not in output
     assert "\u202e" not in output
-    assert "\\x1b" in output
-    assert "\\u202e" in output
+    assert "request request-1, queued" in output

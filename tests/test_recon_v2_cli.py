@@ -29,6 +29,7 @@ class _FakeCore:
             }],
         }
         self.run_calls = []
+        self.enqueue_calls = []
         self.legacy_calls = []
 
     async def initialize(self, *, drain=False):
@@ -41,6 +42,10 @@ class _FakeCore:
     async def run_workflow_plan(self, plan_id):
         self.run_calls.append(plan_id)
         return self.result
+
+    def enqueue_workflow_run(self, plan_id):
+        self.enqueue_calls.append(plan_id)
+        return {"id": "request-1", "plan_id": plan_id, "status": "queued"}
 
     def workflow_report(self, plan_id):
         assert plan_id == "dns-plan"
@@ -102,7 +107,7 @@ def test_v2_recon_rejects_non_exact_plan_before_dispatch(monkeypatch, capsys, ta
     assert "V2 recon" in capsys.readouterr().err
 
 
-def test_v2_recon_delegates_to_approved_workflow_and_prints_persisted_findings(
+def test_v2_recon_queues_approved_plan_without_inline_dispatch(
     monkeypatch, capsys,
 ):
     core = _FakeCore()
@@ -114,13 +119,14 @@ def test_v2_recon_delegates_to_approved_workflow_and_prints_persisted_findings(
 
     output = capsys.readouterr().out
     assert status == recon_cmd.EXIT_OK
-    assert core.run_calls == ["dns-plan"]
-    assert "plan dns-plan, succeeded, 1 findings" in output
-    assert "example.test A 192.0.2.1" in output
+    assert core.run_calls == []
+    assert core.enqueue_calls == ["dns-plan"]
+    assert "request request-1, queued" in output
+    assert "queued for the supervised V2 worker" in output
 
 
 @pytest.mark.parametrize("capability_id", [CAPABILITY_ID, TLS_CERT_CAPABILITY_ID])
-def test_v2_recon_unapproved_plan_remains_failed_by_workflow_engine(
+def test_v2_recon_leaves_approval_enforcement_to_supervised_worker(
     monkeypatch, capsys, capability_id,
 ):
     core = _FakeCore(
@@ -143,20 +149,73 @@ def test_v2_recon_unapproved_plan_remains_failed_by_workflow_engine(
         "example.test", "--engine", "v2", "--plan-id", "dns-plan",
     ])
 
-    assert status == recon_cmd.EXIT_ERROR
-    assert core.run_calls == ["dns-plan"]
-    assert "failed, 0 findings" in capsys.readouterr().out
+    assert status == recon_cmd.EXIT_OK
+    assert core.run_calls == []
+    assert core.enqueue_calls == ["dns-plan"]
+    assert "queued for the supervised V2 worker" in capsys.readouterr().out
 
 
-def test_v2_recon_requires_plan_and_disallows_legacy_check_filter():
-    assert recon_cmd.main(["example.test", "--engine", "v2"]) == recon_cmd.EXIT_USAGE
+def test_v2_recon_disallows_legacy_check_filter():
     assert recon_cmd.main([
         "example.test", "--engine", "v2", "--plan-id", "dns-plan",
         "--checks", "dns",
     ]) == recon_cmd.EXIT_USAGE
 
 
-def test_legacy_recon_default_remains_available(monkeypatch, capsys):
+def test_recon_default_only_proposes_v2_plan(monkeypatch):
+    core = _FakeCore()
+    proposals = []
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setattr(
+        recon_cmd, "_propose_v2",
+        lambda _core, target, **kwargs: proposals.append((target, kwargs)) or 0,
+    )
+
+    status = recon_cmd.main(["example.test"])
+
+    assert status == recon_cmd.EXIT_OK
+    assert proposals == [("example.test", {
+        "checks": None, "mission_id": None, "plan_id": None, "verbose": False,
+    })]
+
+
+def test_recon_mission_and_plan_ids_select_proposal_mode(monkeypatch):
+    core = _FakeCore()
+    proposals = []
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setattr(
+        recon_cmd, "_propose_v2",
+        lambda _core, target, **kwargs: proposals.append((target, kwargs)) or 0,
+    )
+
+    status = recon_cmd.main([
+        "example.test", "--mission-id", "mission-1", "--plan-id", "plan-1",
+    ])
+
+    assert status == recon_cmd.EXIT_OK
+    assert proposals == [("example.test", {
+        "checks": None, "mission_id": "mission-1", "plan_id": "plan-1", "verbose": False,
+    })]
+
+
+def test_legacy_recon_requires_explicit_flag_and_opt_in(monkeypatch, capsys):
+    core = _FakeCore()
+    core.scope = type("Scope", (), {"check": lambda *_args: None})()
+    core.recon = type("Recon", (), {
+        "run": lambda *_args, **_kwargs: pytest.fail("legacy dispatch must stay blocked"),
+    })()
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.delenv("WHAXON_LEGACY_RECON_ENABLED", raising=False)
+
+    status = recon_cmd.main(["example.test", "--legacy"])
+
+    assert status == recon_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    error = capsys.readouterr().err.lower()
+    assert "disabled" in error
+    assert "no request" not in error
+
+
+def test_legacy_recon_runs_only_with_explicit_flag_and_opt_in(monkeypatch, capsys):
     core = _FakeCore()
     core.scope = type("Scope", (), {
         "check": lambda _self, _target: type("Decision", (), {
@@ -166,12 +225,11 @@ def test_legacy_recon_default_remains_available(monkeypatch, capsys):
     core.recon = type("Recon", (), {
         "run": lambda _self, target, checks=None: "legacy-job",
     })()
-    core.store = type("Store", (), {
-        "get_findings": lambda _self, _job_id: [],
-    })()
+    core.store = type("Store", (), {"get_findings": lambda _self, _job_id: []})()
     monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
+    monkeypatch.setenv("WHAXON_LEGACY_RECON_ENABLED", "true")
 
-    status = recon_cmd.main(["example.test"])
+    status = recon_cmd.main(["example.test", "--legacy"])
 
     assert status == recon_cmd.EXIT_OK
     assert "legacy-job" in capsys.readouterr().out
@@ -191,6 +249,7 @@ def test_v2_recon_partial_persisted_report_is_not_success(
         "example.test", "--engine", "v2", "--plan-id", "dns-plan",
     ])
 
-    assert status == recon_cmd.EXIT_ERROR
-    assert core.run_calls == ["dns-plan"]
-    assert "succeeded, 1 findings" in capsys.readouterr().out
+    assert status == recon_cmd.EXIT_OK
+    assert core.run_calls == []
+    assert core.enqueue_calls == ["dns-plan"]
+    assert "partial" not in capsys.readouterr().out

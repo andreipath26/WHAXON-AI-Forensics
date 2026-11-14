@@ -10,8 +10,8 @@ a callsite requires reviewing its execution path and updating the classification
 | `interfaces/web/server.py` | `_run_job_blocking` | Legacy | `/api/run`; scope checked, but no persisted V2 request or task lease. |
 | `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy | Used only by legacy `/api/ai/run` and explicit `whaxon ai --legacy` execution/resume; approvals remain in legacy `ai_runs`. The separate `propose_v2_workflow_plan` path creates reviewable plan tasks and does not dispatch. |
 | `ai/executor.py`, `ai/providers/*` | Executor/provider actions | Legacy | Indirect callbacks still dispatch through `ToolRunner`. |
-| `interfaces/cli/run_cmd.py` | default proposal path / `main._go` | Mixed; default V2 plan-only | `whaxon run <tool> <target>` saves a provider-pinned review plan after scope/readiness checks; it does not approve or execute. `--v2-plan` executes only a previously persisted and approved plan. Direct ToolRunner and session transports require explicit `--legacy`; there is no V2-to-legacy fallback. |
-| `core/worker.py` | `drain_async` | Legacy | Drains Automator follow-up jobs outside workflow-plan authorization. |
+| `interfaces/cli/run_cmd.py` | default proposal path / `main._go` | Mixed; default V2 plan-only | `whaxon run <tool> <target>` saves a provider-pinned review plan after scope/readiness checks; it does not approve or execute. `--v2-plan` submits a durable run request for a previously persisted plan; the supervised worker owns dispatch. Direct ToolRunner and session transports require explicit `--legacy`; there is no V2-to-legacy fallback. |
+| `core/worker.py` | `drain_async` | Legacy compatibility path | One-shot `run --legacy` drains only follow-ups caused by that invocation; long-lived `Core.initialize(drain=True)` leaves legacy rows pending unless `WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true`. Legacy auto-chain work remains outside workflow-plan authorization. |
 | `interfaces/gui/main_window.py` | `_run_tool` | Legacy; dormant module | The shipped `whaxon-gui` entry point is `interfaces.gui.app:main` and embeds `/ui-v2`; repository search found no import of this older widget. The module remains packaged until documented downstream-import and clean-wheel checks permit removal. It is not the active desktop dispatch path. |
 | `interfaces/tui/screens/main.py` | catalog Run handoff / workflow screen | Engine V2 workflow client | Catalog Run opens V2 authoring with tool and target prefilled. The workflow screen proposes fixed-tool and sealed-evidence plans, reviews task bindings, records per-task approval, submits durable requests, reconnects and requests cancellation through shared Core services. No direct ToolRunner call remains in the TUI. |
 | `core/providers.py` | `dispatch` | Engine V2 | Canonical provider dispatch after workflow authorization and scheduler checks. |
@@ -67,7 +67,7 @@ runner inventory.
 
 | Source | Caller | Service path | Scope/consent boundary | Persistence and V2 status |
 | --- | --- | --- | --- | --- |
-| `interfaces/cli/recon_cmd.py` | `main` | `core.recon.run` → `ReconRunner.run` → registered DNS/TLS/HTTP checks | CLI checks scope before execution; `ReconRunner.run` checks scope again. No plan-bound approval or V2 task authorization. | `JobStarted`/`JobFindings` enter the legacy event bus and its store subscribers. Direct service execution; no V2 workflow request, lease, attempt or cancellation record. |
+| `interfaces/cli/recon_cmd.py` | default proposal / `--engine v2 --plan-id` / explicit `--legacy` | Default creates one fixed multi-provider plan and never dispatches; approved saved V2 plans use Core workflow services; legacy `core.recon.run` is behind `--legacy` plus `WHAXON_LEGACY_RECON_ENABLED=true` | Each included task is preflighted by its provider proposal and remains unapproved until the operator grants exact task consent. Explicit selections block if any requested provider is unsupported or unavailable. | V2 task attempts and evidence use the shared workflow store. `tech`, `cookies`, and `waf` remain legacy-only; a default plan lists them as omitted and does not claim full recon parity. |
 | `interfaces/cli/validate_cmd.py` | `main` | `Validator.validate` | V2-owned evidence is refused before target replay; legacy jobs still require target and active scope. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
 | `interfaces/cli/retest_cmd.py` | `main` | `Validator.revalidate` → `Validator.validate` | V2-owned evidence is refused before replay; legacy findings still require prior verification and current scope. | Legacy job updates remain in `JobStore`; V2 retest uses the plan-bound provider path. |
 | `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy jobs still pass `_validation_scope_error` before the probe. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
@@ -190,9 +190,9 @@ execution evidence; deployment-host readiness remains unverified.
 
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
-| CLI workflow | `whaxon run`, default `whaxon ai`, `recon --engine v2 --plan-id`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `--v2-plan` executes an approved saved plan | `whaxon run --legacy`, `whaxon ai --legacy`, default `recon`, `validate`, and `retest` retain legacy execution; `whaxon msf` only inspects status/sessions/modules | Default AI goals save a scope-checked proposal and print separate review, approval and submission commands. AI `--resume` requires `--legacy`; `--approvals` is read-only. Recon defaults to the direct `ReconRunner` path; its V2 workflow path is opt-in through `--engine v2 --plan-id`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_run_cmd.py`, `test_recon_v2_cli.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| CLI workflow | `whaxon run`, default `whaxon ai`, default `whaxon recon`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `recon --engine v2 --plan-id` submits a durable request for an approved fixed recon plan | `whaxon run --legacy`, `whaxon ai --legacy`, `recon --legacy`, `validate`, and `retest` retain compatibility paths; `whaxon msf` only inspects status/sessions/modules | Default recon saves one reviewable plan from ready fixed providers, reports omitted checks, and never approves or dispatches. Explicit check selections fail as a unit if any check is unsupported or unavailable. Legacy recon requires both `--legacy` and `WHAXON_LEGACY_RECON_ENABLED=true`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_recon_v2_cli.py`, `test_engine_v2_recon_plan_proposal.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
 | HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/msf/sessions/<id>/exec`, `POST /api/msf/sessions/<id>/portfwd`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients; gates are route-specific | `/api/run` and legacy AI execution/answer routes are default-denied unless respectively `WHAXON_LEGACY_TOOL_EXECUTION_ENABLED=true` and `WHAXON_LEGACY_AI_EXECUTION_ENABLED=true`. MSF module launch, session commands, and port-forward creation require `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; port-forward DELETE remains available for cleanup. Validate/retest are gated by `WHAXON_LEGACY_VALIDATION_ENABLED=true` for legacy evidence and still reject V2-owned evidence before replay. V2 clients do not call legacy executor, answer, validation or retest mutations; proposals and approvals remain separate from submission. |
-| Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. |
+| Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate and do not auto-drain by default | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. Legacy queue drain requires `WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true`. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls; no TUI catalog legacy action remains | Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
 
 ### Consequential HTTP route ownership
@@ -389,7 +389,7 @@ which state each family reads and what it cannot establish.
 | V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit` | Core mission, plan, budget and rate-limit records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
 | V2 run and plan state | `/api/v2/workflow-runs/summary`, `/workflow-runs/<id>`, `/snapshot`, `/workflows/<id>` | Durable run request, queue and workflow store. Queued, active, terminal and successful remain distinct; snapshots are not atomic cross-table reads. | `test_workflow_run_requests.py`, `test_server_workflow_v2.py` |
 | V2 approval, attempts and proof | `/api/v2/workflows/<id>/approvals`, `/attempts`, `/audit`, `/event-inbox`, `/events`, `/evidence`, `/limits`, `/progress`, `/readiness`, `/reconciliation`, `/resources` | Core store and workflow integrity/readiness services; only persisted attempts/evidence count, unavailable cost/worker signals are not inferred. | `test_server_workflow_v2.py`, `test_workflow.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
-| Health and advertised tools | `/api/health`, `/api/health/simple`, `/api/status`, `/api/tools` | Health checks database/data-dir writability and optional MSF status. Catalog rows and health do not prove V2 admission or worker liveness. | `test_server.py`, `test_server_workflow_v2.py` |
+| Health and advertised tools | `/api/health`, `/api/health/simple`, `/api/status`, `/api/tools` | Health checks database/data-dir writability and optional MSF status. When `WHAXON_V2_EXTERNAL_WORKER=1`, health also requires a fresh V2 worker heartbeat. Catalog rows and health do not prove V2 admission or assessment success. | `test_server.py`, `test_server_workflow_v2.py`, `test_engine_v2_e5_core_readiness.py` |
 | Legacy AI, jobs and history | `/api/ai/pending`, `/api/ai/runs*`, `/api/jobs/active`, `/api/jobs/<id>`, `/history`, `/jobs/<id>/stream` | Legacy AI run records, JobRegistry, event bus and JobStore. These are not V2 plan/request status. | `test_server_ai.py`, `test_server.py` |
 | Legacy findings, evidence and exports | `/api/coverage/<id>`, `/api/jobs/<id>/evidence*`, `/findings`, `/findings.csv`, `/findings.json`, `/output.txt`, `/report`, `/api/report`, `/api/loot`, `/api/tree`, `/api/ui-v2/findings` | Legacy finding/evidence/report stores and export serializers. Their presence does not establish V2 evidence-seal provenance or complete coverage. | `test_server.py`, `test_coverage.py`, `test_report.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
 | MSF and pivot inspection | `/api/msf/status`, `/sessions`, `/sessions/<id>`, `/modules/<type>`, `/api/pivot/graph`, `/pivot/candidates`, `/pivot/sessions/<id>/chain` | Live RPC inventory and stored pivot graph. Session/module visibility is legacy capability discovery; derived pivot edges are not proof a path is executable or authorized. | `test_server_msf.py`, `test_server_portfwd.py`, `test_server.py` |
@@ -432,7 +432,7 @@ registration alone.
 | systemd | `whaxon.service` uses Gunicorn with `create_app_factory()`; paired worker unit runs durable request polling. | Unit contract and CI are not a successful supported-host install or live worker verification. |
 | `docker-compose.e5.yml` | Repository-source web and dedicated worker share `/data`; host-published port `5001` is bound to `127.0.0.1` (the app listens on `0.0.0.0` inside the container). | Distinct from root `docker-compose.yml`, which is the vulnerable lab target. Docker assets are excluded from sdist; this is a checkout/source deployment path. |
 | Wheel/package | `pyproject.toml` exposes `whaxon`, `whaxon-tui`, and `whaxon-gui` and packages systemd units. | Installed TUI/GUI data directory behavior has not been reconciled with `WHAXON_DATA`; GUI startup also launches `whaxon serve --daemon`. Installed-wheel GUI/TUI acceptance remains unverified. |
-| `/api/health` | `core_ready` means SQLite responds and the data directory is writable; Metasploit is reported as optional degraded state. | Does not prove worker liveness, scanner readiness, workflow readiness, or assessment success. |
+| `/api/health` | `core_ready` means SQLite responds and the data directory is writable; Metasploit is reported as optional degraded state. With an external V2 worker configured, a fresh heartbeat after startup recovery is also required. | Does not prove scanner readiness, workflow approval, or assessment success. |
 | `whaxon workflow providers`, `/api/v2/providers` | `executable=true` means local manifest/catalog binding plus installed binary. `smoke_tested`, `lab_validated`, and `end_to_end_verified` remain separate fields and currently false. | “Executable” does not mean authorized, smoke-tested, lab-validated, end-to-end verified, or production-ready. |
 | `whaxon doctor` | `overall_status=READY` means required dependency checks are ready. | Does not establish service, worker, workflow or deployment acceptance. |
 
@@ -440,12 +440,17 @@ Top-level CLI modes from `src/whaxon/cli.py` are `setup`, `doctor`, `init`,
 `up`, `down`, `serve`, `web`, `tui`, `gui`, `msf`, `bounty`, `scope`,
 `install`, `suggest`, `burp-import`, `evidence`, `report`, `jobs`, `ai`,
 `cve`, `vulndb`, `lookup`, `validate`, `retest`, `coverage`, `recon`,
-`findings`, `run`, `workflow`, and `state`. Only `workflow` enters Engine V2
-capability and plan services. Of the assessment commands, `run`, `ai`, `recon`,
-`validate`, and `retest` still use legacy execution/service ownership; `msf`
-is an inspection CLI, while module/session execution remains on web/runner
-legacy routes. Environment/bootstrap commands and read/report commands do not
-become V2 assessment dispatch merely because they share the `whaxon` binary.
+`findings`, `run`, `workflow`, and `state`. `workflow` and the default `recon`
+proposal path use Engine V2 capability and plan services. Of the assessment
+commands, `run` and `ai` default to reviewable V2 plans; `recon` defaults to a
+reviewable multi-provider plan containing ready fixed checks. Legacy recon
+remains available only with `--legacy` plus
+`WHAXON_LEGACY_RECON_ENABLED=true`. `validate` and `retest` remain conservative
+legacy compatibility commands and do not dispatch for Engine V2 evidence;
+`msf` is an inspection CLI, while module/session execution remains behind
+web/runner legacy gates. Environment/bootstrap commands and read/report
+commands do not become V2 assessment dispatch merely because they share the
+`whaxon` binary.
 
 Installed terminal and desktop paths need a separate packaging check: `WhaxonApp`
 and `EmbeddedServer` derive their data directory from the checkout-relative
@@ -467,18 +472,16 @@ label is not authenticated-principal evidence.
 | `plan approval list/grant/revoke`, `record-cost`, `cancel`, `reconcile`, `rate-limit`, `deadline`, `limits` | Consent, accounting and lifecycle control-plane mutations. Approval actor identity supplied as CLI text is not authenticated identity. | Approval, cancel, recovery and limit tests in `test_workflow_cli.py` and `test_workflow.py`. |
 | `plan readiness`, `evidence`, `report`, `resources`, `audit`, `audit-snapshot`, `audit-verify`, `attempts`, `progress`, `events`, `event-inbox`, `event-ack`, `reconciliation-report` | Persisted diagnostics and evidence views; `report` renders only attempts linked to its named plan and marks failed, incomplete or unsealed evidence partial. It does not collect arbitrary job IDs or call the legacy engagement report. `event-ack` advances a consumer cursor but does not dispatch. | `test_workflow_report.py`, `test_workflow_cli.py`, `test_engine_v2_e3_audit_cli.py`, `test_workflow.py`. |
 | `plan submit-run`, `serve-requests`, `drain-requests`, `queue-summary`, `run-request`, `run-snapshot`, `cancel-request` | Durable request queue and supervised worker lifecycle; submit returns queued state and does not assert completion. | `test_workflow_run_requests.py`, `test_workflow_continuous_worker.py`, `test_workflow_cli.py`. |
-| `plan run` | Synchronous V2 Core workflow execution through policy, provider binding, scheduler and task attempts; does not create a durable run-request record/worker lease. | `test_workflow_cli.py::test_workflow_cli_runs_headless_without_draining_legacy_jobs`, `test_providers.py`, `test_workflow.py`. |
+| `plan run` | Persists a durable V2 run request and returns queued state; the supervised worker owns provider execution and lease lifecycle. | `test_workflow_cli.py::test_workflow_cli_runs_headless_without_draining_legacy_jobs`, `test_workflow_run_requests.py`, `test_workflow_continuous_worker.py`. |
 
-The CLI split also distinguishes three V2 execution modes: `workflow plan run`
-uses the V2 scheduler/policy/provider path synchronously; `workflow plan
-submit-run` plus `serve-requests` uses the durable request queue and supervised
-worker; `whaxon run <tool> <target>` creates a saved plan but does not execute;
-explicit `whaxon run --legacy`, `ai`, `recon`, `validate`, and `retest` remain
-outside V2 task/request ownership. Recon defaults to its direct legacy runner; its V2 path
-requires `--engine v2 --plan-id ID`. `workflow plan run` is not a legacy runner
-dispatch, although it bypasses the durable run-request queue. The top-level
-help omission for `recon` was corrected and is guarded by
-`test_engine_v2_cli_surface.py`.
+The CLI now routes both `workflow plan run` and `whaxon run --v2-plan <id>`
+through the durable request queue and supervised worker. `whaxon run <tool>
+<target>` and default `whaxon recon <target>` create saved plans but do not
+execute. Explicit `whaxon run --legacy`, `ai --legacy`, and `recon --legacy`
+remain compatibility paths outside V2 request ownership. Recon default
+proposal and legacy-opt-in behavior are guarded by `test_recon_v2_cli.py` and
+`test_engine_v2_recon_plan_proposal.py`; the top-level help omission for
+`recon` remains guarded by `test_engine_v2_cli_surface.py`.
 
 ### G01 controlled solo-chain crosswalk
 
@@ -582,13 +585,14 @@ execution routes listed above.
 
 ## Recon capability parity ledger — 2026-11-12
 
-`whaxon recon` defaults to the legacy execution boundary: it runs named protocol
-checks directly in `ReconRunner`, gates the target with `ScopeManager`, then
-publishes legacy `JobStarted`/`JobFindings` events. The `--engine v2 --plan-id`
-route accepts only one matching fixed task and dispatches it through an approved
-workflow plan. V2 providers are migrated individually; wrapping `ReconRunner.run()`
-as a single V2 provider would preserve internal threads and legacy event writes
-outside scheduler attempt ownership.
+The legacy `ReconRunner` path runs named protocol checks directly and publishes
+legacy `JobStarted`/`JobFindings` events; it now requires `--legacy` plus
+`WHAXON_LEGACY_RECON_ENABLED=true`. The default CLI proposes a reviewable V2
+plan from ready fixed providers. `--engine v2 --plan-id` validates fixed task
+bindings and submits a durable request; only the supervised worker dispatches
+an approved plan. V2 providers are migrated individually; wrapping
+`ReconRunner.run()` as a single V2 provider would preserve internal threads and
+legacy event writes outside scheduler attempt ownership.
 
 | Legacy check | Current behavior / output contract | V2 capability overlap | Parity |
 | --- | --- | --- | --- |

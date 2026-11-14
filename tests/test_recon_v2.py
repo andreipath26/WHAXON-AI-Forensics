@@ -307,18 +307,27 @@ def test_passive_dns_dispatch_cancellation_terminates_child_and_records_failure(
         idempotency_key="dns-cancel-test",
     )
 
-    async def cancel_after_child_start() -> None:
+    async def cancel_after_child_start() -> str:
         operation = asyncio.create_task(provider.dispatch(task))
         deadline = time.monotonic() + 5
-        while not marker.exists() and time.monotonic() < deadline:
+        # File creation can precede the child's PID write by a scheduling tick.
+        child_pid = ""
+        while time.monotonic() < deadline:
+            try:
+                child_pid = marker.read_text(encoding="ascii").strip()
+            except FileNotFoundError:
+                pass
+            if child_pid:
+                break
             await asyncio.sleep(0.02)
-        assert marker.exists(), "spawned DNS worker did not start"
+        assert child_pid, "spawned DNS worker did not publish its pid"
         operation.cancel()
         with pytest.raises(asyncio.CancelledError):
             await operation
+        return child_pid
 
-    asyncio.run(cancel_after_child_start())
-    pid = int(marker.read_text(encoding="ascii"))
+    child_pid = asyncio.run(cancel_after_child_start())
+    pid = int(child_pid)
     deadline = time.monotonic() + 3
     while _pid_alive(pid) and time.monotonic() < deadline:
         await_sleep = 0.02

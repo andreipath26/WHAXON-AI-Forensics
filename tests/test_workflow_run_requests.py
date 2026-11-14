@@ -203,7 +203,10 @@ def test_e5_external_worker_mode_prevents_factory_startup_local_drain(tmp_path, 
     app = create_app_factory()
     app.config["TESTING"] = True
     assert not called
-    assert app.test_client().get("/api/health").status_code == 200
+    response = app.test_client().get("/api/health")
+    assert response.status_code == 503
+    assert response.get_json()["checks"]["v2_worker"] == "unavailable"
+    assert not called
 
 
 def test_cancelled_workflow_cannot_be_newly_submitted(tmp_path):

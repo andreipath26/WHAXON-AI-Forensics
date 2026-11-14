@@ -399,11 +399,14 @@ The worker runs `whaxon workflow plan serve-requests` in the foreground;
 SIGTERM stops admission of additional claims. An external effect already in
 flight may remain uncertain, not automatically cancelled or replayed.
 
-For a local operational check, inspect the web's Core readiness at
+For a local operational check, inspect the web's Core and supervised-worker
+readiness at
 `http://127.0.0.1:5001/api/health` using the configured authentication
-when required. Core readiness does **not** prove worker liveness. Check the
-worker's systemd status/journal and, as the service account with the
-production data path, inspect `whaxon workflow plan queue-summary`.
+when required. With `WHAXON_V2_EXTERNAL_WORKER=1`, this endpoint fails
+readiness until the worker has completed startup recovery and refreshed its
+heartbeat. Also check the worker's systemd status/journal and, as the service
+account with the production data path, inspect
+`whaxon workflow plan queue-summary`.
 Verify a permitted, explicitly approved synthetic/controlled workflow
 through submission, persisted run-request inspection, restart, reconnect
 and cancellation without unauthorized external activity.
@@ -550,16 +553,16 @@ acceptance.
 
 ### Durable E5 run submission from headless CLI
 
-Use `whaxon workflow --data-dir /var/lib/whaxon/data plan submit-run
---id <existing-plan-id>` to persist a bounded request for the supervised
-worker without launching a second execution loop. Optional `--max-tasks`,
+Use `whaxon workflow --data-dir /var/lib/whaxon/data plan run
+--id <existing-plan-id>` or `plan submit-run` to persist a bounded request
+for the supervised worker without launching a second execution loop. The
+`whaxon run --v2-plan <existing-plan-id>` bridge uses the same queue. Optional
+`--max-tasks`,
 `--max-attempts` and `--max-concurrency` have the same values and validation
 as the V2 run API. Repeating the same plan and limits returns the same active
 request ID; differing limits fail closed. Inspect with `plan run-request` or
-`plan run-snapshot` using the returned ID. `plan run` remains the existing
-legacy direct execution command for backward compatibility and is **not**
-considered proof of a single execution authority; avoid it during paired
-supervised deployment until caller migration and phase review are complete.
+`plan run-snapshot` using the returned ID. `plan run` and `--v2-plan` now submit
+requests; direct legacy dispatch remains separately gated behind `--legacy`.
 
 
 ---

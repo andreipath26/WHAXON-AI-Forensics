@@ -166,6 +166,10 @@ class _FakeCore:
             "plan_id": plan_id,
         }
 
+    def enqueue_workflow_run(self, plan_id, **kwargs):
+        self.enqueued = (plan_id, kwargs)
+        return {"id": "request-1", "plan_id": plan_id, "status": "queued"}
+
 
 
 def test_tls_proposal_cli_persists_only_when_requested(monkeypatch, capsys):
@@ -277,7 +281,10 @@ def test_workflow_cli_validates_and_persists_plan_file(tmp_path, monkeypatch, ca
 def test_workflow_cli_runs_headless_without_draining_legacy_jobs(monkeypatch, capsys):
     monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
     assert workflow_cmd.main(["plan", "run", "--id", "plan-1"]) == 0
-    capsys.readouterr()
+    result = json.loads(capsys.readouterr().out)
+    assert result["execution_started"] is False
+    assert result["run_request"]["status"] == "queued"
+    assert "serve-requests" in result["next"][1]
 
 
 def test_workflow_cli_progress_and_events(monkeypatch, capsys):

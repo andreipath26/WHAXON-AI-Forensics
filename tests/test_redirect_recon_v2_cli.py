@@ -79,6 +79,7 @@ def test_v2_recon_cli_accepts_only_matching_single_redirect_task(monkeypatch, ca
     class _ExecutionCore:
         def __init__(self):
             self.run_calls = []
+            self.direct_calls = []
 
         def workflow_plan_details(self, plan_id):
             assert plan_id == "redirect-plan"
@@ -88,8 +89,12 @@ def test_v2_recon_cli_accepts_only_matching_single_redirect_task(monkeypatch, ca
             assert drain is False
 
         async def run_workflow_plan(self, plan_id):
-            self.run_calls.append(plan_id)
+            self.direct_calls.append(plan_id)
             return {"complete": True, "tasks": [{"id": "redirect-1", "status": "succeeded"}]}
+
+        def enqueue_workflow_run(self, plan_id):
+            self.run_calls.append(plan_id)
+            return {"id": "request-1", "status": "queued"}
 
         def workflow_report(self, plan_id):
             assert plan_id == "redirect-plan"
@@ -105,7 +110,8 @@ def test_v2_recon_cli_accepts_only_matching_single_redirect_task(monkeypatch, ca
     ])
     assert status == recon_cmd.EXIT_OK
     assert core.run_calls == ["redirect-plan"]
-    assert "redirect_observation" in capsys.readouterr().out
+    assert core.direct_calls == []
+    assert "request request-1, queued" in capsys.readouterr().out
 
 
 def test_v2_recon_cli_rejects_dynamic_redirect_inputs_before_dispatch(monkeypatch, capsys):
@@ -131,4 +137,4 @@ def test_v2_recon_cli_rejects_dynamic_redirect_inputs_before_dispatch(monkeypatc
     ])
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "must contain one fixed" in capsys.readouterr().err
+    assert "must contain only fixed" in capsys.readouterr().err

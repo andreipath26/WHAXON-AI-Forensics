@@ -67,7 +67,12 @@ def test_dispatched_top_level_modes_match_g01_inventory():
         / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
     )
     inventory = inventory_path.read_text(encoding="utf-8")
-    section = inventory.split("Top-level CLI modes", 1)[1].split(". Only ", 1)[0]
-    documented = set(re.findall(r"`([^`]+)`", section)) - {"src/whaxon/cli.py"}
+    section = re.search(
+        r"Top-level CLI modes from `src/whaxon/cli\.py` are (.*?)(?:\.|$)",
+        inventory,
+        re.DOTALL,
+    )
+    assert section is not None, "G01 inventory is missing its top-level CLI modes section"
+    documented = set(re.findall(r"`([^`]+)`", section.group(1)))
 
     assert documented == modes, f"CLI/G01 inventory drift: missing={modes - documented}, stale={documented - modes}"

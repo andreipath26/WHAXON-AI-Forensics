@@ -59,12 +59,15 @@ def test_v2_recon_cli_dispatches_matching_security_txt_plan(monkeypatch, capsys)
             "target": "api.example.test", "inputs": {}, "depends_on": []}
 
     class _Core:
-        def __init__(self): self.run_calls = []
+        def __init__(self): self.run_calls = []; self.direct_calls = []
         def workflow_plan_details(self, _plan_id): return {"plan": {"tasks": [task]}}
         async def initialize(self, *, drain=False): assert drain is False
         async def run_workflow_plan(self, plan_id):
-            self.run_calls.append(plan_id)
+            self.direct_calls.append(plan_id)
             return {"complete": True, "tasks": [{"status": "succeeded"}]}
+        def enqueue_workflow_run(self, plan_id):
+            self.run_calls.append(plan_id)
+            return {"id": "request-1", "status": "queued"}
         def workflow_report(self, _plan_id):
             return {"status": "complete", "findings": [{"severity": "info",
                 "kind": "security_txt", "raw_line": "Contact: mailto:security@example.test"}]}
@@ -73,7 +76,8 @@ def test_v2_recon_cli_dispatches_matching_security_txt_plan(monkeypatch, capsys)
     monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
     status = recon_cmd.main(["api.example.test", "--engine", "v2", "--plan-id", "security-plan"])
     assert status == recon_cmd.EXIT_OK and core.run_calls == ["security-plan"]
-    assert "security_txt" in capsys.readouterr().out
+    assert core.direct_calls == []
+    assert "request request-1, queued" in capsys.readouterr().out
 
 
 def test_v2_recon_cli_rejects_security_txt_dynamic_inputs_before_dispatch(monkeypatch, capsys):

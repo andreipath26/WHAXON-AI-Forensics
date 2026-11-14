@@ -17,7 +17,10 @@ def test_scope_visual_candidate(page, live_server, width, height, label):
         "() => document.querySelector('#scope-ui-notice')?.textContent.includes('Loaded the active scope')",
         timeout=12000,
     )
-    page.evaluate("() => document.fonts.ready")
+    page.evaluate("""async () => await Promise.race([
+        document.fonts.ready,
+        new Promise(resolve => setTimeout(resolve, 1500)),
+    ])""")
     output = Path("scope-visual-evidence")
     output.mkdir(exist_ok=True)
     page.screenshot(path=str(output / f"scope-{label}.png"), full_page=True)
