@@ -10,7 +10,7 @@ def test_canonical_findings_page_loads_live_report(page, live_server):
     page.wait_for_function(
         "() => { const el = document.querySelector('#whaxon-findings-count'); "
         "return el && !el.textContent.includes('Loading'); }",
-        timeout=5000,
+        timeout=15000,
     )
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
     assert page.locator("#whaxon-findings-list").inner_text().find(
@@ -37,7 +37,7 @@ def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, l
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=5000,
+        timeout=15000,
     )
     assert page.locator('a[data-path="trust-layer-and-findings"]').is_visible()
     assert page.locator('a[data-path="scope-and-targets"]').is_visible()
@@ -84,6 +84,25 @@ def test_verified_finding_action_routes_to_v2_retest_studio(page, live_server):
 
 
 def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, live_server):
+    payload = {
+        "jobs": [{
+            "job": {"id": "filter-fixture", "target": "127.0.0.1", "tool": "nmap"},
+            "findings": [
+                {"seq": 0, "title": "Verified finding", "severity": "high",
+                 "source": "nmap", "verification_status": "verified", "data": {}},
+                {"seq": 1, "title": "Candidate finding one", "severity": "medium",
+                 "source": "nmap", "verification_status": "candidate", "data": {}},
+                {"seq": 2, "title": "Candidate finding two", "severity": "low",
+                 "source": "nmap", "verification_status": "candidate", "data": {}},
+            ],
+        }],
+    }
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(payload),
+        ),
+    )
     page.goto(f"{live_server}/ui-v2/findings")
     # The live report is loaded asynchronously; allow for the shared-server
     # contention seen in the full xdist suite before asserting filter behavior.
@@ -129,7 +148,7 @@ def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=8000,
+        timeout=15000,
     )
 
     # "protocol" exists in the structured finding data, not the scanner raw line.
@@ -178,7 +197,7 @@ def test_findings_kpi_bars_match_live_report_counts(page, live_server):
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
+        timeout=15000,
     )
     total_text = page.locator("#whaxon-findings-count").inner_text()
     total = int(total_text.rsplit(" ", 1)[-1])
@@ -210,7 +229,7 @@ def test_findings_list_uses_only_records_from_live_report(page, live_server):
     assert template.is_hidden()
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=5000,
+        timeout=15000,
     )
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
 
@@ -229,7 +248,7 @@ def test_findings_page_loads_all_assets_locally(page, live_server):
     assert response is not None and response.status == 200
     page.wait_for_function(
         "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
-        timeout=8000,
+        timeout=15000,
     )
     assert page.title() == "WHAXON — Trust Layer & Findings"
     assert external == []
