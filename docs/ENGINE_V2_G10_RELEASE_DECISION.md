@@ -1,8 +1,8 @@
 # Engine V2 G10 Delivery Status and Release Decision
 
-**Assessment date:** 2026-11-06  
+**Assessment date:** 2026-11-14  
 **Decision:** **HOLD — NOT READY TO DEPLOY**  
-**Current main:** `a05949a885ce3b2060d180dab2904b8a681d112e` (documentation reconciliation); implementation baseline: `0cef416155623199d8cb551b809dd469d62b4778`. The recorded exact-head CI run for the implementation baseline passed 20/20 jobs. No V2 release tag, package publication, or production deployment exists.
+**Current code head before this documentation refresh:** `d02aaa74b46a624082921e2bcc30a2d2ee3ce8e5`. PRs #202 and #208 passed full 20/20 exact-tree CI; PRs #203, #204, and #206 are merged, with combined main CI run #43617029052 pending. No V2 release tag, package publication, or production deployment exists.
 
 ## Delivery sequence
 
