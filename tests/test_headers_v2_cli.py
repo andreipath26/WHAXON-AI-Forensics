@@ -75,6 +75,10 @@ def test_v2_recon_cli_dispatches_only_matching_fixed_headers_plan(monkeypatch, c
             self.run_calls.append(plan_id)
             return {"complete": True, "tasks": [{"status": "succeeded"}]}
 
+        def enqueue_workflow_run(self, plan_id):
+            self.enqueued = plan_id
+            return {"id": "request-1", "status": "queued"}
+
         def workflow_report(self, _plan_id):
             return {"status": "complete", "findings": [{
                 "severity": "medium", "kind": "http_header_missing",
@@ -86,8 +90,11 @@ def test_v2_recon_cli_dispatches_only_matching_fixed_headers_plan(monkeypatch, c
     status = recon_cmd.main([
         "api.example.test", "--engine", "v2", "--plan-id", "headers-plan",
     ])
-    assert status == recon_cmd.EXIT_OK and core.run_calls == ["headers-plan"]
-    assert "http_header_missing" in capsys.readouterr().out
+    assert status == recon_cmd.EXIT_OK and core.run_calls == []
+    assert core.enqueued == "headers-plan"
+    output = capsys.readouterr().out
+    assert "request request-1, queued" in output
+    assert "http_header_missing" not in output
 
 
 def test_v2_recon_cli_rejects_dynamic_headers_plan_inputs(monkeypatch, capsys):
