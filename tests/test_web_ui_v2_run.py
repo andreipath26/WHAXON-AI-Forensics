@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 
 def _stub_v2_plan_authoring(page, *, in_scope=True):
@@ -178,6 +179,32 @@ def test_arbitrary_shell_input_is_disabled_and_execute_is_hidden(page, live_serv
     assert command_input.is_disabled()
     assert "Engine V2 workflow controls" in command_input.get_attribute("placeholder")
     assert page.get_by_role("button", name="Execute").is_hidden()
+
+
+def test_run_page_reference_controls_are_inert_in_server_rendered_html(page, live_server):
+    response = page.goto(f"{live_server}/ui-v2/run")
+    assert response is not None and response.status == 200
+    html = response.text()
+
+    checkboxes = re.findall(r"<input\b(?=[^>]*type=\"checkbox\")[^>]*>", html)
+    assert checkboxes
+    assert all(re.search(r"\sdisabled(?:\s|>)", tag) for tag in checkboxes)
+    assert re.search(r'<input\b(?=[^>]*id="cli-input")(?=[^>]*\sdisabled)[^>]*>', html)
+
+    for label in ("View stdout", "Re-run", "Engage Replay", "WhatWeb", "Gobuster",
+                  "WPScan", "Execute", "Inject Payload", "Spawn Sub-tool", "Emergency Abort"):
+        button = re.search(
+            rf"(<button\b[^>]*>)(?:(?!</button>)[\s\S])*?{re.escape(label)}(?:(?!</button>)[\s\S])*?</button>",
+            html,
+        )
+        assert button is not None and re.search(r"\sdisabled(?:\s|>)", button.group(1)), label
+
+    assert 'onclick="clearLog()"' in html
+    clear_button = re.search(r'<button\b(?=[^>]*onclick="clearLog\(\)")[^>]*>', html)
+    assert clear_button is not None and not re.search(r"\sdisabled(?:\s|>)", clear_button.group(0))
+    for handler in ("showNmapStdout", "sendManualCommand", "togglePipelinePause",
+                    "injectPayloadPrompt", "spawnSubtoolModal", "emergencyAbort"):
+        assert f"onclick=\"{handler}()\"" not in html
 
 
 def test_run_page_start_is_single_flight(page, live_server):
