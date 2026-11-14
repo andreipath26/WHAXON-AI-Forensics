@@ -695,6 +695,7 @@ def test_loopback_listener_rejects_cross_site_fetch_metadata(tmp_path, monkeypat
     assert "cross-origin" in response.get_json()["error"]
 
 def test_web_validation_refuses_out_of_scope_job_target(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     core.store.create("outside")
     core.store.set_started("outside", "sqlmap", "google.com")
@@ -706,6 +707,77 @@ def test_web_validation_refuses_out_of_scope_job_target(tmp_path, monkeypatch):
     )
     assert response.status_code == 403
     assert "out of scope" in response.get_json()["error"].lower()
+
+
+def test_legacy_validation_api_is_default_denied_before_read_or_replay(tmp_path, monkeypatch):
+    from whaxon.core.validator import Validator
+
+    monkeypatch.delenv("WHAXON_LEGACY_VALIDATION_ENABLED", raising=False)
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding(kind="sqli")])
+    calls = []
+    read_findings = core.store.get_findings
+    monkeypatch.setattr(core.store, "get_findings", lambda *_: calls.append("read"))
+    monkeypatch.setattr(Validator, "validate", lambda *_a, **_k: calls.append("replay"))
+
+    response = app.test_client().post("/api/validate/j1/0")
+
+    assert response.status_code == 410
+    assert response.get_json()["legacy_validation_enabled"] is False
+    assert response.get_json()["approval_granted"] is False
+    assert response.get_json()["replay_attempted"] is False
+    assert calls == []
+    assert read_findings("j1")[0]["verification_status"] == "candidate"
+
+
+def test_legacy_validation_api_runs_only_with_explicit_opt_in(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from whaxon.core.validator import Validator
+
+    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding(kind="sqli")])
+    monkeypatch.setattr(
+        core.scope, "check",
+        lambda target: SimpleNamespace(allowed=True, reason="in scope", matched_rule="test"),
+    )
+    replayed = []
+    monkeypatch.setattr(
+        Validator, "validate",
+        lambda _self, finding, target_url=None: (
+            replayed.append((finding.kind, target_url)) or ("verified", "synthetic proof")
+        ),
+    )
+
+    response = app.test_client().post("/api/validate/j1/0")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "verified", "reason": "synthetic proof"}
+    assert replayed == [("sqli", "http://10.0.0.5")]
+    assert core.store.get_findings("j1")[0]["verification_status"] == "verified"
+
+
+def test_legacy_retest_api_is_default_denied_before_read_or_replay(tmp_path, monkeypatch):
+    from whaxon.core.validator import Validator
+
+    monkeypatch.delenv("WHAXON_LEGACY_VALIDATION_ENABLED", raising=False)
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding(kind="sqli")])
+    core.store.update_verification("j1", 0, "verified", by="test", reason="seeded proof")
+    calls = []
+    read_findings = core.store.get_findings
+    monkeypatch.setattr(core.store, "get_findings", lambda *_: calls.append("read"))
+    monkeypatch.setattr(Validator, "revalidate", lambda *_a, **_k: calls.append("replay"))
+
+    response = app.test_client().post("/api/retest/j1/0")
+
+    assert response.status_code == 410
+    assert response.get_json()["legacy_validation_enabled"] is False
+    assert response.get_json()["approval_granted"] is False
+    assert response.get_json()["replay_attempted"] is False
+    assert calls == []
+    assert read_findings("j1")[0]["verification_status"] == "verified"
 
 def test_tool_catalog_reports_adapter_availability(tmp_path, monkeypatch):
     app, _ = _make_app(tmp_path, monkeypatch)
@@ -1066,6 +1138,7 @@ def test_dependency_audit_integrity_endpoint_fails_on_corruption(tmp_path, monke
 def test_retest_api_refuses_candidate_without_replay(tmp_path, monkeypatch):
     from whaxon.core.validator import Validator
 
+    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     _seed_job(core, findings=[_finding()])
     called = []
@@ -1087,6 +1160,7 @@ def test_retest_api_persists_inconclusive_instead_of_fixed(tmp_path, monkeypatch
 
     from whaxon.core.validator import Validator
 
+    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     _seed_job(core, findings=[_finding()])
     core.store.update_verification("j1", 0, "verified", by="test", reason="seeded proof")

@@ -295,7 +295,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/pivot/graph` | `api_pivot_graph` | Legacy pivot/session graph |
 | `GET` | `/api/pivot/sessions/<session_id>/chain` | `api_pivot_chain` | Legacy pivot/session graph |
 | `GET` | `/api/report` | `api_report` | Legacy report, finding or loot view |
-| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
+| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
 | `POST` | `/api/run` | `run_tool` | Legacy ToolRunner and JobStore |
 | `GET` | `/api/scope` | `get_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
@@ -356,7 +356,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Legacy Validator for legacy jobs; V2 jobs fail closed before replay |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
@@ -364,7 +364,7 @@ test family remain authoritative for side effects and access-control limits.
 | Legacy tool and AI dispatch | `POST /api/run` → `_run_job_blocking`; `POST /api/ai/run` → legacy AI executor/bridge | Scope and input checks apply at the route, with legacy job or AI-run state. They do not create V2 plan-bound task attempts. | Legacy path; see `test_server.py`, `test_server_ai.py`, runner and AI bridge tests. |
 | Legacy Metasploit | `POST /api/msf/run`; `POST /api/msf/sessions/<session_id>/exec` | Module path validates inputs and scope before worker dispatch. Session command checks live session scope before RPC. | Legacy job/session paths; no V2 task/attempt lifecycle. |
 | Metasploit pivot forwarding | `GET`, `POST`, and `DELETE /api/msf/sessions/<session_id>/portfwd` | Every operation checks the session host against current scope. Creation separately checks the destination and writes a pivot edge; removal calls the legacy forward manager. | Network/pivot side effects remain outside V2 task ownership. See `test_server_portfwd.py` and scope-denial cases in `test_server.py`. |
-| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest recheck current target scope; retest requires existing verified status. The resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
+| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest default-deny before finding reads, replay or mutation unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; with opt-in, they recheck current target scope and retest requires existing verified status. V2-owned evidence remains rejected before replay. The separate resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
 | V2 authoring scope preview | `POST /api/v2/scope/check` | Uses the selected capability's target policy for authoring feedback; passive DNS requires a hostname and DNS-query scope. This preview does not authorize or dispatch a task. | Core scheduler and the supervised DNS child recheck current scope before execution. |
 | Scope policy | `GET`, `POST /api/scope`; `POST /api/scope/check`; `POST /api/scope/override` | Scope POST persists rules and requires explicit confirmation to disable enforcement. Scope check evaluates a target. Override only writes a legacy audit-style record; it does not authorize dispatch. | Scope configuration feeds shared Core checks, but the legacy override record is not a V2 approval. See `test_web_scope.py`, `test_scope_failclosed.py`, and `test_server.py`. |
 | Legacy job cancellation | `POST /api/jobs/<job_id>/cancel` | Calls `_cancel_job_blocking` for a legacy job process/event state. | Separate from durable V2 run-request and plan cancellation endpoints. Route-level lifecycle parity remains open under G05. |

@@ -150,6 +150,9 @@ def live_server(tmp_path_factory):
     env["WHAXON_PORT"] = str(port)
     env["WHAXON_HOST"] = "127.0.0.1"
     env["WHAXON_AUTH_DISABLED"] = "1"
+    # These compatibility integration tests exercise the retained legacy
+    # validate/retest routes; the default-deny behavior has focused unit tests.
+    env["WHAXON_LEGACY_VALIDATION_ENABLED"] = "true"
 
     proc = subprocess.Popen(
         [_whaxon_bin(), "serve"],
