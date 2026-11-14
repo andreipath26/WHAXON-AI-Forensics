@@ -85,9 +85,11 @@ def test_verified_finding_action_routes_to_v2_retest_studio(page, live_server):
 
 def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, live_server):
     page.goto(f"{live_server}/ui-v2/findings")
+    # The live report is loaded asynchronously; allow for the shared-server
+    # contention seen in the full xdist suite before asserting filter behavior.
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=8000,
+        timeout=15000,
     )
     total = page.locator("#whaxon-findings-list [data-finding-index]:visible").count()
     assert page.get_by_role("button", name="ALL").count() >= 3
