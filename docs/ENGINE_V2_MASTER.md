@@ -9,7 +9,7 @@ Total output lines: 2154
 
 # WHAXON — ENGINE V2 MASTER DOCUMENT
 
-> **Current implementation status — 2026-11-14, code head `c95acb789aa5f510c782ba24f465975a8fb51c80`.** PRs #202, #203, #204, #206, #208, and #209 are merged. The complete code tree passed 20/20 jobs in exact-tree CI run #43619108947. G10 remains **HOLD — NOT READY TO DEPLOY**: exhaustive legacy execution-path coverage, remaining shared V2 lifecycle and transport parity, provider-effect recovery, and the complete agreed UI behavior/control wiring are still implementation work. External qualification and release-artifact verification follow completion of that work.
+> **Current implementation status — 2026-11-14, main code head `272245e700dfa89835f44886f370b011c1786cf1`.** PRs #202, #203, #204, #206, #208, #209, #212, #213, #214, and #215 are merged. The exact source candidate tree at `75880425cdaf4857989f229638e59c5b65de099f` passed all 20 CI jobs in run #43624338670; the same run passed the isolated Engine V2 G01 controlled-lab chain and retained evidence artifact #14125401711. G10 remains **HOLD — NOT READY TO DEPLOY**: exhaustive legacy execution-path coverage, remaining shared V2 lifecycle and transport parity, provider-effect recovery, and the complete agreed UI behavior/control wiring are still implementation work. External qualification and release-artifact verification follow completion of that work.
 
 **Consolidation date:** 2026-11-06. **Historical consolidation baseline:** `6a41f626536be917e12acd175ffffad716132823`; current status is reconciled to the exact `main` SHA in the audit banner above.
 
@@ -550,7 +550,7 @@ Symbols: **S** source/artifact and related test found; **G** gate incomplete or 
 4. **E3/E5 under-described by dated snapshots:** actual main includes persisted run requests, continuous polling, mission-wide durable limits, cancellation fencing, event cursors, evidence cross-checks and local evidence seals. They close *implementation slices*, not process-kill and deployment acceptance.
 5. **E4 snapshot lags main:** the existing dated E4 discussion still describes earlier unmerged/failed PRs; main now includes trusted alternative routing, bound provider identities, semantic operation aliases, a read-only portfolio audit and evidence-derived follow-up planning. Full transport parity is still not established.
 6. **Audit integrity limitation:** `src/whaxon/core/store.py` explicitly describes its local SHA-256 evidence baseline as not a tamper-proof external audit signature. Do not label local digests an independent trust anchor.
-7. **UI status must not be equated with working controls:** 793 statically inventoried controls across 22 templates, including unresolved/static examples, do not imply complete interaction, visual, accessibility or offline acceptance.
+7. **UI status must not be equated with working controls:** 808 statically inventoried controls across 22 templates, including unresolved/static examples, do not imply complete interaction, visual, accessibility or offline acceptance.
 
 ## Batches to turn observed-checkpoint coverage into genuine completion percentages
 
@@ -593,7 +593,7 @@ The separate 75-row roadmap-index ledger still records **0/75 formally accepted 
 - **E3:** Lost worker leases and changed plan digests emit durable, bounded, idempotent uncertain-request audit events. A regression actually kills a Python child process after a synthetic callback writes a marker, manually ages its heartbeat and asserts uncertain/no automatic replay; this is **not** a real external-scanner effects test nor a complete independent integrity/outbox test.
 - **E4:** Adapter disappearance, stale manifests and changed catalog bindings are checked at live resolution; this does not certify cross-transport provider substitution or retirement of all legacy execution paths.
 - **E5:** PR #120 (squash `15fd5e4058377abaea2f0103f849f3817f050ba8`) merged a packaged, independently supervised *systemd unit candidate* and SQLite-only snapshot/restore tests. Health checks differentiate Core data/DB readiness from optional MSF. The crosswalk records 10/10 successful **pre-merge PR-head checks**, not verified runtime launch on an actual host or complete disaster recovery.
-- **E6:** Source presence of 22 UI-v2 pages and a 793-control static inventory remains distinct from complete authorized per-control runtime, visual/accessibility and lab-release acceptance.
+- **E6:** Source presence of 22 UI-v2 pages and a 808-control static inventory remains distinct from complete authorized per-control runtime, visual/accessibility and lab-release acceptance.
 
 **Authoritative precedence:** master roadmap defines goals and gates; current source/tests establish code behavior; dated documents and branch/PR checkpoint notes are historical unless verified against main. Do not resurrect fixed one-shot startup issues or represent partial provider/service components as absent. Existing legacy worker/Automator/AI paths remain until migration, parity and rollback gates are passed.
 
