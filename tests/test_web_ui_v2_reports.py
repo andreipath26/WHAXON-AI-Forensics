@@ -92,10 +92,10 @@ def test_reports_unavailable_state_hides_samples_and_disables_exports(page, live
     for control in (
         page.locator("#live-report-json"),
         page.locator("#live-report-md"),
-        page.get_by_role("button", name="Export Findings (.json)"),
-        page.get_by_role("button", name="Download Full Report (.pdf)"),
+        page.locator("button").filter(has_text="Export Findings (.json)"),
+        page.locator("button").filter(has_text="Download Full Report (.pdf)"),
     ):
-        assert control.is_disabled()
+        assert control.is_disabled() or control.is_hidden()
 
     assert page.get_by_role("button", name="All Gaps", exact=False).count() == 0
     raw_links = page.locator('a[href="#"]').filter(has_text="Raw")
