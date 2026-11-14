@@ -3,7 +3,7 @@ Total output lines: 1574
 
 # WHAXON — UI V2 DESIGN, INTERACTION AND ACCEPTANCE MASTER
 
-> **Current UI / delivery reconciliation — 2026-11-14, code head `b018024261748df1a581226780f2b802ab67e35a`.** UI safety PRs #203 (Adapters), #204 (Run), #206 (AI), and #213 (disconnected Adapter configuration controls) are merged. Their changes disable disconnected reference actions and hide unverified AI sample state until live state loads. The combined code tree passed all 20 CI jobs in run #43619108947. All 22 route rows remain open for full behavior/control wiring and D1–D6 acceptance. Complete implementation and internal tests before final external/manual/deployment qualification. Supported UI scope remains desktop.
+> **Current UI / delivery reconciliation — 2026-11-14, main code head `272245e700dfa89835f44886f370b011c1786cf1`.** UI safety and reliability PRs #203 (Adapters), #204 (Run), #206 (AI), #213 (disconnected Adapter configuration controls), #214 (deterministic Findings browser data), and #215 (truthful Reports unavailable state) are merged. The exact source candidate tree `75880425cdaf4857989f229638e59c5b65de099f` passed all 20 CI jobs in run #43624338670, including the isolated G01 chain. The regenerated inventory contains 808 controls across 22 templates. All 22 route rows remain open for full behavior/control wiring and D1–D6 acceptance. Complete implementation and internal tests before final external/manual/deployment qualification. Supported UI scope remains desktop.
 
 **Canonical UI implementation and post-completion qualification reference.** Use this crosswalk to complete the 22-page agreed UI scope. Source, tests, screenshots, and exact-head CI establish implementation behavior. Run internal browser/API checks throughout implementation. D1–D6 are final external/manual/deployment qualification criteria and are not prerequisites for implementing the UI. Start that qualification only after the agreed V2 engine and UI scope is complete and internal checks pass. Do not infer that one page's results establish another page's behavior.
 
@@ -71,7 +71,7 @@ and current scope before the server saves a plan. Review, approval and durable
 submission remain separate. Legacy routes remain available to older clients.
 UI-11 and UI-17 remain open for the D1–D6 gates below.
 
-All templates live under `src/whaxon/interfaces/web/templates/`; browser tests live under `tests/`. The dashboard alias `/ui-v2/dashboard` and root entry route `/` additionally require parity checks. Common tests: `test_web_ui_v2_route_matrix.py`, `test_web_ui_v2_navigation.py`, `test_web_ui_v2_control_inventory.py`; auxiliary pages share the listed suites. The regenerated inventory records **808 static controls across 22 templates** at code head `b018024261748df1a581226780f2b802ab67e35a`; script references do not establish live bindings.
+All templates live under `src/whaxon/interfaces/web/templates/`; browser tests live under `tests/`. The dashboard alias `/ui-v2/dashboard` and root entry route `/` additionally require parity checks. Common tests: `test_web_ui_v2_route_matrix.py`, `test_web_ui_v2_navigation.py`, `test_web_ui_v2_control_inventory.py`; auxiliary pages share the listed suites. The regenerated inventory records **808 static controls across 22 templates** at code head `272245e700dfa89835f44886f370b011c1786cf1`; script references do not establish live bindings.
 
 ## Acceptance criteria for EVERY row
 
@@ -189,7 +189,7 @@ PR [#126](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/126) merged a
 
 # New Default Web UI — Interaction and Acceptance Audit
 
-> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](#part-4--docsui_control_inventorymd-source-record) for the regenerated 808 source controls across 22 templates at code head `b018024261748df1a581226780f2b802ab67e35a`; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
+> **Integration update — 2026-11-02, supersedes affected baseline statements below:** Four one-shot CLI commands now use `initialize(drain=False)` with regression coverage. Desktop startup targets `/ui-v2`. Test catalog consumers use the packaged seed; the duplicate tracked root catalog and unused qasync requirement/manifest entry are removed, while operator catalogs and protected legacy designs remain preserved. See [UI control inventory](#part-4--docsui_control_inventorymd-source-record) for the regenerated 808 source controls across 22 templates at code head `272245e700dfa89835f44886f370b011c1786cf1`; static coverage does not establish complete runtime wiring, visual fidelity, accessibility or service parity. Local browser execution is blocked by unavailable Chromium downloads. The earlier CI/source records below describe their stated baseline, not acceptance of this integration.
 
 
 **Authority:** `WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md`, P4 and §38 G06; the previous section references are reconciled in its §50.
@@ -443,7 +443,7 @@ This is a complete **static source-control registry**, not a declaration that ev
 | ui_v2_monitoring.html | 45 | 0 | 0 | 0 | 0 | 19 | 26 |
 | ui_v2_ptaas.html | 42 | 5 | 0 | 0 | 11 | 17 | 9 |
 | ui_v2_report.html | 22 | 1 | 0 | 1 | 0 | 5 | 15 |
-| ui_v2_reports.html | 21 | 1 | 0 | 0 | 0 | 5 | 15 |
+| ui_v2_reports.html | 21 | 1 | 2 | 0 | 0 | 5 | 13 |
 | ui_v2_retest.html | 36 | 0 | 0 | 0 | 0 | 14 | 22 |
 | ui_v2_run.html | 50 | 0 | 34 | 1 | 1 | 12 | 2 |
 | ui_v2_scope.html | 39 | 25 | 1 | 5 | 0 | 6 | 2 |
@@ -782,8 +782,8 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 379:1 | input | (unnamed) | unresolved-static | — |
 | 387:1 | input | (unnamed) | unresolved-static | — |
 | 428:1 | button | visibility Preview Markdown | script-reference | previewBtn |
-| 432:1 | button | data_object Export Findings (.json) | unresolved-static | — |
-| 436:1 | button | download Download Full Report (.pdf) | unresolved-static | — |
+| 432:1 | button | data_object Export Findings (.json) | disabled | — |
+| 436:1 | button | download Download Full Report (.pdf) | disabled | — |
 | 489:1 | a | download Raw | unresolved-static | # |
 | 504:1 | a | download Raw | unresolved-static | # |
 | 519:1 | a | download Raw | unresolved-static | # |
