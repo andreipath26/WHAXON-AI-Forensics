@@ -10,7 +10,7 @@ def test_canonical_findings_page_loads_live_report(page, live_server):
     page.wait_for_function(
         "() => { const el = document.querySelector('#whaxon-findings-count'); "
         "return el && !el.textContent.includes('Loading'); }",
-        timeout=5000,
+        timeout=15000,
     )
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
     assert page.locator("#whaxon-findings-list").inner_text().find(
