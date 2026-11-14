@@ -220,13 +220,26 @@ def _run_v2(core: Core, target: str, plan_id: str, *, verbose: bool) -> int:
             ROBOTS_RECON_CAPABILITY_ID, SECURITY_TXT_RECON_CAPABILITY_ID,
             HEADERS_RECON_CAPABILITY_ID,
         }
-    if any(
-        task.get("capability_id") not in allowed_capabilities
-        or task.get("target") != target
-        or task.get("inputs") != {}
-        or task.get("depends_on", []) != []
-        for task in tasks
-    ):
+    task_bindings: set[tuple[str, str]] = set()
+    invalid_task = False
+    for task in tasks:
+        capability_id = task.get("capability_id")
+        task_target = task.get("target")
+        if (
+            not isinstance(capability_id, str)
+            or capability_id not in allowed_capabilities
+            or task_target != target
+            or task.get("inputs") != {}
+            or task.get("depends_on", []) != []
+        ):
+            invalid_task = True
+            break
+        binding = (capability_id, task_target)
+        if binding in task_bindings:
+            invalid_task = True
+            break
+        task_bindings.add(binding)
+    if invalid_task:
         print(
             "V2 recon plan must contain only fixed DNS, TLS, HTTPS, headers, redirects, robots, or security.txt tasks matching the target",
             file=sys.stderr,
