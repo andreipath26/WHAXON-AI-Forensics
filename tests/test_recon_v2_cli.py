@@ -29,6 +29,7 @@ class _FakeCore:
             }],
         }
         self.run_calls = []
+        self.enqueue_calls = []
         self.legacy_calls = []
 
     async def initialize(self, *, drain=False):
@@ -41,6 +42,10 @@ class _FakeCore:
     async def run_workflow_plan(self, plan_id):
         self.run_calls.append(plan_id)
         return self.result
+
+    def enqueue_workflow_run(self, plan_id):
+        self.enqueue_calls.append(plan_id)
+        return {"id": "request-1", "plan_id": plan_id, "status": "queued"}
 
     def workflow_report(self, plan_id):
         assert plan_id == "dns-plan"
@@ -102,7 +107,7 @@ def test_v2_recon_rejects_non_exact_plan_before_dispatch(monkeypatch, capsys, ta
     assert "V2 recon" in capsys.readouterr().err
 
 
-def test_v2_recon_delegates_to_approved_workflow_and_prints_persisted_findings(
+def test_v2_recon_queues_approved_plan_without_inline_dispatch(
     monkeypatch, capsys,
 ):
     core = _FakeCore()
@@ -114,13 +119,14 @@ def test_v2_recon_delegates_to_approved_workflow_and_prints_persisted_findings(
 
     output = capsys.readouterr().out
     assert status == recon_cmd.EXIT_OK
-    assert core.run_calls == ["dns-plan"]
-    assert "plan dns-plan, succeeded, 1 findings" in output
-    assert "example.test A 192.0.2.1" in output
+    assert core.run_calls == []
+    assert core.enqueue_calls == ["dns-plan"]
+    assert "request request-1, queued" in output
+    assert "queued for the supervised V2 worker" in output
 
 
 @pytest.mark.parametrize("capability_id", [CAPABILITY_ID, TLS_CERT_CAPABILITY_ID])
-def test_v2_recon_unapproved_plan_remains_failed_by_workflow_engine(
+def test_v2_recon_leaves_approval_enforcement_to_supervised_worker(
     monkeypatch, capsys, capability_id,
 ):
     core = _FakeCore(
@@ -143,9 +149,10 @@ def test_v2_recon_unapproved_plan_remains_failed_by_workflow_engine(
         "example.test", "--engine", "v2", "--plan-id", "dns-plan",
     ])
 
-    assert status == recon_cmd.EXIT_ERROR
-    assert core.run_calls == ["dns-plan"]
-    assert "failed, 0 findings" in capsys.readouterr().out
+    assert status == recon_cmd.EXIT_OK
+    assert core.run_calls == []
+    assert core.enqueue_calls == ["dns-plan"]
+    assert "queued for the supervised V2 worker" in capsys.readouterr().out
 
 
 def test_v2_recon_requires_plan_and_disallows_legacy_check_filter():
@@ -243,6 +250,7 @@ def test_v2_recon_partial_persisted_report_is_not_success(
         "example.test", "--engine", "v2", "--plan-id", "dns-plan",
     ])
 
-    assert status == recon_cmd.EXIT_ERROR
-    assert core.run_calls == ["dns-plan"]
-    assert "succeeded, 1 findings" in capsys.readouterr().out
+    assert status == recon_cmd.EXIT_OK
+    assert core.run_calls == []
+    assert core.enqueue_calls == ["dns-plan"]
+    assert "partial" not in capsys.readouterr().out
