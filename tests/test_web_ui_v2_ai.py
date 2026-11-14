@@ -14,6 +14,21 @@ def test_ai_strategy_gate_loads_live_run_state(page, live_server):
     assert page.locator("#ai-goal").is_visible()
 
 
+def test_ai_strategy_gate_hides_unverified_demo_state_until_live_data_is_loaded(page, live_server):
+    context = page.context.browser.new_context(java_script_enabled=False)
+    no_script_page = context.new_page()
+    response = no_script_page.goto(f"{live_server}/ui-v2/ai")
+    assert response is not None and response.status == 200
+    assert no_script_page.locator("main").evaluate(
+        "element => getComputedStyle(element).visibility"
+    ) == "hidden"
+    assert no_script_page.locator("header").first.evaluate(
+        "element => getComputedStyle(element).visibility"
+    ) == "hidden"
+    assert no_script_page.locator("aside nav").is_visible()
+    context.close()
+
+
 def test_ai_strategy_gate_blocks_target_when_scope_check_denies(page, live_server):
     calls = []
     page.route("**/api/scope/check", lambda route: route.fulfill(status=200, content_type="application/json", body='{"allowed":false,"reason":"blocked by test"}'))
