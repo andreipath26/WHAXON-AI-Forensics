@@ -2,7 +2,7 @@
 
 **Assessment date:** 2026-11-14  
 **Decision:** **HOLD — NOT READY TO DEPLOY**  
-**Current code head before this documentation refresh:** `c95acb789aa5f510c782ba24f465975a8fb51c80`. The exact code tree passed all 20 CI jobs in run #43619108947. PRs #202, #203, #204, #206, #208, and #209 are merged. No V2 release tag, package publication, or production deployment exists.
+**Current main code head:** `272245e700dfa89835f44886f370b011c1786cf1`. The exact source candidate tree `75880425cdaf4857989f229638e59c5b65de099f` passed all 20 CI jobs in run #43624338670; its isolated G01 controlled-lab job passed and retained evidence artifact #14125401711. PRs #202, #203, #204, #206, #208, #209, #212, #213, #214, and #215 are merged. No V2 release tag, package publication, or production deployment exists.
 
 ## Delivery sequence
 
@@ -22,7 +22,7 @@ The release checklist also contains post-implementation external qualification i
 
 | Gate | Implemented or recorded now | Remaining work and sequence |
 |---|---|---|
-| G01 | Bounded V2 crosswalk/lab evidence; top-level CLI inventory and AST guard | Complete exhaustive V1 caller and dispatch-path inventory during implementation. Defer additional real-target qualification until the full scope and internal checks are complete |
+| G01 | Bounded V2 crosswalk and exact-tree isolated lab evidence; top-level CLI inventory and AST guard. Candidate `75880425cdaf4857989f229638e59c5b65de099f` passed CI run #43624338670; G01 chain artifact #14125401711 is retained. | Complete exhaustive V1 caller and dispatch-path inventory during implementation. Defer additional real-target qualification until the full scope and internal checks are complete |
 | G02 | Bounded authorization/execution regressions, including legacy `/api/run` bypass and redirect cases | Close remaining caller, session, pivot, cancellation, and cross-transport authorization gaps with internal tests |
 | G03 | Bounded independent-validation/retest behavior; unsupported methods and kinds remain conservative | Complete supported-method and finding-state behavior and internal regression coverage |
 | G04 | Report overhaul and bounded evidence/coverage checks | Complete implementation of evidence and report requirements. Defer independent audit anchoring, external custody review, and final evidence qualification until implementation is complete |
