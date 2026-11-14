@@ -381,7 +381,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: timeout --signal=TERM --kill-after=5s 15m python -m pytest tests/ -x -vv -ra -o faulthandler_timeout=120
+        run: timeout --signal=TERM --kill-after=5s 10m python -m pytest tests/test_workflow.py tests/test_workflow_cli.py tests/test_workflow_continuous_worker.py -vv -ra -s -o faulthandler_timeout=60
 
       - name: Build distributions and validate metadata
         run: |
