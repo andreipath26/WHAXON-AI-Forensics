@@ -137,4 +137,4 @@ def test_v2_recon_cli_rejects_dynamic_redirect_inputs_before_dispatch(monkeypatc
     ])
     assert status == recon_cmd.EXIT_USAGE
     assert core.run_calls == []
-    assert "must contain one fixed" in capsys.readouterr().err
+    assert "must contain only fixed" in capsys.readouterr().err
