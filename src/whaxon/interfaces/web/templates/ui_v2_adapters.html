@@ -15,15 +15,15 @@
 <span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-primary/10 text-primary">SC-02 ENFORCED</span>
 </div>
 <div class="flex items-center gap-space-sm shrink-0">
-<button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm rounded transition-colors shadow-sm" id="btn-sync">
+<button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm rounded transition-colors shadow-sm" id="btn-sync" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span class="material-symbols-outlined text-sm text-secondary">sync</span>
 <span>Sync whaxon.adapters</span>
 </button>
-<button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm rounded transition-colors shadow-sm" id="btn-reload">
+<button class="flex items-center gap-space-xs px-space-md py-1 bg-surface-container hover:bg-surface-container-high text-on-surface font-code-sm text-code-sm rounded transition-colors shadow-sm" id="btn-reload" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span class="material-symbols-outlined text-sm text-tertiary">restart_alt</span>
 <span>Reload Entry Points</span>
 </button>
-<button class="flex items-center gap-space-xs px-space-md py-1 bg-primary text-on-primary font-code-sm text-code-sm rounded font-medium hover:bg-primary/90 transition-colors shadow-sm" id="btn-register">
+<button class="flex items-center gap-space-xs px-space-md py-1 bg-primary text-on-primary font-code-sm text-code-sm rounded font-medium hover:bg-primary/90 transition-colors shadow-sm" id="btn-register" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span class="material-symbols-outlined text-sm">add_circle</span>
 <span>+ Register New Adapter</span>
 </button>
@@ -113,31 +113,31 @@
 <!-- Search Input -->
 <div class="relative w-full lg:w-96 flex items-center bg-surface-container-lowest rounded px-space-sm py-1 shadow-sm">
 <span class="material-symbols-outlined text-outline text-sm shrink-0">search</span>
-<input class="w-full bg-transparent px-space-xs text-on-surface font-code-sm text-code-sm placeholder:text-outline focus:outline-none" id="adapter-search" placeholder="Search adapters by tool name, entrypoint, author, tags..." type="text"/>
+<input class="w-full bg-transparent px-space-xs text-on-surface font-code-sm text-code-sm placeholder:text-outline focus:outline-none" id="adapter-search" placeholder="Search adapters by tool name, entrypoint, author, tags..." type="text" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span class="font-label-sm text-label-sm text-outline bg-surface-container px-1 py-0.5 rounded">⌘K</span>
 </div>
 <!-- Filter Category Tabs -->
 <div class="flex items-center gap-space-xs overflow-x-auto w-full lg:w-auto">
-<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-primary text-on-primary font-medium transition-colors" data-cat="all">
+<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-primary text-on-primary font-medium transition-colors" data-cat="all" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             All (14)
           </button>
-<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="recon">
+<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="recon" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             Recon (5)
           </button>
-<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="vuln">
+<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="vuln" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             Vulnerability (4)
           </button>
-<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="exploit">
+<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="exploit" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             Exploitation (3)
           </button>
-<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="ingestion">
+<button class="filter-cat-btn px-space-sm py-1 rounded font-code-sm text-code-sm bg-surface-container text-on-surface-variant hover:text-on-surface transition-colors" data-cat="ingestion" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             Ingestion (2)
           </button>
 </div>
 <!-- Binary & Trust Filter Dropdown -->
 <div class="flex items-center gap-space-xs shrink-0">
 <span class="font-label-sm text-label-sm text-outline">STATUS:</span>
-<select class="bg-surface-container-lowest text-on-surface font-code-sm text-code-sm px-space-sm py-1 rounded focus:outline-none" id="status-select">
+<select class="bg-surface-container-lowest text-on-surface font-code-sm text-code-sm px-space-sm py-1 rounded focus:outline-none" id="status-select" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <option value="all">All States</option>
 <option value="binary_found">Binary Found (12)</option>
 <option value="missing">Missing Binary (2)</option>
@@ -185,7 +185,7 @@
 <span class="material-symbols-outlined text-xs text-primary">folder_check</span>
 <span>/usr/local/bin/nuclei</span>
 </div>
-<button class="select-adapter-btn text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="nuclei">
+<button class="select-adapter-btn text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="nuclei" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span>CONFIGURE</span>
 <span class="material-symbols-outlined text-xs">tune</span>
 </button>
@@ -229,7 +229,7 @@
 <span class="material-symbols-outlined text-xs text-primary">folder_check</span>
 <span>/usr/bin/nmap</span>
 </div>
-<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="nmap">
+<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="nmap" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span>CONFIGURE</span>
 <span class="material-symbols-outlined text-xs">tune</span>
 </button>
@@ -273,7 +273,7 @@
 <span class="material-symbols-outlined text-xs text-primary">folder_check</span>
 <span>/usr/local/bin/sqlmap</span>
 </div>
-<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="sqlmap">
+<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="sqlmap" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span>CONFIGURE</span>
 <span class="material-symbols-outlined text-xs">tune</span>
 </button>
@@ -317,7 +317,7 @@
 <span class="material-symbols-outlined text-xs text-primary">folder_check</span>
 <span>/usr/local/bin/ffuf</span>
 </div>
-<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="ffuf">
+<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="ffuf" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span>CONFIGURE</span>
 <span class="material-symbols-outlined text-xs">tune</span>
 </button>
@@ -360,7 +360,7 @@
 <span class="material-symbols-outlined text-xs text-secondary">memory</span>
 <span>Python Native Submodule</span>
 </div>
-<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="burp">
+<button class="select-adapter-btn text-on-surface-var…341 tokens truncated… font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="nikto" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span>CONFIGURE</span>
 <span class="material-symbols-outlined text-xs">tune</span>
 </button>
@@ -492,7 +492,7 @@
 <span class="material-symbols-outlined text-xs text-primary">folder_check</span>
 <span>~/.whaxon/plugins/subfinder</span>
 </div>
-<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="subfinder">
+<button class="select-adapter-btn text-on-surface-variant hover:text-primary font-label-sm text-label-sm hover:underline flex items-center gap-0.5" data-adapter="subfinder" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span>CONFIGURE</span>
 <span class="material-symbols-outlined text-xs">tune</span>
 </button>
@@ -542,7 +542,7 @@
 </div>
 <div class="flex items-center gap-space-xs">
 <span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-primary/20 text-primary font-semibold">VERIFIED</span>
-<button class="text-outline hover:text-on-surface p-1 rounded hover:bg-surface-variant transition-colors" id="close-drawer" title="Close Panel">
+<button class="text-outline hover:text-on-surface p-1 rounded hover:bg-surface-variant transition-colors" id="close-drawer" title="Close Panel" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span class="material-symbols-outlined text-sm">close</span>
 </button>
 </div>
@@ -580,21 +580,21 @@
 <div class="p-space-sm bg-surface-container-lowest rounded flex flex-wrap gap-space-xs items-center min-h-[48px]">
 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container font-code-sm text-code-sm text-secondary">
 <span>-rate-limit 50</span>
-<button class="text-outline hover:text-error text-xs" title="Remove flag">×</button>
+<button class="text-outline hover:text-error text-xs" title="Remove flag" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">×</button>
 </span>
 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container font-code-sm text-code-sm text-secondary">
 <span>-proxy 127.0.0.1:5001</span>
-<button class="text-outline hover:text-error text-xs" title="Remove flag">×</button>
+<button class="text-outline hover:text-error text-xs" title="Remove flag" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">×</button>
 </span>
 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container font-code-sm text-code-sm text-secondary">
 <span>-duc</span>
-<button class="text-outline hover:text-error text-xs" title="Remove flag">×</button>
+<button class="text-outline hover:text-error text-xs" title="Remove flag" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">×</button>
 </span>
 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container font-code-sm text-code-sm text-secondary">
 <span>-silent</span>
-<button class="text-outline hover:text-error text-xs" title="Remove flag">×</button>
+<button class="text-outline hover:text-error text-xs" title="Remove flag" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">×</button>
 </span>
-<input class="bg-transparent font-code-sm text-code-sm text-on-surface placeholder:text-outline/70 focus:outline-none min-w-[120px] px-1" id="add-flag-input" placeholder="+ Add CLI parameter..." type="text"/>
+<input class="bg-transparent font-code-sm text-code-sm text-on-surface placeholder:text-outline/70 focus:outline-none min-w-[120px] px-1" id="add-flag-input" placeholder="+ Add CLI parameter..." type="text" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 </div>
 </div>
 <!-- Forbidden Flags Blacklist -->
@@ -628,7 +628,7 @@
 <span class="font-body-sm text-body-sm text-on-surface font-medium">Isolated Network Namespace</span>
 <span class="font-label-sm text-label-sm text-outline">Only localhost proxy tunnel permitted</span>
 </div>
-<input checked="" class="accent-primary h-4 w-4 rounded cursor-pointer" type="checkbox"/>
+<input checked="" class="accent-primary h-4 w-4 rounded cursor-pointer" type="checkbox" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 </div>
 <div class="flex items-center justify-between pt-2">
 <div class="flex flex-col">
@@ -642,7 +642,7 @@
 <span class="font-body-sm text-body-sm text-on-surface font-medium">eBPF Socket Enforcement</span>
 <span class="font-label-sm text-label-sm text-outline">Audit and block unauthorized IP sockets</span>
 </div>
-<input checked="" class="accent-primary h-4 w-4 rounded cursor-pointer" type="checkbox"/>
+<input checked="" class="accent-primary h-4 w-4 rounded cursor-pointer" type="checkbox" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 </div>
 </div>
 </div>
@@ -658,54 +658,26 @@
 </div>
 <!-- Quick Actions Drawer Footer -->
 <div class="p-space-md bg-surface-container-high flex flex-col gap-space-sm shrink-0">
-<button class="w-full flex items-center justify-center gap-space-xs py-1.5 px-space-md rounded bg-surface-container-highest hover:bg-surface-variant text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" id="btn-mock-test">
+<button class="w-full flex items-center justify-center gap-space-xs py-1.5 px-space-md rounded bg-surface-container-highest hover:bg-surface-variant text-on-surface font-code-sm text-code-sm transition-colors shadow-sm" id="btn-mock-test" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
 <span class="material-symbols-outlined text-sm text-secondary">play_arrow</span>
 <span>Test Adapter Execution with Mock Output</span>
 </button>
 <div class="flex items-center gap-space-sm">
-<button class="flex-1 py-1.5 px-space-sm rounded bg-surface-container hover:bg-surface-variant text-outline hover:text-on-surface font-code-sm text-code-sm transition-colors text-center" id="btn-resign">
+<button class="flex-1 py-1.5 px-space-sm rounded bg-surface-container hover:bg-surface-variant text-outline hover:text-on-surface font-code-sm text-code-sm transition-colors text-center" id="btn-resign" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             Re-sign Manifest
           </button>
-<button class="flex-1 py-1.5 px-space-sm rounded bg-primary text-on-primary font-code-sm text-code-sm font-semibold hover:bg-primary/90 transition-colors text-center shadow-sm" id="btn-save-conf">
+<button class="flex-1 py-1.5 px-space-sm rounded bg-primary text-on-primary font-code-sm text-code-sm font-semibold hover:bg-primary/90 transition-colors text-center shadow-sm" id="btn-save-conf" disabled aria-disabled="true" title="Read-only reference: this control is not connected to a live WHAXON workflow.">
             Save Configuration
           </button>
 </div>
 </div>
 </div>
 </div>
-<!-- Notification Toast Container (Deterministic state feedback) -->
-<div class="fixed bottom-6 right-6 hidden bg-surface-container-highest text-on-surface px-space-md py-space-sm rounded shadow-xl flex items-center gap-space-sm z-50" id="toast">
-<span class="material-symbols-outlined text-primary text-base">check_circle</span>
-<span class="font-code-sm text-code-sm" id="toast-text">Manifest signatures re-verified successfully.</span>
-</div>
+
 </div>
 <script>
   // Interactive functionality for Adapter & Plugin Manager
   document.addEventListener('DOMContentLoaded', function() {
-    const toast = document.getElementById('toast');
-    const toastText = document.getElementById('toast-text');
-    
-    function showToast(message) {
-      toastText.textContent = message;
-      toast.classList.remove('hidden');
-      setTimeout(() => {
-        toast.classList.add('hidden');
-      }, 3200);
-    }
-
-    // Top action buttons
-    document.getElementById('btn-sync').addEventListener('click', () => {
-      showToast("Sync completed: 14 adapters scanned across namespace 'whaxon.adapters'");
-    });
-
-    document.getElementById('btn-reload').addEventListener('click', () => {
-      showToast("Reloaded: 14 entrypoint descriptors validated via importlib metadata");
-    });
-
-    document.getElementById('btn-register').addEventListener('click', () => {
-      showToast("Opened register dialog: upload manifest (.whx-plugin) or package wheel");
-    });
-
     // Filtering logic
     const searchInput = document.getElementById('adapter-search');
     const cards = document.querySelectorAll('.adapter-card');
@@ -831,22 +803,7 @@
       });
     });
 
-    // Drawer action buttons
-    document.getElementById('btn-mock-test').addEventListener('click', () => {
-      showToast("Mock execution successful: return code 0, 14 mock telemetry records parsed.");
-    });
 
-    document.getElementById('btn-resign').addEventListener('click', () => {
-      showToast("Signature re-computed and signed using local HSM Ed25519 key.");
-    });
-
-    document.getElementById('btn-save-conf').addEventListener('click', () => {
-      showToast("Configuration saved to /etc/whaxon/adapters.d/ manifest override.");
-    });
-
-    document.getElementById('close-drawer').addEventListener('click', () => {
-      showToast("Configuration drawer collapsed to background runner.");
-    });
   });
 </script></main></div>
 <script>
