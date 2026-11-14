@@ -381,7 +381,7 @@ jobs:
         run: mypy src
 
       - name: Pytest
-        run: timeout --signal=TERM --kill-after=5s 5m python -m pytest tests/test_workflow_continuous_worker.py::test_worker_recovery_failure_never_advertises_ready -vv -ra -o faulthandler_timeout=60
+        run: timeout --signal=TERM --kill-after=5s 10m python -m pytest tests/test_workflow_continuous_worker.py -n 0 -vv -ra -o faulthandler_timeout=60
 
       - name: Build distributions and validate metadata
         run: |
