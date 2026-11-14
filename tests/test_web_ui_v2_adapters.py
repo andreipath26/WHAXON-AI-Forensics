@@ -101,6 +101,11 @@ def test_adapter_halt_uses_active_workflow_apis_and_static_mutations_are_disable
     )
     for control_id in ("btn-sync", "btn-reload", "btn-register", "btn-mock-test", "btn-resign", "btn-save-conf"):
         assert page.locator(f"#{control_id}").is_disabled(), f"Disconnected adapter control remains enabled: {control_id}"
+    configure_controls = page.locator(".select-adapter-btn")
+    assert configure_controls.count() == 8
+    assert configure_controls.evaluate_all(
+        "nodes => nodes.every(node => node.disabled && node.getAttribute('aria-disabled') === 'true')"
+    ), "Disconnected adapter configuration controls must stay disabled"
     assert page.locator("#adapter-refresh").is_enabled()
     assert page.locator("#adapter-filter").is_enabled()
     assert "read-only visual references" in page.locator("#whaxon-live-adapters").inner_text()
