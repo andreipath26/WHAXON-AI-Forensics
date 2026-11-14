@@ -91,8 +91,6 @@ EXPECTED_RUNNER_CALLS = Counter(
 EXPECTED_SERVICE_CALLS = Counter(
     {
         ("interfaces/cli/recon_cmd.py", "main", "core.recon.run"): 1,
-        ("interfaces/cli/validate_cmd.py", "main", "validator.validate"): 1,
-        ("interfaces/cli/retest_cmd.py", "main", "validator.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
         ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.msf_run._do_run", "adapter.run_module"): 1,
