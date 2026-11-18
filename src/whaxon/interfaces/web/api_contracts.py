@@ -40,3 +40,13 @@ class WorkflowEventAcknowledgement(BaseModel):
 
     consumer: str
     event_id: int
+
+
+class WorkflowEventAcknowledgementResult(BaseModel):
+    """The unchanged event acknowledgement response shape."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    plan_id: str
+    consumer_id: str
+    last_event_id: int
