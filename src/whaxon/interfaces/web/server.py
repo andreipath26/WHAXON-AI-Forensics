@@ -26,6 +26,7 @@ from whaxon.core.events import (
 )
 from whaxon.interfaces.web.api_contracts import (
     WorkflowEventAcknowledgement,
+    WorkflowEventAcknowledgementResult,
     WorkflowRunAccepted,
     WorkflowRunRequest,
 )
@@ -1090,10 +1091,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             checkpoint = core.acknowledge_workflow_event(
                 plan_id, acknowledgement.consumer, acknowledgement.event_id,
             )
-            return jsonify({
-                "plan_id": plan_id, "consumer_id": acknowledgement.consumer,
+            result = WorkflowEventAcknowledgementResult.model_validate({
+                "plan_id": plan_id,
+                "consumer_id": acknowledgement.consumer,
                 "last_event_id": checkpoint,
             })
+            return jsonify(result.model_dump(mode="json"))
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
