@@ -1,7 +1,9 @@
 """Typed internal contracts for the existing HTTP API.
 
 These models validate values at the Flask boundary without defining routes or
-changing the public request and response representation.
+changing the public request and response representation. Request variants model
+the existing JSON bodies, including their strict fields and defaults; response
+models preserve selected existing serialized shapes.
 """
 from __future__ import annotations
 
