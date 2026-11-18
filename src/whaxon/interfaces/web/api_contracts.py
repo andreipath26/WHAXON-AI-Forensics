@@ -5,6 +5,8 @@ changing the public request and response representation.
 """
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -16,6 +18,33 @@ class WorkflowRunRequest(BaseModel):
     max_tasks: int = Field(default=100, ge=1, le=1000)
     max_attempts: int = Field(default=2, ge=1, le=1000)
     max_concurrency: int = Field(default=4, ge=1, le=1000)
+
+
+class WorkflowToolProposalRequest(BaseModel):
+    """Fixed catalog-tool proposal accepted by the existing V2 route."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    kind: Literal["tool"]
+    mission_id: str
+    id: str
+    tool: str
+    target: str
+    save: bool = False
+
+
+class WorkflowFindingProposalRequest(BaseModel):
+    """Sealed-finding verification or retest proposal request."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    kind: Literal["verification"]
+    mission_id: str
+    id: str
+    source_job_id: str
+    finding_seq: int = Field(ge=0)
+    mode: str
+    save: bool = False
 
 
 class WorkflowRunAccepted(BaseModel):
