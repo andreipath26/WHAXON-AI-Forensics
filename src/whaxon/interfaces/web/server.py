@@ -25,6 +25,7 @@ from whaxon.core.events import (
     JobStarted,
 )
 from whaxon.interfaces.web.api_contracts import (
+    WorkflowEventAcknowledgement,
     WorkflowRunAccepted,
     WorkflowRunRequest,
 )
@@ -1079,17 +1080,18 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/v2/workflows/<plan_id>/event-ack")
     def workflow_v2_event_ack(plan_id):
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not isinstance(payload.get("consumer"), str) or (
-            not payload["consumer"] or isinstance(payload.get("event_id"), bool)
-            or not isinstance(payload.get("event_id"), int)
-        ):
+        try:
+            acknowledgement = WorkflowEventAcknowledgement.model_validate(payload)
+        except ValidationError:
+            return jsonify({"error": "consumer and integer event_id required"}), 400
+        if not acknowledgement.consumer:
             return jsonify({"error": "consumer and integer event_id required"}), 400
         try:
             checkpoint = core.acknowledge_workflow_event(
-                plan_id, payload["consumer"], payload["event_id"],
+                plan_id, acknowledgement.consumer, acknowledgement.event_id,
             )
             return jsonify({
-                "plan_id": plan_id, "consumer_id": payload["consumer"],
+                "plan_id": plan_id, "consumer_id": acknowledgement.consumer,
                 "last_event_id": checkpoint,
             })
         except (ValueError, TypeError) as exc:
