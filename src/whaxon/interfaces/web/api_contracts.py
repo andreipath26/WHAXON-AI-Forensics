@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class WorkflowRunRequest(BaseModel):
     """Bounded execution limits accepted when submitting a saved workflow."""
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="ignore", strict=True)
 
     max_tasks: int = Field(default=100, ge=1, le=1000)
     max_attempts: int = Field(default=2, ge=1, le=1000)
