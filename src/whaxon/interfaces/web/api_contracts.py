@@ -31,3 +31,12 @@ class WorkflowRunAccepted(BaseModel):
     durable_progress_url: str
     run_request_url: str
     run_snapshot_url: str
+
+
+class WorkflowEventAcknowledgement(BaseModel):
+    """The existing durable-event acknowledgement request shape."""
+
+    model_config = ConfigDict(strict=True, extra="ignore")
+
+    consumer: str
+    event_id: int
