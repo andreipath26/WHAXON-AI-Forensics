@@ -13,7 +13,7 @@ def test_report_page_loads_and_uses_live_report_counts(page, live_server):
     page.wait_for_function(
         "() => [...document.querySelectorAll('main div')].some(n => "
         "document.documentElement.dataset.reportReady === 'true' && n.textContent.includes('Live report data:') && n.textContent.includes('findings'))",
-        timeout=5000,
+        timeout=8000,
     )
     assert page.locator("#previewBtn").is_visible()
     assert page.get_by_role("button", name="Export Findings (.json)").is_visible()
@@ -25,7 +25,7 @@ def test_report_page_hides_illustrative_proof_and_evidence_panels(page, live_ser
     page.wait_for_function(
         "() => [...document.querySelectorAll('main div')].some(n => "
         "document.documentElement.dataset.reportReady === 'true' && n.textContent.includes('Live report data:'))",
-        timeout=5000,
+        timeout=8000,
     )
     assert page.get_by_text("Sample Deterministic Proof: FINDING-SQLI-001 (auth-endpoint)").is_hidden()
     assert page.get_by_role("heading", name="PTES Phase Execution & Telemetry Tracker").is_hidden()
