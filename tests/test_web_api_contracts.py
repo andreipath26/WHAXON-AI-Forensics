@@ -30,7 +30,7 @@ def test_workflow_run_request_defaults_and_bounds():
         {"max_attempts": 1.0},
     ],
 )
-def test_workflow_run_request_rejects_invalid_or_unknown_fields(payload):
+def test_workflow_run_request_rejects_invalid_fields(payload):
     with pytest.raises(ValidationError):
         WorkflowRunRequest.model_validate(payload)
 
