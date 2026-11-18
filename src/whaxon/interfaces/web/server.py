@@ -14,6 +14,7 @@ from typing import Any
 from flask import Flask, jsonify, render_template, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from pydantic import ValidationError
 
 from whaxon.core import Core
 from whaxon.core.events import (
@@ -22,6 +23,10 @@ from whaxon.core.events import (
     JobFinished,
     JobOutput,
     JobStarted,
+)
+from whaxon.interfaces.web.api_contracts import (
+    WorkflowRunAccepted,
+    WorkflowRunRequest,
 )
 
 
@@ -785,14 +790,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             payload = {}
         if not isinstance(payload, dict):
             return jsonify({"error": "JSON object required"}), 400
-        fields = ("max_tasks", "max_attempts", "max_concurrency")
-        defaults = {"max_tasks": 100, "max_attempts": 2, "max_concurrency": 4}
-        bounds = {name: payload.get(name, defaults[name]) for name in fields}
-        if any(type(value) is not int or not 1 <= value <= 1000
-               for value in bounds.values()):
+        try:
+            run_request = WorkflowRunRequest.model_validate(payload)
+        except ValidationError:
             return jsonify({"error": "execution limits must be positive and bounded"}), 400
         try:
-            queued = core.enqueue_workflow_run(plan_id, **bounds)
+            queued = core.enqueue_workflow_run(plan_id, **run_request.model_dump())
         except ValueError as exc:
             return jsonify({"error": str(exc)}), (
                 404 if "unknown workflow plan" in str(exc) else 409
@@ -805,7 +808,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             except Exception:
                 # An accepted durable request must not become a false 500.
                 pass
-        return jsonify({
+        accepted = WorkflowRunAccepted.model_validate({
             "plan_id": plan_id,
             "run_request_id": queued["id"],
             "request_status": queued["status"],
@@ -814,7 +817,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             "durable_progress_url": f"/api/v2/workflows/{plan_id}/progress",
             "run_request_url": f"/api/v2/workflow-runs/{queued['id']}",
             "run_snapshot_url": f"/api/v2/workflow-runs/{queued['id']}/snapshot",
-        }), 202
+        })
+        return jsonify(accepted.model_dump(mode="json")), 202
 
     @app.get("/api/v2/workflow-runs/summary")
     def workflow_v2_run_queue_summary():
