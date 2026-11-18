@@ -16,12 +16,6 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from pydantic import ValidationError
 
-from whaxon.interfaces.web.api_contracts import (
-    WorkflowRunAccepted,
-    WorkflowRunRequest,
-    openapi_document,
-)
-
 from whaxon.core import Core
 from whaxon.core.events import (
     JobFailed,
@@ -29,6 +23,11 @@ from whaxon.core.events import (
     JobFinished,
     JobOutput,
     JobStarted,
+)
+from whaxon.interfaces.web.api_contracts import (
+    WorkflowRunAccepted,
+    WorkflowRunRequest,
+    openapi_document,
 )
 
 
