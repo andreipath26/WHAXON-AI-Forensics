@@ -46,6 +46,8 @@ def test_openapi_publishes_run_request_and_acknowledgement_schemas():
     schemas = document["components"]["schemas"]
 
     assert document["openapi"] == "3.1.0"
+    assert operation["security"] == [{"BasicAuth": []}]
+    assert document["components"]["securitySchemes"]["BasicAuth"]["scheme"] == "basic"
     assert operation["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/WorkflowRunRequest",
     }
