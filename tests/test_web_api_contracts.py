@@ -28,12 +28,16 @@ def test_workflow_run_request_defaults_and_bounds():
         {"max_tasks": 0},
         {"max_tasks": 1001},
         {"max_attempts": 1.0},
-        {"unexpected": "ignored before typed contracts"},
     ],
 )
 def test_workflow_run_request_rejects_invalid_or_unknown_fields(payload):
     with pytest.raises(ValidationError):
         WorkflowRunRequest.model_validate(payload)
+
+
+def test_workflow_run_request_ignores_unknown_fields_for_compatibility():
+    request = WorkflowRunRequest.model_validate({"future_option": "ignored"})
+    assert request.max_tasks == 100
 
 
 def test_openapi_publishes_run_request_and_acknowledgement_schemas():
