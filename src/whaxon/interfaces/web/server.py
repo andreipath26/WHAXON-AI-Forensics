@@ -638,7 +638,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             message = str(exc)
             return jsonify({"error": message}), (
-                4    @app.post("/api/v2/workflow-proposals")
+                404 if message.startswith("unknown mission:") else 400
+            )
+
+    @app.post("/api/v2/workflow-proposals")
     @limiter.limit("20 per minute")
     def workflow_v2_workflow_proposal():
         """Prepare a fixed tool or evidence-bound verification plan for review."""
