@@ -188,19 +188,6 @@
         "web",
         "report-rendering"
       ]
-    },
-    {
-      "id": "pydantic",
-      "name": "Pydantic",
-      "kind": "python-package",
-      "required": false,
-      "minimum_version": "2.8",
-      "import_name": "pydantic",
-      "extra": "web",
-      "capabilities": [
-        "web",
-        "api-contracts"
-      ]
     }
   ],
   "profiles": {
@@ -224,8 +211,7 @@
       "waitress",
       "bcrypt",
       "flask-limiter",
-      "markdown",
-      "pydantic"
+      "markdown"
     ],
     "metasploit": [
       "pymetasploit3"
