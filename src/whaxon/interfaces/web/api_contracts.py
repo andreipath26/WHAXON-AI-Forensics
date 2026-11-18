@@ -50,6 +50,11 @@ def openapi_document() -> dict:
                 "post": {
                     "operationId": "submitWorkflowRun",
                     "summary": "Submit a bounded workflow run request",
+                    "description": (
+                        "Non-loopback requests require HTTP Basic authentication. "
+                        "Loopback requests follow the server's local trust policy."
+                    ),
+                    "security": [{"BasicAuth": []}],
                     "parameters": [
                         {
                             "name": "plan_id",
@@ -93,6 +98,9 @@ def openapi_document() -> dict:
             }
         },
         "components": {
+            "securitySchemes": {
+                "BasicAuth": {"type": "http", "scheme": "basic"}
+            },
             "schemas": {
                 "WorkflowRunRequest": WorkflowRunRequest.model_json_schema(),
                 "WorkflowRunAccepted": WorkflowRunAccepted.model_json_schema(),
