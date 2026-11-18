@@ -443,7 +443,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     )
     app.config["RATELIMIT_STORAGE_URI"] = "memory://"
 
-    @app.get("/api/openapi.json")
+    @app.get("/openapi.json")
     def api_openapi():
         """Return the generated OpenAPI contract for the typed V2 run endpoint."""
         return jsonify(openapi_document())
@@ -800,7 +800,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         try:
             run_request = WorkflowRunRequest.model_validate(payload)
         except ValidationError:
-            return jsonify({"error": "invalid workflow run request"}), 400
+            return jsonify({"error": "execution limits must be positive and bounded"}), 400
         try:
             queued = core.enqueue_workflow_run(
                 plan_id, **run_request.model_dump(),
