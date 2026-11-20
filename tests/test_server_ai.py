@@ -123,6 +123,34 @@ def test_ai_run_rejects_out_of_scope_target_server_side(tmp_path, monkeypatch):
     assert core.store.list_ai_runs() == []
 
 
+def test_ai_run_legacy_opt_in_does_not_override_scope_denial(tmp_path, monkeypatch):
+    """An operator legacy flag cannot authorize an out-of-scope AI run."""
+    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
+    app, core = _make_app(tmp_path, monkeypatch)
+    submitted = []
+    monkeypatch.setattr(
+        core.scope,
+        "check",
+        lambda _target: SimpleNamespace(
+            allowed=False,
+            reason="target is not in scope",
+            matched_rule=None,
+        ),
+    )
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, task: submitted.append(task))
+
+    before = core.store.list_ai_runs()
+    response = app.test_client().post(
+        "/api/ai/run",
+        json={"target": "https://example.com", "goal": "assess this target"},
+    )
+
+    assert response.status_code == 403
+    assert "out of scope" in response.get_json()["error"]
+    assert core.store.list_ai_runs() == before == []
+    assert submitted == []
+
+
 def test_ai_run_fails_closed_when_scope_check_raises(tmp_path, monkeypatch):
     app, core = _make_app(tmp_path, monkeypatch)
 

@@ -552,6 +552,38 @@ def test_run_legacy_execution_requires_server_operator_opt_in(tmp_path, monkeypa
     assert len(submitted) == 1
 
 
+def test_run_legacy_opt_in_does_not_override_scope_denial(tmp_path, monkeypatch):
+    """An operator legacy flag cannot authorize an out-of-scope request."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "true")
+    app, core = _make_app(tmp_path, monkeypatch)
+    client = app.test_client()
+    submitted = []
+    monkeypatch.setattr(
+        core.scope,
+        "check",
+        lambda target: SimpleNamespace(
+            allowed=False,
+            reason="target is not in scope",
+            matched_rule=None,
+        ),
+    )
+    monkeypatch.setattr(core.catalog, "get", lambda tool_id: object())
+    monkeypatch.setattr(AsyncRunner, "submit", lambda self, task: submitted.append(task))
+
+    before = core.store.history()
+    response = client.post(
+        "/api/run",
+        json={"tool_id": "nmap", "target": "198.51.100.25"},
+    )
+
+    assert response.status_code == 403
+    assert "out of scope" in response.get_json()["error"]
+    assert core.store.history() == before
+    assert submitted == []
+
+
 def test_run_refuses_to_start_when_scope_check_raises(tmp_path, monkeypatch):
     """A scope-check failure must fail closed and must not enqueue a scan."""
     app, core = _make_app(tmp_path, monkeypatch)

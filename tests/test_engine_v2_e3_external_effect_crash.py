@@ -26,6 +26,8 @@ class _EffectReceiver(BaseHTTPRequestHandler):
         if self.path == "/disconnect":
             self.close_connection = True
             return
+        if self.path == "/hold":
+            self.server.allow_response.wait(timeout=10)
         self.send_response(204)
         self.end_headers()
 
@@ -38,6 +40,7 @@ class _Receiver:
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _EffectReceiver)
         self.server.received = []
         self.server.observed = threading.Event()
+        self.server.allow_response = threading.Event()
         self.thread = threading.Thread(
             target=self.server.serve_forever, daemon=True,
         )
@@ -175,3 +178,45 @@ def test_http_effect_followed_by_disconnected_response_is_uncertain(tmp_path):
         ).run("plan", max_tasks=3))
         assert retried["attempts"] == 0
         assert receiver.server.received == [b"effect-before-disconnect"]
+
+
+def test_cancel_after_real_http_effect_is_uncertain_and_never_replayed(tmp_path):
+    store = JobStore(tmp_path / "cancel-after-effect.db")
+    _plan(store)
+    with _Receiver() as receiver:
+        url = receiver.url("/hold")
+
+        def dispatch(_task):
+            import urllib.request
+            request = urllib.request.Request(
+                url, data=b"effect-before-cancel", method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=5) as response:
+                assert response.status == 204
+            return {"success": True}
+
+        async def run():
+            return await WorkflowScheduler(
+                store, authorize=lambda task: True, dispatch=dispatch,
+            ).run("plan", max_tasks=1, max_attempts=3)
+
+        async def cancel_while_effect_is_in_flight():
+            running = asyncio.create_task(run())
+            observed = await asyncio.to_thread(
+                receiver.server.observed.wait, 5,
+            )
+            assert observed, "receiver did not record the side effect"
+            store.request_workflow_cancellation("plan")
+            receiver.server.allow_response.set()
+            return await running
+
+        result = asyncio.run(cancel_while_effect_is_in_flight())
+        assert receiver.server.received == [b"effect-before-cancel"]
+        assert result["attempts"] == 1
+        assert result["tasks"][0]["status"] == "uncertain"
+
+        retried = asyncio.run(WorkflowScheduler(
+            JobStore(store.path), authorize=lambda task: True, dispatch=dispatch,
+        ).run("plan", max_tasks=3, max_attempts=3))
+        assert retried["attempts"] == 0
+        assert receiver.server.received == [b"effect-before-cancel"]
