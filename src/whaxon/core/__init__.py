@@ -457,7 +457,10 @@ class Core:
                 "web.paths.fuzz",
             },
             "initial_access": {"lab.initial_access.samba_usermap"},
-            "verification": {"tool.verify_sqli", "tool.verify_xss"},
+            "verification": {
+                "tool.verify_sqli", "tool.verify_xss",
+                "tool.verify_http_observation",
+            },
             "retest": {"tool.retest_sqli", "tool.retest_xss"},
         }
         for plan_id in selected_ids:
@@ -527,14 +530,20 @@ class Core:
 
                 if stage == "verification":
                     accepted_statuses = {"verified"}
-                    accepted_capabilities = {"tool.verify_sqli", "tool.verify_xss"}
+                    accepted_capabilities = {
+                        "tool.verify_sqli", "tool.verify_xss",
+                        "tool.verify_http_observation",
+                    }
                 else:
                     accepted_statuses = {"still_vulnerable", "fixed"}
                     accepted_capabilities = {"tool.retest_sqli", "tool.retest_xss"}
                 stage_evidence_ok = stage_evidence_ok and any(
                     attempt.get("capability_id") in accepted_capabilities
                     and finding.get("source") == "engine-v2-verifier"
-                    and finding.get("kind") in {"sqli", "sql_injection", "xss"}
+                    and finding.get("kind") in {
+                        "sqli", "sql_injection", "xss",
+                        "http_header_missing", "cookie_insecure",
+                    }
                     and finding.get("verification_status") in accepted_statuses
                     and finding.get("verified_by") == "engine-v2"
                     and isinstance(finding.get("data"), dict)

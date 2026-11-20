@@ -86,6 +86,32 @@ def test_present_http_header_does_not_claim_the_finding_is_fixed():
         server.server_close()
 
 
+def test_observation_scope_denial_stops_before_http_request(monkeypatch):
+    import urllib.request
+
+    calls = []
+    monkeypatch.setattr(
+        urllib.request,
+        "build_opener",
+        lambda *_handlers: (_ for _ in ()).throw(
+            AssertionError("unauthorized observation must not open a connection")
+        ),
+    )
+    finding = Finding(
+        kind="http_header_missing", severity="low", source="recon:headers",
+        data={"header": "Content-Security-Policy", "url": "http://192.0.2.10/"},
+        raw_line="missing CSP",
+    )
+
+    status, reason = Validator(
+        PAYLOADS, authorize_request=lambda url: calls.append(url) or False,
+    ).validate(finding, target_url="http://192.0.2.10/")
+
+    assert status == "candidate"
+    assert "no HTTP request was sent" in reason
+    assert calls == ["http://192.0.2.10/"]
+
+
 def test_cookie_missing_flag_is_verified_from_live_set_cookie_header():
     server, url = _serve()
     try:

@@ -570,7 +570,7 @@ class SemanticOperationProvider:
 
 
 class FindingVerificationProvider:
-    """Run bounded SQLi/XSS verification as scheduler-owned V2 tasks.
+    """Run bounded vulnerability/observation checks as scheduler-owned V2 tasks.
 
     Only a stored V2 finding of the exact supported kind can enter its matching
     verifier. Probes reuse the existing bounded validators; each outbound
@@ -582,14 +582,17 @@ class FindingVerificationProvider:
     RETEST = "tool.retest_sqli"
     VERIFY_XSS = "tool.verify_xss"
     RETEST_XSS = "tool.retest_xss"
+    VERIFY_HTTP_OBSERVATION = "tool.verify_http_observation"
     PROVIDER_ID = "whaxon.verifier.http"
-    PROVIDER_VERSION = "v2-sqli-xss-verifier.1"
+    PROVIDER_VERSION = "v2-http-verifier.2"
     _KINDS = {
         VERIFY: frozenset({"sqli", "sql_injection"}),
         RETEST: frozenset({"sqli", "sql_injection"}),
         VERIFY_XSS: frozenset({"xss"}),
         RETEST_XSS: frozenset({"xss"}),
+        VERIFY_HTTP_OBSERVATION: frozenset({"http_header_missing", "cookie_insecure"}),
     }
+    _VERIFY_ONLY = frozenset({VERIFY, VERIFY_XSS, VERIFY_HTTP_OBSERVATION})
 
     def __init__(self, *, store, registry, scope):
         self.store = store
@@ -610,6 +613,7 @@ class FindingVerificationProvider:
             (self.RETEST, "conservative SQL injection remediation retest"),
             (self.VERIFY_XSS, "independent reflected XSS verification"),
             (self.RETEST_XSS, "conservative reflected XSS remediation retest"),
+            (self.VERIFY_HTTP_OBSERVATION, "HTTP header and cookie observation verification"),
         ):
             manifest = CapabilityManifest(
                 capability_id=capability_id,
@@ -629,7 +633,7 @@ class FindingVerificationProvider:
                 },
                 limitations=(
                     f"Supports {operation} for sealed stored findings of its exact vulnerability kind only.",
-                    "Uses bounded non-destructive probes with three baseline and three injected samples.",
+                    "Uses bounded non-destructive probes; injection verification uses three baseline and three injected samples.",
                     "Accepts IP-literal targets only; hostname targets require a future pinned-address transport.",
                     "No payload supplied by the caller; redirects are blocked.",
                     "Retest may return still_vulnerable or inconclusive; it never infers fixed from missing proof.",
@@ -776,7 +780,7 @@ class FindingVerificationProvider:
             authorize_request=authorize_probe,
         )
         started = time.monotonic()
-        if task.capability_id in {self.VERIFY, self.VERIFY_XSS}:
+        if task.capability_id in self._VERIFY_ONLY:
             status, reason = validator.validate(finding, target_url=task.target)
         else:
             status, reason = validator.revalidate(finding, target_url=task.target)

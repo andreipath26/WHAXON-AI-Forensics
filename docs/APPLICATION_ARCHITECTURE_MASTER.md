@@ -3,7 +3,7 @@ Total output lines: 2565
 
 # WHAXON — APPLICATION ARCHITECTURE, AGENTS, TOOLS AND API MASTER
 
-> **Current source / CI reconciliation — 2026-11-20.** `main` is `668ce5ee72851b257c3b734511d9fa9354cbca04`; exact-head CI [44728330739](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44728330739) passed 20/20 jobs. This does not imply production acceptance. Legacy direct `/api/run` and `/api/ai/run` execution paths remain separate from the durable V2 lifecycle; the current caller inventory and Engine V2 release decision define remaining work. The earlier `0cef416` and `55618da` records below are historical.
+> **Current source / CI reconciliation — 2026-11-21.** `main` is `f32ce0913d460f046f6d984ec54a1f7f5d775409`; PR #226's exact head passed CI [44833852913](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852913) (20/20) before merge. This does not imply production acceptance. Legacy direct `/api/run` and `/api/ai/run` execution paths remain separate from the durable V2 lifecycle; the current caller inventory and Engine V2 release decision define remaining work. The earlier `0cef416` and `55618da` records below are historical.
 
 **Canonical shared application and developer reference, consolidated 2026-11-05.** This master covers the application outside the separately governed Engine V2 and UI V2 contracts. Operational and implementation assertions in original snapshots must be checked against current code/tests. Security authorization remains deterministic; AI proposals never grant execution permission. The root roadmap controls priorities.
 

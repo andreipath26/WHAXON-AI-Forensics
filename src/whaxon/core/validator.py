@@ -211,6 +211,16 @@ class Validator:
             return "candidate", "observation target must be an absolute HTTP(S) URL"
         data = finding.data or {}
         host = parsed.hostname
+
+        def authorized_probe(url: str) -> bool:
+            """Fail closed before an observation probe crosses the network."""
+            if self.authorize_request is None:
+                return True
+            try:
+                return self.authorize_request(url) is True
+            except Exception:
+                return False
+
         if finding.kind == "open_port":
             port = data.get("port")
             if type(port) is not int or not 1 <= port <= 65535:
@@ -218,6 +228,10 @@ class Validator:
             protocol = str(data.get("protocol") or "tcp").lower()
             if protocol != "tcp":
                 return "candidate", f"automatic observation probe does not support {protocol!r}"
+            authority_host = f"[{host}]" if ":" in host else host
+            probe_url = f"{parsed.scheme}://{authority_host}:{port}/"
+            if not authorized_probe(probe_url):
+                return "candidate", "scope authorization denied; no TCP probe was sent"
             try:
                 with socket.create_connection((host, port), timeout=3.0):
                     pass
@@ -231,6 +245,10 @@ class Validator:
                 return "candidate", "certificate finding host does not match the authorized target"
             requested_port = data.get("port")
             port = requested_port if type(requested_port) is int and 1 <= requested_port <= 65535 else 443
+            authority_host = f"[{host}]" if ":" in host else host
+            probe_url = f"https://{authority_host}:{port}/"
+            if not authorized_probe(probe_url):
+                return "candidate", "scope authorization denied; no TLS probe was sent"
             try:
                 context = ssl.create_default_context()
                 with (
@@ -272,6 +290,8 @@ class Validator:
             probe_url, method="GET",
             headers={"User-Agent": "WHAXON-validate/1.0"},
         )
+        if not authorized_probe(probe_url):
+            return "candidate", "scope authorization denied; no HTTP request was sent"
         opener = urllib.request.build_opener(_NoRedirect)
         try:
             response = opener.open(request, timeout=5.0)
