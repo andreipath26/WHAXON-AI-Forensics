@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-20 — Restore omitted and truncated documentation
+
+- Audited the 2026-11-05 consolidation against its pre-removal source documents. Restored the complete Engine V2 architecture, baseline, E1/E3/E5/E6 acceptance, privacy, recovery, service-readiness and UI-handoff records, plus the full application session, Metasploit/Armitage, tool-intelligence and engineering-execution designs.
+- Restored the dated AI usage disclosure and the prior categorized documentation inventory as an explicitly historical archive. Kept records whose substantive content is already represented by current masters as embedded, superseded evidence.
+- Removed literal truncation strings from the application and Engine V2 masters, regenerated the complete 808-control registry from all 22 tracked UI templates, and repaired the affected adapter button markup.
+- Updated the documentation index, ownership policy, source links and current-main status. No release decision changed; V2 remains HOLD — NOT READY TO DEPLOY.
+
 ## 2026-11-05 — Documentation ownership and restored original sources (unreleased)
 
 - Restored `docs/bounty-addon.md` as the technical owner of bounty programme policy, differential analysis and workflow design; corrected missing-policy wording to fail closed for bounty operations, without changing standalone WHAXON host-scope rules.

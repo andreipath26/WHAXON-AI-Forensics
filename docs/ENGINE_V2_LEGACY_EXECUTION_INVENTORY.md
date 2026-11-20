@@ -5,6 +5,34 @@ This inventory records Python callsites that invoke `run_tool` or
 `tests/test_engine_v2_legacy_callsite_inventory.py`: adding, removing, or moving
 a callsite requires reviewing its execution path and updating the classification.
 
+> **Current inventory evidence — main source `668ce5ee72851b257c3b734511d9fa9354cbca04` (2026-11-20):** the guarded census pins runner calls, recon/validation/retest service calls, API route method/handler pairs, UI route handlers, packaged catalog transports, V2 catalog admission and semantic aliases. The focused inventory, CLI disposition, bounty gate, provider-effect recovery, manual reconciliation, and V2 API run passed **59 tests** locally. This is strong source/callsite coverage, but it does not claim that every arbitrary network side effect, every visible UI control, or every supported client workflow has passed acceptance. The 808-control UI inventory is separately recorded in [the UI crosswalk](V2_UI_MANDATORY_CROSSWALK.md).
+
+> **Draft-branch inventory extension — 2026-11-20:** all 12 non-admitted catalog entries now have explicit solo-V1.0 dispositions. The inventory guard pins 60 direct process/network callsite locations and verifies their source files are named in this document; the focused inventory suite passes **9/9** locally. Exact-head hosted CI for the draft branch is still running. Dynamic/reflection-based effects and complete per-control/UI workflow acceptance remain outside this static guard.
+
+## V2 release surface and legacy compatibility disposition
+
+For the current solo release scope, a V2 task is one created from a persisted
+V2 plan, authorized against current scope and exact task approval, and dispatched
+by the supervised workflow worker through the bound provider. Proposal creation
+does not dispatch. Provider registration or catalog admission does not mean the
+provider is installed, executable, smoke-tested, lab-accepted, or deployment-
+ready; those readiness states remain separate.
+
+| Surface | Current disposition for V2 release | Boundary |
+| --- | --- | --- |
+| V2 catalog tools | The 12 admitted catalog IDs in the table below are the bounded local-process catalog surface. | Fixed catalog arguments/provider binding only; installed/readiness checks and exact plan approval still apply. |
+| V2 verification | `tool.verify_sqli`, `tool.retest_sqli`, `tool.verify_xss`, and `tool.retest_xss` are the bounded HTTP verification operations. | V2-sealed source evidence and separate plan approval required. Smoke/lab/end-to-end acceptance flags remain false in the provider inventory. |
+| V2 recon | Only the fixed, explicitly listed V2 recon proposals/providers are in scope. | No full legacy parity; `tech`, `cookies`, and `waf` remain legacy-only. Redirect handling is first-hop only. |
+| V2 clients | CLI workflow commands, TUI workflow screen, V2 API, and `/ui-v2` are clients of shared Core services. | UI route presence does not close per-control wiring or full client-parity acceptance. |
+| Legacy direct execution | Compatibility only; excluded from the V2 task/attempt guarantee unless and until migrated and accepted. | Web execution endpoints are default-denied behind their named `WHAXON_LEGACY_*_ENABLED` gates; legacy CLI execution requires explicit legacy selection where documented. Do not present these as V2 workflows. |
+| Session transports | Metasploit session, SMB, SSH, and WMI execution are not admitted V2 transports. | Keep them inaccessible as V2 actions; any legacy compatibility use remains separately scoped and does not create V2 task evidence. |
+
+This is a release-boundary statement about current implementation, not a claim
+that the V2 release is accepted. Any legacy path needed by the solo proof must
+either be migrated to the shared lifecycle or be explicitly excluded from that
+proof and remain visibly legacy-only. Do not widen the admitted set by changing
+documentation alone.
+
 | Source | Caller | Classification | Notes |
 | --- | --- | --- | --- |
 | `interfaces/web/server.py` | `_run_job_blocking` | Legacy | `/api/run`; scope checked, but no persisted V2 request or task lease. |
@@ -104,6 +132,35 @@ reachable execution paths until a caller is added and its authorization owner
 is reviewed. Current Impacket catalog and SMB/WMI session execution goes through
 `ToolRunner`, which applies target/scope checks before dispatch.
 
+### Direct process and network effect sinks
+
+The runner/service census above is supplemented by
+`EXPECTED_EXTERNAL_SINKS` in `test_engine_v2_legacy_callsite_inventory.py`.
+It pins 60 direct process, HTTP request, urllib opener, and socket callsites,
+including `subprocess`, `create_subprocess_exec`, `urlopen`,
+`HTTPConnection.request`, `requests.post`, and pinned numeric `socket.connect`.
+These are classified below; their presence is not itself evidence that a route
+is supported or authorized.
+
+| Sink family and source paths | Owner and authorization boundary | Persistence and V2 disposition | Regression guard |
+| --- | --- | --- | --- |
+| Target-tool process: `core/runner.py::run`; callers in `core/providers.py`, `core/worker.py`, `interfaces/cli/run_cmd.py`, `ai/executor.py`, `core/ai_bridge.py`, `interfaces/web/server.py`, and dormant `interfaces/gui/main_window.py` | V2 provider dispatch follows persisted plan policy, approval, current scope and worker checks. Legacy callers retain their separate explicit legacy or gated boundaries. | V2 attempts and sealed evidence belong to workflow stores; legacy jobs/AI runs remain legacy records. This is the only supported catalog process family for admitted tools. | AST runner and external-sink inventories; `test_runner.py`, workflow/provider tests, legacy-callsite tests. |
+| Session subprocesses: `core/runner.py::_run_smb_session`, `_run_wmi_session`, `_run_ssh_session` | Legacy session identity, live target scope, and session-specific checks apply; no V2 session provider is admitted. | Legacy job output only; unsupported as V2 task/attempt work in solo V1.0. | AST runner and external-sink inventories; runner session/scope regressions. |
+| Direct target probes: `core/validator.py`, `core/recon_checks.py`, `core/tls_cert_v2.py`, `core/headers_v2.py`, `core/http_recon_v2.py`, `core/redirect_recon_v2.py`, `core/robots_recon_v2.py`, `core/security_txt_v2.py` | Legacy validator/recon callers recheck current scope; V2 verifier/recon operations require fixed provider contracts, validated/pinned destinations, exact-plan approval and dispatch-time scope checks. A provider response remains untrusted observation data. | Legacy job/finding state for old callers; V2 attempt/evidence references for scheduler-owned providers. Redirect and hostname-verification limits remain as stated in the provider entries above. | External-sink and service-call AST guards; `test_validator_security_regressions.py`, V2 recon/verifier scope and transport tests. |
+| Metasploit RPC: `core/msf.py` (`requests.post`, socket probe), `core/portfwd.py`, `core/lab_access.py`, `adapters/msf.py` | Legacy route gates and session/target scope checks govern assessment calls; port-forward cleanup remains a separate cleanup operation. | MSF jobs/sessions/pivots are legacy-owned; no V2 attempt/evidence lifecycle. Excluded from V2 release transports. | External-sink and service-call AST guards; `test_server_msf.py`, `test_server_portfwd.py`, scope regressions. |
+| AI-provider HTTP: `ai/providers/backends/openai.py`, `anthropic.py`, `google.py`, `ollama.py` | Provider calls may produce proposals or legacy AI actions; model output never supplies authorization. V2 proposal creation stores a plan only and cannot dispatch. | Provider exchanges are AI-run/proposal records, not target evidence. Only a later approved V2 plan creates attempts. | External-sink AST guard; AI provider, proposal, and legacy execution-gate tests. |
+| Authorization, ingestion, and metadata network access: `core/scope.py`, `core/bounty_ingest.py`, `core/vulndb.py`, `interfaces/cli/cve_cmd.py`, `interfaces/tui/app.py`, `interfaces/tui/screens/main.py` | Scope DNS resolution is part of fail-closed authorization. Bounty ingestion is pinned HTTPS and creates an inert review draft. CVE/VulnDB/TUI requests are lookups or presentation data, not target execution. | Scope decisions, imported drafts, local vulnerability data, or UI state only; no V2 target attempt. | External-sink AST guard; scope fail-closed, bounty-ingest, lookup and TUI regressions. |
+| Approved host setup and service control: `core/dependencies.py`, `core/installer.py`, `core/setup_installers.py`, `interfaces/cli/init_cmd.py`, `install_cmd.py`, `up_cmd.py`, `down_cmd.py`, `interfaces/gui/embed.py` | Dependency changes require a current approved install plan and applicable OS elevation; service/container commands are explicit local operator actions. They are not target-scope approvals. | Dependency operation/history state and local process/container state; outside workflow task attempts. | External-sink AST guard; dependency/installer, CLI setup, GUI entrypoint, systemd and Docker tests. |
+| Reporting and helper processes: `core/report.py`, `interfaces/cli/lookup_cmd.py`, `report_cmd.py`, `tools/state.py` | SearchSploit lookup, PDF rendering, clipboard/open-file helpers and local state helpers do not authorize target execution. Report inputs remain evidence-bound by their originating stores. | Report bytes and local helper effects; no new target attempt. | External-sink AST guard; report/PDF, CLI helper and state tests. |
+| Uncalled adapter hooks: `adapters/hashcat.py`, `adapters/impacket.py` | AST callsite search finds no production caller for either direct `run_module` hook; no release authorization owner is assigned until a caller is proposed and reviewed. | Not reachable product actions in the inspected runtime; exclude from V2 admission. | External-sink guard pins the hook locations; runner/service callsite census catches a new dispatch caller. |
+
+`core/recon.py` temporarily wraps socket connect/receive calls for its legacy
+recon context; its public caller and authorization boundary are classified in
+the dedicated recon entry above. The direct-sink guard intentionally pins
+callable constructors/request/process launches, while the runner and service
+inventories pin the higher-level dispatch and recon entry points. A changed sink
+must be reviewed at both levels when it can reach a target.
+
 ## Packaged catalog and Engine V2 admission
 
 The packaged catalog contains 24 tool IDs across five declared transports:
@@ -124,6 +181,22 @@ verification.
 | `smb_ls`, `smb_shares` | Unsupported in V2 | `smb`; requires a separately accepted session provider. |
 | `ssh_cmd` | Unsupported in V2 | `ssh`; no registered adapter in the inspected runtime. |
 | `wmi_exec` | Unsupported in V2 | `wmi`; requires a separately accepted session provider. |
+
+The non-admitted entries have these explicit solo-V1.0 dispositions:
+
+| Catalog IDs | Release disposition | Compatibility behavior and owner |
+| --- | --- | --- |
+| `commix` | Excluded from the V2 release surface; no V2 provider migration in solo V1.0. | Retained only through separately selected legacy execution where available; V2 plan proposals, approvals and workers cannot dispatch it. Capability owner: provider registry; reassess only with a bounded command-injection contract, impact policy and independent evidence rules. |
+| `echo` | Test-only; not a supported assessment capability and not admitted to V2. | Keep only where repository tests or compatibility fixtures require it; do not advertise it as an assessment action. Catalog cleanup requires fixture/default-catalog compatibility review. |
+| `hydra` | Excluded from solo-V1.0 V2; credential-attack support is not promised. | Any remaining legacy use is explicitly legacy and outside V2 plan/attempt guarantees. No V2 migration in this release; a future proposal would need credential-specific authorization, rate/budget controls and evidence policy. |
+| `impacket`, `netexec` | Excluded from the V2 catalog bridge in solo V1.0. | Existing legacy catalog compatibility remains separate from V2 and must not be surfaced as V2 actions. A future migration requires per-operation capability contracts rather than a broad protocol toolbox entry. |
+| `msf_getuid`, `msf_hashdump`, `msf_sysinfo` | Metasploit session transports are excluded from the V2 release surface. | Existing gated legacy Metasploit routes remain separately classified; no V2 task/attempt evidence is produced. Migration requires a session-provider contract and accepted session identity, pivot, cancellation and recovery checks. |
+| `smb_ls`, `smb_shares`, `ssh_cmd`, `wmi_exec` | SMB, SSH and WMI session transports are excluded from the V2 release surface. | Any existing explicit legacy session path remains outside the V2 guarantee. Migration requires a separately accepted transport provider, identity/scope rechecks, bounded command semantics, cancellation and durable evidence. |
+
+These are release-surface dispositions, not authorization to perform legacy
+execution. Legacy compatibility gates and CLI `--legacy` selection remain
+independent; do not enable a legacy gate or use a legacy action as a substitute
+for a supported V2 workflow.
 
 Exact V2 operation aliases and declared target types:
 
@@ -405,7 +478,7 @@ V2-owned evidence.
 
 | Mutation group | Paths and persisted state | Authority/truth limitation | Evidence |
 | --- | --- | --- | --- |
-| V2 mission and plan controls | Mission create, budget/cost/rate/deadline writes; plan approval grant/revoke, cancellation, reconciliation, event acknowledgement, attempt cost and plan limit/deadline/rate writes all delegate to Core workflow services and durable stores. | Approval `actor` and attempt-cost `source` are accepted from the request body; route tests establish binding and validation, not an authenticated principal or provider-origin proof. Reconciliation fences stale attempts as uncertain; it does not prove external work stopped or recovered. | `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, `test_workflow.py` |
+| V2 mission and plan controls | Mission create, budget/cost/rate/deadline writes; plan approval grant/revoke, cancellation, reconciliation, event acknowledgement, attempt cost and plan limit/deadline/rate writes all delegate to Core workflow services and durable stores. | Approval/revocation/reconciliation actors are derived by `_request_actor()` from loopback or the authenticated request; a body-supplied `actor` is ignored. Attempt-cost `source` remains caller-supplied metadata and is not provider-origin proof. Reconciliation fences stale attempts as uncertain; it does not prove external work stopped or recovered. | `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, `test_workflow.py` |
 | Legacy AI answer | `POST /api/ai/runs/<run_id>/answer` writes the operator response to legacy AI-run state and may resume the legacy executor. | Not a V2 plan/task approval. The route ignores a client-supplied user identity and records its local actor behavior. | `test_server_ai.py::test_ai_run_answer_records_operator_response` |
 | Legacy evidence mutation | `POST`/`DELETE /api/jobs/<job_id>/evidence[/<seq>]` writes/removes files and JobStore evidence rows. | Legacy job evidence, not V2 attempt-sealed evidence. | `test_server.py`, `test_server_ai.py` evidence note/delete cases |
 | Bounty program import | `POST /api/bounty/import` fetches or parses source and returns a disabled review-required draft. | Ingestion only; draft is not persisted as authorization and does not activate testing. | `test_web_bounty_ingest.py`, `test_bounty_ingest.py` |
@@ -450,7 +523,10 @@ legacy compatibility commands and do not dispatch for Engine V2 evidence;
 `msf` is an inspection CLI, while module/session execution remains behind
 web/runner legacy gates. Environment/bootstrap commands and read/report
 commands do not become V2 assessment dispatch merely because they share the
-`whaxon` binary.
+`whaxon` binary. `bounty run` is also not an execution path today: it validates
+the stored program policy and prints a gate result, then explicitly reports
+that dispatch is not wired. Bounty execution is deferred outside the solo
+V1.0/V2 release surface.
 
 Installed terminal and desktop paths need a separate packaging check: `WhaxonApp`
 and `EmbeddedServer` derive their data directory from the checkout-relative

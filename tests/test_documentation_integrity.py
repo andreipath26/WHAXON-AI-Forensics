@@ -53,6 +53,7 @@ CANONICAL_DOCUMENTS = (
     "docs/CHANGELOG.md",
 )
 MARKDOWN_LINK = re.compile(r"\]\(([^)\n]+)\)")
+MARKDOWN_TARGET = re.compile(r"\[[^\]]+\]\(([^)\n]+)\)")
 
 
 def test_canonical_markdown_local_links_resolve():
@@ -70,6 +71,28 @@ def test_canonical_markdown_local_links_resolve():
             if target and not (doc.parent / target).is_file():
                 missing.append(f"{relative}: {raw}")
     assert not missing, "Broken canonical Markdown links:\n" + "\n".join(missing)
+
+
+def test_acceptance_ledger_markdown_links_resolve():
+    """Catch dead linked documents embedded in CSV requirement descriptions."""
+    from urllib.parse import unquote
+
+    missing = []
+    for ledger in LEDGERS:
+        with ledger.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                key = row.get("requirement_id") or row.get("checkpoint_id")
+                for field, value in row.items():
+                    for match in MARKDOWN_TARGET.finditer(value or ""):
+                        raw = match.group(1).split(' "', 1)[0].strip("<> ")
+                        if not raw or raw.startswith(("#", "/", "https:", "http:", "mailto:", "data:")):
+                            continue
+                        target = unquote(raw.split("#", 1)[0].split("?", 1)[0])
+                        # Acceptance-ledger links use repository-root-relative
+                        # paths, unlike links in the Markdown documents above.
+                        if target and not (ROOT / target).is_file():
+                            missing.append(f"{ledger.name}:{key}:{field}:{raw}")
+    assert not missing, "Broken acceptance-ledger Markdown links:\n" + "\n".join(missing)
 
 
 def test_active_release_guidance_does_not_reopen_fixed_one_shot_bug():

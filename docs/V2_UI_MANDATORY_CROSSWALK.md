@@ -5,6 +5,8 @@ Total output lines: 1574
 
 > **Current UI / delivery reconciliation — 2026-11-14, main code head `272245e700dfa89835f44886f370b011c1786cf1`.** UI safety and reliability PRs #203 (Adapters), #204 (Run), #206 (AI), #213 (disconnected Adapter configuration controls), #214 (deterministic Findings browser data), and #215 (truthful Reports unavailable state) are merged. The exact source candidate tree `75880425cdaf4857989f229638e59c5b65de099f` passed all 20 CI jobs in run #43624338670, including the isolated G01 chain. The regenerated inventory contains 808 controls across 22 templates. All 22 route rows remain open for full behavior/control wiring and D1–D6 acceptance. Complete implementation and internal tests before final external/manual/deployment qualification. Supported UI scope remains desktop.
 
+> **Current-main reconciliation — 2026-11-20:** main is now `668ce5ee72851b257c3b734511d9fa9354cbca04`; CI run [44728330739](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44728330739) and README-freeze run [44728330736](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44728330736) passed on that SHA. The source-control inventory at `272245e700dfa89835f44886f370b011c1786cf1` remains the latest static count: 808 controls across 22 templates. The intervening commits changed workflow API/service, report tests, dependency/readiness, CLI inventory, and dormant Qt dispatch; this is not fresh per-control runtime acceptance. All 22 route rows and per-control wiring remain open; D1–D6 qualification stays deferred until implementation and internal checks are complete.
+
 **Canonical UI implementation and post-completion qualification reference.** Use this crosswalk to complete the 22-page agreed UI scope. Source, tests, screenshots, and exact-head CI establish implementation behavior. Run internal browser/API checks throughout implementation. D1–D6 are final external/manual/deployment qualification criteria and are not prerequisites for implementing the UI. Start that qualification only after the agreed V2 engine and UI scope is complete and internal checks pass. Do not infer that one page's results establish another page's behavior.
 
 **Supported scope:** This product targets desktop. Continue UI implementation within the supplied design and service contracts. Historical mobile/responsive references below are not current scope. Manual visual and accessibility reviews remain deferred until post-implementation qualification.
@@ -407,7 +409,7 @@ The former F.05 “Sort headers” and F.06 “Density toggle” rows described 
 
 # Supplied UI control inventory
 
-**Source baseline:** `7ae5aa1` plus the current integration batch. Generated from all 22 production `ui_v2_*.html` templates using the stdlib HTML parser in `tests/test_web_ui_v2_control_inventory.py`. Regenerate after template changes. No supplied design was changed.
+**Source baseline:** Current draft head `97d8b850f16ea8abb8411f77a0c929e8dee6b09`. Regenerated from all 22 production `ui_v2_*.html` templates using the stdlib HTML parser in `tests/test_web_ui_v2_control_inventory.py`. Regenerate after template changes. This records static source controls only; it does not imply runtime acceptance.
 
 ## Evidence boundary
 
@@ -454,7 +456,7 @@ This is a complete **static source-control registry**, not a declaration that ev
 
 ## Exact source registry
 
-Labels and binding excerpts are shortened for readability; line:column identifies the complete source. No truncation changes the count or classification.
+Labels and binding excerpts are generated from the complete tracked templates; line:column identifies the source control. This registry is a static snapshot, not runtime acceptance.
 
 ### ui_v2_adapters.html
 
@@ -478,22 +480,342 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 7:11306 | button | add New | unresolved-static | — |
 | 7:13011 | button | terminal Terminal Log | unresolved-static | — |
 | 7:13350 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 18:1 | button | sync Sync whaxon.adapters | script-reference | btn-sync |
-| 22:1 | button | restart_alt Reload Entry Points | script-reference | btn-reload |
-| 26:1 | button | add_cir…5271 tokens truncated…) arrow_drop_down | unresolved-static | — |
-| 17:13230 | button | add New | unresolved-static | — |
-| 17:14943 | button | terminal Terminal Log | unresolved-static | — |
-| 17:15282 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 39:1 | button | terminal CLI Help | unresolved-static | — |
-| 43:1 | button | vpn_key Update Credentials Now | unresolved-static | — |
-| 84:1 | button | history Switch Target Session | unresolved-static | — |
-| 88:1 | button | rocket_launch Start New Engagement | unresolved-static | — |
-| 199:1 | button | Open Scope Setup arrow_forward | source-hidden | — |
-| 238:1 | button | upload Upload Artifact | unresolved-static | — |
-| 279:1 | button | play_arrow Deploy Mock | unresolved-static | — |
-| 304:1 | button | tune Configure Filters | source-hidden | — |
-| 397:1 | input | Filter recent job history by ID, target, or tool | unresolved-static | — |
-| 399:1 | button | download Export Archive | unresolved-static | — |
+| 18:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | btn-sync |
+| 22:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | btn-reload |
+| 26:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | btn-register |
+| 116:1 | input | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | adapter-search |
+| 121:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 124:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 127:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 130:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 133:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 140:1 | select | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | status-select |
+| 188:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 232:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 276:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 320:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 363:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 407:1 | button | Read-only reference: this adapter configuration action is not connected to a live WHAXON workflow. | disabled | — |
+| 451:1 | button | Read-only reference: this adapter configuration action is not connected to a live WHAXON workflow. | disabled | — |
+| 495:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 545:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | close-drawer |
+| 583:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 587:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 591:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 595:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 597:1 | input | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | add-flag-input |
+| 631:1 | input | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 638:1 | input | (unnamed) | disabled | — |
+| 645:1 | input | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | — |
+| 661:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | btn-mock-test |
+| 666:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | btn-resign |
+| 669:1 | button | Read-only reference: this control is not connected to a live WHAXON workflow. | disabled | btn-save-conf |
+
+### ui_v2_ai.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 4:4719 | a | Dashboard / Zero State | script-reference | # |
+| 4:4976 | a | Scope & Targets | script-reference | # |
+| 4:5227 | a | Run & Orchestration | script-reference | # |
+| 4:5486 | a | Trust Layer & Findings | script-reference | # |
+| 4:5751 | a | PTES Coverage & Reports | script-reference | # |
+| 4:6226 | a | AI Strategy Gate | script-reference | # |
+| 4:6472 | a | Remediation Retest Studio | script-reference | # |
+| 4:6737 | a | Correlated Attack Chains | script-reference | # |
+| 4:7200 | a | Job Execution History | script-reference | # |
+| 4:7457 | a | Evidence File Inspector | script-reference | # |
+| 4:7718 | a | Cryptographic Audit Log | script-reference | # |
+| 4:8181 | a | System Diagnostics & Health | script-reference | # |
+| 4:8456 | a | Adapter & Plugin Manager | script-reference | # |
+| 4:8725 | a | Settings & API Explorer | script-reference | # |
+| 4:11089 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
+| 4:11446 | button | add New | unresolved-static | — |
+| 4:13151 | button | terminal Terminal Log | unresolved-static | — |
+| 4:13490 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 84:1 | button | close Legacy response disabled Use V2 plan controls | disabled | btn-reject |
+| 91:1 | button | bolt V2 approval in Run Separate action | disabled | btn-authorize |
+| 258:1 | button | content_copy Copy | unresolved-static | — |
+
+### ui_v2_approvals.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 4:4475 | a | target Scope & Targets | script-reference | # |
+| 4:4807 | a | terminal Run & Orchestration | script-reference | # |
+| 4:5149 | a | verified_user Trust Layer & Findings | script-reference | # |
+| 4:5502 | a | analytics PTES Coverage & Reports | script-reference | # |
+| 4:9037 | button | terminal Terminal Log | unresolved-static | — |
+| 4:9376 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 30:1 | button | replay Retest Verified Scope | inline-handler | runRetestAll() |
+| 126:1 | button | ALL | unresolved-static | — |
+| 127:1 | button | CRIT (1) | unresolved-static | — |
+| 128:1 | button | HIGH (2) | unresolved-static | — |
+| 129:1 | button | MED (1) | unresolved-static | — |
+| 130:1 | button | LOW (0) | unresolved-static | — |
+| 135:1 | button | VERIFIED (6) | unresolved-static | — |
+| 136:1 | button | CANDIDATE (11) | unresolved-static | — |
+| 137:1 | button | REVIEW NEEDED | unresolved-static | — |
+| 142:1 | button | Nuclei | unresolved-static | — |
+| 143:1 | button | sqlmap | unresolved-static | — |
+| 144:1 | button | Nikto | unresolved-static | — |
+| 149:1 | input | Filter proof pattern, URL, CVE... | unresolved-static | — |
+| 164:1 | div | CRITICAL SQLi: Time-based Blind VERIFIED /api/v1/catalog/items?id= CVSS 9.8 Nuclei / sqlmap timer Delta: 5021ms (Threshold: 5000ms) CONFIRM 100% | inline-handler | selectFinding(1) |
+| 191:1 | div | HIGH Stored Cross-Site Scripting (XSS) VERIFIED /v1/reviews/post (comment payload parameter) CVSS 7.5 Nuclei HTTP fingerprint Proof Nonce: <whaxon_proof_nonce_492> CONFIRMED | inline-handler | selectFinding(2) |
+| 218:1 | div | HIGH BOLA Authorization Bypass CANDIDATE /api/v2/tenant/billing (tenant_id switch) CVSS 8.2 WHAXON Adapter approval_delegation Requires Operator Replay Approval QUEUED | inline-handler | selectFinding(3) |
+| 245:1 | div | MEDIUM Exposed .env Backup Secret File VERIFIED /backup/.env.production.bak CVSS 6.5 Nikto Web check_circle Matched Pattern: DB_PASSWORD=[a-zA-Z0-9_]{16} EXIT 0 | inline-handler | selectFinding(4) |
+| 332:1 | button | content_copy Copy Command | inline-handler | copyProofCurl() |
+| 407:1 | button | play_arrow Replay Test (Retest) | inline-handler | triggerReplayAction() |
+| 411:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
+| 417:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
+| 421:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
+| 521:1518 | button | close | source-hidden | document.getElementById('approvals-modal').remove() |
+| 529:600 | input | (unnamed) | source-hidden | — |
+| 529:1089 | input | (unnamed) | source-hidden | — |
+| 529:1561 | input | (unnamed) | source-hidden | — |
+| 529:2020 | textarea | Cross-tenant billing data was exposed in JSON response payload despite token tenant mismatch. Verified manually via modified export parameter. | source-hidden | — |
+| 529:2759 | button | redo Skip Item | source-hidden | — |
+| 529:3032 | button | Refute / False Positive | source-hidden | document.getElementById('approvals-modal').remove() |
+| 529:3289 | button | Hold for Retest | source-hidden | document.getElementById('approvals-modal').remove() |
+| 529:3573 | button | how_to_reg Approve as Verified (Sign Proof) | source-hidden | document.getElementById('approvals-modal').remove() |
+
+### ui_v2_audit.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 4:4579 | a | Dashboard / Zero State | script-reference | # |
+| 4:4836 | a | Scope & Targets | script-reference | # |
+| 4:5087 | a | Run & Orchestration | script-reference | # |
+| 4:5346 | a | Trust Layer & Findings | script-reference | # |
+| 4:5611 | a | PTES Coverage & Reports | script-reference | # |
+| 4:6086 | a | AI Strategy Gate | script-reference | # |
+| 4:6333 | a | Remediation Retest Studio | script-reference | # |
+| 4:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
+| 4:6895 | a | Correlated Attack Chains | script-reference | # |
+| 4:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
+| 4:7443 | a | PTaaS Client Portal | script-reference | # |
+| 4:7896 | a | Job Execution History | script-reference | # |
+| 4:8153 | a | Evidence File Inspector | script-reference | # |
+| 4:8414 | a | Cryptographic Audit Log | script-reference | # |
+| 4:8876 | a | System Diagnostics & Health | script-reference | # |
+| 4:9151 | a | Adapter & Plugin Manager | script-reference | # |
+| 4:9420 | a | Settings & Secrets Vault | script-reference | # |
+| 4:11786 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
+| 4:12143 | button | add New | unresolved-static | — |
+| 4:13848 | button | terminal Terminal Log | unresolved-static | — |
+| 4:14187 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 38:1 | button | sync Verify Entire Merkle Root | inline-handler | triggerMerkleVerification() |
+| 42:1 | button | enhanced_encryption Export Attestation (.sig) | inline-handler | downloadSigAttestation() |
+| 157:1 | input | Search seq #, actor ID, SHA-256 digest, or payload target... | inline-handler | ledger-search |
+| 162:1 | select | ALL SIGNALS (6) SCOPE MODIFICATION FINDING VERIFICATION PAYLOAD DETONATION EMERGENCY HALT | inline-handler | category-filter |
+| 171:1 | button | shield SEALED ONLY | unresolved-static | — |
+| 178:1 | button | chevron_left | unresolved-static | — |
+| 181:1 | button | chevron_right | unresolved-static | — |
+| 203:1 | tr | 2026-03-30T14:22:08.892401Z #EVT-9941 Finding Verified person OP//7749-ALPHA (HSM#01) Finding #F-2026-881 (BOLA in /v2/transfers) sha256: 7b91f03ce89a88... PASS: SEALED data_object | inline-handler | selectEvent('EVT-9941') |
+| 235:1 | button | Inspect Hash Tree | unresolved-static | — |
+| 241:1 | tr | 2026-03-30T14:18:41.119830Z #EVT-9940 Scope Change key OP//4108-BRAVO (Dual-Auth) WHITELIST: CIDR 192.168.10.0/24 sha256: 4e18ac49b9901d... PASS: SEALED data_object | inline-handler | selectEvent('EVT-9940') |
+| 273:1 | button | Inspect Hash Tree | unresolved-static | — |
+| 279:1 | tr | 2026-03-30T14:05:12.601944Z #EVT-9939 Payload Detonation memory AUTONOMOUS RUNNER #04 (PID 41902) sqlmap blind injection /items?id=1 sha256: c99201f8b1a3e6... PASS: SEALED data_object | inline-handler | selectEvent('EVT-9939') |
+| 311:1 | button | Inspect Hash Tree | unresolved-static | — |
+| 317:1 | tr | 2026-03-30T13:42:01.002195Z #EVT-9938 Emergency Halt gavel OP//7749-ALPHA (Manual Abort) ALL 4 RUNNER DAEMONS PURGED sha256: aa82f76c023d19... PASS: SEALED data_object | inline-handler | selectEvent('EVT-9938') |
+| 349:1 | button | Inspect Hash Tree | unresolved-static | — |
+| 355:1 | tr | 2026-03-30T13:15:55.441920Z #EVT-9937 Tool Invocation terminal DAEMON//NUCLEI-ORCH cve-2024-auth-bypass against /oauth sha256: 02bc79e8a01124... PASS: SEALED data_object | inline-handler | selectEvent('EVT-9937') |
+| 386:1 | button | Inspect Hash Tree | unresolved-static | — |
+| 392:1 | tr | 2026-03-30T12:59:10.104510Z #EVT-9936 Policy Override verified_user SEC-COMPLIANCE-ROBOT Engagement Window Extended +2h sha256: 9d8213aa7312ee... PASS: SEALED data_object | inline-handler | selectEvent('EVT-9936') |
+| 423:1 | button | Inspect Hash Tree | unresolved-static | — |
+| 446:1 | button | content_copy Copy Raw Hex | inline-handler | copyRawProof() |
+| 561:1 | button | gavel Court-Ready Forensic Bundle (.zip) | inline-handler | downloadCourtReadyPackage() |
+| 565:1 | button | Cryptographic QR Verification Slip | inline-handler | generateQrCert() |
+
+### ui_v2_bas.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 5:4579 | a | Dashboard / Zero State | script-reference | # |
+| 5:4836 | a | Scope & Targets | script-reference | # |
+| 5:5087 | a | Run & Orchestration | script-reference | # |
+| 5:5346 | a | Trust Layer & Findings | script-reference | # |
+| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
+| 5:6086 | a | AI Strategy Gate | script-reference | # |
+| 5:6333 | a | Remediation Retest Studio | script-reference | # |
+| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
+| 5:6895 | a | Correlated Attack Chains | script-reference | # |
+| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
+| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
+| 5:7724 | a | BAS & Detection Validation | script-reference | # |
+| 5:8209 | a | Job Execution History | script-reference | # |
+| 5:8466 | a | Evidence File Inspector | script-reference | # |
+| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
+| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
+| 5:9473 | a | System Diagnostics & Health | script-reference | # |
+| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
+| 5:10017 | a | PTaaS Client Portal | script-reference | # |
+| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
+| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
+| 5:12993 | button | add New | unresolved-static | — |
+| 5:14698 | button | terminal Terminal Log | unresolved-static | — |
+| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 40:1 | button | play_circle Detonate Sequence | unresolved-static | — |
+| 44:1 | button | chevron_forward Query Blue Telemetry | unresolved-static | — |
+| 48:1 | button | assessment Gap Report | unresolved-static | — |
+| 443:1 | button | tune Configure Vector Filters | unresolved-static | — |
+| 495:1 | button | Push Rule to SIEM | unresolved-static | — |
+| 573:1 | button | download Export Validation Matrix (Navigator JSON + PDF) | unresolved-static | — |
+| 601:1 | button | rocket_launch Deploy to Sentinel | unresolved-static | — |
+| 628:1 | button | publish Deploy to Splunk | unresolved-static | — |
+
+### ui_v2_bug_bounty.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 206:1124 | a | terminal Dashboard / Zero State | script-reference | # |
+| 206:1479 | a | radar Scope & Targets | script-reference | # |
+| 206:1821 | a | play_circle Run & Orchestration | script-reference | # |
+| 206:2177 | a | verified_user Trust Layer & Findings | script-reference | # |
+| 206:2541 | a | description PTES Coverage & Reports | script-reference | # |
+| 206:3082 | a | psychology AI Strategy Gate | script-reference | # |
+| 206:3429 | a | build_circle Remediation Retest Studio | script-reference | # |
+| 206:3796 | a | account_tree Correlated Attack Chains | script-reference | # |
+| 206:4161 | a | open_in_browser Bug Bounty & Live Browser | script-reference | # |
+| 206:4702 | a | history_toggle_off Job Execution History | script-reference | # |
+| 206:5067 | a | folder_zip Evidence File Inspector | script-reference | # |
+| 206:5428 | a | encrypted Cryptographic Audit Log | script-reference | # |
+| 206:5957 | a | monitor_heart System Diagnostics & Health | script-reference | # |
+| 206:6331 | a | extension Adapter & Plugin Manager | script-reference | # |
+| 206:6695 | a | shield_person PTaaS Client Portal | script-reference | # |
+| 206:7051 | a | key Settings & Secrets Vault | script-reference | # |
+| 206:8931 | button | terminal LOGS | unresolved-static | — |
+| 206:9234 | button | dangerous HALT SCAN | unresolved-static | — |
+| 305:1 | button | Go back | unresolved-static | — |
+| 306:1 | button | Go forward | unresolved-static | — |
+| 307:1 | button | Reload target view | unresolved-static | — |
+| 313:1 | input | (unnamed) | unresolved-static | — |
+| 320:1 | select | User_A (Attacker Context) User_B (Victim / Target #092) Unauthenticated Guest | unresolved-static | — |
+| 384:1 | input | (unnamed) | unresolved-static | — |
+| 389:1 | input | (unnamed) | unresolved-static | — |
+| 414:1 | button | send EXECUTE COMMIT (TAMPERED) | unresolved-static | — |
+| 439:1 | button | CLEAR CACHE | unresolved-static | — |
+| 440:1 | button | DUMP DOM SNAPSHOT | unresolved-static | — |
+| 555:1 | button | terminal INSPECTOR: POST /app/transfer/commit | unresolved-static | — |
+| 595:1 | button | cached SEND TO VALIDATOR | unresolved-static | — |
+| 599:1 | button | difference DIFF ANALYSIS | unresolved-static | — |
+| 603:1 | button | verified_user PROMOTE TO FINDING | unresolved-static | — |
+
+### ui_v2_chains.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 5:4579 | a | Dashboard / Zero State | script-reference | # |
+| 5:4836 | a | Scope & Targets | script-reference | # |
+| 5:5087 | a | Run & Orchestration | script-reference | # |
+| 5:5346 | a | Trust Layer & Findings | script-reference | # |
+| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
+| 5:6086 | a | AI Strategy Gate | script-reference | # |
+| 5:6333 | a | Remediation Retest Studio | script-reference | # |
+| 5:6598 | a | Correlated Attack Chains | script-reference | # |
+| 5:7061 | a | Job Execution History | script-reference | # |
+| 5:7318 | a | Evidence File Inspector | script-reference | # |
+| 5:7579 | a | Cryptographic Audit Log | script-reference | # |
+| 5:8042 | a | System Diagnostics & Health | script-reference | # |
+| 5:8317 | a | Adapter & Plugin Manager | script-reference | # |
+| 5:8586 | a | Settings & API Explorer | script-reference | # |
+| 5:10950 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
+| 5:11307 | button | add New | unresolved-static | — |
+| 5:13012 | button | terminal Terminal Log | unresolved-static | — |
+| 5:13351 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 29:1 | button | sync_saved_locally Re-compute Graph | script-reference | btn-recompute |
+| 35:1 | select | Severity: All Vectors Severity: Critical & Compound 10.0 Severity: High (CVSS > 8.0) | unresolved-static | — |
+| 41:1 | button | download Export Graph SVG/JSON | unresolved-static | — |
+| 338:1 | button | play_arrow Simulate Controlled Replay | unresolved-static | — |
+| 342:1 | button | menu_book Export PTES Chapter | unresolved-static | — |
+| 429:1 | button | Add Custom Mitigation Rule (Envoy WAF) | unresolved-static | — |
+| 432:1 | button | Generate Red Team Retest Script | unresolved-static | — |
+
+### ui_v2_compliance.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 5:4579 | a | Dashboard / Zero State | script-reference | # |
+| 5:4836 | a | Scope & Targets | script-reference | # |
+| 5:5087 | a | Run & Orchestration | script-reference | # |
+| 5:5346 | a | Trust Layer & Findings | script-reference | # |
+| 5:5611 | a | PTES Coverage & Reports | script-reference | # |
+| 5:6086 | a | AI Strategy Gate | script-reference | # |
+| 5:6333 | a | Remediation Retest Studio | script-reference | # |
+| 5:6598 | a | Attack Surface & Continuous Monitoring | script-reference | # |
+| 5:6895 | a | Correlated Attack Chains | script-reference | # |
+| 5:7158 | a | Bug Bounty & Live Browser Studio | script-reference | # |
+| 5:7443 | a | Threat Intel & Exploit Arsenal | script-reference | # |
+| 5:7724 | a | BAS & Detection Validation | script-reference | # |
+| 5:8209 | a | Job Execution History | script-reference | # |
+| 5:8466 | a | Evidence File Inspector | script-reference | # |
+| 5:8727 | a | Cryptographic Audit Log | script-reference | # |
+| 5:8988 | a | Compliance & Framework Crosswalk | script-reference | # |
+| 5:9473 | a | System Diagnostics & Health | script-reference | # |
+| 5:9748 | a | Adapter & Plugin Manager | script-reference | # |
+| 5:10017 | a | PTaaS Client Portal | script-reference | # |
+| 5:10270 | a | Settings & Secrets Vault | script-reference | # |
+| 5:12636 | button | ENG-2026-X892 (api.internal.corp) arrow_drop_down | unresolved-static | — |
+| 5:12993 | button | add New | unresolved-static | — |
+| 5:14698 | button | terminal Terminal Log | unresolved-static | — |
+| 5:15037 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 22:1 | button | tune Configure Scope | unresolved-static | — |
+| 26:1 | button | picture_as_pdf Auditor Crosswalk PDF | unresolved-static | — |
+| 30:1 | button | archive Export Package (.ZIP) | unresolved-static | — |
+| 201:1 | button | PCI-DSS v4.0 (5) | unresolved-static | — |
+| 204:1 | button | OWASP Top 10 (4) | unresolved-static | — |
+| 207:1 | button | SOC 2 Type II (8) | unresolved-static | — |
+| 210:1 | button | ISO 27001 (6) | unresolved-static | — |
+| 213:1 | button | NIST CSF (3) | unresolved-static | — |
+| 216:1 | button | MITRE ATT&CK | unresolved-static | — |
+| 423:1 | button | PREV | unresolved-static | — |
+| 425:1 | button | NEXT | unresolved-static | — |
+| 479:1 | input | (unnamed) | unresolved-static | — |
+| 486:1 | input | (unnamed) | unresolved-static | — |
+| 493:1 | input | (unnamed) | unresolved-static | — |
+| 500:1 | input | (unnamed) | unresolved-static | — |
+| 522:1 | button | lock_clock Compile Signed Matrix (.PDF / .JSON) | unresolved-static | — |
+
+### ui_v2_dashboard.html
+
+| Line:column | Tag | Label | Static state | Binding evidence |
+|---|---|---|---|---|
+| 27:4365 | a | Dashboard / Zero State | script-reference | # |
+| 27:4621 | a | Scope & Targets | script-reference | # |
+| 27:4872 | a | Run & Orchestration | script-reference | # |
+| 27:5131 | a | Trust Layer & Findings | script-reference | # |
+| 27:5396 | a | PTES Coverage & Reports | script-reference | # |
+| 27:5871 | a | AI Strategy Gate | script-reference | # |
+| 27:6118 | a | Remediation Retest Studio | script-reference | # |
+| 27:6383 | a | Correlated Attack Chains | script-reference | # |
+| 27:6846 | a | Job Execution History | script-reference | # |
+| 27:7103 | a | Evidence File Inspector | script-reference | # |
+| 27:7364 | a | Cryptographic Audit Log | script-reference | # |
+| 27:7827 | a | System Diagnostics & Health | script-reference | # |
+| 27:8102 | a | Adapter & Plugin Manager | script-reference | # |
+| 27:8371 | a | Settings & API Explorer | script-reference | # |
+| 27:8836 | a | Attack Surface & Continuous Monitoring | script-reference | # |
+| 27:9133 | a | Bug Bounty & Live Browser Studio | script-reference | # |
+| 27:9418 | a | PTaaS Client Portal | script-reference | # |
+| 27:9671 | a | Threat Intelligence | script-reference | # |
+| 27:9937 | a | BAS & Detection Validation | script-reference | # |
+| 27:10210 | a | Compliance & Framework Crosswalk | script-reference | # |
+| 27:10495 | a | Trust Layer Approvals Queue | script-reference | # |
+| 27:12616 | button | No active engagement (No target selected) arrow_drop_down | unresolved-static | — |
+| 27:12981 | button | add New | unresolved-static | — |
+| 27:14694 | button | terminal Terminal Log | unresolved-static | — |
+| 27:15033 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 49:1 | button | terminal CLI Help | unresolved-static | — |
+| 53:1 | button | vpn_key Update Credentials Now | unresolved-static | — |
+| 94:1 | button | history Switch Target Session | unresolved-static | — |
+| 98:1 | button | rocket_launch Start New Engagement | unresolved-static | — |
+| 209:1 | button | Open Scope Setup arrow_forward | source-hidden | — |
+| 248:1 | button | upload Upload Artifact | unresolved-static | — |
+| 289:1 | button | play_arrow Deploy Mock | unresolved-static | — |
+| 314:1 | button | tune Configure Filters | source-hidden | — |
+| 407:1 | input | Filter recent job history by ID, target, or tool | unresolved-static | — |
+| 409:1 | button | download Export Archive | unresolved-static | — |
+| 417:1 | div | Job history table, scroll horizontally for all columns | unresolved-static | — |
 
 ### ui_v2_diagnostics.html
 
@@ -577,11 +899,11 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 
 | Line:column | Tag | Label | Static state | Binding evidence |
 |---|---|---|---|---|
-| 4:4470 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4816 | a | target Scope & Targets | script-reference | # |
-| 4:5148 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5490 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5843 | a | analytics PTES Coverage & Reports | script-reference | # |
+| 4:4386 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
+| 4:4732 | a | target Scope & Targets | script-reference | # |
+| 4:5064 | a | terminal Run & Orchestration | script-reference | # |
+| 4:5406 | a | verified_user Trust Layer & Findings | script-reference | # |
+| 4:5759 | a | analytics PTES Coverage & Reports | script-reference | # |
 | 30:1 | button | replay Open V2 Verification & Retest Studio | inline-handler | openV2RetestStudio() |
 | 126:1 | button | ALL | script-reference | filter:severity:all |
 | 127:1 | button | CRIT (1) | script-reference | filter:severity:critical |
@@ -727,13 +1049,13 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 467:1 | button | VIEW RAW PACKET open_in_new | inline-handler | toggleProof('proof-1') |
 | 493:1 | button | refresh REQUEST VERIFICATION RETEST | inline-handler | requestRetest('BOLA / IDOR in Merchant Transfer Settlement Route') |
 | 523:1 | button | VIEW SCRIPT open_in_new | inline-handler | toggleProof('proof-2') |
-| 619:1 | div | picture_as_pdf Executive Brief (PDF) v2.1 • 14 Pages • Cryptographic | inline-handler | downloadArtifact('Executive_Brief_Q4.pdf') |
-| 632:1 | div | slideshow Board-Ready Deck (Slides) Keynote & PPTX • High-level KPIs | inline-handler | downloadArtifact('Board_Risk_Deck_2026.key') |
-| 645:1 | div | table_chart Remediation Matrix (Jira CSV) Atlassian Schema • CVSS v3 | inline-handler | downloadArtifact('Findings_Jira_Sync.csv') |
+| 619:1 | div | picture_as_pdf Executive Brief (PDF) v2.1 • 14 Pages • Cryptographically Signed download | inline-handler | downloadArtifact('Executive_Brief_Q4.pdf') |
+| 632:1 | div | slideshow Board-Ready Deck (Slides) Keynote & PPTX • High-level KPIs & Timeline download | inline-handler | downloadArtifact('Board_Risk_Deck_2026.key') |
+| 645:1 | div | table_chart Remediation Matrix (Jira CSV) Atlassian Schema • CVSS v3.1 & Remediation Fixes download | inline-handler | downloadArtifact('Findings_Jira_Sync.csv') |
 | 683:1 | button | PING SEC-OPS | unresolved-static | — |
 | 698:1 | button | close | source-hidden | closeScopeModal() |
 | 705:1 | textarea | e.g. api-v3-staging.internal.stripe.com 192.168.12.0/24 (VPC Peered) | source-hidden | — |
-| 711:1 | select | Synchronized with Primary RoE (Now through Nov 02, 2026) Restricted  | source-hidden | — |
+| 711:1 | select | Synchronized with Primary RoE (Now through Nov 02, 2026) Restricted 48-hour Weekend Window Only Off-peak Business Hours Only (00:00 - 06:00 UTC) | source-hidden | — |
 | 722:1 | button | CANCEL | source-hidden | closeScopeModal() |
 | 725:1 | button | SIGN & SUBMIT ROE ADDENDUM | source-hidden | confirmScopeExpansion() |
 
@@ -782,8 +1104,8 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 379:1 | input | (unnamed) | unresolved-static | — |
 | 387:1 | input | (unnamed) | unresolved-static | — |
 | 428:1 | button | visibility Preview Markdown | script-reference | previewBtn |
-| 432:1 | button | data_object Export Findings (.json) | disabled | — |
-| 436:1 | button | download Download Full Report (.pdf) | disabled | — |
+| 432:1 | button | Live report data has not loaded. | disabled | — |
+| 436:1 | button | Live report data has not loaded. | disabled | — |
 | 489:1 | a | download Raw | unresolved-static | # |
 | 504:1 | a | download Raw | unresolved-static | # |
 | 519:1 | a | download Raw | unresolved-static | # |
@@ -825,7 +1147,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 21:1679 | input | (unnamed) | unresolved-static | — |
 | 21:2308 | input | (unnamed) | unresolved-static | — |
 | 21:2943 | input | (unnamed) | unresolved-static | — |
-| 21:3692 | input | e.g., timing delta >3.0s (median of 3), xss marker present, candidat | unresolved-static | — |
+| 21:3692 | input | e.g., timing delta >3.0s (median of 3), xss marker present, candidate: replay request inconclusive | unresolved-static | — |
 | 21:4285 | textarea | Enter proof delta justification... | unresolved-static | — |
 | 21:4959 | button | refresh RE-EXECUTE IMMEDIATE PROBE | unresolved-static | — |
 | 21:5315 | button | data_object EXPORT PROOF AUDIT JSON | unresolved-static | — |
@@ -835,87 +1157,100 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 
 | Line:column | Tag | Label | Static state | Binding evidence |
 |---|---|---|---|---|
-| 4:4475 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4821 | a | target Scope & Targets | script-reference | # |
-| 4:5153 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5495 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5848 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9381 | button | terminal Terminal Log | unresolved-static | — |
-| 4:9720 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 54:1 | button | tune Approval Gate: Active | unresolved-static | toggle-planner-gate |
-| 105:1 | input | (unnamed) | unresolved-static | — |
-| 109:1 | input | (unnamed) | unresolved-static | — |
-| 113:1 | input | (unnamed) | unresolved-static | — |
-| 117:1 | input | (unnamed) | unresolved-static | — |
-| 121:1 | input | (unnamed) | unresolved-static | — |
-| 125:1 | input | (unnamed) | unresolved-static | — |
-| 129:1 | input | (unnamed) | unresolved-static | — |
-| 133:1 | input | (unnamed) | unresolved-static | — |
-| 137:1 | input | (unnamed) | unresolved-static | — |
-| 141:1 | input | (unnamed) | unresolved-static | — |
-| 149:1 | select | WHAXON tool | script-reference | run-tool-select |
-| 150:1 | input | Authorized target host or URL | script-reference | run-target-input |
-| 151:1 | button | play_arrow Create V2 Plan | script-reference | run-active-btn |
-| 187:1 | input | ai-planner-toggle | script-reference | ai-planner-toggle |
-| 223:1 | button | View stdout open_in_new | inline-handler | showNmapStdout() |
-| 230:1 | button | Re-run | unresolved-static | — |
-| 278:1 | button | Pause | unresolved-static | — |
-| 281:1 | button | Abort | unresolved-static | — |
-| 335:1 | button | Engage Replay | unresolved-static | — |
-| 347:1 | button | explore WhatWeb | unresolved-static | — |
-| 351:1 | button | folder_zip Gobuster | unresolved-static | — |
-| 355:1 | button | security WPScan | unresolved-static | — |
-| 392:1 | button | Clear buffer | inline-handler | clearLog() |
-| 485:1 | input | Type command (e.g. validate --id=F-104, pause, resume, replay)... | script-reference | cli-input |
-| 486:1 | button | Execute | inline-handler | sendManualCommand() |
-| 494:1 | button | pause_circle Pause Pipeline | inline-handler | togglePipelinePause() |
-| 499:1 | button | input Inject Payload | inline-handler | injectPayloadPrompt() |
-| 504:1 | button | add_circle Spawn Sub-tool | inline-handler | spawnSubtoolModal() |
-| 509:1 | button | emergency_home Emergency Abort | inline-handler | emergencyAbort() |
+| 5:4076 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
+| 5:4422 | a | target Scope & Targets | script-reference | # |
+| 5:4754 | a | terminal Run & Orchestration | script-reference | # |
+| 5:5096 | a | verified_user Trust Layer & Findings | script-reference | # |
+| 5:5449 | a | analytics PTES Coverage & Reports | script-reference | # |
+| 5:8710 | button | terminal Terminal Log | unresolved-static | — |
+| 5:9049 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 55:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | toggle-planner-gate |
+| 106:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 110:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 114:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 118:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 122:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 126:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 130:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 134:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 138:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 142:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 157:5 | select | Engine V2 mission | script-reference | v2-mission-select |
+| 159:5 | select | Engine V2 workflow plan | disabled | v2-plan-select |
+| 160:5 | button | Refresh List | script-reference | v2-refresh-missions |
+| 161:5 | button | Review Selected | disabled | v2-use-plan |
+| 168:7 | input | Assessment objective | script-reference | v2-mission-objective |
+| 170:7 | select | Installed Engine V2 capability | disabled | v2-capability-select |
+| 171:7 | button | Create Mission & Plan | disabled | v2-create-plan |
+| 177:5 | input | Existing workflow plan ID | script-reference | v2-plan-id |
+| 178:5 | button | Review Plan | script-reference | v2-load-plan |
+| 179:5 | button | Submit V2 Run | disabled | v2-submit-run |
+| 180:5 | button | Request Cancel | disabled | v2-cancel-run |
+| 181:5 | button | Inspect Evidence Report | disabled | v2-inspect-report |
+| 182:5 | button | Preview Evidence Follow-ups | disabled | v2-propose-followups |
+| 192:1 | select | Legacy tool catalog (inventory only) | script-reference | run-tool-select |
+| 193:1 | input | Authorized target host or URL | script-reference | run-target-input |
+| 194:1 | button | play_arrow Create V2 Plan | script-reference | run-active-btn |
+| 230:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | ai-planner-toggle |
+| 266:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 273:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 321:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 324:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 378:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 390:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 394:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 398:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 435:1 | button | Clear buffer | inline-handler | clearLog() |
+| 528:1 | input | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | cli-input |
+| 529:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 537:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | btn-pause |
+| 542:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 547:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
+| 552:1 | button | Reference control: this action is not connected to a live Engine V2 workflow. | disabled | — |
 
 ### ui_v2_scope.html
 
 | Line:column | Tag | Label | Static state | Binding evidence |
 |---|---|---|---|---|
-| 4:4475 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
-| 4:4821 | a | target Scope & Targets | script-reference | # |
-| 4:5153 | a | terminal Run & Orchestration | script-reference | # |
-| 4:5495 | a | verified_user Trust Layer & Findings | script-reference | # |
-| 4:5848 | a | analytics PTES Coverage & Reports | script-reference | # |
-| 4:9679 | button | terminal Terminal Log | unresolved-static | — |
-| 4:10018 | button | gavel Emergency Halt Scan | unresolved-static | — |
-| 28:1 | button | file_upload Quick Import | script-reference | openImportDrawerBtn |
-| 32:1 | button | add_circle Add In-Scope Target | script-reference | openTargetModalBtn |
-| 101:1 | button | Waiting for scope | disabled | toggleScopeEnforcementBtn |
-| 119:1 | input | Filter configured scope rules | script-reference | targetFilterInput |
-| 147:3069 | button | link View Certificate SAN Chain | source-hidden | — |
-| 147:3404 | button | block Mark Out-of-Scope Exclusion | source-hidden | — |
-| 147:3702 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | — |
-| 147:4827 | button | link View Certificate SAN Chain | source-hidden | — |
-| 147:5162 | button | block Mark Out-of-Scope Exclusion | source-hidden | — |
-| 147:5460 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | — |
-| 147:6577 | button | link View Certificate SAN Chain | source-hidden | — |
-| 147:6912 | button | block Mark Out-of-Scope Exclusion | source-hidden | — |
-| 147:7210 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | — |
-| 162:1 | input | hostname, IP, or URL | script-reference | scopeCheckTarget |
-| 163:1 | button | Check | script-reference | runScopeCheckBtn |
-| 164:1 | button | Copy CLI | script-reference | copyCliBtn |
-| 223:1 | button | add_moderator Add Boundary Exclusion | source-hidden | addDenyRuleBtn |
-| 266:1 | button | close | source-hidden | closeTargetModalBtn |
-| 274:1 | input | Authorized target hostname, IP address, or CIDR | source-hidden | modalTargetInput |
-| 279:1 | input | (unnamed) | source-hidden | — |
-| 283:1 | input | (unnamed) | source-hidden | — |
-| 288:1 | input | AUTHORIZATION-REFERENCE | source-hidden | — |
-| 291:1 | input | authConfirmCheckbox | source-hidden | authConfirmCheckbox |
-| 299:1 | button | Cancel | source-hidden | cancelTargetModalBtn |
-| 300:1 | button | Commit to Scope | source-hidden | saveTargetBtn |
-| 312:1 | button | close | source-hidden | closeImportDrawerBtn |
-| 320:1 | button | Burp XML/JSON | source-hidden | — |
-| 321:1 | button | scope.json | source-hidden | — |
-| 322:1 | button | CIDR List | source-hidden | — |
-| 327:1 | textarea | Paste scope JSON definition | source-hidden | — |
-| 331:1 | button | Cancel | source-hidden | cancelImportDrawerBtn |
-| 332:1 | button | Import & Parse Rules | source-hidden | executeImportBtn |
+| 26:4304 | a | dashboard Dashboard / Zero State | declared-nav | /ui-v2 |
+| 26:4650 | a | target Scope & Targets | declared-nav | /ui-v2/scope |
+| 26:4993 | a | terminal Run & Orchestration | declared-nav | /ui-v2/run |
+| 26:5344 | a | verified_user Trust Layer & Findings | declared-nav | /ui-v2/findings |
+| 26:5711 | a | analytics PTES Coverage & Reports | declared-nav | /ui-v2/reports |
+| 26:9283 | button | terminal Terminal Log | unresolved-static | — |
+| 26:9622 | button | gavel Emergency Halt Scan | unresolved-static | — |
+| 50:1 | button | file_upload Quick Import | script-reference | openImportDrawerBtn |
+| 54:1 | button | add_circle Add In-Scope Target | script-reference | openTargetModalBtn |
+| 123:1 | button | Waiting for scope | disabled | toggleScopeEnforcementBtn |
+| 141:1 | input | Filter configured scope rules | script-reference | targetFilterInput |
+| 169:3069 | button | link View Certificate SAN Chain | source-hidden | — |
+| 169:3404 | button | block Mark Out-of-Scope Exclusion | source-hidden | — |
+| 169:3702 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | — |
+| 169:4827 | button | link View Certificate SAN Chain | source-hidden | — |
+| 169:5162 | button | block Mark Out-of-Scope Exclusion | source-hidden | — |
+| 169:5460 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | — |
+| 169:6577 | button | link View Certificate SAN Chain | source-hidden | — |
+| 169:6912 | button | block Mark Out-of-Scope Exclusion | source-hidden | — |
+| 169:7210 | button | assignment_turned_in Promote to Scope (+ Signed Override Log) | source-hidden | — |
+| 184:1 | input | hostname, IP, or URL | script-reference | scopeCheckTarget |
+| 185:1 | button | Check | script-reference | runScopeCheckBtn |
+| 186:1 | button | Copy CLI | script-reference | copyCliBtn |
+| 245:1 | button | add_moderator Add Boundary Exclusion | source-hidden | addDenyRuleBtn |
+| 288:1 | button | close | source-hidden | closeTargetModalBtn |
+| 296:1 | input | Authorized target hostname, IP address, or CIDR | source-hidden | modalTargetInput |
+| 301:1 | input | (unnamed) | source-hidden | — |
+| 305:1 | input | (unnamed) | source-hidden | — |
+| 310:1 | input | AUTHORIZATION-REFERENCE | source-hidden | — |
+| 313:1 | input | authConfirmCheckbox | source-hidden | authConfirmCheckbox |
+| 321:1 | button | Cancel | source-hidden | cancelTargetModalBtn |
+| 322:1 | button | Commit to Scope | source-hidden | saveTargetBtn |
+| 334:1 | button | close | source-hidden | closeImportDrawerBtn |
+| 342:1 | button | Burp XML/JSON | source-hidden | — |
+| 343:1 | button | scope.json | source-hidden | — |
+| 344:1 | button | CIDR List | source-hidden | — |
+| 349:1 | textarea | Paste scope JSON definition | source-hidden | — |
+| 353:1 | button | Cancel | source-hidden | cancelImportDrawerBtn |
+| 354:1 | button | Import & Parse Rules | source-hidden | executeImportBtn |
 
 ### ui_v2_settings.html
 
@@ -969,7 +1304,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 767:1 | button | add_link REGISTER ENDPOINT | unresolved-static | — |
 | 794:1 | button | close | source-hidden | closeKeyGenModal() |
 | 804:1 | input | e.g. CI_TEST_PIPELINE | source-hidden | newTokenName |
-| 808:1 | select | Operator (Execute scans, trigger payloads, write findings) Reviewer  | source-hidden | — |
+| 808:1 | select | Operator (Execute scans, trigger payloads, write findings) Reviewer (Read-only, verify evidence, sign reports) Client-Viewer (Zero target details, summary metrics only) | source-hidden | — |
 | 817:1 | button | 30 Days | source-hidden | — |
 | 818:1 | button | 90 Days | source-hidden | — |
 | 819:1 | button | 365 Days | source-hidden | — |
@@ -977,7 +1312,7 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 827:1 | button | GENERATE TOKEN | source-hidden | executeTokenGeneration() |
 | 841:1 | button | close | source-hidden | closeCredentialModal() |
 | 851:1 | input | 10.0.0.0/8 or admin.internal.corp | source-hidden | — |
-| 856:1 | select | SSH Private Key (Ed25519) HTTP Bearer JWT Kerberos TGT Ticket AWS IA | source-hidden | — |
+| 856:1 | select | SSH Private Key (Ed25519) HTTP Bearer JWT Kerberos TGT Ticket AWS IAM STS Role NTLM Password Hash | source-hidden | — |
 | 866:1 | input | admin or svc_account | source-hidden | — |
 | 871:1 | textarea | -----BEGIN OPENSSH PRIVATE KEY-----... | source-hidden | — |
 | 875:1 | button | ABORT | source-hidden | closeCredentialModal() |
@@ -1015,22 +1350,22 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 108:1 | button | database Rebuild SQLite Vector DB | unresolved-static | — |
 | 112:1 | button | terminal Searchsploit Terminal | unresolved-static | — |
 | 203:1 | input | Filter by CVE-ID, service (OpenSSH, RDP, FortiOS), CVSS, EPSS... | unresolved-static | — |
-| 207:1 | select | Severity (CVSS DESC) EPSS Probability Weaponized First CISA KEV List | unresolved-static | — |
+| 207:1 | select | Severity (CVSS DESC) EPSS Probability Weaponized First CISA KEV Listed | unresolved-static | — |
 | 217:1 | button | All (14) | inline-handler | toggleFilter('all', this) |
 | 220:1 | button | CISA KEV (5) | inline-handler | toggleFilter('cisa', this) |
 | 223:1 | button | Weaponized PoC (8) | inline-handler | toggleFilter('weaponized', this) |
 | 226:1 | button | Remote Code Execution (4) | inline-handler | toggleFilter('rce', this) |
 | 229:1 | button | PrivEsc (3) | inline-handler | toggleFilter('privesc', this) |
-| 236:1 | div | CVE-2024-6387 RegreSSHion (OpenSSH Race Condition) CVSS 9.8 EPSS 88. | inline-handler | selectCve('CVE-2024-6387', 'RegreSSHion — OpenSSH Signal Handler Race  |
+| 236:1 | div | CVE-2024-6387 RegreSSHion (OpenSSH Race Condition) CVSS 9.8 EPSS 88.2% CISA KEV Signal handler race condition in OpenSSH's server (sshd) allows unauthenticated remote attackers to execute arbitrary code with root privileges on glibc-based Linux systems. In Scope: ssh://10.142.0.4:22 (Discovered Nmap #4192) Async Python PoC Ready code Inspect Exploit Code sensors Queue Safe Probe tune Simulate Dry-Run | inline-handler | selectCve('CVE-2024-6387', 'RegreSSHion — OpenSSH Signal Handler Race RCE', '9.8 CRITICAL', '88.2%', 'YES', 'ssh://10.142.0.4:22') |
 | 263:1 | button | code Inspect Exploit Code | unresolved-static | — |
 | 266:1 | button | sensors Queue Safe Probe | unresolved-static | — |
 | 269:1 | button | tune Simulate Dry-Run | unresolved-static | — |
-| 275:1 | div | CVE-2024-38077 MadLicense (Windows RDP Gateway) CVSS 9.8 EPSS 94.6%  | inline-handler | selectCve('CVE-2024-38077', 'MadLicense — Windows Remote Desktop Licen |
+| 275:1 | div | CVE-2024-38077 MadLicense (Windows RDP Gateway) CVSS 9.8 EPSS 94.6% CISA KEV Heap-based buffer overflow in Windows Remote Desktop Licensing Service (RDLGS) allowing unauthenticated RCE via RPC interface binding. In Scope: rdp://10.142.1.15:3389 (NetExec Identified) MSF: exploit/windows/rdp/cve_2024_38077 terminal Metasploit Harness data_object Inspect MSF Options | inline-handler | selectCve('CVE-2024-38077', 'MadLicense — Windows Remote Desktop Licensing Service RCE', '9.8 CRITICAL', '94.6%', 'YES', 'rdp://10.142.1.15:3389') |
 | 301:1 | button | terminal Metasploit Harness | unresolved-static | — |
 | 304:1 | button | data_object Inspect MSF Options | unresolved-static | — |
-| 310:1 | div | CVE-2023-38606 BOLA in Internal Merchant API Endpoint CVSS 8.4 EPSS  | inline-handler | selectCve('CVE-2023-38606', 'Broken Object Level Authorization (BOLA)  |
+| 310:1 | div | CVE-2023-38606 BOLA in Internal Merchant API Endpoint CVSS 8.4 EPSS 34.1% NON-KEV Missing access token boundary check in `/v1/merchants/{id}/payouts` allows authenticated lower-tier operators to exfiltrate full banking routing artifacts. In Scope: api.internal.corp/v1/merchants Deterministic Replay Payload play_arrow Execute Curl Replay Test | inline-handler | selectCve('CVE-2023-38606', 'Broken Object Level Authorization (BOLA) in Internal Merchant API', '8.4 HIGH', '34.1%', 'NO', 'https://api.internal.corp/v1/merchants/') |
 | 335:1 | button | play_arrow Execute Curl Replay Test | unresolved-static | — |
-| 341:1 | div | CVE-2024-21762 Fortinet FortiOS SSL-VPN OOB Write CVSS 9.6 EPSS 96.8 | inline-handler | selectCve('CVE-2024-21762', 'Fortinet FortiOS SSL-VPN Out-of-Bounds Wr |
+| 341:1 | div | CVE-2024-21762 Fortinet FortiOS SSL-VPN OOB Write CVSS 9.6 EPSS 96.8% CISA KEV Out-of-bounds write vulnerability in FortiOS SSL-VPN enables remote unauthenticated threat actors to execute arbitrary code via specially crafted HTTP requests. In Scope: vpn.internal.corp:8443 Weaponized Nuclei Template assignment_turned_in View Nuclei Heuristics | inline-handler | selectCve('CVE-2024-21762', 'Fortinet FortiOS SSL-VPN Out-of-Bounds Write RCE', '9.6 CRITICAL', '96.8%', 'YES', 'https://vpn.internal.corp:8443') |
 | 366:1 | button | assignment_turned_in View Nuclei Heuristics | unresolved-static | — |
 | 397:1 | button | Source Code | inline-handler | switchExploitTab('tab-source') |
 | 400:1 | button | Mechanics | inline-handler | switchExploitTab('tab-mechanics') |
@@ -1041,8 +1376,6 @@ Labels and binding excerpts are shortened for readability; line:column identifie
 | 510:1 | input | (unnamed) | unresolved-static | — |
 | 518:1 | button | gavel Arm & Queue for HITL Approval Gate | unresolved-static | — |
 
-
----
 
 ## Part 5 — web ui files and rendering/obsidian_kinetic/DESIGN.md (historical embedded copy; original restored at supplied path)
 

@@ -103,6 +103,75 @@ EXPECTED_SERVICE_CALLS = Counter(
     }
 )
 
+# Direct operating-system process and external network sinks. Runner/service
+# entry-point inventories above classify target execution; this supplemental
+# census catches side effects that bypass ToolRunner, including setup, lookups,
+# AI-provider HTTP, and V2 pinned-HTTP providers.
+EXPECTED_EXTERNAL_SINKS = Counter(
+    {
+        ("adapters/hashcat.py", "run_module", "subprocess.run"): 1,
+        ("adapters/impacket.py", "_run", "subprocess.run"): 1,
+        ("ai/providers/backends/anthropic.py", "chat", "urllib.request.urlopen"): 1,
+        ("ai/providers/backends/google.py", "chat", "urllib.request.urlopen"): 1,
+        ("ai/providers/backends/ollama.py", "chat", "urllib.request.urlopen"): 1,
+        ("ai/providers/backends/ollama.py", "available", "urllib.request.urlopen"): 1,
+        ("ai/providers/backends/openai.py", "chat", "urllib.request.urlopen"): 1,
+        ("core/bounty_ingest.py", "_public_ip", "socket.getaddrinfo"): 1,
+        ("core/bounty_ingest.py", "connect", "socket.create_connection"): 1,
+        ("core/bounty_ingest.py", "_request", "conn.request"): 1,
+        ("core/dependencies.py", "collect_dependency_report", "subprocess.run"): 1,
+        ("core/installer.py", "apply_approved_dependency_plan", "subprocess.Popen"): 1,
+        ("core/msf.py", "_verified_rpc_post", "requests.post"): 1,
+        ("core/msf.py", "_probe_or_raise", "socket.create_connection"): 1,
+        ("core/msf.py", "_probe_or_raise", "sock.sendall"): 1,
+        ("core/recon_checks.py", "check_ssl", "socket.create_connection"): 2,
+        ("core/recon_checks.py", "_open_no_redirect", "_NO_REDIRECT_OPENER.open"): 1,
+        ("core/recon_checks.py", "check_redirects", "opener.open"): 1,
+        ("core/report.py", "_searchsploit_json", "subprocess.run"): 1,
+        ("core/report.py", "to_pdf_bytes", "subprocess.run"): 1,
+        ("core/runner.py", "_run_smb_session", "_asyncio.create_subprocess_exec"): 1,
+        ("core/runner.py", "_run_wmi_session", "_asyncio.create_subprocess_exec"): 1,
+        ("core/runner.py", "_run_ssh_session", "_asyncio.create_subprocess_exec"): 1,
+        ("core/runner.py", "run", "asyncio.create_subprocess_exec"): 1,
+        ("core/scope.py", "check", "socket.getaddrinfo"): 1,
+        ("core/scope.py", "resolve_for_execution", "socket.getaddrinfo"): 1,
+        ("core/headers_v2.py", "_headers_worker", "connection.request"): 1,
+        ("core/http_recon_v2.py", "connect", "raw.connect"): 1,
+        ("core/http_recon_v2.py", "_https_worker", "connection.request"): 1,
+        ("core/redirect_recon_v2.py", "_worker", "connection.request"): 1,
+        ("core/robots_recon_v2.py", "_request_fixed_path", "connection.request"): 1,
+        ("core/security_txt_v2.py", "_worker", "connection.request"): 1,
+        ("core/setup_installers.py", "_run_bounded_package_command", "subprocess.Popen"): 1,
+        ("core/tls_cert_v2.py", "_socket_connect", "socket.socket"): 1,
+        ("core/tls_cert_v2.py", "_socket_connect", "raw.connect"): 1,
+        ("core/validator.py", "_validate_observation", "socket.create_connection"): 2,
+        ("core/validator.py", "_validate_observation", "opener.open"): 1,
+        ("core/validator.py", "_fetch", "opener.open"): 1,
+        ("core/validator.py", "_replay_ctx.request_once", "opener.open"): 1,
+        ("core/vulndb.py", "_http_get", "urllib.request.urlopen"): 1,
+        ("interfaces/cli/cve_cmd.py", "_fetch", "urllib.request.urlopen"): 1,
+        ("interfaces/cli/down_cmd.py", "_rc", "subprocess.run"): 1,
+        ("interfaces/cli/down_cmd.py", "main", "subprocess.run"): 4,
+        ("interfaces/cli/init_cmd.py", "_docker", "subprocess.run"): 1,
+        ("interfaces/cli/install_cmd.py", "main", "subprocess.run"): 1,
+        ("interfaces/cli/lookup_cmd.py", "_searchsploit", "subprocess.run"): 1,
+        ("interfaces/cli/report_cmd.py", "_copy_to_clipboard", "subprocess.run"): 1,
+        ("interfaces/cli/report_cmd.py", "_open_file", "subprocess.Popen"): 1,
+        ("interfaces/cli/up_cmd.py", "_run", "subprocess.run"): 1,
+        ("interfaces/cli/up_cmd.py", "_wait_tcp", "socket.create_connection"): 1,
+        ("interfaces/cli/up_cmd.py", "_wait_healthy", "socket.create_connection"): 1,
+        ("interfaces/cli/up_cmd.py", "main", "subprocess.Popen"): 1,
+        ("interfaces/cli/up_cmd.py", "main", "subprocess.run"): 1,
+        ("interfaces/cli/up_cmd.py", "main", "socket.create_connection"): 1,
+        ("interfaces/gui/embed.py", "_port_open", "socket.create_connection"): 1,
+        ("interfaces/gui/embed.py", "start", "subprocess.Popen"): 1,
+        ("interfaces/gui/embed.py", "stop", "subprocess.run"): 1,
+        ("interfaces/tui/app.py", "action_cycle_theme", "urllib.request.urlopen"): 1,
+        ("interfaces/tui/screens/main.py", "action_show_chain", "_url.urlopen"): 1,
+        ("tools/state.py", "_run", "subprocess.run"): 1,
+    }
+)
+
 # Pin every Flask API method/path/handler binding. UI page routes are excluded;
 # their ownership is frozen and tracked by the separate UI inventory.
 EXPECTED_API_ROUTE_HANDLERS = {
@@ -248,6 +317,7 @@ EXPECTED_UI_ROUTE_HANDLERS = {
 }
 
 SERVICE_CALL_NAMES = {item[2] for item in EXPECTED_SERVICE_CALLS}
+EXTERNAL_SINK_NAMES = {item[2] for item in EXPECTED_EXTERNAL_SINKS}
 
 
 def _dotted_name(node: ast.expr) -> str | None:
@@ -299,6 +369,19 @@ class _ServiceCallVisitor(_RunnerCallVisitor):
         self.generic_visit(node)
 
 
+class _ExternalSinkVisitor(_RunnerCallVisitor):
+    def __init__(self, path: str) -> None:
+        super().__init__(path)
+        self.external_sinks: Counter[tuple[str, str, str]] = Counter()
+
+    def visit_Call(self, node: ast.Call) -> None:
+        call_name = _dotted_name(node.func)
+        if call_name in EXTERNAL_SINK_NAMES:
+            scope = ".".join(self.functions)
+            self.external_sinks[(self.path, scope, call_name)] += 1
+        self.generic_visit(node)
+
+
 def _runner_call_inventory() -> Counter[tuple[str, str, str]]:
     calls: Counter[tuple[str, str, str]] = Counter()
     for source in sorted(SOURCE_ROOT.rglob("*.py")):
@@ -334,6 +417,32 @@ def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
         f"Unexpected: {actual - EXPECTED_SERVICE_CALLS}; "
         f"missing: {EXPECTED_SERVICE_CALLS - actual}"
     )
+
+
+def test_direct_external_effect_sinks_are_classified() -> None:
+    actual: Counter[tuple[str, str, str]] = Counter()
+    for source in sorted(SOURCE_ROOT.rglob("*.py")):
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        visitor = _ExternalSinkVisitor(source.relative_to(SOURCE_ROOT).as_posix())
+        visitor.visit(tree)
+        actual.update(visitor.external_sinks)
+
+    assert actual == EXPECTED_EXTERNAL_SINKS, (
+        "Direct process/network effect sinks changed. Classify each new path by "
+        "owner, authorization, persistence, support status, and regression evidence "
+        "in the Engine V2 inventory before updating this map. "
+        f"Unexpected: {actual - EXPECTED_EXTERNAL_SINKS}; "
+        f"missing: {EXPECTED_EXTERNAL_SINKS - actual}"
+    )
+
+    inventory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    assert len(EXPECTED_EXTERNAL_SINKS) == 60
+    for source_path in {path for path, _scope, _call in EXPECTED_EXTERNAL_SINKS}:
+        assert Path(source_path).name in inventory, source_path
 
 
 def test_api_route_methods_and_handlers_are_explicit() -> None:
@@ -475,7 +584,8 @@ def test_catalog_and_v2_operation_crosswalk_are_documented():
     inventory = inventory_path.read_text(encoding="utf-8")
     catalog_start = inventory.index("| Catalog IDs | V2 status | Transport and reason |")
     catalog_end = inventory.index(
-        "Exact V2 operation aliases and declared target types:", catalog_start,
+        "The non-admitted entries have these explicit solo-V1.0 dispositions:",
+        catalog_start,
     )
     documented_catalog = {}
     for line in inventory[catalog_start:catalog_end].splitlines():
@@ -541,4 +651,32 @@ def test_catalog_and_v2_operation_crosswalk_are_documented():
         for tool_id, operation_id in EXPECTED_V2_SEMANTIC_OPERATIONS.items()
     }
     assert documented_operations == expected_operations
+
+
+def test_every_non_admitted_catalog_entry_has_a_release_disposition() -> None:
+    inventory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    marker = "The non-admitted entries have these explicit solo-V1.0 dispositions:"
+    start = inventory.index(marker)
+    end = inventory.index("Exact V2 operation aliases and declared target types:", start)
+    rows = re.findall(
+        r"^\| ([^|]+) \| ([^|]+) \| ([^|]+) \|$",
+        inventory[start:end],
+        re.MULTILINE,
+    )
+
+    documented_ids: set[str] = set()
+    for ids, disposition, compatibility in rows:
+        documented_ids.update(re.findall(r"`([^`]+)`", ids))
+        assert disposition.strip(), ids
+        assert compatibility.strip(), ids
+
+    expected_ids = set(EXPECTED_CATALOG_TRANSPORTS) - set(EXPECTED_V2_TARGET_TYPES)
+    assert documented_ids == expected_ids
+    assert "Excluded" in inventory[start:end]
+    assert "Test-only" in inventory[start:end]
+    assert "no V2 task/attempt evidence" in inventory[start:end]
 
