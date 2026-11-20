@@ -690,6 +690,53 @@ async def test_dispatch_boundary_rechecks_authorization_when_scope_changes(tmp_p
     assert result["tasks"] == [{"id": "scan", "status": "blocked"}]
 
 
+@_run_async_test
+async def test_cancellation_during_authorization_blocks_task_and_descendants(tmp_path):
+    """A stop request during policy checks must fence dispatch and DAG children."""
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "cancel-during-authorization.db")
+    store.create_mission("m", "controlled lab")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("recon", "fixture", "192.0.2.10"),
+        WorkflowTask(
+            "verify", "fixture", "192.0.2.10", depends_on=("recon",),
+        ),
+    )))
+    dispatched = []
+    checks = []
+
+    def authorize(task):
+        checks.append(task.id)
+        # Model a concurrent operator stop while the initial policy callback
+        # is running. The durable dispatch barrier must observe it afterwards.
+        store.request_workflow_cancellation("p")
+        return True
+
+    result = await WorkflowScheduler(
+        store,
+        authorize=authorize,
+        dispatch=lambda task: dispatched.append(task.id),
+    ).run("p")
+
+    assert checks == ["recon"]
+    assert dispatched == []
+    assert {task["id"]: task["status"] for task in result["tasks"]} == {
+        "recon": "cancelled",
+        "verify": "cancelled",
+    }
+    snapshot = store.get_workflow_progress("p")
+    assert snapshot["cancellation_requested"] is True
+    assert snapshot["counts"] == {"cancelled": 2}
+    assert snapshot["complete"] is True
+    assert not any(
+        event["event_type"] == "dispatch_started"
+        for event in store.list_workflow_events("p")
+    )
+
+
 def test_limits_configuration_is_audited_idempotently(tmp_path):
     from whaxon.core.store import JobStore
 
