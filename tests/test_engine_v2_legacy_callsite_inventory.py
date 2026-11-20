@@ -118,11 +118,15 @@ EXPECTED_EXTERNAL_SINKS = Counter(
         ("ai/providers/backends/openai.py", "chat", "urllib.request.urlopen"): 1,
         ("core/bounty_ingest.py", "_public_ip", "socket.getaddrinfo"): 1,
         ("core/bounty_ingest.py", "connect", "socket.create_connection"): 1,
+        ("core/bounty_ingest.py", "_request", "conn.request"): 1,
         ("core/dependencies.py", "collect_dependency_report", "subprocess.run"): 1,
         ("core/installer.py", "apply_approved_dependency_plan", "subprocess.Popen"): 1,
         ("core/msf.py", "_verified_rpc_post", "requests.post"): 1,
         ("core/msf.py", "_probe_or_raise", "socket.create_connection"): 1,
+        ("core/msf.py", "_probe_or_raise", "sock.sendall"): 1,
         ("core/recon_checks.py", "check_ssl", "socket.create_connection"): 2,
+        ("core/recon_checks.py", "_open_no_redirect", "_NO_REDIRECT_OPENER.open"): 1,
+        ("core/recon_checks.py", "check_redirects", "opener.open"): 1,
         ("core/report.py", "_searchsploit_json", "subprocess.run"): 1,
         ("core/report.py", "to_pdf_bytes", "subprocess.run"): 1,
         ("core/runner.py", "_run_smb_session", "_asyncio.create_subprocess_exec"): 1,
@@ -131,9 +135,19 @@ EXPECTED_EXTERNAL_SINKS = Counter(
         ("core/runner.py", "run", "asyncio.create_subprocess_exec"): 1,
         ("core/scope.py", "check", "socket.getaddrinfo"): 1,
         ("core/scope.py", "resolve_for_execution", "socket.getaddrinfo"): 1,
+        ("core/headers_v2.py", "_headers_worker", "connection.request"): 1,
+        ("core/http_recon_v2.py", "connect", "raw.connect"): 1,
+        ("core/http_recon_v2.py", "_https_worker", "connection.request"): 1,
+        ("core/redirect_recon_v2.py", "_worker", "connection.request"): 1,
+        ("core/robots_recon_v2.py", "_request_fixed_path", "connection.request"): 1,
+        ("core/security_txt_v2.py", "_worker", "connection.request"): 1,
         ("core/setup_installers.py", "_run_bounded_package_command", "subprocess.Popen"): 1,
         ("core/tls_cert_v2.py", "_socket_connect", "socket.socket"): 1,
+        ("core/tls_cert_v2.py", "_socket_connect", "raw.connect"): 1,
         ("core/validator.py", "_validate_observation", "socket.create_connection"): 2,
+        ("core/validator.py", "_validate_observation", "opener.open"): 1,
+        ("core/validator.py", "_fetch", "opener.open"): 1,
+        ("core/validator.py", "_replay_ctx.request_once", "opener.open"): 1,
         ("core/vulndb.py", "_http_get", "urllib.request.urlopen"): 1,
         ("interfaces/cli/cve_cmd.py", "_fetch", "urllib.request.urlopen"): 1,
         ("interfaces/cli/down_cmd.py", "_rc", "subprocess.run"): 1,
@@ -420,6 +434,15 @@ def test_direct_external_effect_sinks_are_classified() -> None:
         f"Unexpected: {actual - EXPECTED_EXTERNAL_SINKS}; "
         f"missing: {EXPECTED_EXTERNAL_SINKS - actual}"
     )
+
+    inventory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    assert len(EXPECTED_EXTERNAL_SINKS) == 60
+    for source_path in {path for path, _scope, _call in EXPECTED_EXTERNAL_SINKS}:
+        assert Path(source_path).name in inventory, source_path
 
 
 def test_api_route_methods_and_handlers_are_explicit() -> None:
