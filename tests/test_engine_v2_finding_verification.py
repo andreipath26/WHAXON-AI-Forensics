@@ -20,6 +20,7 @@ class _SQLiFixture(BaseHTTPRequestHandler):
     requests = 0
     vulnerable = True
     reflect_xss = True
+    send_cookie = False
     scope_path = None
     revoke_after = None
 
@@ -45,6 +46,8 @@ class _SQLiFixture(BaseHTTPRequestHandler):
             if "'" in value and type(self).vulnerable else b"Product found"
         )
         self.send_response(200)
+        if type(self).send_cookie:
+            self.send_header("Set-Cookie", "session=fixture; Path=/")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -293,6 +296,50 @@ def test_v2_http_header_observation_verification_is_scheduler_owned(tmp_path):
 
         asyncio.run(exercise())
     finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_cookie_observation_verification_is_scheduler_owned(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.send_cookie = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="cookie-source-plan", target=target,
+                kind="cookie_insecure",
+            )
+            _bound_plan(
+                core, plan_id="cookie-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(
+                "cookie-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("cookie-verification-plan")
+            assert evidence["all_evidence_integrity_verified"] is True
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["kind"] == "cookie_insecure"
+            assert finding["verification_status"] == "verified"
+            assert "still lacks httponly" in finding["verification_reason"]
+            assert _SQLiFixture.requests == 1
+
+        asyncio.run(exercise())
+    finally:
+        _SQLiFixture.send_cookie = False
         server.shutdown()
         thread.join(timeout=2)
         server.server_close()

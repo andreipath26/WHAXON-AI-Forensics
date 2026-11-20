@@ -213,7 +213,6 @@ def test_finding_verification_proposal_binds_exact_source_and_kind():
     assert proposal["execution_submitted"] is False
     assert proposal["approval_granted"] is False
 
-
 def test_http_observation_proposal_uses_bounded_v2_verifier():
     source_job_id = "0123456789ab"
     resolved = []
@@ -247,6 +246,13 @@ def test_http_observation_proposal_uses_bounded_v2_verifier():
     assert resolved[0][1] == {"require_installed": True}
     assert proposal["execution_submitted"] is False
     assert proposal["approval_granted"] is False
+
+    retest = workflow_proposals.propose_finding_verification_plan(
+        core, mission_id="mission-1", plan_id="plan-header-retest",
+        source_job_id=source_job_id, finding_seq=2, mode="retest",
+    )
+    assert retest["status"] == "blocked"
+    assert "unsupported by the V2 verifier" in retest["reason"]
 
 
 def test_finding_verification_proposal_blocks_unsealed_source():
