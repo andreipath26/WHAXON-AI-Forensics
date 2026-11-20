@@ -9,7 +9,7 @@ Total output lines: 2154
 
 # WHAXON — ENGINE V2 MASTER DOCUMENT
 
-> **Current implementation status — 2026-11-20.** Main is at `90eb7b8` after PR #222 merged; its exact-head CI passed all 20 jobs, including full Python 3.11/3.12/3.13 suites, package builds, the fixed controlled-lab chain, and service deployment smokes. PR #222 adds strict typed validation for V2 execution budgets, approvals, and uncertain-attempt reconciliation without changing routes or payload names. The next change gives each external V2 worker its own durable readiness heartbeat, preventing one instance's shutdown from masking another live instance; the focused readiness/worker/queue suite passes 59 tests. G10 remains **HOLD — NOT READY TO DEPLOY**: exhaustive legacy execution-path coverage, remaining shared V2 lifecycle and transport parity, provider-effect recovery, complete agreed UI behavior/control wiring, exact-candidate CI, and deferred external qualification remain open.
+> **Current implementation status — 2026-11-20.** Main is at `44e66a9` after PR #223 merged; PR #222 and #223 each passed all 20 exact-head CI jobs, including Python 3.11/3.12/3.13 suites, package builds, the fixed controlled-lab chain, and service deployment smokes. PR #222 adds typed V2 execution-budget, approval, and recovery request validation. PR #223 adds per-instance durable worker readiness so one worker's shutdown cannot mask another live worker. The current continuation reconciles stale durable run requests before advertising a worker as ready; its focused worker/queue/health/API suite passes 60 tests, with Ruff and mypy passing. G10 remains **HOLD — NOT READY TO DEPLOY**: exhaustive legacy execution-path coverage, remaining shared V2 lifecycle and transport parity, provider-effect recovery, complete agreed UI behavior/control wiring, exact-candidate CI, and deferred external qualification remain open.
 
 **Consolidation date:** 2026-11-06. **Historical consolidation baseline:** `6a41f626536be917e12acd175ffffad716132823`; current status is reconciled to the exact `main` SHA in the audit banner above.
 
@@ -1032,3 +1032,11 @@ cannot overwrite another live worker's status. The previous singleton record is
 still maintained for compatibility and included in readiness checks for rolling
 upgrades. Focused queue, continuous-worker, and health regressions pass 59 tests;
 exact-head CI and deployment qualification remain pending.
+
+## Queue recovery before worker readiness — 2026-11-20
+
+The supervised worker now reconciles the complete bounded backlog of stale run
+requests after initialization and before writing a ready heartbeat. If recovery
+fails, readiness stays false and startup fails closed; a stop signal during
+recovery exits without briefly advertising readiness. Focused worker, queue,
+health coverage passes 60 tests; exact-head CI remains pending.
