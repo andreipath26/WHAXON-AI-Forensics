@@ -397,6 +397,13 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
+        task_status_counts = progress.get("counts")
+        if not isinstance(task_status_counts, dict):
+            task_status_counts = {}
+        task_status_counts = {
+            status: count for status, count in task_status_counts.items()
+            if isinstance(status, str) and type(count) is int and count >= 0
+        }
         return {
             "schema_version": "whaxon.workflow-report.v1",
             "plan_id": evidence["plan_id"],
@@ -407,6 +414,9 @@ class Core:
             "truncated": truncated,
             "evidence": evidence,
             "summary": {
+                "planned_tasks": progress.get("total_tasks"),
+                "task_status_counts": task_status_counts,
+                "pending_tasks": task_status_counts.get("pending", 0),
                 "task_attempts": len(attempts),
                 "recorded_attempts": sum(
                     attempt["evidence_status"] == "recorded" for attempt in attempts
