@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import csv
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,7 +34,15 @@ def test_every_top_level_cli_mode_has_an_inventory_disposition():
     modes = [row["mode"] for row in rows]
     assert len(modes) == len(set(modes)), "CLI mode inventory has duplicate modes"
     assert "__default__" in modes
-    assert {"mode", "dispatcher_source", "engine_owner", "classification", "v1_boundary_or_limit"} <= set(rows[0])
+    assert {
+        "mode",
+        "dispatcher_source",
+        "engine_owner",
+        "classification",
+        "v1_boundary_or_limit",
+        "persistence_behavior",
+        "regression_guard",
+    } <= set(rows[0])
 
     explicit = set()
     for node in ast.walk(tree):
@@ -63,4 +72,14 @@ def test_every_top_level_cli_mode_has_an_inventory_disposition():
     for row in rows:
         assert row["dispatcher_source"], row["mode"]
         assert (ROOT / row["dispatcher_source"]).is_file(), row["mode"]
-        assert row["engine_owner"] and row["classification"] and row["v1_boundary_or_limit"], row["mode"]
+        assert (
+            row["engine_owner"]
+            and row["classification"]
+            and row["v1_boundary_or_limit"]
+            and row["persistence_behavior"]
+            and row["regression_guard"]
+        ), row["mode"]
+        guard_files = re.findall(r"test_[A-Za-z0-9_]+\.py", row["regression_guard"])
+        assert guard_files, row["mode"]
+        for guard_file in guard_files:
+            assert (ROOT / "tests" / guard_file).is_file(), (row["mode"], guard_file)
