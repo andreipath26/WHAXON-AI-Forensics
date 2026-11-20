@@ -758,6 +758,11 @@ class FindingVerificationProvider:
                     or parsed.password is not None or parsed.fragment
                 ):
                     return False
+                if (
+                    selected.get("kind") in {"http_header_missing", "cookie_insecure"}
+                    and parsed.query
+                ):
+                    return False
                 self.scope.load()
                 return self.scope.check_for_execution(url).allowed is True
             except (AttributeError, TypeError, ValueError, RuntimeError):

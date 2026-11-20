@@ -18,6 +18,7 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 class _SQLiFixture(BaseHTTPRequestHandler):
     requests = 0
+    paths = []
     vulnerable = True
     reflect_xss = True
     send_cookie = False
@@ -26,6 +27,7 @@ class _SQLiFixture(BaseHTTPRequestHandler):
 
     def do_GET(self):
         type(self).requests += 1
+        type(self).paths.append(self.path)
         if (
             type(self).scope_path is not None
             and type(self).revoke_after == type(self).requests
@@ -79,7 +81,9 @@ def _bound_plan(core, *, plan_id, capability_id, target, inputs):
     return task
 
 
-async def _seed_sealed_source(core, *, plan_id, target, request_context=None, kind="sqli"):
+async def _seed_sealed_source(
+    core, *, plan_id, target, request_context=None, finding_data=None, kind="sqli",
+):
     """Persist a test-only SQLmap result through the real scheduler seal path."""
     from whaxon.core.workflow import WorkflowPlan
 
@@ -100,7 +104,7 @@ async def _seed_sealed_source(core, *, plan_id, target, request_context=None, ki
         core.store.create(source_job)
         core.store.set_started(source_job, tool_id, target)
         core.store.mark_engine_v2_execution_job(source_job)
-        finding_data = (
+        data = finding_data or (
             {"header": "Content-Security-Policy", "url": target}
             if kind == "http_header_missing"
             else {"cookie": "session", "missing": "httponly", "url": target}
@@ -109,7 +113,7 @@ async def _seed_sealed_source(core, *, plan_id, target, request_context=None, ki
         )
         core.store.append_finding(source_job, Finding(
             kind=kind, severity="high", source=tool_id,
-            data=finding_data, raw_line="controlled fixture finding",
+            data=data, raw_line="controlled fixture finding",
             request_context=(request_context if request_context is not None else {
                 "method": "GET", "url": target, "parameter": "id",
             }),
@@ -340,6 +344,51 @@ def test_v2_cookie_observation_verification_is_scheduler_owned(tmp_path):
         asyncio.run(exercise())
     finally:
         _SQLiFixture.send_cookie = False
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_observation_verifier_strips_evidence_query_before_request(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.paths = []
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="changed-query-source-plan", target=target,
+                kind="http_header_missing",
+                finding_data={
+                    "header": "Content-Security-Policy",
+                    "url": f"http://127.0.0.1:{server.server_port}/search?id=2",
+                },
+            )
+            _bound_plan(
+                core, plan_id="changed-query-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(
+                "changed-query-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("changed-query-verification-plan")
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["verification_status"] == "verified"
+            assert _SQLiFixture.requests == 1
+            assert _SQLiFixture.paths == ["/search"]
+
+        asyncio.run(exercise())
+    finally:
         server.shutdown()
         thread.join(timeout=2)
         server.server_close()
