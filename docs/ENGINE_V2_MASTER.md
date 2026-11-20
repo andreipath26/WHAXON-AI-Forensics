@@ -9,7 +9,7 @@ Total output lines: 2154
 
 # WHAXON — ENGINE V2 MASTER DOCUMENT
 
-> **Current implementation status — 2026-11-20.** Main is at `44e66a9` after PR #223 merged; PR #222 and #223 each passed all 20 exact-head CI jobs, including Python 3.11/3.12/3.13 suites, package builds, the fixed controlled-lab chain, and service deployment smokes. PR #222 adds typed V2 execution-budget, approval, and recovery request validation. PR #223 adds per-instance durable worker readiness so one worker's shutdown cannot mask another live worker. The current continuation reconciles stale durable run requests before advertising a worker as ready; its focused worker/queue/health/API suite passes 60 tests, with Ruff and mypy passing. G10 remains **HOLD — NOT READY TO DEPLOY**: exhaustive legacy execution-path coverage, remaining shared V2 lifecycle and transport parity, provider-effect recovery, complete agreed UI behavior/control wiring, exact-candidate CI, and deferred external qualification remain open.
+> **Current implementation status — 2026-11-20.** Main is at `5aecbc8` after PRs #222–#224 merged. PRs #222 and #223 each passed all 20 exact-head CI jobs; PR #224 passed all 22 after a transient Docker-install failure was retried successfully. The checks included Python 3.11/3.12/3.13 suites, package builds, the fixed controlled-lab chain, and service deployment smokes. The merged work adds typed V2 execution-budget/approval/recovery validation, per-instance worker readiness, and stale run-request reconciliation before workers advertise ready. The current continuation default-denies the dormant legacy Qt window's direct ToolRunner path unless `WHAXON_LEGACY_GUI_EXECUTION_ENABLED=true`; its 11 focused tests, Ruff, and mypy pass locally. G10 remains **HOLD — NOT READY TO DEPLOY**: exhaustive legacy execution-path coverage, remaining shared V2 lifecycle and transport parity, provider-effect recovery, complete agreed UI behavior/control wiring, exact-candidate CI, and deferred external qualification remain open.
 
 **Consolidation date:** 2026-11-06. **Historical consolidation baseline:** `6a41f626536be917e12acd175ffffad716132823`; current status is reconciled to the exact `main` SHA in the audit banner above.
 
@@ -1040,3 +1040,13 @@ requests after initialization and before writing a ready heartbeat. If recovery
 fails, readiness stays false and startup fails closed; a stop signal during
 recovery exits without briefly advertising readiness. Focused worker, queue,
 health coverage passes 60 tests; exact-head CI remains pending.
+
+## Dormant legacy Qt dispatch boundary — 2026-11-20
+
+The shipped `whaxon-gui` entry point already uses the V2 web-view client, but
+the older import-compatible Qt module remained in the wheel with direct
+`Core.runner` calls. Those calls now fail closed unless
+`WHAXON_LEGACY_GUI_EXECUTION_ENABLED=true` is explicitly configured. The
+execution-path inventory identifies this compatibility path, and focused gate,
+callsite-inventory, and GUI-entrypoint tests pass; the current change still
+requires exact-head CI.

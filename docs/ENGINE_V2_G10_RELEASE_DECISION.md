@@ -3,7 +3,7 @@
 **Assessment date:** 2026-11-20
 
 **Decision:** **HOLD — NOT READY TO DEPLOY**
-**Current main code head:** `dfe6a38`. PR #221 is merged; its exact-head CI and README-freeze checks passed. A local, unpublished implementation branch is at `f997fc8`; its selected Engine V2/backend regression set passes 275/275, and repository Ruff and mypy pass. Full local pytest is blocked at browser startup by the container's Chromium socket restriction (1,908 passed, 17 skipped, 376 browser setup errors). No exact-candidate hosted CI has run for the local branch. No V2 release tag, package publication, or production deployment exists.
+**Current main code head:** `5aecbc8`. PRs #222–#224 are merged. PRs #222 and #223 passed 20/20 exact-head CI checks each; PR #224 passed 22/22 after retrying a transient Docker installation failure in the controlled-lab job. The merged work hardens typed V2 request contracts, tracks worker readiness per instance, and reconciles stale run requests before readiness. Current continuation `codex/v2-effect-recovery-20261120` adds a default-deny gate to the dormant legacy Qt direct-dispatch path. Its 11 focused tests pass; repository Ruff and mypy pass. Hosted exact-head CI for this continuation is pending. A previous full local pytest run was blocked at browser startup by the container's Chromium socket restriction (1,908 passed, 17 skipped, 376 browser setup errors); this is not a current hosted-CI result. No V2 release tag, package publication, or production deployment exists.
 
 ## Delivery sequence
 
@@ -23,7 +23,7 @@ The release checklist also contains post-implementation external qualification i
 
 | Gate | Implemented or recorded now | Remaining work and sequence |
 |---|---|---|
-| G01 | Bounded V2 crosswalk and exact-tree isolated lab evidence; top-level CLI inventory and AST guard. Candidate `75880425cdaf4857989f229638e59c5b65de099f` passed CI run #43624338670; G01 chain artifact #14125401711 is retained. | Complete exhaustive V1 caller and dispatch-path inventory during implementation. Defer additional real-target qualification until the full scope and internal checks are complete |
+| G01 | Bounded V2 crosswalk and exact-tree isolated lab evidence; top-level CLI inventory and AST guard. Candidate `75880425cdaf4857989f229638e59c5b65de099f` passed CI run #43624338670; G01 chain artifact #14125401711 is retained. PR #224 also passed the current controlled-lab chain. The dormant Qt direct-dispatch path is now default-denied by an explicit environment gate. | Complete exhaustive V1 caller and dispatch-path inventory during implementation. Defer additional real-target qualification until the full scope and internal checks are complete |
 | G02 | Bounded authorization/execution regressions, including legacy `/api/run` bypass and redirect cases | Close remaining caller, session, pivot, cancellation, and cross-transport authorization gaps with internal tests |
 | G03 | Bounded independent-validation/retest behavior; unsupported methods and kinds remain conservative | Complete supported-method and finding-state behavior and internal regression coverage |
 | G04 | Report overhaul and bounded evidence/coverage checks | Complete implementation of evidence and report requirements. Defer independent audit anchoring, external custody review, and final evidence qualification until implementation is complete |
