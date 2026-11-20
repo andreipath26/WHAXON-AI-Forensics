@@ -213,6 +213,47 @@ def test_finding_verification_proposal_binds_exact_source_and_kind():
     assert proposal["execution_submitted"] is False
     assert proposal["approval_granted"] is False
 
+def test_http_observation_proposal_uses_bounded_v2_verifier():
+    source_job_id = "0123456789ab"
+    resolved = []
+    manifest = SimpleNamespace(
+        capability_id="tool.verify_http_observation",
+        provider_id="whaxon.verifier.http", fingerprint="observation-manifest",
+        impact="moderate", permissions=("network.verify",), timeout_s=75,
+    )
+    core = SimpleNamespace(
+        store=SimpleNamespace(
+            get_mission=lambda _mission_id: {"id": "mission-1"},
+            get=lambda job_id: {"id": job_id, "target": "http://192.0.2.10/"},
+            get_findings=lambda _job_id: [{"seq": 2, "kind": "http_header_missing"}],
+        ),
+        scope=SimpleNamespace(check=lambda _target: SimpleNamespace(allowed=True)),
+        providers=SimpleNamespace(
+            manifest_for=lambda _capability: manifest,
+            resolve_task=lambda task, **kwargs: resolved.append((task, kwargs)),
+        ),
+    )
+
+    proposal = workflow_proposals.propose_finding_verification_plan(
+        core, mission_id="mission-1", plan_id="plan-header-verify",
+        source_job_id=source_job_id, finding_seq=2, mode="verify",
+    )
+
+    assert proposal["status"] == "proposed"
+    task = WorkflowPlan.from_dict(proposal["plan"]).tasks[0]
+    assert task.capability_id == "tool.verify_http_observation"
+    assert task.inputs == {"source_job_id": source_job_id, "finding_seq": 2}
+    assert resolved[0][1] == {"require_installed": True}
+    assert proposal["execution_submitted"] is False
+    assert proposal["approval_granted"] is False
+
+    retest = workflow_proposals.propose_finding_verification_plan(
+        core, mission_id="mission-1", plan_id="plan-header-retest",
+        source_job_id=source_job_id, finding_seq=2, mode="retest",
+    )
+    assert retest["status"] == "blocked"
+    assert "unsupported by the V2 verifier" in retest["reason"]
+
 
 def test_finding_verification_proposal_blocks_unsealed_source():
     source_job_id = "0123456789ab"

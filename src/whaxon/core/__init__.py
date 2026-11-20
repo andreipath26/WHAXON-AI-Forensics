@@ -146,6 +146,7 @@ class Core:
         )
         verification_provider = FindingVerificationProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
+            authorize_task=self.authorize_workflow_task_for_plan,
         )
         lab_access_provider = MetasploitableLabAccessProvider(
             store=self.store, registry=self.capabilities, scope=self.scope, msf=self.msf,
@@ -397,6 +398,13 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
+        task_status_counts = progress.get("counts")
+        if not isinstance(task_status_counts, dict):
+            task_status_counts = {}
+        task_status_counts = {
+            status: count for status, count in task_status_counts.items()
+            if isinstance(status, str) and type(count) is int and count >= 0
+        }
         return {
             "schema_version": "whaxon.workflow-report.v1",
             "plan_id": evidence["plan_id"],
@@ -407,6 +415,9 @@ class Core:
             "truncated": truncated,
             "evidence": evidence,
             "summary": {
+                "planned_tasks": progress.get("total_tasks"),
+                "task_status_counts": task_status_counts,
+                "pending_tasks": task_status_counts.get("pending", 0),
                 "task_attempts": len(attempts),
                 "recorded_attempts": sum(
                     attempt["evidence_status"] == "recorded" for attempt in attempts
@@ -457,7 +468,10 @@ class Core:
                 "web.paths.fuzz",
             },
             "initial_access": {"lab.initial_access.samba_usermap"},
-            "verification": {"tool.verify_sqli", "tool.verify_xss"},
+            "verification": {
+                "tool.verify_sqli", "tool.verify_xss",
+                "tool.verify_http_observation",
+            },
             "retest": {"tool.retest_sqli", "tool.retest_xss"},
         }
         for plan_id in selected_ids:
@@ -527,14 +541,20 @@ class Core:
 
                 if stage == "verification":
                     accepted_statuses = {"verified"}
-                    accepted_capabilities = {"tool.verify_sqli", "tool.verify_xss"}
+                    accepted_capabilities = {
+                        "tool.verify_sqli", "tool.verify_xss",
+                        "tool.verify_http_observation",
+                    }
                 else:
                     accepted_statuses = {"still_vulnerable", "fixed"}
                     accepted_capabilities = {"tool.retest_sqli", "tool.retest_xss"}
                 stage_evidence_ok = stage_evidence_ok and any(
                     attempt.get("capability_id") in accepted_capabilities
                     and finding.get("source") == "engine-v2-verifier"
-                    and finding.get("kind") in {"sqli", "sql_injection", "xss"}
+                    and finding.get("kind") in {
+                        "sqli", "sql_injection", "xss",
+                        "http_header_missing", "cookie_insecure",
+                    }
                     and finding.get("verification_status") in accepted_statuses
                     and finding.get("verified_by") == "engine-v2"
                     and isinstance(finding.get("data"), dict)

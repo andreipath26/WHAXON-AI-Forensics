@@ -547,7 +547,7 @@ def propose_finding_verification_plan(
     finding_seq: int,
     mode: str,
 ) -> dict:
-    """Prepare a plan for the bounded V2 SQLi/XSS verifier or retester.
+    """Prepare a plan for the bounded V2 verifier or vulnerability retester.
 
     The source job and finding must already be persisted. Provider resolution
     verifies the V2 evidence seal and exact finding-kind contract; this helper
@@ -578,6 +578,8 @@ def propose_finding_verification_plan(
         ("verify", "sqli"): "tool.verify_sqli",
         ("verify", "sql_injection"): "tool.verify_sqli",
         ("verify", "xss"): "tool.verify_xss",
+        ("verify", "http_header_missing"): "tool.verify_http_observation",
+        ("verify", "cookie_insecure"): "tool.verify_http_observation",
         ("retest", "sqli"): "tool.retest_sqli",
         ("retest", "sql_injection"): "tool.retest_sqli",
         ("retest", "xss"): "tool.retest_xss",

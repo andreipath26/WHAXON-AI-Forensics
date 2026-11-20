@@ -32,6 +32,8 @@ def _core_with(evidence, *, ready=True, persisted_attempts=None):
         "plan_id": plan_id,
         "attempts": persisted_attempts if persisted_attempts is not None
         else len(evidence["attempts"]),
+        "total_tasks": 1,
+        "counts": {"succeeded": 1} if ready else {"failed": 1},
     }
     return core
 
@@ -41,6 +43,8 @@ def test_core_workflow_report_uses_only_sealed_plan_evidence():
     assert report["schema_version"] == "whaxon.workflow-report.v1"
     assert report["status"] == "complete"
     assert report["summary"] == {
+        "planned_tasks": 1, "task_status_counts": {"succeeded": 1},
+        "pending_tasks": 0,
         "task_attempts": 1, "recorded_attempts": 1,
         "verified_seals": 1, "findings": 1,
     }
@@ -61,6 +65,23 @@ def test_core_workflow_report_flags_failed_or_unsealed_evidence_partial():
 def test_core_workflow_report_flags_incomplete_plan_partial():
     report = Core.workflow_report(_core_with(_evidence(), ready=False), "plan-1")
     assert report["status"] == "partial"
+
+
+def test_core_workflow_report_surfaces_pending_and_uncertain_tasks():
+    core = _core_with(_evidence(), ready=False)
+    core.workflow_progress = lambda _plan_id: {
+        "plan_id": "plan-1", "attempts": 2, "total_tasks": 4,
+        "counts": {"succeeded": 1, "pending": 2, "uncertain": 1},
+    }
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["status"] == "partial"
+    assert report["summary"]["planned_tasks"] == 4
+    assert report["summary"]["pending_tasks"] == 2
+    assert report["summary"]["task_status_counts"] == {
+        "succeeded": 1, "pending": 2, "uncertain": 1,
+    }
 
 
 def test_core_workflow_report_flags_truncated_attempt_history():

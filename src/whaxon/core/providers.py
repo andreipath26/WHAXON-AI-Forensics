@@ -570,7 +570,7 @@ class SemanticOperationProvider:
 
 
 class FindingVerificationProvider:
-    """Run bounded SQLi/XSS verification as scheduler-owned V2 tasks.
+    """Run bounded vulnerability/observation checks as scheduler-owned V2 tasks.
 
     Only a stored V2 finding of the exact supported kind can enter its matching
     verifier. Probes reuse the existing bounded validators; each outbound
@@ -582,19 +582,25 @@ class FindingVerificationProvider:
     RETEST = "tool.retest_sqli"
     VERIFY_XSS = "tool.verify_xss"
     RETEST_XSS = "tool.retest_xss"
+    VERIFY_HTTP_OBSERVATION = "tool.verify_http_observation"
     PROVIDER_ID = "whaxon.verifier.http"
-    PROVIDER_VERSION = "v2-sqli-xss-verifier.1"
+    PROVIDER_VERSION = "v2-http-verifier.2"
     _KINDS = {
         VERIFY: frozenset({"sqli", "sql_injection"}),
         RETEST: frozenset({"sqli", "sql_injection"}),
         VERIFY_XSS: frozenset({"xss"}),
         RETEST_XSS: frozenset({"xss"}),
+        VERIFY_HTTP_OBSERVATION: frozenset({"http_header_missing", "cookie_insecure"}),
     }
+    _VERIFY_ONLY = frozenset({VERIFY, VERIFY_XSS, VERIFY_HTTP_OBSERVATION})
 
-    def __init__(self, *, store, registry, scope):
+    def __init__(self, *, store, registry, scope, authorize_task):
         self.store = store
         self.registry = registry
         self.scope = scope
+        if not callable(authorize_task):
+            raise TypeError("authorize_task must be callable")
+        self.authorize_task = authorize_task
         self._manifests = {}
         schema = {
             "type": "object",
@@ -610,6 +616,7 @@ class FindingVerificationProvider:
             (self.RETEST, "conservative SQL injection remediation retest"),
             (self.VERIFY_XSS, "independent reflected XSS verification"),
             (self.RETEST_XSS, "conservative reflected XSS remediation retest"),
+            (self.VERIFY_HTTP_OBSERVATION, "HTTP header and cookie observation verification"),
         ):
             manifest = CapabilityManifest(
                 capability_id=capability_id,
@@ -629,7 +636,7 @@ class FindingVerificationProvider:
                 },
                 limitations=(
                     f"Supports {operation} for sealed stored findings of its exact vulnerability kind only.",
-                    "Uses bounded non-destructive probes with three baseline and three injected samples.",
+                    "Uses bounded non-destructive probes; injection verification uses three baseline and three injected samples.",
                     "Accepts IP-literal targets only; hostname targets require a future pinned-address transport.",
                     "No payload supplied by the caller; redirects are blocked.",
                     "Retest may return still_vulnerable or inconclusive; it never infers fixed from missing proof.",
@@ -735,6 +742,9 @@ class FindingVerificationProvider:
         source_job_id = task.inputs["source_job_id"]
         source_seq = task.inputs["finding_seq"]
         _, selected = self._source_finding(task)
+        plan_id = getattr(task, "_plan_id", None)
+        if not isinstance(plan_id, str) or not plan_id:
+            raise ValueError("verification task is not bound to a persisted workflow plan")
 
         target_parts = urlsplit(task.target)
         target_host = target_parts.hostname
@@ -753,6 +763,13 @@ class FindingVerificationProvider:
                     request_origin != origin or parsed.username is not None
                     or parsed.password is not None or parsed.fragment
                 ):
+                    return False
+                if (
+                    selected.get("kind") in {"http_header_missing", "cookie_insecure"}
+                    and parsed.query
+                ):
+                    return False
+                if self.authorize_task(plan_id, task) is not True:
                     return False
                 self.scope.load()
                 return self.scope.check_for_execution(url).allowed is True
@@ -776,7 +793,7 @@ class FindingVerificationProvider:
             authorize_request=authorize_probe,
         )
         started = time.monotonic()
-        if task.capability_id in {self.VERIFY, self.VERIFY_XSS}:
+        if task.capability_id in self._VERIFY_ONLY:
             status, reason = validator.validate(finding, target_url=task.target)
         else:
             status, reason = validator.revalidate(finding, target_url=task.target)

@@ -18,13 +18,17 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 class _SQLiFixture(BaseHTTPRequestHandler):
     requests = 0
+    paths = []
     vulnerable = True
     reflect_xss = True
+    send_cookie = False
+    after_response = None
     scope_path = None
     revoke_after = None
 
     def do_GET(self):
         type(self).requests += 1
+        type(self).paths.append(self.path)
         if (
             type(self).scope_path is not None
             and type(self).revoke_after == type(self).requests
@@ -45,8 +49,13 @@ class _SQLiFixture(BaseHTTPRequestHandler):
             if "'" in value and type(self).vulnerable else b"Product found"
         )
         self.send_response(200)
+        if type(self).send_cookie:
+            self.send_header("Set-Cookie", "session=fixture; Path=/")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
+        callback = type(self).after_response
+        if callback is not None:
+            callback()
         self.wfile.write(body)
 
     def log_message(self, *_args):
@@ -76,12 +85,18 @@ def _bound_plan(core, *, plan_id, capability_id, target, inputs):
     return task
 
 
-async def _seed_sealed_source(core, *, plan_id, target, request_context=None, kind="sqli"):
+async def _seed_sealed_source(
+    core, *, plan_id, target, request_context=None, finding_data=None, kind="sqli",
+):
     """Persist a test-only SQLmap result through the real scheduler seal path."""
     from whaxon.core.workflow import WorkflowPlan
 
     core.create_mission(plan_id, "Seed a sealed in-process scanner fixture")
-    tool_id = "nuclei" if kind == "xss" else "sqlmap"
+    tool_id = (
+        "nuclei" if kind == "xss"
+        else "nmap" if kind in {"http_header_missing", "cookie_insecure"}
+        else "sqlmap"
+    )
     task = WorkflowTask(
         id="scan", capability_id=f"tool.{tool_id}", target=target,
         permissions=("network.scan",), impact="moderate",
@@ -93,9 +108,16 @@ async def _seed_sealed_source(core, *, plan_id, target, request_context=None, ki
         core.store.create(source_job)
         core.store.set_started(source_job, tool_id, target)
         core.store.mark_engine_v2_execution_job(source_job)
+        data = finding_data or (
+            {"header": "Content-Security-Policy", "url": target}
+            if kind == "http_header_missing"
+            else {"cookie": "session", "missing": "httponly", "url": target}
+            if kind == "cookie_insecure"
+            else {"parameter": "q" if kind == "xss" else "id"}
+        )
         core.store.append_finding(source_job, Finding(
             kind=kind, severity="high", source=tool_id,
-            data={"parameter": "q" if kind == "xss" else "id"}, raw_line="controlled fixture finding",
+            data=data, raw_line="controlled fixture finding",
             request_context=(request_context if request_context is not None else {
                 "method": "GET", "url": target, "parameter": "id",
             }),
@@ -246,6 +268,137 @@ def test_v2_reflected_xss_verify_and_retest_are_scheduler_owned(tmp_path):
         thread.join(timeout=5)
 
 
+def test_v2_http_header_observation_verification_is_scheduler_owned(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="header-source-plan", target=target,
+                kind="http_header_missing",
+            )
+            _bound_plan(
+                core, plan_id="header-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(
+                "header-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("header-verification-plan")
+            assert evidence["all_evidence_integrity_verified"] is True
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["kind"] == "http_header_missing"
+            assert finding["verification_status"] == "verified"
+            assert "still lacks Content-Security-Policy" in finding["verification_reason"]
+            assert _SQLiFixture.requests == 1
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_cookie_observation_verification_is_scheduler_owned(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.send_cookie = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="cookie-source-plan", target=target,
+                kind="cookie_insecure",
+            )
+            _bound_plan(
+                core, plan_id="cookie-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(
+                "cookie-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("cookie-verification-plan")
+            assert evidence["all_evidence_integrity_verified"] is True
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["kind"] == "cookie_insecure"
+            assert finding["verification_status"] == "verified"
+            assert "still lacks httponly" in finding["verification_reason"]
+            assert _SQLiFixture.requests == 1
+
+        asyncio.run(exercise())
+    finally:
+        _SQLiFixture.send_cookie = False
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_observation_verifier_strips_evidence_query_before_request(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.paths = []
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="changed-query-source-plan", target=target,
+                kind="http_header_missing",
+                finding_data={
+                    "header": "Content-Security-Policy",
+                    "url": f"http://127.0.0.1:{server.server_port}/search?id=2",
+                },
+            )
+            _bound_plan(
+                core, plan_id="changed-query-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(
+                "changed-query-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("changed-query-verification-plan")
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["verification_status"] == "verified"
+            assert _SQLiFixture.requests == 1
+            assert _SQLiFixture.paths == ["/search"]
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_v2_retest_requires_a_prior_v2_verified_finding(tmp_path):
     async def exercise():
         core = Core(tmp_path / "data")
@@ -336,6 +489,7 @@ def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
             FindingVerificationProvider.RETEST,
             FindingVerificationProvider.VERIFY_XSS,
             FindingVerificationProvider.RETEST_XSS,
+            FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
         }
         assert all(
             row["provider_version"] == FindingVerificationProvider.PROVIDER_VERSION
@@ -359,6 +513,7 @@ def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
             FindingVerificationProvider.RETEST,
             FindingVerificationProvider.VERIFY_XSS,
             FindingVerificationProvider.RETEST_XSS,
+            FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
         ))
 
     asyncio.run(exercise())
@@ -479,6 +634,106 @@ def test_v2_validation_rechecks_scope_before_each_probe(tmp_path):
     finally:
         _SQLiFixture.scope_path = None
         _SQLiFixture.revoke_after = None
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_verification_rechecks_exact_approval_before_each_request(
+    tmp_path, monkeypatch,
+):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.vulnerable = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="approval-source-plan", target=target,
+            )
+            _bound_plan(
+                core, plan_id="approval-revocation-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            approval_checks = []
+
+            def approval_is_current(plan_id, task_key):
+                approval_checks.append((plan_id, task_key))
+                # Scheduler dispatch checks are allowed; revoke before the
+                # verifier's second HTTP request.
+                return len(approval_checks) < 4
+
+            monkeypatch.setattr(
+                core.store, "has_valid_workflow_approval", approval_is_current,
+            )
+            result = await core.run_workflow_plan(
+                "approval-revocation-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("approval-revocation-plan")
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["verification_status"] == "candidate"
+            assert "scope authorization denied" in finding["verification_reason"]
+            assert len(approval_checks) == 4
+            assert all(item == ("approval-revocation-plan", "verification")
+                       for item in approval_checks)
+            assert _SQLiFixture.requests == 1
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_verification_cancellation_blocks_the_next_probe(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.vulnerable = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    _SQLiFixture.after_response = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="cancel-source-plan", target=target,
+            )
+            _bound_plan(
+                core, plan_id="cancel-in-flight-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            _SQLiFixture.after_response = lambda: core.store.request_workflow_cancellation(
+                "cancel-in-flight-plan",
+            )
+
+            result = await core.run_workflow_plan(
+                "cancel-in-flight-plan", max_tasks=1, max_concurrency=1,
+            )
+
+            assert _SQLiFixture.requests == 1
+            assert core.store.get_workflow_progress(
+                "cancel-in-flight-plan",
+            )["cancellation_requested"] is True
+            assert result["tasks"][0]["status"] in {"uncertain", "cancelled"}
+
+        asyncio.run(exercise())
+    finally:
+        _SQLiFixture.after_response = None
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)

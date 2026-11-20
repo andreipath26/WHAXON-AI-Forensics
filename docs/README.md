@@ -1,6 +1,6 @@
 # WHAXON documentation — canonical index
 
-> **Current delivery status — 2026-11-20:** `main` is at `668ce5ee72851b257c3b734511d9fa9354cbca04`; exact-head CI run [44728330739](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44728330739) and README-freeze run [44728330736](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44728330736) passed. V2 remains **HOLD — NOT READY TO DEPLOY**: implementation/integration is incomplete, including exhaustive legacy caller coverage, shared lifecycle parity, provider-specific effect recovery, and the remaining UI workflows/controls. The green run verifies that commit's CI; it does not close those release gates.
+> **Current delivery status — 2026-11-21:** `main` is at `f32ce0913d460f046f6d984ec54a1f7f5d775409`. PR #226's tested head `65cae35059934a6032cb250bca3752152c88d918` passed exact-head CI [44833852913](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852913) (20/20), README freeze [44833852900](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852900), and dashboard acceptance [44833853031](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833853031) before merge; the squash merge has the same tree, with no separate main-commit check run recorded yet. V2 remains **HOLD — NOT READY TO DEPLOY**: implementation/integration is incomplete, including provider-specific effect recovery, remaining shared lifecycle parity, and UI workflows/controls.
 
 | Area | Single authoritative document | Scope |
 |---|---|---|
