@@ -47,20 +47,46 @@ class WorkflowRunQueue:
                     );
                     INSERT OR IGNORE INTO workflow_worker_liveness
                       (id,status,heartbeat_at) VALUES (1,'stopped',0);
+                    CREATE TABLE IF NOT EXISTS workflow_worker_instances (
+                        worker_id TEXT PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        heartbeat_at REAL NOT NULL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_workflow_worker_ready
+                      ON workflow_worker_instances(status,heartbeat_at);
                 """)
             finally:
                 conn.close()
 
-    def set_worker_status(self, status: str) -> None:
+    def set_worker_status(self, status: str, *, worker_id: str = "legacy-singleton") -> None:
         if status not in {"starting", "ready", "stopped"}:
             raise ValueError("invalid workflow worker status")
+        if not isinstance(worker_id, str) or not worker_id.strip() or len(worker_id) > 200:
+            raise ValueError("valid workflow worker identity required")
+        now = time.time()
         with self.store._lock:
             conn = self.store._conn()
             try:
+                conn.execute("BEGIN IMMEDIATE")
                 conn.execute(
-                    "UPDATE workflow_worker_liveness SET status=?,heartbeat_at=? WHERE id=1",
-                    (status, time.time()),
+                    "INSERT INTO workflow_worker_instances(worker_id,status,heartbeat_at) "
+                    "VALUES (?,?,?) ON CONFLICT(worker_id) DO UPDATE SET "
+                    "status=excluded.status,heartbeat_at=excluded.heartbeat_at",
+                    (worker_id, status, now),
                 )
+                # Keep the original singleton row current for older WHAXON
+                # versions that still read it during a rolling upgrade.
+                if worker_id == "legacy-singleton":
+                    conn.execute(
+                        "UPDATE workflow_worker_liveness SET status=?,heartbeat_at=? "
+                        "WHERE id=1",
+                        (status, now),
+                    )
+                conn.execute("COMMIT")
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
             finally:
                 conn.close()
 
@@ -75,14 +101,19 @@ class WorkflowRunQueue:
             conn = self.store._conn()
             try:
                 row = conn.execute(
+                    "SELECT 1 FROM workflow_worker_instances WHERE status='ready' "
+                    "AND heartbeat_at>=? LIMIT 1",
+                    (time.time() - max_age_s,),
+                ).fetchone()
+                legacy = conn.execute(
                     "SELECT status,heartbeat_at FROM workflow_worker_liveness WHERE id=1",
                 ).fetchone()
             finally:
                 conn.close()
-        return bool(
-            row is not None and row["status"] == "ready"
-            and time.time() - float(row["heartbeat_at"]) <= max_age_s
-        )
+        return bool(row is not None or (
+            legacy is not None and legacy["status"] == "ready"
+            and time.time() - float(legacy["heartbeat_at"]) <= max_age_s
+        ))
 
     @staticmethod
     def _check_limits(limits):
