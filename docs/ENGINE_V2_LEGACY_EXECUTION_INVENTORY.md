@@ -5,6 +5,32 @@ This inventory records Python callsites that invoke `run_tool` or
 `tests/test_engine_v2_legacy_callsite_inventory.py`: adding, removing, or moving
 a callsite requires reviewing its execution path and updating the classification.
 
+> **Current inventory evidence — main source `668ce5ee72851b257c3b734511d9fa9354cbca04` (2026-11-20):** the guarded census pins runner calls, recon/validation/retest service calls, API route method/handler pairs, UI route handlers, packaged catalog transports, V2 catalog admission and semantic aliases. The focused inventory, CLI disposition, bounty gate, provider-effect recovery, manual reconciliation, and V2 API run passed **59 tests** locally. This is strong source/callsite coverage, but it does not claim that every arbitrary network side effect, every visible UI control, or every supported client workflow has passed acceptance. The 808-control UI inventory is separately recorded in [the UI crosswalk](V2_UI_MANDATORY_CROSSWALK.md).
+
+## V2 release surface and legacy compatibility disposition
+
+For the current solo release scope, a V2 task is one created from a persisted
+V2 plan, authorized against current scope and exact task approval, and dispatched
+by the supervised workflow worker through the bound provider. Proposal creation
+does not dispatch. Provider registration or catalog admission does not mean the
+provider is installed, executable, smoke-tested, lab-accepted, or deployment-
+ready; those readiness states remain separate.
+
+| Surface | Current disposition for V2 release | Boundary |
+| --- | --- | --- |
+| V2 catalog tools | The 12 admitted catalog IDs in the table below are the bounded local-process catalog surface. | Fixed catalog arguments/provider binding only; installed/readiness checks and exact plan approval still apply. |
+| V2 verification | `tool.verify_sqli`, `tool.retest_sqli`, `tool.verify_xss`, and `tool.retest_xss` are the bounded HTTP verification operations. | V2-sealed source evidence and separate plan approval required. Smoke/lab/end-to-end acceptance flags remain false in the provider inventory. |
+| V2 recon | Only the fixed, explicitly listed V2 recon proposals/providers are in scope. | No full legacy parity; `tech`, `cookies`, and `waf` remain legacy-only. Redirect handling is first-hop only. |
+| V2 clients | CLI workflow commands, TUI workflow screen, V2 API, and `/ui-v2` are clients of shared Core services. | UI route presence does not close per-control wiring or full client-parity acceptance. |
+| Legacy direct execution | Compatibility only; excluded from the V2 task/attempt guarantee unless and until migrated and accepted. | Web execution endpoints are default-denied behind their named `WHAXON_LEGACY_*_ENABLED` gates; legacy CLI execution requires explicit legacy selection where documented. Do not present these as V2 workflows. |
+| Session transports | Metasploit session, SMB, SSH, and WMI execution are not admitted V2 transports. | Keep them inaccessible as V2 actions; any legacy compatibility use remains separately scoped and does not create V2 task evidence. |
+
+This is a release-boundary statement about current implementation, not a claim
+that the V2 release is accepted. Any legacy path needed by the solo proof must
+either be migrated to the shared lifecycle or be explicitly excluded from that
+proof and remain visibly legacy-only. Do not widen the admitted set by changing
+documentation alone.
+
 | Source | Caller | Classification | Notes |
 | --- | --- | --- | --- |
 | `interfaces/web/server.py` | `_run_job_blocking` | Legacy | `/api/run`; scope checked, but no persisted V2 request or task lease. |
@@ -450,7 +476,10 @@ legacy compatibility commands and do not dispatch for Engine V2 evidence;
 `msf` is an inspection CLI, while module/session execution remains behind
 web/runner legacy gates. Environment/bootstrap commands and read/report
 commands do not become V2 assessment dispatch merely because they share the
-`whaxon` binary.
+`whaxon` binary. `bounty run` is also not an execution path today: it validates
+the stored program policy and prints a gate result, then explicitly reports
+that dispatch is not wired. Bounty execution is deferred outside the solo
+V1.0/V2 release surface.
 
 Installed terminal and desktop paths need a separate packaging check: `WhaxonApp`
 and `EmbeddedServer` derive their data directory from the checkout-relative

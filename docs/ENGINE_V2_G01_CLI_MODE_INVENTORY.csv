@@ -9,7 +9,7 @@ init,src/whaxon/interfaces/cli/init_cmd.py,Legacy initialization,supporting-cli,
 up,src/whaxon/interfaces/cli/up_cmd.py,Local service lifecycle,service-host,Starts configured local services; not an Engine V2 target-task dispatch.
 down,src/whaxon/interfaces/cli/down_cmd.py,Local service lifecycle,service-host,Stops configured local services; not an Engine V2 task cancellation endpoint.
 msf,src/whaxon/interfaces/cli/msf_cmd.py,Metasploit RPC inspection,supporting-cli,"Exposes status, sessions and modules inspection only; Engine V2 session-provider support is not accepted."
-bounty,src/whaxon/interfaces/cli/bounty_cmd.py,Legacy bounty policy and runner,legacy-execution,"Program-policy checks constrain bounty runs; execution remains on legacy dispatch, outside the V2 plan/task lifecycle."
+bounty,src/whaxon/interfaces/cli/bounty_cmd.py,Bounty policy validation only,supporting-cli,"The run subcommand validates policy and prints a gate result only; dispatch is not wired. No legacy or V2 tool execution occurs. Bounty execution is deferred outside solo V1.0."
 scope,src/whaxon/interfaces/cli/scope_cmd.py,Legacy scope configuration,supporting-cli,Manages local scope configuration; it does not create a V2 plan or task authorization.
 install,src/whaxon/interfaces/cli/install_cmd.py,Legacy dependency installation,supporting-cli,Installs local dependencies; this is separate from Engine V2 provider admission and task dispatch.
 suggest,src/whaxon/interfaces/cli/suggest_cmd.py,Legacy finding suggestions,supporting-cli,Prints suggested next steps; suggestion output does not dispatch the named tools.

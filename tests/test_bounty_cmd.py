@@ -72,7 +72,9 @@ def test_run_allows_permitted_tool(tmp_path: Path, monkeypatch, capsys) -> None:
     rc = bounty_cmd.main(["--data", str(tmp_path), "run", "api.moneyboxapp.com",
                           "--", "curl"])
     assert rc == 0
-    assert "permits curl" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "permits curl" in out
+    assert "dispatch is not wired in v1" in out
 
 
 def test_run_refuses_denylisted_tool(tmp_path: Path, monkeypatch, capsys) -> None:
