@@ -22,6 +22,8 @@ class _SQLiFixture(BaseHTTPRequestHandler):
     vulnerable = True
     reflect_xss = True
     send_cookie = False
+    secure_cookie = False
+    send_csp = False
     after_response = None
     scope_path = None
     revoke_after = None
@@ -49,8 +51,11 @@ class _SQLiFixture(BaseHTTPRequestHandler):
             if "'" in value and type(self).vulnerable else b"Product found"
         )
         self.send_response(200)
+        if type(self).send_csp:
+            self.send_header("Content-Security-Policy", "default-src 'self'")
         if type(self).send_cookie:
-            self.send_header("Set-Cookie", "session=fixture; Path=/")
+            cookie_flags = "; HttpOnly; Secure" if type(self).secure_cookie else ""
+            self.send_header("Set-Cookie", f"session=fixture; Path=/{cookie_flags}")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         callback = type(self).after_response
@@ -354,6 +359,92 @@ def test_v2_cookie_observation_verification_is_scheduler_owned(tmp_path):
         thread.join(timeout=5)
 
 
+def test_v2_http_observation_retest_reports_fixed_only_on_positive_correction(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.send_cookie = False
+    _SQLiFixture.secure_cookie = False
+    _SQLiFixture.send_csp = False
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/settings"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            for kind in ("http_header_missing", "cookie_insecure"):
+                if kind == "cookie_insecure":
+                    _SQLiFixture.send_cookie = True
+                    _SQLiFixture.secure_cookie = False
+                source_job = await _seed_sealed_source(
+                    core, plan_id=f"{kind}-source-plan", target=target, kind=kind,
+                )
+                _bound_plan(
+                    core, plan_id=f"{kind}-verify-plan",
+                    capability_id=FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+                    target=target,
+                    inputs={"source_job_id": source_job, "finding_seq": 0},
+                )
+                verified = await core.run_workflow_plan(
+                    f"{kind}-verify-plan", max_tasks=1, max_concurrency=1,
+                )
+                assert verified["tasks"] == [{"id": "verification", "status": "succeeded"}]
+                verified_evidence = core.workflow_evidence(f"{kind}-verify-plan")
+                verified_finding = verified_evidence["attempts"][0]["findings"][0]
+                assert verified_finding["verification_status"] == "verified"
+                verified_job = verified_evidence["attempts"][0]["job_id"]
+
+                if kind == "http_header_missing":
+                    _SQLiFixture.send_csp = True
+                else:
+                    _SQLiFixture.send_cookie = True
+                    _SQLiFixture.secure_cookie = True
+                _bound_plan(
+                    core, plan_id=f"{kind}-retest-plan",
+                    capability_id=FindingVerificationProvider.RETEST_HTTP_OBSERVATION,
+                    target=target,
+                    inputs={"source_job_id": verified_job, "finding_seq": 0},
+                )
+                retested = await core.run_workflow_plan(
+                    f"{kind}-retest-plan", max_tasks=1, max_concurrency=1,
+                )
+                assert retested["tasks"] == [{"id": "verification", "status": "succeeded"}]
+                retest_finding = core.workflow_evidence(
+                    f"{kind}-retest-plan",
+                )["attempts"][0]["findings"][0]
+                assert retest_finding["verification_status"] == "fixed", (kind, retest_finding)
+                assert "now includes" in retest_finding["verification_reason"]
+
+                if kind == "cookie_insecure":
+                    _SQLiFixture.send_cookie = False
+                    _bound_plan(
+                        core, plan_id="cookie-absent-retest-plan",
+                        capability_id=FindingVerificationProvider.RETEST_HTTP_OBSERVATION,
+                        target=target,
+                        inputs={"source_job_id": verified_job, "finding_seq": 0},
+                    )
+                    absent = await core.run_workflow_plan(
+                        "cookie-absent-retest-plan", max_tasks=1, max_concurrency=1,
+                    )
+                    assert absent["tasks"] == [{"id": "verification", "status": "succeeded"}]
+                    absent_finding = core.workflow_evidence(
+                        "cookie-absent-retest-plan",
+                    )["attempts"][0]["findings"][0]
+                    assert absent_finding["verification_status"] == "inconclusive"
+
+        asyncio.run(exercise())
+    finally:
+        _SQLiFixture.send_cookie = False
+        _SQLiFixture.secure_cookie = False
+        _SQLiFixture.send_csp = False
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_v2_observation_verifier_strips_evidence_query_before_request(tmp_path):
     _SQLiFixture.requests = 0
     _SQLiFixture.paths = []
@@ -418,6 +509,23 @@ def test_v2_retest_requires_a_prior_v2_verified_finding(tmp_path):
         )
         assert result["tasks"] == [{"id": "verification", "status": "blocked"}]
         assert core.workflow_evidence("retest-unverified-plan")["all_evidence_recorded"] is False
+
+        observation_source = await _seed_sealed_source(
+            core, plan_id="observation-unverified-source-plan",
+            target=target, kind="http_header_missing",
+        )
+        _bound_plan(
+            core, plan_id="observation-unverified-retest-plan",
+            capability_id=FindingVerificationProvider.RETEST_HTTP_OBSERVATION,
+            target=target,
+            inputs={"source_job_id": observation_source, "finding_seq": 0},
+        )
+        observation_retest = await core.run_workflow_plan(
+            "observation-unverified-retest-plan", max_tasks=1, max_concurrency=1,
+        )
+        assert observation_retest["tasks"] == [
+            {"id": "verification", "status": "blocked"},
+        ]
 
     asyncio.run(exercise())
 
@@ -490,6 +598,7 @@ def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
             FindingVerificationProvider.VERIFY_XSS,
             FindingVerificationProvider.RETEST_XSS,
             FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+            FindingVerificationProvider.RETEST_HTTP_OBSERVATION,
         }
         assert all(
             row["provider_version"] == FindingVerificationProvider.PROVIDER_VERSION
@@ -514,6 +623,7 @@ def test_v2_verifier_readiness_and_inventory_are_documented(tmp_path):
             FindingVerificationProvider.VERIFY_XSS,
             FindingVerificationProvider.RETEST_XSS,
             FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+            FindingVerificationProvider.RETEST_HTTP_OBSERVATION,
         ))
 
     asyncio.run(exercise())

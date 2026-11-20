@@ -310,7 +310,7 @@ class Validator:
                     return "candidate", "missing-header finding has no header name"
                 if headers.get(header) is None:
                     return "verified", f"HTTP response still lacks {header}"
-                return "candidate", f"HTTP response includes {header}; finding did not reproduce"
+                return "refuted", f"HTTP response now includes {header}; missing-header finding did not reproduce"
 
             cookie_name = data.get("cookie")
             missing_flag = str(data.get("missing") or "").lower()
@@ -329,7 +329,7 @@ class Validator:
                 }
                 if missing_flag not in attributes:
                     return "verified", f"cookie {cookie_name!r} still lacks {missing_flag}"
-                return "candidate", f"cookie {cookie_name!r} now includes {missing_flag}"
+                return "refuted", f"cookie {cookie_name!r} now includes {missing_flag}"
             return "candidate", f"cookie {cookie_name!r} was not observed in the response"
 
     @staticmethod
