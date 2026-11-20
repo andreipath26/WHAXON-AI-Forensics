@@ -25,9 +25,16 @@ from whaxon.core.events import (
     JobStarted,
 )
 from whaxon.interfaces.web.api_contracts import (
+    DeadlineRequest,
+    ExecutionLimitsRequest,
+    MissionCostLimitRequest,
+    RateLimitRequest,
+    WorkflowApprovalGrantRequest,
+    WorkflowAttemptReconciliationRequest,
     WorkflowEventAcknowledgement,
     WorkflowEventAcknowledgementResult,
     WorkflowFindingProposalRequest,
+    WorkflowPlanReconciliationRequest,
     WorkflowRunAccepted,
     WorkflowRunRequest,
     WorkflowToolProposalRequest,
@@ -789,10 +796,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         try:
             if request.method == "POST":
                 payload = request.get_json(silent=True)
-                if not isinstance(payload, dict) or "min_spacing_s" not in payload:
+                if not isinstance(payload, dict):
                     return jsonify({"error": "min_spacing_s required"}), 400
+                try:
+                    rate_limit = RateLimitRequest.model_validate(payload)
+                except ValidationError as exc:
+                    missing = any(error["type"] == "missing" for error in exc.errors())
+                    message = (
+                        "min_spacing_s required" if missing
+                        else "mission min_spacing_s must be finite and positive"
+                    )
+                    return jsonify({"error": message}), 400
                 core.configure_mission_rate_limit(
-                    mission_id, min_spacing_s=payload["min_spacing_s"],
+                    mission_id, min_spacing_s=rate_limit.min_spacing_s,
                 )
             return jsonify(core.mission_rate_limit(mission_id))
         except (ValueError, TypeError) as exc:
@@ -899,10 +915,19 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         try:
             if request.method == "POST":
                 payload = request.get_json(silent=True)
-                if not isinstance(payload, dict) or "max_cost_microusd" not in payload:
+                if not isinstance(payload, dict):
                     return jsonify({"error": "max_cost_microusd required"}), 400
+                try:
+                    cost_limit = MissionCostLimitRequest.model_validate(payload)
+                except ValidationError as exc:
+                    missing = any(error["type"] == "missing" for error in exc.errors())
+                    message = (
+                        "max_cost_microusd required" if missing
+                        else "max_cost_microusd must be a nonnegative integer"
+                    )
+                    return jsonify({"error": message}), 400
                 core.configure_mission_cost_limit(
-                    mission_id, max_cost_microusd=payload["max_cost_microusd"],
+                    mission_id, max_cost_microusd=cost_limit.max_cost_microusd,
                 )
             return jsonify(core.mission_cost_summary(mission_id))
         except (ValueError, TypeError) as exc:
@@ -927,11 +952,20 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/v2/missions/<mission_id>/deadline")
     def workflow_v2_mission_deadline(mission_id):
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or "deadline_at" not in payload:
+        if not isinstance(payload, dict):
             return jsonify({"error": "deadline_at required"}), 400
         try:
+            deadline = DeadlineRequest.model_validate(payload)
+        except ValidationError as exc:
+            missing = any(error["type"] == "missing" for error in exc.errors())
+            message = (
+                "deadline_at required" if missing
+                else "mission deadline_at must be a finite positive unix timestamp"
+            )
+            return jsonify({"error": message}), 400
+        try:
             core.configure_mission_deadline(
-                mission_id, deadline_at=payload["deadline_at"],
+                mission_id, deadline_at=deadline.deadline_at,
             )
             return jsonify({
                 "mission_id": mission_id, "deadline_at": core.mission_deadline(mission_id),
@@ -947,14 +981,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 payload = request.get_json(silent=True)
                 if not isinstance(payload, dict):
                     return jsonify({"error": "JSON object required"}), 400
+                try:
+                    limits = ExecutionLimitsRequest.model_validate(payload)
+                except ValidationError as exc:
+                    missing = any(error["type"] == "missing" for error in exc.errors())
+                    message = (
+                        "both mission limits required" if missing
+                        else "mission limits must be positive integers"
+                    )
+                    return jsonify({"error": message}), 400
                 core.configure_mission_execution_limits(
                     mission_id,
-                    max_total_attempts=payload["max_total_attempts"],
-                    max_concurrency=payload["max_concurrency"],
+                    max_total_attempts=limits.max_total_attempts,
+                    max_concurrency=limits.max_concurrency,
                 )
             return jsonify(core.mission_execution_limits(mission_id))
-        except KeyError:
-            return jsonify({"error": "both mission limits required"}), 400
         except (ValueError, TypeError) as exc:
             status = 404 if "unknown mission" in str(exc) else 400
             return jsonify({"error": str(exc)}), status
@@ -1016,9 +1057,26 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             ):
                 return jsonify({"error": "task_key, approval_id and expires_at required"}), 400
             try:
+                approval = WorkflowApprovalGrantRequest.model_validate(payload)
+            except ValidationError as exc:
+                missing = any(error["type"] == "missing" for error in exc.errors())
+                if missing:
+                    return jsonify({
+                        "error": "task_key, approval_id and expires_at required",
+                    }), 400
+                invalid_expiry = any(
+                    error["loc"] == ("expires_at",) for error in exc.errors()
+                )
+                if invalid_expiry:
+                    return jsonify({
+                        "error": "approval expiry must be finite and in the future",
+                    }), 400
+                field = exc.errors()[0]["loc"][0]
+                return jsonify({"error": f"{field} must be a nonempty string"}), 400
+            try:
                 granted = core.grant_workflow_approval(
-                    plan_id, payload["task_key"], payload["approval_id"],
-                    _request_actor(), expires_at=payload["expires_at"],
+                    plan_id, approval.task_key, approval.approval_id,
+                    _request_actor(), expires_at=approval.expires_at,
                 )
                 return jsonify({"plan_id": plan_id, "granted": bool(granted)}), 200
             except (ValueError, TypeError, KeyError) as exc:
@@ -1070,17 +1128,34 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             if not required.issubset(payload) or set(payload) - required - {"actor"}:
                 return jsonify({"error": "exact attempt reconciliation fields are required"}), 400
             try:
+                reconciliation = WorkflowAttemptReconciliationRequest.model_validate(payload)
+            except ValidationError as exc:
+                messages = {
+                    "attempt_id": "unknown workflow attempt for this plan",
+                    "disposition": "unsupported reconciliation disposition",
+                    "evidence_ref": (
+                        "evidence_ref must be normalized non-empty text within its limit"
+                    ),
+                    "note": "note must be normalized non-empty text within its limit",
+                }
+                field = exc.errors()[0]["loc"][0]
+                return jsonify({"error": messages[field]}), 400
+            try:
                 result = core.reconcile_workflow_attempt(
-                    plan_id, payload["attempt_id"],
-                    disposition=payload["disposition"], actor=_request_actor(),
-                    evidence_ref=payload["evidence_ref"], note=payload["note"],
+                    plan_id, reconciliation.attempt_id,
+                    disposition=reconciliation.disposition, actor=_request_actor(),
+                    evidence_ref=reconciliation.evidence_ref, note=reconciliation.note,
                 )
                 return jsonify(result)
             except (ValueError, TypeError) as exc:
                 return jsonify({"error": str(exc)}), 400
         try:
+            reconciliation = WorkflowPlanReconciliationRequest.model_validate(payload)
+        except ValidationError:
+            return jsonify({"error": "stale_after_s must be positive and finite"}), 400
+        try:
             changed = core.reconcile_workflow_plan(
-                plan_id, stale_after_s=payload.get("stale_after_s", 60.0),
+                plan_id, stale_after_s=reconciliation.stale_after_s,
             )
             return jsonify({"plan_id": plan_id, "attempts_marked_uncertain": changed})
         except (ValueError, TypeError) as exc:
@@ -1171,24 +1246,40 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if not isinstance(payload, dict):
             return jsonify({"error": "JSON object required"}), 400
         try:
+            limits = ExecutionLimitsRequest.model_validate(payload)
+        except ValidationError as exc:
+            missing = any(error["type"] == "missing" for error in exc.errors())
+            message = (
+                "both limits are required" if missing
+                else "workflow limits must be positive integers"
+            )
+            return jsonify({"error": message}), 400
+        try:
             core.configure_workflow_limits(
                 plan_id,
-                max_total_attempts=payload["max_total_attempts"],
-                max_concurrency=payload["max_concurrency"],
+                max_total_attempts=limits.max_total_attempts,
+                max_concurrency=limits.max_concurrency,
             )
             return jsonify({"plan_id": plan_id, "limits": core.store.get_workflow_limits(plan_id)})
-        except KeyError:
-            return jsonify({"error": "both limits are required"}), 400
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400
 
     @app.post("/api/v2/workflows/<plan_id>/deadline")
     def workflow_v2_set_deadline(plan_id):
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or "deadline_at" not in payload:
+        if not isinstance(payload, dict):
             return jsonify({"error": "deadline_at required"}), 400
         try:
-            core.configure_workflow_deadline(plan_id, deadline_at=payload["deadline_at"])
+            deadline = DeadlineRequest.model_validate(payload)
+        except ValidationError as exc:
+            missing = any(error["type"] == "missing" for error in exc.errors())
+            message = (
+                "deadline_at required" if missing
+                else "deadline_at must be a finite positive unix timestamp"
+            )
+            return jsonify({"error": message}), 400
+        try:
+            core.configure_workflow_deadline(plan_id, deadline_at=deadline.deadline_at)
             return jsonify({
                 "plan_id": plan_id, "deadline_at": core.store.get_workflow_deadline(plan_id),
             })
@@ -1198,10 +1289,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/v2/workflows/<plan_id>/rate-limit")
     def workflow_v2_set_rate_limit(plan_id):
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or "min_spacing_s" not in payload:
+        if not isinstance(payload, dict):
             return jsonify({"error": "min_spacing_s required"}), 400
         try:
-            core.configure_workflow_rate_limit(plan_id, min_spacing_s=payload["min_spacing_s"])
+            rate_limit = RateLimitRequest.model_validate(payload)
+        except ValidationError as exc:
+            missing = any(error["type"] == "missing" for error in exc.errors())
+            message = (
+                "min_spacing_s required" if missing
+                else "min_spacing_s must be finite and positive"
+            )
+            return jsonify({"error": message}), 400
+        try:
+            core.configure_workflow_rate_limit(
+                plan_id, min_spacing_s=rate_limit.min_spacing_s,
+            )
             return jsonify({"plan_id": plan_id, "rate_limit_configured": True})
         except (ValueError, TypeError) as exc:
             return jsonify({"error": str(exc)}), 400

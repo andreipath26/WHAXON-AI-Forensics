@@ -353,6 +353,15 @@ def test_workflow_v2_control_routes_reject_invalid_budgets(tmp_path, monkeypatch
     assert client.post(
         "/api/v2/workflows/p/limits", json={"max_total_attempts": -1},
     ).status_code == 400
+    for value in (True, "2", 0):
+        response = client.post(
+            "/api/v2/workflows/p/limits",
+            json={"max_total_attempts": value, "max_concurrency": 1},
+        )
+        assert response.status_code == 400
+        assert response.get_json() == {
+            "error": "workflow limits must be positive integers",
+        }
     assert client.post(
         "/api/v2/workflows/p/deadline", json={"deadline_at": 1000000000.0},
     ).status_code == 200
@@ -365,6 +374,17 @@ def test_workflow_v2_control_routes_reject_invalid_budgets(tmp_path, monkeypatch
     assert client.post(
         "/api/v2/workflows/p/rate-limit", json={"min_spacing_s": 1.0},
     ).status_code == 400
+    for value in (True, "2", 0):
+        response = client.post(
+            "/api/v2/workflows/p/rate-limit", json={"min_spacing_s": value},
+        )
+        assert response.status_code == 400
+        assert response.get_json() == {
+            "error": "min_spacing_s must be finite and positive",
+        }
+    assert client.post(
+        "/api/v2/workflows/p/rate-limit", json=[],
+    ).get_json() == {"error": "min_spacing_s required"}
 
 
 def test_workflow_v2_control_routes_enforce_cross_origin_gate(tmp_path, monkeypatch):
@@ -390,6 +410,11 @@ def test_workflow_v2_mission_budget_is_shared_with_store(tmp_path, monkeypatch):
     assert client.post("/api/v2/missions/m/budget", json={
         "max_total_attempts": 5, "max_concurrency": 2,
     }).status_code == 400
+    response = client.post("/api/v2/missions/m/budget", json={
+        "max_total_attempts": True, "max_concurrency": 1,
+    })
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "mission limits must be positive integers"}
     assert client.get("/api/v2/missions/missing/budget").status_code == 404
 
 
@@ -413,6 +438,14 @@ def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
     assert client.post(
         "/api/v2/missions/m/deadline", json={"deadline_at": time.time() + 100},
     ).status_code == 400
+    for value in (True, "123", 0):
+        response = client.post(
+            "/api/v2/missions/m/deadline", json={"deadline_at": value},
+        )
+        assert response.status_code == 400
+        assert response.get_json() == {
+            "error": "mission deadline_at must be a finite positive unix timestamp",
+        }
 
 
 def test_mission_cost_api_requires_explicit_cost_evidence(tmp_path, monkeypatch):
@@ -422,6 +455,14 @@ def test_mission_cost_api_requires_explicit_cost_evidence(tmp_path, monkeypatch)
     assert response.status_code == 200
     assert response.get_json()["cap_microusd"] == 100
     assert client.get("/api/v2/missions/m/cost").get_json()["reported_attempts"] == 0
+    for value in (True, "100", -1):
+        response = client.post(
+            "/api/v2/missions/m/cost", json={"max_cost_microusd": value},
+        )
+        assert response.status_code == 400
+        assert response.get_json() == {
+            "error": "max_cost_microusd must be a nonnegative integer",
+        }
     assert client.post(
         "/api/v2/workflows/attempts/unknown/cost",
         json={"cost_microusd": 3, "source": "invoice"},
@@ -541,6 +582,28 @@ def test_v2_api_approval_and_reconciliation_parity(tmp_path, monkeypatch):
     assert client.post(
         "/api/v2/workflows/p/approvals", json={"task_key": "scan"},
     ).status_code == 400
+    for value in (True, "later", float("inf")):
+        response = client.post("/api/v2/workflows/p/approvals", json={
+            "task_key": "scan", "approval_id": "approval-invalid",
+            "expires_at": value,
+        })
+        assert response.status_code == 400
+        assert response.get_json() == {
+            "error": "approval expiry must be finite and in the future",
+        }
+    assert client.post(
+        "/api/v2/workflows/p/reconcile", json={"stale_after_s": True},
+    ).get_json() == {"error": "stale_after_s must be positive and finite"}
+    invalid_reconciliation = client.post(
+        "/api/v2/workflows/p/reconcile", json={
+            "attempt_id": 1, "disposition": "unresolved",
+            "evidence_ref": "evidence-1", "note": "operator reviewed",
+        },
+    )
+    assert invalid_reconciliation.status_code == 400
+    assert invalid_reconciliation.get_json() == {
+        "error": "unknown workflow attempt for this plan",
+    }
     assert client.post(
         "/api/v2/workflows/p/approvals", json={},
         headers={"Origin": "https://attacker.invalid"},
