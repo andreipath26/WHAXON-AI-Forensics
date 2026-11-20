@@ -2,7 +2,7 @@
 
 The Engine V2 requirement and checkpoint ledgers are live CSV navigation indexes. Keep their `implementation_candidate`, `test_candidate`, `source_paths` and `related_test_definition` columns pointing to existing files after every consolidation. `tests/test_documentation_integrity.py` enforces this condition and the 75-entry cardinality in CI. Dated narrative history remains intact.
 
-**Active inventory after consolidation; status checked 2026-11-06 at `main` `0cef416155623199d8cb551b809dd469d62b4778`.** This document specifies canonical owners; [docs/README](README.md) is the reader-facing index.
+**Active inventory and status baseline: `main` `668ce5ee72851b257c3b734511d9fa9354cbca04` (2026-11-20).** This document specifies canonical owners; [docs/README](README.md) is the reader-facing index.
 
 ## Authoritative subject ownership
 
@@ -33,11 +33,11 @@ The root `README.md`, `AGENTS.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CLA.md`, `
 1. Write current advice into the existing owner; do not create another `*_STATUS`, `*_AUDIT`, `*_ROADMAP`, `*_ACCEPTANCE`, or `*_PLAN` Markdown narrative for the same topic.
 2. A dated technical record may be appended to the master under a clear evidence boundary. Keep machine-readable verification results in test artifacts or CSVs.
 3. Before deleting a standalone narrative, incorporate all unique content into its subject master, replace internal references, and verify no source/test/license consumer requires the old path.
-4. Do not delete binding policy or data files on the assumption they are obsolete; their ownership is distinct.
+4. Do not delete binding policy or data files on the assumption they are obsolete; their ownership is distinct. Do not delete historical acceptance, security, legal, or provenance records merely to reduce document counts.
 5. Treat source and CI on exact HEAD as behavioral truth; historical text embedded in masters is evidence, not an updated deployment verdict.
 
 ## Consolidation record
 
-**2026-11-05:** 56 redundant narrative Markdown paths were removed after their full text was absorbed into nine subject masters. The UI-supplied DESIGN.md text was absorbed into UI master; immutable design images and source HTML remain. Legal/functional files stay at their stable paths. Individual historical changes remain accessible by Git commit. The removal transaction is captured in the consolidation commit and remains reversible through Git history.
+**2026-11-05 consolidation:** Commit `2a6290b23ea5e51b60f92292470b818efd42fd0b` removed 56 narrative Markdown paths under the stated consolidation plan. A later full-text audit found that some source records had not been fully retained and that several consolidated files contained literal `tokens truncated` strings. The document restoration on 2026-11-20 restores the missing historical sources at their original paths, repairs the affected UI and application documentation, and preserves the previous categorized inventory at [the archived 2026-11-05 register](archive/DOCUMENTATION_OWNERSHIP_2026-11-05.md). This archive is a historical inventory, not a current file list.
 
 The standalone `WHAXON Competitor Capability and Remediation Roadmap Addendum.md` was removed in that consolidation (`2a6290b23ea5e51b60f92292470b818efd42fd0b`); its complete text is embedded in Part II of the root Product Roadmap. This addendum is not a competitor-by-competitor assessment: the sourced competitor capability matrix and seeded-lab comparison are separately deferred as P7-02, after the solo UI/release gate. Use the Product Roadmap Part II anchor instead of the retired filename.

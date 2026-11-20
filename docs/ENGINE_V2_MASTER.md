@@ -22,31 +22,31 @@ Finish the agreed V2 engine, V2 UI, and remaining solo-v1.0 implementation befor
 ## Reading order and ownership
 
 1. **Architecture and implementation contract:** Part I (canonical technical design, invariants, execution model, delivery gates).
-2. **Dated phase acceptance and operational evidence:** Part II (retain baseline SHAs and acceptance caveats; newer exact-head evidence can supersede older evidence but must be validated).
-3. **Historical inventories, audit, provider scope and evidence mapping:** Part III (traceability, not a second roadmap).
+2. **Dated phase acceptance:** Use the original source files linked below; preserve their baseline SHAs and acceptance caveats.
+3. **Historical inventories, audit, provider scope and evidence mapping:** Use the linked source files and the dated source sections embedded below; these are traceability records, not a second roadmap.
 
-The previous `ENGINE_V2_*.md` documents were consolidated here and removed from the working tree; their commits remain in Git history. Edit this master for any new, authoritative Engine V2 synthesis; do not create another competing current-state Engine V2 document. Move future raw CI artifacts or evidence snapshots to dated archival files only when required for provenance. Do not remove acceptance evidence or amend historical results retroactively.
+The source documents listed in the source map are retained at their original paths as dated evidence and detailed acceptance records. This master remains the current synthesis; historical source documents preserve their original dates, baselines and caveats and do not override current source, exact-head CI or the release decision. Do not remove acceptance evidence or amend historical results retroactively.
 
 ## Consolidated source map
 
 | Purpose | Original retained source | Consolidated location |
 |---|---|---|
-| Architecture / implementation | [ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md](#source-1-engine_v2_architecture_and_roadmap_crosswalkmd) | Part I, source 1 |
-| Baseline / audit | [ENGINE_V2_BASELINE_INVENTORY.md](#source-2-engine_v2_baseline_inventorymd) | Part III, source 2 |
-| Baseline / audit | [ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md](#source-3-engine_v2_code_vs_roadmap_audit_2026-11-03md) | Part III, source 3 |
-| Phase-specific acceptance | [ENGINE_V2_E1_ACCEPTANCE.md](#source-4-engine_v2_e1_acceptancemd) | Part II, source 4 |
-| Phase-specific acceptance | [ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md](#source-5-engine_v2_e1_queue_lease_privacymd) | Part II, source 5 |
-| Phase-specific acceptance | [ENGINE_V2_E3_PHASE_ACCEPTANCE.md](#source-6-engine_v2_e3_phase_acceptancemd) | Part II, source 6 |
-| Phase-specific acceptance | [ENGINE_V2_E3_RECOVERY_BOUNDARIES.md](#source-7-engine_v2_e3_recovery_boundariesmd) | Part II, source 7 |
-| Phase-specific acceptance | [ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md](#source-8-engine_v2_e3_run_request_audit_eventsmd) | Part II, source 8 |
-| Phase-specific acceptance | [ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md](#source-9-engine_v2_e5_caller_inventory_and_rollbackmd) | Part II, source 9 |
-| Phase-specific acceptance | [ENGINE_V2_E5_PHASE_ACCEPTANCE.md](#source-10-engine_v2_e5_phase_acceptancemd) | Part II, source 10 |
-| Phase-specific acceptance | [ENGINE_V2_E5_SERVICE_READINESS.md](#source-11-engine_v2_e5_service_readinessmd) | Part II, source 11 |
-| Phase-specific acceptance | [ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md](#source-12-engine_v2_e6_contract_first_acceptancemd) | Part II, source 12 |
-| Phase-specific acceptance | [ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md](#source-13-engine_v2_e6_deployment_gate_ledgermd) | Part II, source 13 |
-| Phase-specific acceptance | [ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md](#source-14-engine_v2_e6_service_ui_handoff_matrixmd) | Part II, source 14 |
-| Evidence / provider | [ENGINE_V2_EVIDENCE_MATRIX.md](#source-15-engine_v2_evidence_matrixmd) | Part III, source 15 |
-| Evidence / provider | [ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md](#source-16-engine_v2_provider_capability_implementationmd) | Part III, source 16 |
+| Architecture / implementation | [ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) | Part I summary; full dated source at original path |
+| Baseline / audit | [ENGINE_V2_BASELINE_INVENTORY.md](ENGINE_V2_BASELINE_INVENTORY.md) | Full dated historical source at original path |
+| Baseline / audit | [ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md](#source-3-engine_v2_code_vs_roadmap_audit_2026-11-03md) | Full source embedded below |
+| Phase-specific acceptance | [ENGINE_V2_E1_ACCEPTANCE.md](ENGINE_V2_E1_ACCEPTANCE.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md](ENGINE_V2_E1_QUEUE_LEASE_PRIVACY.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E3_PHASE_ACCEPTANCE.md](ENGINE_V2_E3_PHASE_ACCEPTANCE.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E3_RECOVERY_BOUNDARIES.md](ENGINE_V2_E3_RECOVERY_BOUNDARIES.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md](ENGINE_V2_E3_RUN_REQUEST_AUDIT_EVENTS.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md](ENGINE_V2_E5_CALLER_INVENTORY_AND_ROLLBACK.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E5_PHASE_ACCEPTANCE.md](ENGINE_V2_E5_PHASE_ACCEPTANCE.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E5_SERVICE_READINESS.md](ENGINE_V2_E5_SERVICE_READINESS.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md](ENGINE_V2_E6_CONTRACT_FIRST_ACCEPTANCE.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md](ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md) | Full dated source at original path |
+| Phase-specific acceptance | [ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md](ENGINE_V2_E6_SERVICE_UI_HANDOFF_MATRIX.md) | Full dated source at original path |
+| Evidence / provider | [ENGINE_V2_EVIDENCE_MATRIX.md](#source-15-engine_v2_evidence_matrixmd) | Full source embedded below |
+| Evidence / provider | [ENGINE_V2_PROVIDER_CAPABILITY_IMPLEMENTATION.md](#source-16-engine_v2_provider_capability_implementationmd) | Full source embedded below |
 
 ---
 
@@ -59,15 +59,15 @@ The previous `ENGINE_V2_*.md` documents were consolidated here and removed from 
 
 ## Source 1: ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md
 
-**Provenance:** [Original source](#source-1-engine_v2_architecture_and_roadmap_crosswalkmd) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
+**Provenance:** [Original source](ENGINE_V2_ARCHITECTURE_AND_ROADMAP_CROSSWALK.md) · Snapshot at 2026-11-05 main baseline. **Interpretation:** Contains original dated claims; keep their stated commit and acceptance boundaries.
 
 ### WHAXON Engine v2 — Architecture Specification & Roadmap Crosswalk
 
-> **E5 post-merge disposition (2026-11-05, superseding 2026-11-04 pending status):** [E5 acceptance review](#source-10-engine_v2_e5_phase_acceptancemd) and merged [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) establish bounded shared-service E5 engineering acceptance. Its reviewed PR head passed 12/12 CI. This does **not** authorize production deployment or certify migration of legacy direct dispatch; all integrated Engine V2 operator gates remain separately open.
+> **E5 post-merge disposition (2026-11-05, superseding 2026-11-04 pending status):** [E5 acceptance review](ENGINE_V2_E5_PHASE_ACCEPTANCE.md) and merged [PR #124](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/124) establish bounded shared-service E5 engineering acceptance. Its reviewed PR head passed 12/12 CI. This does **not** authorize production deployment or certify migration of legacy direct dispatch; all integrated Engine V2 operator gates remain separately open.
 
-**Status:** Target architecture and implementation contract. This document does not claim the design is implemented.  
-**Repository:** `andreipath26/WHAXON-AI-Forensics`  
-**Authority:** The master roadmap remains authoritative. Its §0 dependency-driven order governs delivery; this specification does not reorder or bypass it.  
+**Status:** Target architecture and implementation contract. This document does not claim the design is implemented.
+**Repository:** `andreipath26/WHAXON-AI-Forensics`
+**Authority:** The master roadmap remains authoritative. Its §0 dependency-driven order governs delivery; this specification does not reorder or bypass it.
 **Historical baseline:** Main at `b27d361e706bcea800300dcf3e8b2e094a429d42`. This was the architecture-design starting point, not the current implementation baseline. Implementation has since begun; use current main-branch source, tests and master roadmap §49 for status. The E0 inventory is a dated migration snapshot, not current-state evidence.
 
 ## 1. Architectural decision
@@ -386,118 +386,13 @@ The first provider-backed task uses a capability such as `tool.nmap`, with `perm
 A task's declared timeout now covers both deterministic authorization and provider dispatch. Synchronous callbacks execute in worker threads rather than blocking the event loop, preserving lease heartbeats and independent task progress. Authorization timeout fails closed as `blocked` and never dispatches; provider timeout remains `uncertain` because cancelling an await or timing out a worker thread cannot prove that an external effect stopped. Regression tests cover synchronous and asynchronous authorization timeouts. This closes a scheduler correctness gap, not the remaining mission-wide budget, cancellation, audit/outbox or recovery acceptance gates.
 ---
 
-## 14. Whole-engine roadmap implementation plan — 2026-11-03
+## Source 2: [ENGINE_V2_BASELINE_INVENTORY.md](ENGINE_V2_BASELINE_INVENTORY.md)
 
-**Scope and delivery sequence:** This section consolidates the full-engine direction across E0–E9. Implementation remains active across the agreed V2 engine and UI scope; no repository freeze should block that work. Reuse correct, tested code; do not rebuild working components. Internal checks run continuously. Final external validation and deployment qualification begin only after the agreed implementation scope is complete and internal checks pass. No phase is considered accepted merely because its code or tests exist.
+**Provenance:** The complete 2026-11-01 E0 inventory is restored at its original path from the pre-consolidation Git revision. It is a historical baseline, not a current execution-path census or release verdict. The current execution inventory and release status are maintained in [ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md](ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md) and [ENGINE_V2_G10_RELEASE_DECISION.md](ENGINE_V2_G10_RELEASE_DECISION.md).
 
-**Priority and source order:** (1) the CURRENT master roadmap \`WHAXON ROAD MAP - WHATS NEXT - FULL SCOPE.md\`, especially §0, P0–P8, §38, §49–50; (2) this architecture specification and its E0–E9 gates; (3) \`docs/ENGINEERING_EXECUTION_MODEL.md\`; (4) scoped designs such as \`docs/TOOL_INTELLIGENCE_AND_ONBOARDING.md\`, \`docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md\`, \`docs/bounty-addon.md\` and the remediation addendum. Older roadmap detail is retained only where not superseded by the current master; historical estimates, completion claims, tool quotas and conflicting implementation instructions are not current authority.
-
-**Architectural objective:** Deliver WHAXON's **single long-lived, capability-driven, policy-controlled, durable execution engine**. New tools, providers, transport implementations, automation modes and approved product features must normally attach through versioned extension contracts, without new scheduler branches, alternative permission authorities, independent evidence stores or client-owned execution engines. “Build once” means stable and migratable boundaries, not a guarantee that unspecified future requirements can never change a contract or a requirement to ship every future provider today.
-
-### 14.1 Phase-to-roadmap ownership and action
-
-| Engine phase | Current master roadmap responsibility | Foundation or product work required | Acceptance boundary |
-|---|---|---|---|
-| **E0 — Baseline and architectural decisions** | P0; §0; §49; G01/G10 | Keep a current exhaustive execution/caller/adapter/tool/transport/permission/data/dependency map; record schema, queue, storage, audit, trust-anchor, provider-selection and cutover decisions. Correct stale assumptions when implementation changes. | Exact source-to-feature inventory, migration dependency graph and reviewed decisions; old E0 snapshot is historical. |
-| **E1 — Correctness and security** | P1; §0 invariants; G02–G04 | Complete fail-closed scope/DNS/redirect/session/pivot/replay/follow-up checks; exact action/consent, startup no-unrelated-dispatch, cancellation boundaries, parser/evidence integrity and adversarial coverage. Preserve existing corrections. | Controlled negative/positive authorization, evidence and recovery tests; no unauthorized effect; explicit limitations for external tool networking. |
-| **E2 — Versioned domain contracts** | P2; §49; G01/G05 | Complete and version canonical mission, authorization, plan/task/attempt, manifest/provider, policy/approval, budget/context, observation/finding/verification, evidence/audit/readiness contracts; migrations and compatibility façades. | Schema/version/backward compatibility, immutable digests, explicit unsupported results, no implicit authorizations. |
-| **E3 — Durable operations** | P2; G02/G04/G05 | Finish mission-wide rate/time/request/resource/cost/concurrency limits, leases, cancellation/emergency stop, retry/reconciliation, outbox/audit integrity and failures, crash/restart safety and bounded work. Adapt existing scheduler/store rather than introducing a second one. | Real worker crash, duplicate delivery, lease loss, cancellation, queue/store/audit failures and recovery without unsafe replay. |
-| **E4 — Capability migration** | P0/P2, §49–50; tool-intelligence portfolio audit; G01/G02 | Reconcile every existing catalog, adapter, entry point, local/session/RPC transport, parser, runner dispatch path and advertised UI/API/CLI capability; stable operation-level capability IDs independent of product/tool names; provider-neutral deterministic routing; capability-specific readiness; evidence-driven follow-up and no hard-coded chains; demonst…6406 tokens truncated…-only job recovery can misclassify a live long-running worker | Lease owner/token, heartbeat, expiry and safe reconciliation |
-| E0-02 | Critical | Session host/target-lock scope binding incomplete for MSF | Revalidate session identity and host authorization at dispatch |
-| E0-03 | Critical | DNS authorization can diverge from address used by external tool | Authorized resolution pinning/network-boundary enforcement and redirect checks |
-| E0-04 | Critical | Approval is not bound to exact immutable plan/action | Digest-bound, expiring, revocable approvals |
-| E0-05 | High | No persisted mission/plan/task/attempt graph | Versioned domain contracts and migration-safe schema |
-| E0-06 | High | No generalized capability manifests/provider resolver | Capability IDs, typed I/O, compatibility and readiness metadata |
-| E0-07 | High | Hard-coded Nmap→Nikto Automator | Declarative evidence/capability follow-up policies |
-| E0-08 | High | No durable scheduler/worker leases, budgets, retry reconciliation or cancellation state | Durable scheduler with bounded concurrency and attempt ledger |
-| E0-09 | High | Event bus is process-local and has no durable outbox | Schema-versioned events, transactional outbox and consumer cursors |
-| E0-10 | High | Bounty policy validates but does not dispatch and is not an independent execution service | Separate bounty policy/mission lifecycle and activation/expiry checks |
-| E0-11 | High | AI emits sequential single actions; wall-clock limit not enforced | Typed DAG proposals, compiler and enforced mission/task budgets |
-| E0-12 | High | Evidence/audit lacks content integrity and causal provenance | Evidence vault, provenance graph and tamper-evident audit |
-| E0-13 | Medium | Capability readiness is binary availability only | Dependency/readiness snapshots and verified capability states |
-| E0-14 | Medium | Session/SSH/SMB/WMI transport contracts differ and are partly embedded in runner | Typed transport adapters and transport-specific lifecycle/security |
-| E0-15 | Medium | Interfaces own different execution lifecycle details | Shared application services; CLI/web/UI/headless become clients |
-| E0-16 | Medium | No comprehensive multi-target fan-out/fan-in, per-target isolation and aggregation | Bounded graph primitives and partial-failure semantics |
-
-Critical here means a prerequisite to safe autonomous or multi-worker operation, not necessarily a blocker to current supervised local use.
-
-## 10. What to preserve, wrap or replace
-
-| Component | Decision | Reason |
-|---|---|---|
-| `ToolRunner` subprocess and output handling | Preserve and narrow | Strong low-level execution foundation; remove orchestration responsibilities over time |
-| `build_argv` target-override protections | Preserve and expand tests | Important security boundary |
-| Existing adapter parsers | Preserve | Domain knowledge and evidence parsing are valuable |
-| `ToolCatalog` | Wrap with capability manifests | Current tool records are too implementation-specific |
-| Adapter registry / entry points | Preserve behind trusted provider registration | Useful extensibility point; plugin trust/readiness must be explicit |
-| `ScopeManager` | Preserve as one policy primitive; strengthen dispatch binding | Existing fail-closed behavior is useful but not a full engagement policy |
-| `ProgramPolicy` | Evolve into separate bounty authorization domain | Current CLI is validation-only and incomplete for dispatch |
-| `EventBus` | Preserve for local notifications; add durable event/outbox layer | In-process bus is not a workflow source of truth |
-| `JobStore` | Migrate with additive/versioned schema | Existing operational history should remain readable |
-| `worker.py` | Replace scheduler semantics; retain worker execution adapter | No lease/heartbeat/attempt model |
-| `Automator` | Replace with declarative graph transitions | Fixed Nmap→Nikto branch cannot scale |
-| `Agent` / providers | Preserve planner isolation; change output to typed plan proposal | AI must remain a proposer, not an authority |
-| `Executor` | Replace sequential loop with graph compiler/orchestrator integration | Current one-action loop cannot represent workflows |
-| CLI/web/UI/GUI/TUI | Keep as clients; migrate behind shared services | Avoid duplicate business logic and interface-owned job lifecycle |
-| Validator / finding model | Preserve and evolve into verification/evidence contracts | Existing conservative verification is a foundation |
-
-## 11. Implementation order derived from the baseline
-
-This is the Engine-specific sequence, subordinate to roadmap §0 and all UI/release gates:
-
-1. **E1 — Close and regression-protect correctness/security defects.** Fix the lease/recovery hazard before enabling concurrent workers; close session-host authorization and DNS/pivot boundary gaps; verify current Nikto and CLI drain behavior; test all failure paths. No broad refactor.
-2. **E2 — Establish domain contracts and compatibility façade.** Introduce schema-versioned mission, authorization context, plan, task, attempt, manifest, provider, policy decision, approval, budget, execution context, observation, verification, evidence, audit and readiness models. Preserve current clients through a façade.
-3. **E3 — Durable scheduler and state machine.** Add leases/heartbeats, attempts, idempotency/reconciliation, transactional state/events, bounded worker pools, cancellation, deadlines and budget accounting. Do not add multi-worker dispatch until lease/recovery tests pass.
-4. **E4 — Capability migration.** Generate truthful manifests for current catalog entries and adapters. Resolve providers deterministically. Prove a new provider can be added without scheduler code changes. Convert Nmap→Nikto to a declarative rule and preserve current behavior.
-5. **E5 — Shared application services and headless runtime.** Route CLI/web and later supplied UI through shared mission/task services. Support daemon lifecycle, health/readiness, restart and job continuation with no browser/TUI dependency.
-6. **E6 — Solo v1.0 and supplied UI acceptance.** Respect the UI-first roadmap gate, exact supplied UI design and real backend functionality.
-7. **E7 — Autonomous campaigns and bounty.** Introduce bounded autonomy only after customer/bounty policy isolation, exact approvals, evidence and recovery pass adversarial tests.
-8. **E8/E9 — Multi-target and selective future transports/platforms.** Add fan-out, cloud/API/browser/code/container and team/enterprise extensions only against measured requirements and explicit acceptance.
-
-## 12. E0 exit and limitations
-
-**E0 static inventory is complete for the principal execution, persistence, provider, AI, scope, session, bounty, findings and CI paths listed above.** It is not a claim that every file in the 621-path repository has been manually audited. The remaining detailed call-site and adversarial review belongs to E1 before runtime changes.
-
-Not performed in this pass:
-- No local checkout or runtime test execution.
-- No latest GitHub Actions run inspection.
-- No exhaustive review of every web endpoint, UI page, individual adapter parser or all external-tool behavior.
-- No live target or external tool execution.
-- No schema migration or runtime code change.
-
-The next code work should begin with E1's critical security/recovery defects and regression tests, not by introducing the DAG engine on top of unsafe multi-process recovery.
-
-
-## E0 supplemental finding — Metasploit capability underuse and Armitage workflow gap
-
-The baseline review identified a narrow Metasploit integration: basic RPC connectivity, a limited exploit/auxiliary/post adapter, console-based module launch, simple session command execution, polling, a fixed post-module auto-chain and partial pivot/port-forward support. This is not equivalent to exposing the Framework's supported capabilities.
-
-The research crosswalk identifies the broader Framework surface: module discovery and metadata, option/target/payload compatibility, job lifecycle, consoles, sessions, payloads and handlers, plugin APIs, database records, Meterpreter capabilities and route-aware operation. The exact surface is version- and edition-dependent and must be discovered at runtime.
-
-Armitage provides useful workflow precedents missing from WHAXON's current integration: attack-surface/session visualization, host/service-driven attack candidate discovery ("Find Attacks"), contextual session operations, pivot-aware network view and shared-session deconfliction. These are patterns to incorporate into WHAXON's existing engine and supplied UI—not a reason to add a separate UI or runtime dependency.
-
-This is a static architecture/research finding, not runtime validation of every RPC method or a live Framework instance. Detailed requirements, source references, security decisions and acceptance tests are in `docs/METASPLOIT_ARMITAGE_ENGINE_INTEGRATION.md`.
-
-
+**Historical section 14 disposition:** The 2026-11-03 whole-engine implementation-plan copy in the consolidated master contained literal truncation text and interleaved E0 rows. Its current work-order role is superseded by the root [Product Roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and the exact-head release record. Do not treat the damaged historical excerpt as complete evidence.
 
 ---
-
-## E0 supplemental finding — Tool Intelligence and onboarding gap
-
-The repository has a catalog, adapter base contract, adapter registry/entry-point discovery and provider/transport integrations. These are useful extension points, but they do not constitute an end-to-end tool intelligence function.
-
-The current design lacks one source-backed workflow to reconcile catalog entries, adapters, transports and dispatch paths; discover upstream capabilities; research candidate tools; compare upstream support with WHAXON implementation and verification; and produce an auditable, operator-reviewed onboarding proposal. Preliminary inspection also identified catalog/adapter inventory discrepancies. The exact complete mismatch set must be established by E4 reconciliation rather than inferred from catalog size.
-
-No general candidate research/onboarding service, versioned capability report lifecycle or continuous upstream-delta assessment was identified in the reviewed baseline. Python entry points provide adapter discovery, not trust, compatibility, capability completeness or permission. Binary availability is not capability readiness.
-
-**Required response:** implement roadmap §52 and docs/TOOL_INTELLIGENCE_AND_ONBOARDING.md using Engine v2 manifest, registry, readiness, scheduler, policy and evidence contracts. Keep discovery read-only and bounded; no auto-install, upgrade, plugin loading, credential use or operational execution. Define contracts in E2 and perform portfolio reconciliation/local discovery/gap analysis in E4, after E1 blockers and without disrupting the compatibility bridge.
-
-This is an architecture/static inventory finding, not a claim that the proposed service already exists or that every repository file has been exhaustively audited.
-
-
-
----
-
 
 ## Source 3: ENGINE_V2_CODE_VS_ROADMAP_AUDIT_2026-11-03.md
 
@@ -610,8 +505,8 @@ The separate 75-row roadmap-index ledger still records **0/75 formally accepted 
 
 > **2026-11-03 update:** Four bounded rows (P0-04, P1-01, P2-07, P4-01) now have ACCEPTED status on exact source `f0b25d3629d7`, backed by [acceptance reconciliation](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) and [CI #41642767222](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/41642767222). This file's older `NOT_ACCEPTED` accounting is historical for its stated earlier baseline. All ten G gates remain open.
 
-**Source of truth:** [master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and [architecture crosswalk](#source-15-engine_v2_evidence_matrixmd).  
-**Original audited baseline:** `c75c03888e35f6147cfae3547f286202bb09fd6e` (main, 2026-11-03). **Current-head source reconciliation:** `f0b25d3629d776b433f72c83db679bb41313c812`; see [checkpoint audit](#source-15-engine_v2_evidence_matrixmd) and [48-row bounded checkpoint ledger](ENGINE_V2_AUDIT_CHECKPOINTS_2026-11-03.csv). The figures below remain a historical mapping of compound roadmap requirements, not current completeness.  
+**Source of truth:** [master roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) and [architecture crosswalk](#source-15-engine_v2_evidence_matrixmd).
+**Original audited baseline:** `c75c03888e35f6147cfae3547f286202bb09fd6e` (main, 2026-11-03). **Current-head source reconciliation:** `f0b25d3629d776b433f72c83db679bb41313c812`; see [checkpoint audit](#source-15-engine_v2_evidence_matrixmd) and [48-row bounded checkpoint ledger](ENGINE_V2_AUDIT_CHECKPOINTS_2026-11-03.csv). The figures below remain a historical mapping of compound roadmap requirements, not current completeness.
 **Detailed ledger:** [ENGINE_V2_ROADMAP_REQUIREMENTS.csv](ENGINE_V2_ROADMAP_REQUIREMENTS.csv).
 
 ## Coverage and limitations
