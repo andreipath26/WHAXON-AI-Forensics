@@ -39,3 +39,5 @@ The root `README.md`, `AGENTS.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CLA.md`, `
 ## Consolidation record
 
 **2026-11-05:** 56 redundant narrative Markdown paths were removed after their full text was absorbed into nine subject masters. The UI-supplied DESIGN.md text was absorbed into UI master; immutable design images and source HTML remain. Legal/functional files stay at their stable paths. Individual historical changes remain accessible by Git commit. The removal transaction is captured in the consolidation commit and remains reversible through Git history.
+
+The standalone `WHAXON Competitor Capability and Remediation Roadmap Addendum.md` was removed in that consolidation (`2a6290b23ea5e51b60f92292470b818efd42fd0b`); its complete text is embedded in Part II of the root Product Roadmap. This addendum is not a competitor-by-competitor assessment: the sourced competitor capability matrix and seeded-lab comparison are separately deferred as P7-02, after the solo UI/release gate. Use the Product Roadmap Part II anchor instead of the retired filename.

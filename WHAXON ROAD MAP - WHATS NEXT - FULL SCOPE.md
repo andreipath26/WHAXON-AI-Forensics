@@ -204,7 +204,7 @@ Build a sourced competitor capability matrix and reproducible seeded-lab benchma
 | Tool portfolio | Evaluate unique capability and measurable value; reconcile catalog/adapters/providers before adding breadth. Keep CLI-native tools native; adopt structured harness/verification/discovery methodology on touch; GUI/Burp control is a separate integration. No 120-tool quota or old hour estimates |
 | Recon/API/cloud/code | Preserve provenance/scope for recon; design authenticated API/OpenAPI contracts and typed cloud-SDK/account/region/IAM scope; distinguish source/SARIF, container/dependency/SBOM, Kubernetes and secrets inputs. Prefer supported unique providers over overlapping frameworks; maintenance substitutions require current evidence |
 | Metasploit/Armitage | [Detailed design](docs/APPLICATION_ARCHITECTURE_MASTER.md): full module metadata/search/options/payload/compatibility/job/session/route/pivot coverage and collaborative-workbench patterns inside the supplied UI, through the same Engine v2 services; individual operations require scope, impact/privilege, approval, timeout, cleanup and lab acceptance. Existing RPC support is not full integration |
-| Remediation | [Approved detailed addendum](./WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md): native/imported finding normalization → root cause/context → reviewable patch → isolated validation → separately authorized application → rollback/recovery → original-check retest and before/after evidence. Current `core/remediation.py` is dependency remediation planning, not this vulnerability patch engine |
+| Remediation | [Approved detailed addendum](#competitor-remediation-roadmap): native/imported finding normalization → root cause/context → reviewable patch → isolated validation → separately authorized application → rollback/recovery → original-check retest and before/after evidence. Current `core/remediation.py` is dependency remediation planning, not this vulnerability patch engine |
 | AI/business-logic/AIRT | Provider-neutral proposal interface; budgets/backoff/resume/escalation/dry-run and confidential-data policy; differential sessions, workflow/invariant checks and AI-surface adapters only with evidence and demand. No fixed free-tier/pricing/privacy assumptions from historical notes |
 | Small teams/MCP | Shared workspaces, delegated roles/approvals, graph, retrieval and separate multi-agent roles after stable services and demonstrated demand. MCP metadata never grants permission; no mandatory new runtime dependency |
 | Company/platform | Tenant/RBAC/SSO isolation, engagement lifecycle, collaboration, HA/observability, deployment/secrets/upgrade, billing/support only after validated customer need; preserve actor/tenant seams without pretending enterprise exists |
@@ -291,6 +291,8 @@ When a historical requirement is ambiguous or conflicts with a later approved de
 ---
 
 ## Part II — Competitor capability and remediation research (subordinate)
+
+<a id="competitor-remediation-roadmap"></a>
 
 # WHAXON Competitor Capability and Vulnerability Remediation Roadmap Addendum
 

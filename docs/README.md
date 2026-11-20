@@ -6,7 +6,7 @@
 
 | Area | Single authoritative document | Scope |
 |---|---|---|
-| Product work order and release gates | [Product roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) | P0–P8, product priorities, competitor gap analysis, dated product-state capture |
+| Product work order and release gates | [Product roadmap](../WHAXON%20ROAD%20MAP%20-%20WHATS%20NEXT%20-%20FULL%20SCOPE.md) | P0–P8, product priorities, deferred P7-02 competitor benchmarking, embedded Part II remediation roadmap, dated product-state capture |
 | Engine V2 | [Engine V2 master](ENGINE_V2_MASTER.md) | Architecture, migration, provider contracts, E0–E9, evidence and acceptance |
 | V1 release | [V1 acceptance master](V1_0_BASELINE_AND_ACCEPTANCE_REGISTER.md) | Solo release criteria, bounded acceptance and reconciliations |
 | UI V2 | [UI V2 master](V2_UI_MANDATORY_CROSSWALK.md) | 22-page crosswalk, interaction, accessibility/design inventories and audits |
