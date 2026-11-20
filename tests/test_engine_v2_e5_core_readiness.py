@@ -41,6 +41,9 @@ def test_e5_external_worker_is_a_readiness_gate(tmp_path, monkeypatch):
         connection.execute(
             "UPDATE workflow_worker_liveness SET heartbeat_at=0 WHERE id=1",
         )
+        connection.execute(
+            "UPDATE workflow_worker_instances SET heartbeat_at=0",
+        )
     finally:
         connection.close()
     stale = client.get("/api/health")
@@ -50,6 +53,26 @@ def test_e5_external_worker_is_a_readiness_gate(tmp_path, monkeypatch):
     ready = client.get("/api/health")
     assert ready.status_code == 200
     assert ready.get_json()["checks"]["v2_worker"] == "ready"
+
+
+def test_e5_readiness_tracks_each_worker_without_cross_instance_stop_race(tmp_path):
+    core = Core(tmp_path)
+    workers = core.workflow_requests
+    workers.set_worker_status("ready", worker_id="worker-a")
+    workers.set_worker_status("ready", worker_id="worker-b")
+
+    workers.set_worker_status("stopped", worker_id="worker-a")
+    assert workers.worker_is_ready()
+
+    connection = core.store._conn()
+    try:
+        connection.execute(
+            "UPDATE workflow_worker_instances SET heartbeat_at=0 "
+            "WHERE worker_id='worker-b'",
+        )
+    finally:
+        connection.close()
+    assert not workers.worker_is_ready()
 
 
 def test_e5_health_tests_core_data_dir_not_unrelated_environment_path(

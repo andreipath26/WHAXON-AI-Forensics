@@ -880,6 +880,7 @@ class Core:
         """
         import asyncio
         import math
+        import uuid
 
         if isinstance(poll_interval_s, bool) or not isinstance(
             poll_interval_s, (int, float)
@@ -889,13 +890,14 @@ class Core:
             raise ValueError("max_runs_per_batch must be in range 1..100")
         if not callable(getattr(stop_event, "is_set", None)):
             raise TypeError("stop_event must expose is_set()")
-        self.workflow_requests.set_worker_status("starting")
+        worker_id = "workflow-run-worker-" + uuid.uuid4().hex
+        self.workflow_requests.set_worker_status("starting", worker_id=worker_id)
         try:
             await self.initialize(drain=False)
         except Exception:
-            self.workflow_requests.set_worker_status("stopped")
+            self.workflow_requests.set_worker_status("stopped", worker_id=worker_id)
             raise
-        self.workflow_requests.set_worker_status("ready")
+        self.workflow_requests.set_worker_status("ready", worker_id=worker_id)
         total = 0
         loop = asyncio.get_running_loop()
 
@@ -903,7 +905,7 @@ class Core:
             while not stop_event.is_set():
                 await asyncio.sleep(2.0)
                 if not stop_event.is_set():
-                    self.workflow_requests.set_worker_status("ready")
+                    self.workflow_requests.set_worker_status("ready", worker_id=worker_id)
 
         heartbeat = asyncio.create_task(refresh_worker_heartbeat())
         try:
@@ -928,7 +930,7 @@ class Core:
                 await heartbeat
             except asyncio.CancelledError:
                 pass
-            self.workflow_requests.set_worker_status("stopped")
+            self.workflow_requests.set_worker_status("stopped", worker_id=worker_id)
         return total
 
     def propose_workflow_followups(self, source_plan_id: str, *, max_tasks: int = 16):
