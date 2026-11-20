@@ -633,3 +633,58 @@ def test_v2_validation_rechecks_scope_before_each_probe(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_v2_verification_rechecks_exact_approval_before_each_request(
+    tmp_path, monkeypatch,
+):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.vulnerable = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="approval-source-plan", target=target,
+            )
+            _bound_plan(
+                core, plan_id="approval-revocation-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            approval_checks = []
+
+            def approval_is_current(plan_id, task_key):
+                approval_checks.append((plan_id, task_key))
+                # Scheduler dispatch checks are allowed; revoke before the
+                # verifier's second HTTP request.
+                return len(approval_checks) < 4
+
+            monkeypatch.setattr(
+                core.store, "has_valid_workflow_approval", approval_is_current,
+            )
+            result = await core.run_workflow_plan(
+                "approval-revocation-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence("approval-revocation-plan")
+            finding = evidence["attempts"][0]["findings"][0]
+            assert finding["verification_status"] == "candidate"
+            assert "scope authorization denied" in finding["verification_reason"]
+            assert len(approval_checks) == 4
+            assert all(item == ("approval-revocation-plan", "verification")
+                       for item in approval_checks)
+            assert _SQLiFixture.requests == 1
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

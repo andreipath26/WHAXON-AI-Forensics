@@ -594,10 +594,13 @@ class FindingVerificationProvider:
     }
     _VERIFY_ONLY = frozenset({VERIFY, VERIFY_XSS, VERIFY_HTTP_OBSERVATION})
 
-    def __init__(self, *, store, registry, scope):
+    def __init__(self, *, store, registry, scope, authorize_task):
         self.store = store
         self.registry = registry
         self.scope = scope
+        if not callable(authorize_task):
+            raise TypeError("authorize_task must be callable")
+        self.authorize_task = authorize_task
         self._manifests = {}
         schema = {
             "type": "object",
@@ -739,6 +742,9 @@ class FindingVerificationProvider:
         source_job_id = task.inputs["source_job_id"]
         source_seq = task.inputs["finding_seq"]
         _, selected = self._source_finding(task)
+        plan_id = getattr(task, "_plan_id", None)
+        if not isinstance(plan_id, str) or not plan_id:
+            raise ValueError("verification task is not bound to a persisted workflow plan")
 
         target_parts = urlsplit(task.target)
         target_host = target_parts.hostname
@@ -762,6 +768,8 @@ class FindingVerificationProvider:
                     selected.get("kind") in {"http_header_missing", "cookie_insecure"}
                     and parsed.query
                 ):
+                    return False
+                if self.authorize_task(plan_id, task) is not True:
                     return False
                 self.scope.load()
                 return self.scope.check_for_execution(url).allowed is True

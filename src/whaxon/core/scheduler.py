@@ -79,6 +79,10 @@ class WorkflowScheduler:
             permissions=tuple(row["permissions"]), impact=row["impact"],
             timeout_s=row["timeout_s"], idempotency_key=row["idempotency_key"],
         )
+        # Keep plan ownership in a runtime-only attribute. It is not part of
+        # the serialized workflow contract; providers use it to recheck exact
+        # plan approval at any in-flight follow-up request boundary.
+        object.__setattr__(task, "_plan_id", row["plan_id"])
         attempt_id = row["attempt_id"]
         lease_lost = asyncio.Event()
         heartbeat_interval = min(10.0, max(0.1, task.timeout_s / 3.0))

@@ -146,6 +146,7 @@ class Core:
         )
         verification_provider = FindingVerificationProvider(
             store=self.store, registry=self.capabilities, scope=self.scope,
+            authorize_task=self.authorize_workflow_task_for_plan,
         )
         lab_access_provider = MetasploitableLabAccessProvider(
             store=self.store, registry=self.capabilities, scope=self.scope, msf=self.msf,
