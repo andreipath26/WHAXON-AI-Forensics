@@ -22,6 +22,7 @@ class _SQLiFixture(BaseHTTPRequestHandler):
     vulnerable = True
     reflect_xss = True
     send_cookie = False
+    after_response = None
     scope_path = None
     revoke_after = None
 
@@ -53,6 +54,9 @@ class _SQLiFixture(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+        callback = type(self).after_response
+        if callback is not None:
+            callback()
 
     def log_message(self, *_args):
         pass
@@ -685,6 +689,51 @@ def test_v2_verification_rechecks_exact_approval_before_each_request(
 
         asyncio.run(exercise())
     finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_v2_verification_cancellation_blocks_the_next_probe(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.vulnerable = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    _SQLiFixture.after_response = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="cancel-source-plan", target=target,
+            )
+            _bound_plan(
+                core, plan_id="cancel-in-flight-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            _SQLiFixture.after_response = lambda: core.store.request_workflow_cancellation(
+                "cancel-in-flight-plan",
+            )
+
+            result = await core.run_workflow_plan(
+                "cancel-in-flight-plan", max_tasks=1, max_concurrency=1,
+            )
+
+            assert _SQLiFixture.requests == 1
+            assert core.store.get_workflow_progress(
+                "cancel-in-flight-plan",
+            )["cancellation_requested"] is True
+            assert result["tasks"][0]["status"] in {"uncertain", "cancelled"}
+
+        asyncio.run(exercise())
+    finally:
+        _SQLiFixture.after_response = None
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
