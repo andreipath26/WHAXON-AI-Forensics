@@ -475,7 +475,8 @@ def test_catalog_and_v2_operation_crosswalk_are_documented():
     inventory = inventory_path.read_text(encoding="utf-8")
     catalog_start = inventory.index("| Catalog IDs | V2 status | Transport and reason |")
     catalog_end = inventory.index(
-        "Exact V2 operation aliases and declared target types:", catalog_start,
+        "The non-admitted entries have these explicit solo-V1.0 dispositions:",
+        catalog_start,
     )
     documented_catalog = {}
     for line in inventory[catalog_start:catalog_end].splitlines():
@@ -541,4 +542,32 @@ def test_catalog_and_v2_operation_crosswalk_are_documented():
         for tool_id, operation_id in EXPECTED_V2_SEMANTIC_OPERATIONS.items()
     }
     assert documented_operations == expected_operations
+
+
+def test_every_non_admitted_catalog_entry_has_a_release_disposition() -> None:
+    inventory = (
+        Path(__file__).resolve().parents[1]
+        / "docs"
+        / "ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    marker = "The non-admitted entries have these explicit solo-V1.0 dispositions:"
+    start = inventory.index(marker)
+    end = inventory.index("Exact V2 operation aliases and declared target types:", start)
+    rows = re.findall(
+        r"^\| ([^|]+) \| ([^|]+) \| ([^|]+) \|$",
+        inventory[start:end],
+        re.MULTILINE,
+    )
+
+    documented_ids: set[str] = set()
+    for ids, disposition, compatibility in rows:
+        documented_ids.update(re.findall(r"`([^`]+)`", ids))
+        assert disposition.strip(), ids
+        assert compatibility.strip(), ids
+
+    expected_ids = set(EXPECTED_CATALOG_TRANSPORTS) - set(EXPECTED_V2_TARGET_TYPES)
+    assert documented_ids == expected_ids
+    assert "Excluded" in inventory[start:end]
+    assert "Test-only" in inventory[start:end]
+    assert "no V2 task/attempt evidence" in inventory[start:end]
 

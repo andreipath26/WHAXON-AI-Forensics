@@ -151,6 +151,22 @@ verification.
 | `ssh_cmd` | Unsupported in V2 | `ssh`; no registered adapter in the inspected runtime. |
 | `wmi_exec` | Unsupported in V2 | `wmi`; requires a separately accepted session provider. |
 
+The non-admitted entries have these explicit solo-V1.0 dispositions:
+
+| Catalog IDs | Release disposition | Compatibility behavior and owner |
+| --- | --- | --- |
+| `commix` | Excluded from the V2 release surface; no V2 provider migration in solo V1.0. | Retained only through separately selected legacy execution where available; V2 plan proposals, approvals and workers cannot dispatch it. Capability owner: provider registry; reassess only with a bounded command-injection contract, impact policy and independent evidence rules. |
+| `echo` | Test-only; not a supported assessment capability and not admitted to V2. | Keep only where repository tests or compatibility fixtures require it; do not advertise it as an assessment action. Catalog cleanup requires fixture/default-catalog compatibility review. |
+| `hydra` | Excluded from solo-V1.0 V2; credential-attack support is not promised. | Any remaining legacy use is explicitly legacy and outside V2 plan/attempt guarantees. No V2 migration in this release; a future proposal would need credential-specific authorization, rate/budget controls and evidence policy. |
+| `impacket`, `netexec` | Excluded from the V2 catalog bridge in solo V1.0. | Existing legacy catalog compatibility remains separate from V2 and must not be surfaced as V2 actions. A future migration requires per-operation capability contracts rather than a broad protocol toolbox entry. |
+| `msf_getuid`, `msf_hashdump`, `msf_sysinfo` | Metasploit session transports are excluded from the V2 release surface. | Existing gated legacy Metasploit routes remain separately classified; no V2 task/attempt evidence is produced. Migration requires a session-provider contract and accepted session identity, pivot, cancellation and recovery checks. |
+| `smb_ls`, `smb_shares`, `ssh_cmd`, `wmi_exec` | SMB, SSH and WMI session transports are excluded from the V2 release surface. | Any existing explicit legacy session path remains outside the V2 guarantee. Migration requires a separately accepted transport provider, identity/scope rechecks, bounded command semantics, cancellation and durable evidence. |
+
+These are release-surface dispositions, not authorization to perform legacy
+execution. Legacy compatibility gates and CLI `--legacy` selection remain
+independent; do not enable a legacy gate or use a legacy action as a substitute
+for a supported V2 workflow.
+
 Exact V2 operation aliases and declared target types:
 
 | Tool | Compatibility capability | Semantic capability | Target types |
