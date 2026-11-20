@@ -53,10 +53,10 @@ class _SQLiFixture(BaseHTTPRequestHandler):
             self.send_header("Set-Cookie", "session=fixture; Path=/")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
         callback = type(self).after_response
         if callback is not None:
             callback()
+        self.wfile.write(body)
 
     def log_message(self, *_args):
         pass
