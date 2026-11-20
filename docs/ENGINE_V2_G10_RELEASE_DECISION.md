@@ -1,8 +1,9 @@
 # Engine V2 G10 Delivery Status and Release Decision
 
-**Assessment date:** 2026-11-14  
-**Decision:** **HOLD — NOT READY TO DEPLOY**  
-**Current main code head:** `272245e700dfa89835f44886f370b011c1786cf1`. The exact source candidate tree `75880425cdaf4857989f229638e59c5b65de099f` passed all 20 CI jobs in run #43624338670; its isolated G01 controlled-lab job passed and retained evidence artifact #14125401711. PRs #202, #203, #204, #206, #208, #209, #212, #213, #214, and #215 are merged. No V2 release tag, package publication, or production deployment exists.
+**Assessment date:** 2026-11-20
+
+**Decision:** **HOLD — NOT READY TO DEPLOY**
+**Current main code head:** `dfe6a38`. PR #221 is merged; its exact-head CI and README-freeze checks passed. A local, unpublished implementation branch is at `f997fc8`; its selected Engine V2/backend regression set passes 275/275, and repository Ruff and mypy pass. Full local pytest is blocked at browser startup by the container's Chromium socket restriction (1,908 passed, 17 skipped, 376 browser setup errors). No exact-candidate hosted CI has run for the local branch. No V2 release tag, package publication, or production deployment exists.
 
 ## Delivery sequence
 
