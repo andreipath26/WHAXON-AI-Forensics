@@ -894,9 +894,19 @@ class Core:
         self.workflow_requests.set_worker_status("starting", worker_id=worker_id)
         try:
             await self.initialize(drain=False)
+            # Queue lease recovery is a prerequisite for advertising an
+            # externally supervised worker as ready. Do the bounded passes
+            # before readiness so health probes cannot route work to a worker
+            # that has not yet quarantined lost run requests.
+            while self.workflow_requests.reconcile_stale():
+                if stop_event.is_set():
+                    break
         except Exception:
             self.workflow_requests.set_worker_status("stopped", worker_id=worker_id)
             raise
+        if stop_event.is_set():
+            self.workflow_requests.set_worker_status("stopped", worker_id=worker_id)
+            return 0
         self.workflow_requests.set_worker_status("ready", worker_id=worker_id)
         total = 0
         loop = asyncio.get_running_loop()

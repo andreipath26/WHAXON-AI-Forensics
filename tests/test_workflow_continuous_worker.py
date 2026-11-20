@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -77,6 +78,54 @@ def test_worker_recovery_failure_never_advertises_ready(tmp_path, monkeypatch):
         pool.submit(lambda: asyncio.run(
             core.serve_workflow_run_requests(threading.Event()),
         )).result(timeout=5)
+    assert not core.workflow_requests.worker_is_ready()
+
+
+def test_worker_waits_for_run_queue_reconciliation_before_readiness(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    request = core.enqueue_workflow_run("p")
+    claimed = core.workflow_requests.claim("crashed-worker")
+    connection = core.store._conn()
+    try:
+        connection.execute(
+            "UPDATE workflow_run_requests SET heartbeat_at=? WHERE id=?",
+            (time.time() - 1000, request["id"]),
+        )
+    finally:
+        connection.close()
+
+    reconciled = threading.Event()
+    allow_startup = threading.Event()
+    stop = threading.Event()
+    reconcile = core.workflow_requests.reconcile_stale
+
+    def pause_after_reconciliation(**kwargs):
+        changed = reconcile(**kwargs)
+        reconciled.set()
+        assert allow_startup.wait(timeout=5)
+        return changed
+
+    monkeypatch.setattr(
+        core.workflow_requests, "reconcile_stale", pause_after_reconciliation,
+    )
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(lambda: asyncio.run(
+            core.serve_workflow_run_requests(stop, poll_interval_s=0.05),
+        ))
+        assert reconciled.wait(timeout=5)
+        assert core.workflow_run_request(request["id"])["status"] == "uncertain"
+        assert not core.workflow_requests.worker_is_ready()
+        allow_startup.set()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not core.workflow_requests.worker_is_ready():
+            time.sleep(0.01)
+        assert core.workflow_requests.worker_is_ready()
+        stop.set()
+        assert future.result(timeout=5) == 0
+
+    assert claimed["id"] == request["id"]
     assert not core.workflow_requests.worker_is_ready()
 
 
