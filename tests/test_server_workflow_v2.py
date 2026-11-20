@@ -118,18 +118,37 @@ def test_v2_workflow_proposal_api_is_inert_and_validates_contract(
     assert core.workflow_run_queue_summary()["counts"]["queued"] == 0
 
     invalid = (
-        [], {"kind": "other"}, {"kind": "tool", "mission_id": "m", "id": "p"},
-        {"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
-         "target": "192.0.2.10", "extra": True},
-        {"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
-         "target": "192.0.2.10", "save": "true"},
-        {"kind": "verification", "mission_id": "m", "id": "p",
-         "source_job_id": "job", "finding_seq": True, "mode": "verify"},
-        {"kind": "verification", "mission_id": "m", "id": "p",
-         "source_job_id": "job", "finding_seq": 0, "mode": "execute"},
+        ([], "JSON object required"),
+        ({"kind": "other"}, "kind must be tool or verification"),
+        (
+            {"kind": "tool", "mission_id": "m", "id": "p"},
+            "tool proposal requires mission_id, id, tool and target",
+        ),
+        (
+            {"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
+             "target": "192.0.2.10", "extra": True},
+            "tool proposal requires mission_id, id, tool and target",
+        ),
+        (
+            {"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",
+             "target": "192.0.2.10", "save": "true"},
+            "save must be a boolean",
+        ),
+        (
+            {"kind": "verification", "mission_id": "m", "id": "p",
+             "source_job_id": "job", "finding_seq": True, "mode": "verify"},
+            "verification proposal requires mission_id, id, source_job_id, non-negative finding_seq and mode",
+        ),
+        (
+            {"kind": "verification", "mission_id": "m", "id": "p",
+             "source_job_id": "job", "finding_seq": 0, "mode": "execute"},
+            "mode must be verify or retest",
+        ),
     )
-    for payload in invalid:
-        assert client.post("/api/v2/workflow-proposals", json=payload).status_code == 400
+    for payload, expected_error in invalid:
+        response = client.post("/api/v2/workflow-proposals", json=payload)
+        assert response.status_code == 400
+        assert response.get_json()["error"] == expected_error
     assert client.post(
         "/api/v2/workflow-proposals",
         json={"kind": "tool", "mission_id": "m", "id": "p", "tool": "nmap",

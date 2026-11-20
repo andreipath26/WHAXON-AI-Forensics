@@ -27,8 +27,10 @@ from whaxon.core.events import (
 from whaxon.interfaces.web.api_contracts import (
     WorkflowEventAcknowledgement,
     WorkflowEventAcknowledgementResult,
+    WorkflowFindingProposalRequest,
     WorkflowRunAccepted,
     WorkflowRunRequest,
+    WorkflowToolProposalRequest,
 )
 
 
@@ -656,36 +658,53 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         save = payload.get("save", False)
         if type(save) is not bool:
             return jsonify({"error": "save must be a boolean"}), 400
+
         if kind == "tool":
-            required = ("mission_id", "id", "tool", "target")
-            allowed = {*required, "kind", "save"}
-            if set(payload) - allowed or any(
-                not isinstance(payload.get(key), str) or not payload[key].strip()
-                for key in required
-            ):
-                return jsonify({"error": "tool proposal requires mission_id, id, tool and target"}), 400
-            if len(payload["target"]) > 2048:
+            try:
+                tool_request = WorkflowToolProposalRequest.model_validate(payload)
+            except ValidationError:
+                return jsonify({
+                    "error": "tool proposal requires mission_id, id, tool and target",
+                }), 400
+            if any(not value.strip() for value in (
+                tool_request.mission_id, tool_request.id,
+                tool_request.tool, tool_request.target,
+            )):
+                return jsonify({
+                    "error": "tool proposal requires mission_id, id, tool and target",
+                }), 400
+            if len(tool_request.target) > 2048:
                 return jsonify({"error": "target exceeds allowed limits"}), 400
+            plan_id = tool_request.id
             proposal_args = {
-                "mission_id": payload["mission_id"], "plan_id": payload["id"],
-                "tool_id": payload["tool"], "target": payload["target"],
+                "mission_id": tool_request.mission_id,
+                "plan_id": tool_request.id,
+                "tool_id": tool_request.tool,
+                "target": tool_request.target,
             }
         elif kind == "verification":
-            required = ("mission_id", "id", "source_job_id", "finding_seq", "mode")
-            allowed = {*required, "kind", "save"}
-            if set(payload) - allowed or any(
-                not isinstance(payload.get(key), str) or not payload[key].strip()
-                for key in ("mission_id", "id", "source_job_id", "mode")
-            ) or type(payload.get("finding_seq")) is not int or payload["finding_seq"] < 0:
+            try:
+                finding_request = WorkflowFindingProposalRequest.model_validate(payload)
+            except ValidationError:
                 return jsonify({
                     "error": "verification proposal requires mission_id, id, source_job_id, non-negative finding_seq and mode",
                 }), 400
-            if payload["mode"] not in {"verify", "retest"}:
+            if any(not value.strip() for value in (
+                finding_request.mission_id, finding_request.id,
+                finding_request.source_job_id, finding_request.mode,
+            )) or finding_request.finding_seq < 0:
+                return jsonify({
+                    "error": "verification proposal requires mission_id, id, source_job_id, non-negative finding_seq and mode",
+                }), 400
+            if finding_request.mode not in {"verify", "retest"}:
                 return jsonify({"error": "mode must be verify or retest"}), 400
+            plan_id = finding_request.id
             proposal_args = {
-                "mission_id": payload["mission_id"], "plan_id": payload["id"],
-                "source_job_id": payload["source_job_id"],
-                "finding_seq": payload["finding_seq"], "mode": payload["mode"],
+                "mission_id": finding_request.mission_id,
+                "plan_id": finding_request.id,
+                "source_job_id": finding_request.source_job_id,
+                "finding_seq": finding_request.finding_seq,
+                "mode": finding_request.mode,
             }
         else:
             return jsonify({"error": "kind must be tool or verification"}), 400
@@ -699,7 +718,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             created = False
             if save and proposal.get("status") == "proposed":
                 created = core.save_workflow_plan(
-                    payload["id"], WorkflowPlan.from_dict(proposal["plan"]),
+                    plan_id, WorkflowPlan.from_dict(proposal["plan"]),
                 )
             return jsonify({
                 **proposal,
