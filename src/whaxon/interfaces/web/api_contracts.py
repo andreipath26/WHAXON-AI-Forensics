@@ -103,6 +103,15 @@ class WorkflowAttemptReconciliationRequest(BaseModel):
     note: str
 
 
+class WorkflowProviderResultRecoveryRequest(BaseModel):
+    """Opt-in recovery from an exact durable provider job, with no caller result."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    attempt_id: str = Field(pattern=r"^[0-9a-f]{32}$")
+    recover_provider_result: Literal[True]
+
+
 class WorkflowPlanReconciliationRequest(BaseModel):
     """Lease timeout used when reconciling stale workflow attempts."""
 

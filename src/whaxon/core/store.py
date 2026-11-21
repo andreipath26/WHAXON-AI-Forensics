@@ -1995,7 +1995,10 @@ class JobStore:
         finally:
             c.close()
 
-    def _close_reconciled_workflow_requests_tx(self, c, plan_id, *, now=None):
+    def _close_reconciled_workflow_requests_tx(
+        self, c, plan_id, *, now=None, reason="provider_effect_reconciled",
+        error="operator reconciliation recorded; no automatic replay",
+    ):
         """Close resolved run intents inside the caller's SQLite transaction."""
         at = time.time() if now is None else now
         if c.execute(
@@ -2030,9 +2033,9 @@ class JobStore:
             cursor = c.execute(
                 "UPDATE workflow_run_requests SET status='incomplete',"
                 "completed_at=?,owner=NULL,lease_token=NULL,"
-                "error='operator reconciliation recorded; no automatic replay' "
+                "error=? "
                 "WHERE id=? AND status='uncertain'",
-                (at, row["id"]),
+                (at, error, row["id"]),
             )
             if cursor.rowcount != 1:
                 continue
@@ -2043,12 +2046,161 @@ class JobStore:
                     "request_id": row["id"],
                     "from_status": "uncertain",
                     "to_status": "incomplete",
-                    "reason": "provider_effect_reconciled",
+                    "reason": reason,
                     "automatic_replay": False,
                 }, sort_keys=True), at),
             )
             closed += 1
         return closed
+
+    def recover_workflow_attempt_from_provider_job(self, plan_id, attempt_id):
+        """Finish a lost workflow acknowledgement from a complete durable V2 job.
+
+        Recovery requires an exact dispatch identity and a V2-owned, successful
+        same-tool, same-target job. Catalog capabilities use their ``tool.*``
+        suffix; first-party providers persist their exact capability ID as the
+        job tool. It never invokes a provider. Cancelled plans and attempts with
+        an operator reconciliation remain fenced.
+        """
+        now = time.time()
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                self._verify_workflow_plan_integrity_tx(c, plan_id)
+                row = c.execute(
+                    "SELECT a.id, a.status AS attempt_status, t.id AS task_ref, "
+                    "t.task_key, t.status AS task_status, t.active_attempt_id, "
+                    "t.target, t.capability_id, p.digest AS plan_digest, "
+                    "p.status AS plan_status FROM task_attempts a "
+                    "JOIN workflow_tasks t ON t.id=a.task_id "
+                    "JOIN workflow_plans p ON p.id=t.plan_id "
+                    "WHERE t.plan_id=? AND a.id=?",
+                    (plan_id, attempt_id),
+                ).fetchone()
+                if row is None:
+                    raise ValueError("unknown workflow attempt for this plan")
+                if row["attempt_status"] != "uncertain" or row["task_status"] != "uncertain":
+                    raise ValueError("only uncertain workflow attempts can be recovered")
+                if row["plan_status"] == "cancel_requested":
+                    raise ValueError("cancelled workflows cannot recover provider results")
+                if row["active_attempt_id"] is not None:
+                    raise ValueError("workflow attempt still has an active lease")
+                capability_id = row["capability_id"]
+                if not isinstance(capability_id, str) or not capability_id:
+                    raise ValueError("workflow capability identity is invalid")
+                tool_id = (
+                    capability_id.removeprefix("tool.")
+                    if capability_id.startswith("tool.") else capability_id
+                )
+                dispatch_events = c.execute(
+                    "SELECT detail_json FROM workflow_events WHERE plan_id=? "
+                    "AND attempt_id=? AND event_type='dispatch_started'",
+                    (plan_id, attempt_id),
+                ).fetchall()
+                if len(dispatch_events) != 1:
+                    raise ValueError("workflow attempt has no unique durable dispatch identity")
+                try:
+                    dispatch_detail = json.loads(dispatch_events[0]["detail_json"] or "{}")
+                except (TypeError, ValueError):
+                    dispatch_detail = None
+                if not isinstance(dispatch_detail, dict) or dispatch_detail.get(
+                    "provider_execution_id"
+                ) != attempt_id:
+                    raise ValueError("workflow dispatch identity does not match the attempt")
+                if c.execute(
+                    "SELECT 1 FROM workflow_attempt_reconciliations WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone() is not None:
+                    raise ValueError("operator-reconciled attempts cannot be provider-recovered")
+                job = c.execute(
+                    "SELECT j.id, j.tool, j.target, j.status, j.exit_code, j.duration_s "
+                    "FROM jobs j JOIN engine_v2_execution_jobs v2 ON v2.job_id=j.id "
+                    "WHERE j.id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if (
+                    job is None or job["tool"] != tool_id
+                    or job["target"] != row["target"]
+                    or job["status"] != "finished" or job["exit_code"] != 0
+                ):
+                    raise ValueError("no matching successful durable provider job is available")
+                findings = [dict(item) for item in c.execute(
+                    "SELECT seq, kind, severity, source, data_json, raw_line, "
+                    "enrichment_json, verification_status, verified_by, verification_reason "
+                    "FROM findings WHERE job_id=? ORDER BY seq",
+                    (attempt_id,),
+                ).fetchall()]
+                evidence_digest = _workflow_evidence_digest(
+                    c, attempt_id=attempt_id, job_id=attempt_id,
+                    target=row["target"], capability_id=capability_id,
+                    plan_digest=row["plan_digest"],
+                )
+                if evidence_digest is None:
+                    raise ValueError("durable provider evidence failed identity validation")
+                if c.execute(
+                    "SELECT 1 FROM workflow_evidence_seals WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone() is not None:
+                    raise ValueError("workflow attempt already has an evidence seal")
+                result = {
+                    "job_id": attempt_id, "tool_id": tool_id,
+                    "target": row["target"], "exit_code": 0,
+                    "duration_s": job["duration_s"], "findings": findings,
+                    "recovered_from_durable_provider_job": True,
+                }
+                encoded = json.dumps(result, sort_keys=True)
+                updated = c.execute(
+                    "UPDATE task_attempts SET status='succeeded', finished_at=?, "
+                    "result_json=?, error='' WHERE id=? AND status='uncertain'",
+                    (now, encoded, attempt_id),
+                )
+                if updated.rowcount != 1:
+                    raise ValueError("workflow attempt changed during provider recovery")
+                updated = c.execute(
+                    "UPDATE workflow_tasks SET status='succeeded', result_json=?, error='', "
+                    "active_attempt_id=NULL, updated_at=? WHERE id=? AND status='uncertain' "
+                    "AND active_attempt_id IS NULL",
+                    (encoded, now, row["task_ref"]),
+                )
+                if updated.rowcount != 1:
+                    raise ValueError("workflow task changed during provider recovery")
+                c.execute(
+                    "INSERT INTO workflow_evidence_seals "
+                    "(attempt_id, job_id, digest, version, sealed_at) VALUES (?,?,?,1,?)",
+                    (attempt_id, attempt_id, evidence_digest, now),
+                )
+                c.execute(
+                    "INSERT INTO workflow_events "
+                    "(plan_id,task_ref,attempt_id,event_type,detail_json,at) "
+                    "VALUES (?,?,?,'workflow_attempt_recovered',?,?)",
+                    (plan_id, row["task_ref"], attempt_id, json.dumps({
+                        "from_status": "uncertain", "to_status": "succeeded",
+                        "provider_execution_id": attempt_id,
+                        "evidence_digest": evidence_digest,
+                        "automatic_replay": False,
+                    }, sort_keys=True), now),
+                )
+                requests_closed = self._close_reconciled_workflow_requests_tx(
+                    c, plan_id, now=now,
+                    reason="durable_provider_result_recovered",
+                    error="durable provider result recovered; new run required",
+                )
+                c.execute("COMMIT")
+                return {
+                    "plan_id": plan_id, "attempt_id": attempt_id,
+                    "task_key": row["task_key"], "task_status": "succeeded",
+                    "provider_execution_id": attempt_id,
+                    "evidence_digest": evidence_digest,
+                    "automatic_replay": False,
+                    "run_requests_closed": requests_closed,
+                }
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
 
     def record_workflow_attempt_reconciliation(
         self, plan_id, attempt_id, *, disposition, actor, evidence_ref, note,
@@ -2349,7 +2501,7 @@ class JobStore:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
             attempts = c.execute(
-                "SELECT a.id, a.status FROM task_attempts a "
+                "SELECT a.id, a.status, a.task_id, a.result_json FROM task_attempts a "
                 "JOIN workflow_tasks t ON t.id=a.task_id WHERE t.plan_id=?",
                 (plan_id,),
             ).fetchall()
@@ -2380,10 +2532,16 @@ class JobStore:
                     (plan_id,),
                 ).fetchall()
             run_request_by_id = {row["id"]: row for row in run_requests}
+            run_reconciliation_errors = {
+                "provider_effect_reconciled":
+                    "operator reconciliation recorded; no automatic replay",
+                "durable_provider_result_recovered":
+                    "durable provider result recovered; new run required",
+            }
             reconciled_request_ids = {
                 row["id"] for row in run_requests
                 if row["status"] == "incomplete"
-                and row["error"] == "operator reconciliation recorded; no automatic replay"
+                and row["error"] in set(run_reconciliation_errors.values())
             }
             run_reconciliation_event_counts = {}
             mismatched_run_reconciliations = set()
@@ -2402,22 +2560,27 @@ class JobStore:
                 run_reconciliation_event_counts[request_id] = (
                     run_reconciliation_event_counts.get(request_id, 0) + 1
                 )
+                reason = detail.get("reason") if isinstance(detail, dict) else None
+                expected_error = run_reconciliation_errors.get(reason)
                 expected_detail = {
                     "request_id": request_id,
                     "from_status": "uncertain",
                     "to_status": "incomplete",
-                    "reason": "provider_effect_reconciled",
+                    "reason": reason,
                     "automatic_replay": False,
                 }
                 request = run_request_by_id[request_id]
                 if (
-                    detail != expected_detail
+                    expected_error is None
+                    or detail != expected_detail
                     or request["status"] != "incomplete"
-                    or request["error"] != "operator reconciliation recorded; no automatic replay"
+                    or request["error"] != expected_error
                     or event["task_ref"] is not None
                     or event["attempt_id"] is not None
                 ):
                     mismatched_run_reconciliations.add(request_id)
+                else:
+                    reconciled_request_ids.add(request_id)
             duplicate_run_reconciliations = sorted(
                 request_id for request_id, count in run_reconciliation_event_counts.items()
                 if count > 1
@@ -2427,14 +2590,18 @@ class JobStore:
                 if run_reconciliation_event_counts.get(request_id, 0) != 1
             )
             attempt_by_id = {row["id"]: row["status"] for row in attempts}
+            attempt_rows_by_id = {row["id"]: row for row in attempts}
             reconciliation_by_id = {
                 row["attempt_id"]: row for row in reconciliations
             }
             claims = {}
             terminal = {}
+            terminal_kind = {}
             dispatch = {}
             mismatched_dispatch_identities = set()
             reconciliation_events = {}
+            recovery_events = {}
+            mismatched_recoveries = set()
             mismatched = set()
             mismatched_reconciliations = set()
             unknown = set()
@@ -2481,13 +2648,68 @@ class JobStore:
                             or event["task_ref"] != expected["task_id"]
                         ):
                             mismatched_reconciliations.add(attempt_id)
+                if kind == "workflow_attempt_recovered":
+                    recovery_events[attempt_id] = recovery_events.get(attempt_id, 0) + 1
+                    attempt_row = attempt_rows_by_id[attempt_id]
+                    try:
+                        detail = json.loads(event["detail_json"] or "{}")
+                        result = json.loads(attempt_row["result_json"] or "null")
+                    except (TypeError, ValueError):
+                        detail, result = None, None
+                    task = c.execute(
+                        "SELECT t.target, t.capability_id, p.digest FROM workflow_tasks t "
+                        "JOIN workflow_plans p ON p.id=t.plan_id WHERE t.id=?",
+                        (attempt_row["task_id"],),
+                    ).fetchone()
+                    current_digest = None
+                    seal = c.execute(
+                        "SELECT job_id, digest FROM workflow_evidence_seals "
+                        "WHERE attempt_id=?", (attempt_id,),
+                    ).fetchone()
+                    if task is not None and isinstance(result, dict):
+                        current_digest = _workflow_evidence_digest(
+                            c, attempt_id=attempt_id, job_id=attempt_id,
+                            target=task["target"], capability_id=task["capability_id"],
+                            plan_digest=task["digest"],
+                        )
+                    expected_tool = None
+                    if task is not None:
+                        expected_tool = task["capability_id"]
+                        if expected_tool.startswith("tool."):
+                            expected_tool = expected_tool.removeprefix("tool.")
+                    expected_detail = {
+                        "from_status": "uncertain", "to_status": "succeeded",
+                        "provider_execution_id": attempt_id,
+                        "evidence_digest": current_digest,
+                        "automatic_replay": False,
+                    }
+                    if (
+                        detail != expected_detail or current_digest is None
+                        or attempt_row["status"] != "succeeded"
+                        or not isinstance(result, dict)
+                        or result.get("job_id") != attempt_id
+                        or result.get("tool_id") != expected_tool
+                        or result.get("target") != (task["target"] if task else None)
+                        or result.get("exit_code") != 0
+                        or result.get("recovered_from_durable_provider_job") is not True
+                        or seal is None or seal["job_id"] != attempt_id
+                        or seal["digest"] != current_digest
+                        or event["task_ref"] != attempt_row["task_id"]
+                    ):
+                        mismatched_recoveries.add(attempt_id)
                 if kind in (
                     "task_succeeded", "task_failed", "task_cancelled",
                     "task_blocked", "task_uncertain",
                 ):
                     terminal[attempt_id] = terminal.get(attempt_id, 0) + 1
-                    if kind != "task_" + attempt_by_id[attempt_id]:
-                        mismatched.add(attempt_id)
+                    terminal_kind[attempt_id] = kind
+            for attempt_id, kind in terminal_kind.items():
+                if kind != "task_" + attempt_by_id[attempt_id] and not (
+                    kind == "task_uncertain"
+                    and attempt_by_id[attempt_id] == "succeeded"
+                    and recovery_events.get(attempt_id, 0) == 1
+                ):
+                    mismatched.add(attempt_id)
             missing_claims = sorted(
                 row["id"] for row in attempts if claims.get(row["id"], 0) != 1
             )
@@ -2504,6 +2726,19 @@ class JobStore:
                 attempt_id for attempt_id in reconciliation_by_id
                 if reconciliation_events.get(attempt_id, 0) != 1
             )
+            uncertain_terminal_ids = {
+                event["attempt_id"] for event in events
+                if event["event_type"] == "task_uncertain"
+            }
+            missing_or_duplicate_recoveries = sorted(
+                row["id"] for row in attempts
+                if (
+                    recovery_events.get(row["id"], 0) != 1
+                    if row["status"] == "succeeded"
+                    and row["id"] in uncertain_terminal_ids
+                    else recovery_events.get(row["id"], 0) != 0
+                )
+            )
             return {
                 "plan_id": plan_id, "attempts": len(attempts),
                 "missing_or_duplicate_claims": missing_claims,
@@ -2519,6 +2754,8 @@ class JobStore:
                     sorted(mismatched_reconciliations),
                 "unknown_reconciliation_events":
                     sorted(unknown_reconciliations),
+                "missing_or_duplicate_recovery_events": missing_or_duplicate_recoveries,
+                "mismatched_recovery_events": sorted(mismatched_recoveries),
                 "duplicate_run_request_reconciliation_events":
                     duplicate_run_reconciliations,
                 "missing_or_duplicate_run_request_reconciliation_events":
@@ -2534,6 +2771,8 @@ class JobStore:
                     or missing_or_duplicate_reconciliations
                     or mismatched_reconciliations
                     or unknown_reconciliations
+                    or missing_or_duplicate_recoveries
+                    or mismatched_recoveries
                     or duplicate_run_reconciliations
                     or missing_or_duplicate_run_reconciliations
                     or mismatched_run_reconciliations
