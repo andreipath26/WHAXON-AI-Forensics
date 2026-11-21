@@ -1405,12 +1405,11 @@ class Core:
         return result
 
     async def initialize(self, drain: bool = True) -> None:
-        """Called once by any interface. Awaitable inside a splash screen.
+        """Initialize persisted state and reconcile stale durable work.
 
-        drain=True (default): long-lived hosts reconcile stale rows. Legacy
-        JobStore rows are never automatically dispatched. Engine V2 requests
-        are serviced by their dedicated durable worker.
-        drain=False: one-shot CLI commands never drain prior legacy jobs.
+        The drain argument remains accepted for caller compatibility, but
+        neither mode dispatches legacy JobStore rows. Engine V2 requests are
+        serviced by their dedicated durable worker.
         """
         self.bus.bind_loop(asyncio.get_running_loop())
         if self.catalog.path.exists():
