@@ -518,7 +518,18 @@ class Core:
                     ):
                         continue
                     requests = outcomes_by_source.get((source_job_id, source_seq), [])
-                    if not requests:
+                    if not requests and finding.get("source") == "engine-v2-verifier":
+                        recorded_status = finding.get("verification_status")
+                        finding["verification_outcome"] = {
+                            "status": "recorded",
+                            "verification_status": (
+                                recorded_status
+                                if recorded_status in allowed_verification_statuses
+                                else "unknown"
+                            ),
+                            "job_id": finding["job_id"],
+                        }
+                    elif not requests:
                         finding["verification_outcome"] = {
                             "status": "not_requested",
                         }
