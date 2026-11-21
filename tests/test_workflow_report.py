@@ -197,3 +197,97 @@ def test_workflow_report_projects_scope_skip_without_raw_coverage_details(tmp_pa
     assert secret_detail not in rendered
     assert "private context" not in rendered
     assert "target" not in attempt["coverage_outcomes"][0]
+
+
+
+def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks():
+    class TaskStore:
+        def __init__(self, tasks):
+            self.tasks = tasks
+
+        def list_workflow_tasks(self, plan_id):
+            assert plan_id == "plan-1"
+            return self.tasks
+
+    source_job = "123456789abc"
+    source_finding = {"seq": 0, "kind": "sqli", "severity": "high"}
+    scan_attempt = {
+        "task_key": "scan", "target": "http://127.0.0.1/item?id=1",
+        "capability_id": "tool.sqlmap", "attempt_id": "scan-attempt",
+        "attempt_no": 1, "attempt_status": "succeeded",
+        "job_id": source_job, "evidence_status": "recorded",
+        "integrity_status": "verified", "finding_count": 1,
+        "findings": [source_finding],
+    }
+
+    def make_report(tasks, extra_attempts=()):
+        evidence = {
+            "plan_id": "plan-1", "mission_id": "mission-1",
+            "plan_digest": "digest-1",
+            "attempts": [scan_attempt, *extra_attempts],
+            "all_evidence_recorded": True,
+            "all_evidence_integrity_verified": True,
+        }
+        core = _core_with(evidence, ready=False)
+        core.store = TaskStore(tasks)
+        core.workflow_progress = lambda _plan_id: {
+            "plan_id": "plan-1", "attempts": len(evidence["attempts"]),
+            "total_tasks": len(tasks) + 1,
+            "counts": {"succeeded": 1, "pending": max(0, len(tasks) - 1)},
+        }
+        return Core.workflow_report(core, "plan-1")
+
+    scan_task = {
+        "id": "scan", "capability_id": "tool.sqlmap", "status": "succeeded",
+        "inputs": {},
+    }
+    verify_task = {
+        "id": "verify", "capability_id": "tool.verify_sqli",
+        "inputs": {"source_job_id": source_job, "finding_seq": 0},
+    }
+
+    not_requested = make_report([scan_task])
+    assert not_requested["findings"][0]["verification_outcome"] == {
+        "status": "not_requested",
+    }
+
+    pending = make_report([scan_task, {**verify_task, "status": "pending"}])
+    assert pending["findings"][0]["verification_outcome"] == {
+        "status": "pending", "task_key": "verify",
+    }
+
+    failed_attempt = {
+        "task_key": "verify", "attempt_status": "failed",
+        "evidence_status": "not_successful", "integrity_status": "unsealed",
+        "findings": [],
+    }
+    failed = make_report(
+        [scan_task, {**verify_task, "status": "failed"}], [failed_attempt],
+    )
+    assert failed["findings"][0]["verification_outcome"] == {
+        "status": "failed", "task_key": "verify",
+        "attempt_statuses": ["failed"],
+    }
+
+    recorded_attempt = {
+        "task_key": "verify", "target": "http://127.0.0.1/item?id=1",
+        "capability_id": "tool.verify_sqli", "attempt_id": "verify-attempt",
+        "attempt_no": 1, "attempt_status": "succeeded",
+        "job_id": "abcdef123456", "evidence_status": "recorded",
+        "integrity_status": "verified", "finding_count": 1,
+        "findings": [{
+            "seq": 0, "kind": "sqli", "severity": "high",
+            "verification_status": "verified",
+            "source_observation": {"job_id": source_job, "finding_seq": 0},
+        }],
+    }
+    recorded = make_report(
+        [scan_task, {**verify_task, "status": "succeeded"}], [recorded_attempt],
+    )
+    assert recorded["findings"][0]["verification_outcome"] == {
+        "status": "recorded", "task_key": "verify",
+        "attempt_statuses": ["succeeded"],
+        "verification_status": "verified", "job_id": "abcdef123456",
+    }
+    assert "source_job_id" not in json.dumps(recorded)
+    assert "source_finding_seq" not in json.dumps(recorded)
