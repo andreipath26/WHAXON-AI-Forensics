@@ -662,13 +662,13 @@
       v2Say("Could not load V2 missions: " + error.message, true);
     }
   }
-  async function v2LoadMissionPlans() {
+  async function v2LoadMissionPlans(selectPlanId = "") {
     const missionId = v2MissionSelect?.value;
-    if (!missionId) return;
+    if (!missionId) return false;
     try {
       const plans = await api("/api/v2/missions/" + encodeURIComponent(missionId) + "/plans");
       if (!Array.isArray(plans)) throw new Error("The server returned an invalid plan list.");
-      const selected = v2PlanSelect?.value;
+      const selected = selectPlanId || v2PlanSelect?.value;
       v2PlanSelect?.replaceChildren(new Option(plans.length ? "Choose a workflow plan…" : "No plans for this mission", ""));
       for (const plan of plans) {
         const label = `${plan.id} · ${plan.status || "unknown"} · ${String(plan.digest || "").slice(0, 12)}`;
@@ -677,10 +677,12 @@
       if (selected && plans.some(item => item.id === selected)) v2PlanSelect.value = selected;
       if (v2PlanSelect) v2PlanSelect.disabled = plans.length === 0;
       v2SetControls();
+      return !selectPlanId || v2PlanSelect?.value === selectPlanId;
     } catch (error) {
       if (v2PlanSelect) { v2PlanSelect.replaceChildren(new Option("Plan list unavailable", "")); v2PlanSelect.disabled = true; }
       v2SetControls();
       v2Say("Could not load plans: " + error.message, true);
+      return false;
     }
   }
   async function v2LoadCapabilities() {
@@ -965,10 +967,24 @@
       const tasks = Array.isArray(proposal.plan?.tasks) ? proposal.plan.tasks : [];
       const blocked = Array.isArray(proposal.blocked) ? proposal.blocked.length : 0;
       if (proposal.created === true && proposal.plan_id) {
+        const missionId = v2Plan.details?.plan?.mission_id;
+        let planListRefreshed = false;
+        if (missionId && v2MissionSelect) {
+          const hasMission = () => [...v2MissionSelect.options].some(option => option.value === missionId);
+          if (!hasMission()) await v2LoadMissions();
+          if (hasMission()) {
+            if (v2MissionSelect.value !== missionId) v2MissionSelect.value = missionId;
+            planListRefreshed = await v2LoadMissionPlans(proposal.plan_id);
+          }
+        }
         v2ShowEvidence(
           "Saved follow-up plan " + proposal.plan_id + " from " + planId +
           " with " + tasks.length + " task(s); " + blocked +
-          " candidate(s) remain blocked. It is review-only: no approval or run request was created."
+          " candidate(s) remain blocked. " +
+          (planListRefreshed
+            ? "It is selected in the mission plan list for review. "
+            : "The mission plan list could not be refreshed; reload it to find the saved plan. ") +
+          "It is review-only: no approval or run request was created."
         );
       } else {
         v2ShowEvidence(
