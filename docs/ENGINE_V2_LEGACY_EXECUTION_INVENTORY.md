@@ -402,6 +402,8 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/missions/<mission_id>/report` | `workflow_v2_mission_report` | Ordered mission-level, evidence-bound report; partial status is preserved |
 | `GET` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/runtime-budget` | `workflow_v2_mission_runtime_budget` | Durable cumulative runtime budget across all plans in the mission |
+| `POST` | `/api/v2/missions/<mission_id>/runtime-budget` | `workflow_v2_mission_runtime_budget` | Tightening-only durable runtime cap; dispatch and active async work recheck the barrier |
 | `GET` | `/api/v2/providers` | `workflow_v2_providers` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/providers/portfolio-audit` | `workflow_v2_portfolio_audit` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflow-runs/<request_id>` | `workflow_v2_run_request_status` | Core workflow registry, stores and lifecycle services |
@@ -457,13 +459,13 @@ does not prove smoke, lab, end-to-end or authorization acceptance.
 ### Read, status and export API semantics
 
 The remaining HTTP GET surfaces are mapped by handler class below. Exact route
-and handler names are pinned by the 104-binding AST guard; this table records
+and handler names are pinned by the 106-binding AST guard; this table records
 which state each family reads and what it cannot establish.
 
 | API family | Handlers/routes | Data owner and truth limit | Existing evidence |
 | --- | --- | --- | --- |
 | V2 capabilities and providers | `/api/v2/capabilities`, `/providers`, `/portfolio-audit` | Core registries and inventory; registered, bound, installed and executable are distinct from smoke/lab/end-to-end acceptance. | `test_server_workflow_v2.py`, `test_providers.py` |
-| V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit` | Core mission, plan, budget and rate-limit records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
+| V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit`, `/runtime-budget` | Core mission, plan, budget, rate-limit and cumulative runtime records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
 | V2 run and plan state | `/api/v2/workflow-runs/summary`, `/workflow-runs/<id>`, `/snapshot`, `/workflows/<id>` | Durable run request, queue and workflow store. Queued, active, terminal and successful remain distinct; snapshots are not atomic cross-table reads. | `test_workflow_run_requests.py`, `test_server_workflow_v2.py` |
 | V2 approval, attempts and proof | `/api/v2/workflows/<id>/approvals`, `/attempts`, `/audit`, `/event-inbox`, `/events`, `/evidence`, `/limits`, `/progress`, `/readiness`, `/reconciliation`, `/resources` | Core store and workflow integrity/readiness services; only persisted attempts/evidence count, unavailable cost/worker signals are not inferred. | `test_server_workflow_v2.py`, `test_workflow.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
 | Health and advertised tools | `/api/health`, `/api/health/simple`, `/api/status`, `/api/tools` | Health checks database/data-dir writability and optional MSF status. When `WHAXON_V2_EXTERNAL_WORKER=1`, health also requires a fresh V2 worker heartbeat. Catalog rows and health do not prove V2 admission or assessment success. | `test_server.py`, `test_server_workflow_v2.py`, `test_engine_v2_e5_core_readiness.py` |
