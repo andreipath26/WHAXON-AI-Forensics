@@ -2932,7 +2932,10 @@ class JobStore:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
             rows = c.execute(
                 "SELECT t.task_key, t.target, t.capability_id, a.id AS attempt_id, "
-                "a.attempt_no, a.status, a.result_json, a.error "
+                "a.attempt_no, a.status, a.result_json, a.error, "
+                "(SELECT e.detail_json FROM workflow_events e "
+                "WHERE e.plan_id=t.plan_id AND e.attempt_id=a.id "
+                "AND e.event_type='dispatch_started' LIMIT 1) AS dispatch_detail "
                 "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                 "WHERE t.plan_id=? ORDER BY a.started_at, a.id LIMIT ?",
                 (plan_id, limit),
@@ -2948,6 +2951,7 @@ class JobStore:
                         row["status"], row["error"],
                     ),
                     "job_id": None,
+                    "coverage_outcomes": [],
                     "evidence_status": "unavailable", "integrity_status": "unsealed",
                     "finding_count": 0, "findings": [],
                 }
@@ -2955,6 +2959,47 @@ class JobStore:
                     result = json.loads(row["result_json"] or "null")
                 except (TypeError, json.JSONDecodeError):
                     result = None
+                try:
+                    dispatch_detail = json.loads(row["dispatch_detail"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    dispatch_detail = None
+                provider_job_id = (
+                    dispatch_detail.get("provider_execution_id")
+                    if isinstance(dispatch_detail, dict) else None
+                )
+                result_job_id = (
+                    result.get("job_id") if isinstance(result, dict) else None
+                )
+                if (
+                    isinstance(provider_job_id, str) and provider_job_id
+                    and (
+                        not isinstance(result_job_id, str)
+                        or result_job_id == provider_job_id
+                    )
+                ):
+                    expected_tool_id = provider_tool_id_for_capability(
+                        row["capability_id"],
+                    )
+                    coverage_rows = c.execute(
+                        "SELECT tool_id, target, kind, phase FROM coverage "
+                        "WHERE job_id=? ORDER BY seq", (provider_job_id,),
+                    ).fetchall()
+                    known_coverage_kinds = {
+                        "scope_blocked", "binary_missing", "timeout",
+                    }
+                    for coverage in coverage_rows:
+                        if (
+                            coverage["tool_id"] != expected_tool_id
+                            or coverage["target"] != row["target"]
+                        ):
+                            continue
+                        entry["coverage_outcomes"].append({
+                            "status": "skipped",
+                            "kind": coverage["kind"]
+                            if coverage["kind"] in known_coverage_kinds else "other",
+                            "phase": "workflow"
+                            if coverage["phase"] == "workflow" else "other",
+                        })
                 recovered_failure = (
                     row["status"] == "failed" and isinstance(result, dict)
                     and result.get("recovered_from_durable_provider_job") is True
