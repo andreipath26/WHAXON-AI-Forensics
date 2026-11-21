@@ -83,6 +83,7 @@ def test_report_page_renders_plan_scoped_v2_verification_outcomes(page, live_ser
     page.goto(f"{live_server}/ui-v2/report")
     page.wait_for_function("() => [...document.querySelector('#v2-report-mission').options].some(o => o.value === 'mission-v2-report')", timeout=8000)
     page.locator("#v2-report-mission").select_option("mission-v2-report")
+    page.wait_for_function("() => [...document.querySelector('#v2-report-plan').options].some(o => o.value === 'plan-v2-report')", timeout=8000)
     page.locator("#v2-report-plan").select_option("plan-v2-report")
     page.wait_for_function(
         "() => document.querySelector('#v2-report-status')?.textContent.includes('Loaded persisted V2 workflow evidence')",
@@ -124,6 +125,7 @@ def test_v2_report_failure_does_not_fallback_to_legacy_report(page, live_server)
     page.goto(f"{live_server}/ui-v2/report")
     page.wait_for_function("() => [...document.querySelector('#v2-report-mission').options].some(o => o.value === 'mission-v2-report')", timeout=8000)
     page.locator("#v2-report-mission").select_option("mission-v2-report")
+    page.wait_for_function("() => [...document.querySelector('#v2-report-plan').options].some(o => o.value === 'plan-v2-report')", timeout=8000)
     page.locator("#v2-report-plan").select_option("plan-v2-report")
     page.wait_for_function(
         "() => document.querySelector('#v2-report-status')?.textContent.includes('V2 workflow report unavailable')",
