@@ -925,6 +925,7 @@ def test_v2_ai_proposals_api_validates_and_never_submits_execution(tmp_path, mon
     payload = {
         "mission_id": "m-ai", "id": "p-ai",
         "goal": "inspect authorized lab", "target": "192.0.2.10",
+        "client_metadata": "ignored for request compatibility",
     }
     response = client.post("/api/v2/ai/proposals", json=payload)
     assert response.status_code == 200
@@ -939,9 +940,12 @@ def test_v2_ai_proposals_api_validates_and_never_submits_execution(tmp_path, mon
         {**payload, "save": "yes"},
         {**payload, "target": ""},
         {**payload, "goal": "x" * 10001},
+        {**payload, "history": "not-an-array"},
+        {**payload, "step": True},
     ):
         response = client.post("/api/v2/ai/proposals", json=invalid)
         assert response.status_code == 400
+    assert len(calls) == 1
     assert client.post(
         "/api/v2/ai/proposals", json=payload,
         headers={"Origin": "https://attacker.invalid"},

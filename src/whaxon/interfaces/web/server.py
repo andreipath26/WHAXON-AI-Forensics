@@ -25,6 +25,7 @@ from whaxon.core.events import (
     JobStarted,
 )
 from whaxon.interfaces.web.api_contracts import (
+    AIWorkflowProposalRequest,
     DeadlineRequest,
     ExecutionLimitsRequest,
     MissionCostLimitRequest,
@@ -620,22 +621,32 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         save = payload.get("save", False)
         if type(save) is not bool:
             return jsonify({"error": "save must be a boolean"}), 400
-        history = payload.get("history", [])
-        step = payload.get("step", 1)
+        try:
+            ai_request = AIWorkflowProposalRequest.model_validate(payload)
+        except ValidationError as exc:
+            invalid_fields = {
+                error["loc"][0] for error in exc.errors()
+                if error.get("loc")
+            }
+            if "step" in invalid_fields:
+                message = "step must be a positive integer"
+            else:
+                message = "AI proposal history must be an array of objects"
+            return jsonify({"error": message}), 400
         try:
             proposal = propose_v2_workflow_plan(
                 core,
-                mission_id=payload["mission_id"],
-                plan_id=payload["id"],
-                goal=payload["goal"],
-                target=payload["target"],
-                history=history,
-                step=step,
+                mission_id=ai_request.mission_id,
+                plan_id=ai_request.id,
+                goal=ai_request.goal,
+                target=ai_request.target,
+                history=ai_request.history,
+                step=ai_request.step,
             )
             created = False
-            if save and proposal.get("status") == "proposed":
+            if ai_request.save and proposal.get("status") == "proposed":
                 created = core.save_workflow_plan(
-                    payload["id"], WorkflowPlan.from_dict(proposal["plan"]),
+                    ai_request.id, WorkflowPlan.from_dict(proposal["plan"]),
                 )
             return jsonify({
                 **proposal,
