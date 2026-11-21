@@ -803,12 +803,15 @@ def test_router_dispatches_through_registered_provider_not_scheduler(monkeypatch
     assert len(runner.calls) == 1
 
 
-def test_router_enforces_provider_input_and_output_contracts():
+def test_router_enforces_provider_input_and_output_contracts(tmp_path):
     import asyncio
     from types import SimpleNamespace
 
     from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
     from whaxon.core.providers import BoundProviderRouter
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan
 
     class ContractProvider:
         def __init__(self):
@@ -860,6 +863,32 @@ def test_router_enforces_provider_input_and_output_contracts():
     )
     with pytest.raises(CapabilityUnavailable, match="inputs violate"):
         asyncio.run(router.dispatch(invalid))
+    assert provider.calls == 0
+
+    store = JobStore(tmp_path / "provider-schema-dispatch.db")
+    store.create_mission("schema-mission", "inert provider contract test")
+    store.save_workflow_plan("schema-plan", WorkflowPlan(
+        "schema-mission", (invalid,), metadata={
+            "provider_bindings": {
+                "task": {
+                    "provider_id": provider.manifest.provider_id,
+                    "manifest_fingerprint": provider.manifest.fingerprint,
+                },
+            },
+        },
+    ))
+
+    def authorize_before_claim(task):
+        try:
+            router.resolve_task(task)
+        except CapabilityUnavailable:
+            return False
+        return True
+
+    run = asyncio.run(WorkflowScheduler(
+        store, authorize=authorize_before_claim, dispatch=router.dispatch,
+    ).run("schema-plan"))
+    assert run["tasks"] == [{"id": "task", "status": "blocked"}]
     assert provider.calls == 0
 
     valid = WorkflowTask(
