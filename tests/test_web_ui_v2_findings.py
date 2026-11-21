@@ -222,7 +222,7 @@ def test_findings_header_uses_live_scope_without_claiming_unverified_enforcement
 def test_findings_kpi_bars_match_live_report_counts(page, live_server):
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-findings-count')?.textContent.startsWith('Live findings:')",
+        "() => /^Live findings:\\s*\\d+$/.test(document.querySelector('#whaxon-findings-count')?.textContent?.trim() ?? '')",
         timeout=15000,
     )
     total_text = page.locator("#whaxon-findings-count").inner_text()

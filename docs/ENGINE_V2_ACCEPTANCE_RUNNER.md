@@ -36,3 +36,7 @@ authorized controlled-provider lab, independent audit-anchor retention,
 manual accessibility review, production-like service recovery, independent
 engineering acceptance, and release artifact publication remain distinct
 gates. The current G10 decision remains authoritative.
+
+## Local prerequisites
+
+The runner uses the active Python environment; it does not install project extras or browser binaries. Provision the same test dependencies as CI before running it (at minimum, `.[dev,web]`). The full suite includes Playwright UI tests: install the matching Chromium browser, or point `WHAXON_TEST_CHROMIUM` at an installed compatible Chromium executable. CI installs Playwright's pinned browser. If the active environment is incomplete, the runner records the actual failed or blocked test result in its log rather than treating unexecuted coverage as passed.
