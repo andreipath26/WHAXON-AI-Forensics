@@ -592,26 +592,43 @@
    e.preventDefault();
    const target=targetInput.value.trim(),goal=goalInput.value.trim(),submit=form.querySelector("button[type=submit]");
    status.textContent="Checking target against current scope…";submit.disabled=true;v2PlanResult.replaceChildren();
+   let missionId=null,missionCreated=false,proposalRequestStarted=false;
    try{
      const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});
      const verdict=await check.json();
      if(!check.ok||verdict.allowed!==true)throw new Error(verdict.reason||verdict.error||"Target was not confirmed in scope");
      const id=()=>globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
-     const missionId="ai-mission-"+id(),planId="ai-plan-"+id();
+     missionId="ai-mission-"+id();
+     const planId="ai-plan-"+id();
      const missionResponse=await fetch("/api/v2/missions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:missionId,objective:goal})});
      const missionData=await missionResponse.json();
      if(!missionResponse.ok)throw new Error(missionData.error||("mission HTTP "+missionResponse.status));
+     if(missionData.created!==true||missionData.mission_id!==missionId){
+       throw new Error("mission service did not confirm creation of the requested mission");
+     }
+     missionCreated=true;
+     proposalRequestStarted=true;
      const response=await fetch("/api/v2/ai/proposals",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mission_id:missionId,id:planId,goal,target,save:true})});
      const data=await response.json();
      if(!response.ok)throw new Error(data.error||("proposal HTTP "+response.status));
-     if(data.status!=="proposed"||data.created!==true)throw new Error("AI proposal blocked: "+(data.reason||"no reviewable plan was saved"));
+     if(data.status!=="proposed"||data.created!==true){
+       status.textContent="Mission "+missionId+" was created, but no V2 plan was saved: "+
+         (data.reason||"the AI proposal was blocked")+
+         ". No approval or execution was submitted.";
+       return;
+     }
      const planLabel=node("p","Saved V2 plan "+planId+" · digest "+data.digest,"font-code-sm text-primary");
      const reviewLink=document.createElement("a");reviewLink.href="/ui-v2/run?plan_id="+encodeURIComponent(planId);reviewLink.textContent="Review task, provider binding and approvals in Run & Orchestration";reviewLink.className="mt-1 inline-block underline text-secondary";
      v2PlanResult.append(planLabel,reviewLink);
      form.reset();
      status.textContent="V2 AI plan saved. No approval was granted and no execution was submitted.";
      load().catch(()=>{});
-   }catch(error){status.textContent="V2 AI plan not saved: "+error.message;}
+   }catch(error){
+     status.textContent=missionCreated&&proposalRequestStarted
+       ? "Mission "+missionId+" was created, but the V2 proposal request failed: "+error.message+
+         ". The plan outcome may need checking; no approval or execution was submitted."
+       : "V2 AI plan not saved: "+error.message;
+   }
    finally{submit.disabled=false;}
  });
  const engagementNavButton=[...document.querySelectorAll("header button")].find(b=>b.querySelector(".material-symbols-outlined")?.textContent.trim()==="arrow_drop_down");
