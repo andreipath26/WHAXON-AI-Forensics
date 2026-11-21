@@ -1,4 +1,4 @@
-"""Create reviewable V2 plans or explicitly use legacy direct dispatch.
+"""Create reviewable V2 plans and execute only persisted approved plans.
 
 Usage:
     whaxon run <tool_id> <target> [options]
@@ -6,7 +6,6 @@ Usage:
 Options:
     --mission-id ID        mission for the V2 plan (generated if omitted)
     --plan-id ID            immutable V2 plan ID (generated if omitted)
-    --legacy                use the old direct-dispatch path explicitly
     --extra "..."          extra arguments passed to the tool
     --data DIR             data directory (default: ./data)
     --timeout SEC          hard timeout in seconds (default: 300)
@@ -42,11 +41,9 @@ def _usage() -> None:
     print("  Creates and saves a provider-pinned Engine V2 plan for operator review.")
     print("  V2: whaxon run --v2-plan <existing-plan-id> [--data DIR]")
     print("  V2 requires a persisted plan and task approvals; no legacy fallback.")
-    print("  Legacy direct dispatch is explicit: whaxon run <tool_id> <target> --legacy")
+    print("  Legacy direct dispatch is retired; use an approved Engine V2 plan.")
     print("  Examples:")
     print("    whaxon run nmap 10.0.0.5")
-    print("    whaxon run nmap 10.0.0.5 --legacy --quiet --json")
-    print("    whaxon run nikto 10.0.0.5 --legacy --extra \"-p 80,443\"")
 
 
 def _print_findings(findings, as_json: bool, verbose: bool = False) -> None:
@@ -144,8 +141,12 @@ def main(args: list[str] | None = None) -> None:
             sys.exit(result)
         return
 
-    if legacy and (mission_id or plan_id):
-        print("error: --mission-id and --plan-id apply only to V2 plan creation", file=sys.stderr)
+    if legacy:
+        print(
+            "error: legacy direct tool execution is retired; no job was created. "
+            "Create and approve an Engine V2 plan instead.",
+            file=sys.stderr,
+        )
         sys.exit(EXIT_USAGE)
 
     if not legacy:
