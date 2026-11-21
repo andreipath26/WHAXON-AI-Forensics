@@ -7,15 +7,10 @@ from pathlib import Path
 from whaxon.interfaces.legacy_execution import legacy_gui_execution_enabled
 
 
-def test_legacy_gui_execution_is_default_denied_and_requires_explicit_opt_in(
-    monkeypatch,
-):
-    monkeypatch.delenv("WHAXON_LEGACY_GUI_EXECUTION_ENABLED", raising=False)
-    assert legacy_gui_execution_enabled() is False
-
+def test_legacy_gui_execution_is_retired_even_with_stale_environment_flag(monkeypatch):
     for value in ("1", "true", "YES", " true "):
         monkeypatch.setenv("WHAXON_LEGACY_GUI_EXECUTION_ENABLED", value)
-        assert legacy_gui_execution_enabled() is True
+        assert legacy_gui_execution_enabled() is False
 
     for value in ("", "false", "on"):
         monkeypatch.setenv("WHAXON_LEGACY_GUI_EXECUTION_ENABLED", value)
