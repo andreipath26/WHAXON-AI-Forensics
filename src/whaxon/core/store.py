@@ -2056,10 +2056,11 @@ class JobStore:
     def recover_workflow_attempt_from_provider_job(self, plan_id, attempt_id):
         """Finish a lost workflow acknowledgement from a complete durable V2 job.
 
-        Recovery is deliberately narrow: only an uncertain ``tool.*`` attempt
-        with an exact dispatch identity and a V2-owned, successful, same-tool,
-        same-target job can be recovered. It never invokes a provider. Cancelled
-        plans and attempts with an operator reconciliation remain fenced.
+        Recovery requires an exact dispatch identity and a V2-owned, successful
+        same-tool, same-target job. Catalog capabilities use their ``tool.*``
+        suffix; first-party providers persist their exact capability ID as the
+        job tool. It never invokes a provider. Cancelled plans and attempts with
+        an operator reconciliation remain fenced.
         """
         now = time.time()
         with self._lock:
@@ -2086,9 +2087,12 @@ class JobStore:
                 if row["active_attempt_id"] is not None:
                     raise ValueError("workflow attempt still has an active lease")
                 capability_id = row["capability_id"]
-                if not isinstance(capability_id, str) or not capability_id.startswith("tool."):
-                    raise ValueError("durable result recovery is unsupported for this capability")
-                tool_id = capability_id.removeprefix("tool.")
+                if not isinstance(capability_id, str) or not capability_id:
+                    raise ValueError("workflow capability identity is invalid")
+                tool_id = (
+                    capability_id.removeprefix("tool.")
+                    if capability_id.startswith("tool.") else capability_id
+                )
                 dispatch_events = c.execute(
                     "SELECT detail_json FROM workflow_events WHERE plan_id=? "
                     "AND attempt_id=? AND event_type='dispatch_started'",
@@ -2668,6 +2672,11 @@ class JobStore:
                             target=task["target"], capability_id=task["capability_id"],
                             plan_digest=task["digest"],
                         )
+                    expected_tool = None
+                    if task is not None:
+                        expected_tool = task["capability_id"]
+                        if expected_tool.startswith("tool."):
+                            expected_tool = expected_tool.removeprefix("tool.")
                     expected_detail = {
                         "from_status": "uncertain", "to_status": "succeeded",
                         "provider_execution_id": attempt_id,
@@ -2679,10 +2688,7 @@ class JobStore:
                         or attempt_row["status"] != "succeeded"
                         or not isinstance(result, dict)
                         or result.get("job_id") != attempt_id
-                        or result.get("tool_id") != (
-                            task["capability_id"].removeprefix("tool.")
-                            if task is not None else None
-                        )
+                        or result.get("tool_id") != expected_tool
                         or result.get("target") != (task["target"] if task else None)
                         or result.get("exit_code") != 0
                         or result.get("recovered_from_durable_provider_job") is not True

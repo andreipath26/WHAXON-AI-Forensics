@@ -7,17 +7,17 @@ from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 
-def _uncertain_catalog_attempt(tmp_path, *, job_status="finished", exit_code=0):
+def _uncertain_catalog_attempt(
+    tmp_path, *, job_status="finished", exit_code=0,
+    capability_id="tool.nmap",
+):
     core = Core(tmp_path)
     core.create_mission("m", "recover lost provider acknowledgement")
-    core.save_workflow_plan(
-        "p", WorkflowPlan("m", (
-            WorkflowTask(
-                "scan", "tool.nmap", "192.0.2.10",
-                permissions=("network.scan",), impact="moderate",
-            ),
-        )),
-    )
+    task_args = {"permissions": ("network.scan",), "impact": "moderate"} \
+        if capability_id.startswith("tool.") else {}
+    core.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", capability_id, "192.0.2.10", **task_args),
+    )))
     request = core.enqueue_workflow_run("p")
     run_claim = core.workflow_requests.claim("run-worker")
     assert run_claim and run_claim["id"] == request["id"]
@@ -29,7 +29,8 @@ def _uncertain_catalog_attempt(tmp_path, *, job_status="finished", exit_code=0):
     )
     core.store.mark_engine_v2_execution_job(attempt_id)
     core.store.create(attempt_id)
-    assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
+    tool_id = capability_id.removeprefix("tool.")
+    assert core.store.set_started(attempt_id, tool_id, "192.0.2.10")
     if job_status == "finished":
         assert core.store.set_finished(attempt_id, exit_code, 0.25)
     else:
@@ -61,6 +62,20 @@ def test_recovery_seals_successful_job_and_never_replays(tmp_path):
     assert core.workflow_requests.claim("worker") is None
     with pytest.raises(ValueError, match="only uncertain"):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+
+
+def test_recovery_supports_first_party_provider_capabilities(tmp_path):
+    capability_id = "recon.http"
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, capability_id=capability_id,
+    )
+
+    recovered = core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+
+    assert recovered["task_status"] == "succeeded"
+    assert core.workflow_evidence("p")["attempts"][0]["integrity_status"] == "verified"
+    audit = core.store.get_workflow_audit_integrity("p")
+    assert audit["consistent"] is True, audit
 
 
 @pytest.mark.parametrize(("job_status", "exit_code"), [
