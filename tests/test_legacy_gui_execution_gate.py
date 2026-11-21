@@ -171,3 +171,23 @@ def test_qt_cancel_async_dispatch_rechecks_v2_ownership(monkeypatch):
 
     assert cancelled == []
     assert "Engine V2 work" in statuses[-1]
+
+
+
+def test_qt_cancel_dispatch_still_allows_legacy_job(monkeypatch):
+    cancelled = []
+    statuses = []
+    scheduled = []
+    window = _cancel_window_harness(
+        lambda _job_id: False, cancelled, statuses,
+    )
+    monkeypatch.setattr(
+        asyncio, "create_task",
+        lambda coroutine: scheduled.append(coroutine),
+    )
+
+    window._cancel_job()
+    assert len(scheduled) == 1
+    asyncio.run(scheduled.pop())
+
+    assert cancelled == ["provider-job"]
