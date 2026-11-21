@@ -47,3 +47,32 @@ def test_legacy_qt_dispatch_checks_gate_before_toolrunner_call():
     ]
     assert gate_lines and dispatch_lines
     assert min(gate_lines) < min(dispatch_lines)
+
+
+def test_legacy_qt_run_action_blocks_before_queuing_task():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "whaxon"
+        / "interfaces"
+        / "gui"
+        / "main_window.py"
+    )
+    module = ast.parse(source.read_text(encoding="utf-8"))
+    run_selected = next(
+        node for node in ast.walk(module)
+        if isinstance(node, ast.FunctionDef) and node.name == "_run_selected"
+    )
+    calls = [node for node in ast.walk(run_selected) if isinstance(node, ast.Call)]
+    gate_lines = [
+        node.lineno for node in calls
+        if isinstance(node.func, ast.Name)
+        and node.func.id == "legacy_gui_execution_enabled"
+    ]
+    task_lines = [
+        node.lineno for node in calls
+        if isinstance(node.func, ast.Attribute)
+        and node.func.attr == "create_task"
+    ]
+    assert gate_lines and task_lines
+    assert min(gate_lines) < min(task_lines)
