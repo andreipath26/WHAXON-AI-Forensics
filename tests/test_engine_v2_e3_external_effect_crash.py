@@ -13,6 +13,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import pytest
+
 from whaxon.core.catalog import Tool, ToolCatalog
 from whaxon.core.events import EventBus
 from whaxon.core.runner import ToolRunner
@@ -226,8 +228,9 @@ def test_cancel_after_real_http_effect_is_uncertain_and_never_replayed(tmp_path)
         assert receiver.server.received == [b"effect-before-cancel"]
 
 
-def test_scheduler_shutdown_cancellation_kills_runner_and_keeps_attempt_uncertain(tmp_path):
-    """Cancelling a dispatched Engine V2 worker cannot orphan its child tool."""
+@pytest.mark.parametrize("stop_kind", ["shutdown", "plan"])
+def test_scheduler_cancellation_kills_runner_and_keeps_attempt_uncertain(tmp_path, stop_kind):
+    """Durable plan stop and worker shutdown cannot orphan a child tool."""
     store = JobStore(tmp_path / "runner-cancel.db")
     _plan(store)
     bus = EventBus()
@@ -255,13 +258,18 @@ def test_scheduler_shutdown_cancellation_kills_runner_and_keeps_attempt_uncertai
                 raise AssertionError("provider child did not start")
             await asyncio.sleep(0.02)
         process = next(iter(runner._procs.values()))
-        scheduled.cancel()
-        try:
-            await asyncio.wait_for(scheduled, timeout=5)
-        except asyncio.CancelledError:
-            pass
+        if stop_kind == "plan":
+            store.request_workflow_cancellation("plan")
+            result = await asyncio.wait_for(scheduled, timeout=5)
+            assert result["tasks"] == [{"id": "task", "status": "uncertain"}]
         else:
-            raise AssertionError("cancelled scheduler did not propagate cancellation")
+            scheduled.cancel()
+            try:
+                await asyncio.wait_for(scheduled, timeout=5)
+            except asyncio.CancelledError:
+                pass
+            else:
+                raise AssertionError("cancelled scheduler did not propagate cancellation")
         return process
 
     process = asyncio.run(cancel_after_dispatch())
