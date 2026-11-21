@@ -69,6 +69,50 @@ def test_catalog_adapter_provider_executes_through_core_runner(monkeypatch):
     assert runner.calls[0]["phase"] == "workflow"
 
 
+def test_catalog_provider_uses_durable_v2_execution_identity(monkeypatch):
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    object.__setattr__(task, "_attempt_id", "a" * 32)
+    object.__setattr__(task, "_provider_execution_id", f"v2-{'a' * 32}")
+
+    import asyncio
+    asyncio.run(provider.dispatch(task))
+
+    assert runner.calls[0]["job_id"] == f"v2-{'a' * 32}"
+
+
+def test_catalog_provider_rejects_mismatched_durable_execution_identity(monkeypatch):
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+    task = WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )
+    object.__setattr__(task, "_attempt_id", "a" * 32)
+    object.__setattr__(task, "_provider_execution_id", "v2-wrong")
+
+    import asyncio
+    with pytest.raises(ValueError, match="durable V2 provider execution identity"):
+        asyncio.run(provider.dispatch(task))
+    assert runner.calls == []
+
+
 def test_catalog_adapter_provider_rejects_dynamic_cli_arguments(monkeypatch):
     import whaxon.adapters
 

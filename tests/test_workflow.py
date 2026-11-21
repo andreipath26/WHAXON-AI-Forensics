@@ -894,21 +894,53 @@ def test_workflow_audit_integrity_detects_missing_events(tmp_path):
 
 
 def test_reconciliation_report_identifies_dispatch_uncertainty(tmp_path):
+    import sqlite3
+
     from whaxon.core.store import JobStore
 
-    store = JobStore(tmp_path / "reconciliation-report.db")
+    path = tmp_path / "reconciliation-report.db"
+    store = JobStore(path)
     store.create_mission("mission-1", "objective")
     store.save_workflow_plan("p", _plan())
     claim = store.claim_ready_workflow_task("p", "worker")
     before = store.get_workflow_dispatch_reconciliation("p")
     assert before[0]["external_effect_possible"] is False
     assert before[0]["manual_reconciliation_required"] is False
-    store.mark_workflow_dispatch_started("p", claim["attempt_id"])
+    provider_execution_id = f"v2-{claim['attempt_id']}"
+    store.mark_workflow_dispatch_started(
+        "p", claim["attempt_id"],
+        provider_execution_id=provider_execution_id,
+    )
+    store.mark_engine_v2_execution_job(provider_execution_id)
+    store.create(provider_execution_id)
+    store.set_started(provider_execution_id, "nmap", "192.0.2.10")
+    store.set_finished(provider_execution_id, 0, 0.25)
     store.finish_task_attempt(claim["attempt_id"], "uncertain")
     after = store.get_workflow_dispatch_reconciliation("p")
     assert after[0]["external_effect_possible"] is True
     assert after[0]["manual_reconciliation_required"] is True
     assert after[0]["status"] == "uncertain"
+    assert after[0]["provider_execution_id"] == provider_execution_id
+    assert after[0]["provider_job_identity_mismatch"] is False
+    assert after[0]["provider_job"] == {
+        "job_id": provider_execution_id,
+        "tool": "nmap",
+        "target": "192.0.2.10",
+        "status": "finished",
+        "exit_code": 0,
+        "duration_s": 0.25,
+        "finding_count": 0,
+    }
+    assert store.get_workflow_audit_integrity("p")["consistent"] is True
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "UPDATE workflow_events SET detail_json=? "
+            "WHERE attempt_id=? AND event_type='dispatch_started'",
+            ('{"provider_execution_id":"v2-wrong-attempt"}', claim["attempt_id"]),
+        )
+    integrity = store.get_workflow_audit_integrity("p")
+    assert integrity["consistent"] is False
+    assert integrity["mismatched_dispatch_identities"] == [claim["attempt_id"]]
 
 
 def test_workflow_absolute_deadline_is_durable_and_unextendable(tmp_path):
