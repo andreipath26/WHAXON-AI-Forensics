@@ -2319,6 +2319,15 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             }, 403
         return None
 
+    def _validation_authorize_request(target_url: str) -> bool:
+        """Recheck current scope immediately before each validator network request."""
+        try:
+            match = _check_execution_scope(registry.core.scope, target_url)
+        except Exception:
+            app.logger.exception("Scope evaluation failed before validation request")
+            return False
+        return match is not None and getattr(match, "allowed", False) is True
+
     def _legacy_validation_v2_error(job_id: str):
         """Keep legacy validators from mutating sealed V2 evidence."""
         checker = getattr(registry.core.store, "is_engine_v2_execution_job", None)
@@ -2375,7 +2384,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             request_context=target_f.get("request_context") or {},
         )
         pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
-        v = Validator(pkg_payloads)
+        v = Validator(
+            pkg_payloads,
+            authorize_request=_validation_authorize_request,
+        )
         status, reason = v.validate(f_obj, target_url=target_url)
         registry.core.store.update_verification(job_id, seq, status, by="engine", reason=reason)
         return {"status": status, "reason": reason}
@@ -2424,7 +2436,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             request_context=target_f.get("request_context") or {},
         )
         pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
-        v = Validator(pkg_payloads)
+        v = Validator(
+            pkg_payloads,
+            authorize_request=_validation_authorize_request,
+        )
         status, reason = v.revalidate(f_obj, target_url=target_url)
         registry.core.store.update_verification(job_id, seq, status, by="engine", reason=reason)
         return {"status": status, "reason": reason}
