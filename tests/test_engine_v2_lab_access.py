@@ -209,6 +209,42 @@ async def test_lab_access_does_not_reuse_a_preexisting_matching_session(
 
 
 @pytest.mark.asyncio
+async def test_lab_access_cancellation_during_session_poll_cleans_remote_effect(
+    lab_provider, monkeypatch,
+):
+    import asyncio
+
+    provider, store, msf = lab_provider
+    poll_started = asyncio.Event()
+    never = asyncio.Event()
+    real_snapshot = provider._session_snapshot
+    snapshots = 0
+
+    async def block_during_poll():
+        nonlocal snapshots
+        snapshots += 1
+        if snapshots == 2:
+            poll_started.set()
+            await never.wait()
+        return await real_snapshot()
+
+    monkeypatch.setattr(provider, "_session_snapshot", block_during_poll)
+    dispatch = asyncio.create_task(provider.dispatch(_task()))
+    await asyncio.wait_for(poll_started.wait(), timeout=2)
+    dispatch.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await dispatch
+
+    assert msf.stopped_jobs == ["msf-remote-23"]
+    assert msf.stopped == ["7"]
+    row = store.history(limit=10)[0]
+    assert row["status"] == "failed"
+    lines = " ".join(line["text"] for line in store.get(row["id"])["lines"])
+    assert "dispatch cancelled during session polling" in lines
+    assert "cleanup_errors=none" in lines
+
+
+@pytest.mark.asyncio
 async def test_lab_access_stops_new_session_if_evidence_persistence_fails(lab_provider, monkeypatch):
     provider, store, msf = lab_provider
 
