@@ -80,7 +80,6 @@ EXPECTED_RUNNER_CALLS = Counter(
         ("core/providers.py", "dispatch", "run_tool"): 1,
         ("core/worker.py", "drain_async", "run_tool"): 1,
         ("interfaces/gui/main_window.py", "_run_tool", "run_tool"): 2,
-        ("interfaces/web/server.py", "_run_job_blocking", "run_tool"): 1,
     }
 )
 

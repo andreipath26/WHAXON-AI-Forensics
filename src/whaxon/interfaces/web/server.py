@@ -5,7 +5,6 @@ import asyncio
 import os
 import queue
 import re
-import subprocess
 import threading
 from pathlib import Path
 from typing import Any
@@ -178,55 +177,8 @@ class AsyncRunner:
             traceback.print_exc()
 
 
-_PROCS: dict[str, subprocess.Popen] = {}
 _RUN_LOOPS: dict[str, asyncio.AbstractEventLoop] = {}
 _PROCS_LOCK = threading.Lock()
-
-
-def _run_job_blocking(
-    core: Core, registry: JobRegistry, tool_id: str, target: str,
-    job_id: str, extra_args: str = "",
-) -> None:
-    """Execute web-submitted jobs through the same guarded core runner as the CLI."""
-    import asyncio
-
-    from whaxon.core.events import JobFailed
-    from whaxon.core.scope import OutOfScopeError
-
-    loop = asyncio.new_event_loop()
-    try:
-        try:
-            timeout_s = float(_os.environ.get("WHAXON_JOB_TIMEOUT_S", "900"))
-        except (TypeError, ValueError):
-            timeout_s = 900.0
-        if timeout_s <= 0:
-            timeout_s = 900.0
-        with _PROCS_LOCK:
-            _RUN_LOOPS[job_id] = loop
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(core.runner.run_tool(
-            tool_id=tool_id,
-            target=target,
-            job_id=job_id,
-            extra_args=extra_args,
-            timeout_s=timeout_s,
-            phase="web",
-        ))
-    except OutOfScopeError as exc:
-        core.bus.publish(JobFailed(job_id=job_id, error=f"target blocked by scope: {exc}"))
-    except FileNotFoundError:
-        # ToolRunner already publishes JobFailed for missing executables.
-        return
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        core.bus.publish(JobFailed(job_id=job_id, error=f"job execution failed: {exc}"))
-    finally:
-        with _PROCS_LOCK:
-            _RUN_LOOPS.pop(job_id, None)
-        asyncio.set_event_loop(None)
-        loop.close()
-
 
 
 def _cancel_job_blocking(core: Core, job_id: str) -> bool:
