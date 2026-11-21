@@ -9,7 +9,7 @@
 | Surface | Source/contract | Durable V2 authority | Current limit |
 |---|---|---|---|
 | V2 run API | `src/whaxon/interfaces/web/server.py`: `POST /api/v2/workflows/<plan_id>/run` | `Core.enqueue_workflow_run` commits before HTTP 202 | In unsupervised legacy web mode, best-effort process-local wakeup remains; HTTP 202 is not execution success |
-| V2 status/reconnect | `GET /api/v2/workflow-runs/<id>`, `/snapshot`, `/summary`, `POST /cancel` | `Core.workflow_run_request`, `workflow_run_snapshot`, `workflow_run_queue_summary`, `cancel_workflow_run_request` | Snapshot uses separately persisted views, not atomic cross-table read; worker liveness is **not verified** |
+| V2 status/reconnect | `GET /api/v2/workflow-runs/<id>`, `/snapshot`, `/summary`, `POST /cancel` | `Core.workflow_run_request`, `workflow_run_snapshot`, `workflow_run_queue_summary`, `cancel_workflow_run_request` | Run snapshot reads request and task progress in one SQLite read transaction; worker liveness is **not verified** |
 | V2 CLI request | `src/whaxon/interfaces/cli/workflow_cmd.py`: `plan submit-run` | Same Core enqueue and bounded identity as API | No direct execution claim or task success on submission |
 | V2 CLI inspection | `plan queue-summary`, `run-request`, `run-snapshot`, `cancel-request`, `progress`, `readiness`, `evidence` | Same Core/store paths as web API | Not a full proof that every legacy frontend uses these services |
 | Headless worker | `plan serve-requests` | `Core.serve_workflow_run_requests` polls and calls `drain_workflow_run_requests` | One worker process can own claims with fencing; no automatic replay of uncertain effects |
@@ -27,6 +27,7 @@
 ## Current evidence (not whole-phase sign-off)
 
 - `tests/test_workflow_run_requests.py`: request persistence, deduplication, cancellation, reconnect, external-worker mode and cross-client submission parity.
+- `tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`: a cancellation committed between the two projections stays invisible to both halves of the existing read snapshot.
 - `tests/test_workflow_continuous_worker.py`: shutdown, poll, lost lease and bounded queue continuation.
 - `tests/test_engine_v2_e5_queue_head_recovery.py`: poisoned heads, bounded quarantine and stale lease recovery.
 - `tests/test_engine_v2_e5_systemd_deployment.py`: two-unit contract with matched identity and shared state.
@@ -50,3 +51,14 @@
 All seven whole-phase engineering gates remain **OPEN** until the acceptance file records a checked source baseline, exhaustive supported-path matrix, cross-client contracts, adversarial and live service evidence, exact-head CI for required platforms, migration/rollback verification and an explicit engineering acceptance decision. Final production lab, host/container, independent audit anchor and real external-target acceptance remain additional non-waivable deployment gates under the master roadmap.
 
 This inventory does not authorize direct security tooling, scanner use or any unapproved target.
+
+## Atomic reconnect snapshot — 2026-11-21
+
+`GET /api/v2/workflow-runs/<id>/snapshot` reads the durable request row and
+workflow progress inside one SQLite read transaction. A concurrent cancellation
+cannot produce a mixed view such as a queued request paired with a cancelled
+plan. The response schema is unchanged, lease tokens remain redacted, and
+`worker_liveness_verified` remains false. The race regression commits a real
+cancellation after the request row is read but before progress is projected,
+then verifies the first response is consistent and the next read observes the
+cancellation.
