@@ -388,6 +388,8 @@ A task's declared timeout now covers both deterministic authorization and provid
 ### 2026-11-21 Engine V2 subprocess cancellation
 
 During provider dispatch, the scheduler polls the durable plan stop and cumulative runtime-budget barriers, then cancels the async provider coroutine when either closes. When a dispatched scheduler task is cancelled during worker shutdown, plan stop, or runtime exhaustion, `ToolRunner` kills the isolated child process group, persists a cancelled provider-job event, and cleans its process/output bookkeeping before propagating cancellation. The workflow attempt remains `uncertain` after the dispatch marker because killing the scanner cannot reverse requests already sent. `tests/test_engine_v2_e3_external_effect_crash.py::test_scheduler_cancellation_kills_runner_and_keeps_attempt_uncertain` and `test_mission_runtime_exhaustion_stops_active_async_provider` exercise these boundaries. A synchronous provider thread may continue after coroutine cancellation; its outcome remains uncertain and is never replayed. These local regressions do not close external-effect, multi-worker, or deployment recovery acceptance.
+
+The read-only portfolio audit now joins each trusted capability manifest to its current readiness snapshot, including capabilities supplied outside the catalog-backed adapter bridge. The report exposes contract fingerprint, declared/live readiness, availability, and explicit authorization requirements; it never registers providers or enables execution. This advances the P2-06 inventory/report slice, while import-only/session completeness and onboarding lifecycle acceptance remain open.
 ---
 
 ## Source 2: [ENGINE_V2_BASELINE_INVENTORY.md](ENGINE_V2_BASELINE_INVENTORY.md)
