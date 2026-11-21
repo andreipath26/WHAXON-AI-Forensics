@@ -2365,8 +2365,12 @@ class JobStore:
                     if (
                         job is not None
                         and job["target"] == row["target"]
-                        and job["tool"] == provider_tool_id_for_capability(
-                            row["capability_id"],
+                        and (
+                            provider_tool_id_for_capability(row["capability_id"])
+                            == row["capability_id"]
+                            or job["tool"] == provider_tool_id_for_capability(
+                                row["capability_id"],
+                            )
                         )
                     ):
                         provider_job = dict(job)

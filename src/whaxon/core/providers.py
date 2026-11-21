@@ -21,8 +21,8 @@ from .capabilities import (
 )
 from .provider_execution import (
     SEMANTIC_OPERATION_TO_TOOL,
-    provider_execution_job_id as _provider_execution_job_id,
 )
+from .provider_execution import provider_execution_job_id as _provider_execution_job_id
 from .workflow import WorkflowTask
 
 # Conservative target formats supported by the actual packaged argv templates.

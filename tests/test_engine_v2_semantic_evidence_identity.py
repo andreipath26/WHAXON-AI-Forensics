@@ -11,10 +11,10 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 
 def test_semantic_operation_map_is_the_provider_tool_identity_contract():
-    assert SEMANTIC_OPERATION_IDS == {
+    assert {
         tool_id: capability_id
         for capability_id, tool_id in SEMANTIC_OPERATION_TO_TOOL.items()
-    }
+    } == SEMANTIC_OPERATION_IDS
     assert all(
         provider_tool_id_for_capability(capability_id) == tool_id
         for capability_id, tool_id in SEMANTIC_OPERATION_TO_TOOL.items()
