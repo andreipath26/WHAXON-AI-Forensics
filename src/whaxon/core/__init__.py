@@ -353,6 +353,14 @@ class Core:
     def mission_execution_limits(self, mission_id: str):
         return self.store.get_mission_execution_limits(mission_id)
 
+    def configure_mission_runtime_limit(self, mission_id: str, *, max_runtime_s: float):
+        return self.store.set_mission_runtime_limit(
+            mission_id, max_runtime_s=max_runtime_s,
+        )
+
+    def mission_runtime_limit(self, mission_id: str):
+        return self.store.get_mission_runtime_limit(mission_id)
+
     def configure_mission_execution_limits(
         self, mission_id: str, *, max_total_attempts: int, max_concurrency: int,
     ):
