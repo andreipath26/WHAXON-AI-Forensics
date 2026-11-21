@@ -749,9 +749,46 @@ class Core:
         return self.store.get_workflow_progress(plan_id)
 
     def cancel_workflow_plan(self, plan_id: str) -> int:
-        """Stop future task claims and close queued (not running) run intents."""
+        """Cancel a plan and its bounded source-linked follow-up tree.
+
+        Source-plan authorization remains a dispatch fence if the tree is larger
+        than the cancellation batch or a descendant was saved concurrently.
+        """
+        root = self.store.get_workflow_plan(plan_id)
+        if root is None:
+            # Preserve the store's stable unknown-plan error.
+            return self.store.request_workflow_cancellation(plan_id)
+
+        # Stop the source first. The authorization boundary below then fences
+        # every linked descendant, including plans saved during this scan.
         cancelled = self.store.request_workflow_cancellation(plan_id)
         self.workflow_requests.cancel_queued(plan_id)
+        mission_plans = self.store.list_workflow_mission_plans(root["mission_id"])
+        max_plans = 1000
+        children: dict[str, list[str]] = {}
+        for candidate in mission_plans[:max_plans]:
+            child_id = candidate.get("id")
+            if not isinstance(child_id, str) or child_id == plan_id:
+                continue
+            child = self.store.get_workflow_plan(child_id)
+            if child is None:
+                continue
+            plan_data = child.get("plan")
+            metadata = plan_data.get("metadata") if isinstance(plan_data, dict) else None
+            source_id = metadata.get("source_plan") if isinstance(metadata, dict) else None
+            if isinstance(source_id, str) and source_id:
+                children.setdefault(source_id, []).append(child_id)
+
+        pending = list(children.get(plan_id, ()))
+        visited = {plan_id}
+        while pending and len(visited) < max_plans:
+            current = pending.pop(0)
+            if current in visited:
+                continue
+            visited.add(current)
+            cancelled += self.store.request_workflow_cancellation(current)
+            self.workflow_requests.cancel_queued(current)
+            pending.extend(children.get(current, ()))
         return cancelled
 
     def save_workflow_plan(self, plan_id: str, plan):
@@ -1093,6 +1130,36 @@ class Core:
             plan = WorkflowPlan.from_dict(row["plan"])
             if plan.digest != row["digest"] or plan.mission_id != row["mission_id"]:
                 return False
+            # Evidence-derived follow-up plans inherit cancellation from their
+            # source chain. This is checked on every authorization pass, so an
+            # already-approved child cannot run after any ancestor is stopped.
+            source_id = plan.metadata.get("source_plan")
+            if "source_plan" in plan.metadata:
+                expected_source_digest = plan.metadata.get("source_digest")
+                seen_sources = {plan_id}
+                for _ in range(1000):
+                    if (
+                        not isinstance(source_id, str) or not source_id
+                        or source_id in seen_sources
+                        or not isinstance(expected_source_digest, str)
+                    ):
+                        return False
+                    seen_sources.add(source_id)
+                    source = self.store.get_workflow_plan(source_id)
+                    if (
+                        source is None
+                        or source["status"] == "cancel_requested"
+                        or source["digest"] != expected_source_digest
+                    ):
+                        return False
+                    self.store.verify_workflow_plan_integrity(source_id)
+                    source_plan = WorkflowPlan.from_dict(source["plan"])
+                    if "source_plan" not in source_plan.metadata:
+                        break
+                    expected_source_digest = source_plan.metadata.get("source_digest")
+                    source_id = source_plan.metadata.get("source_plan")
+                else:
+                    return False
             if not any(candidate == task for candidate in plan.tasks):
                 return False
             self.store.verify_workflow_plan_integrity(plan_id)
