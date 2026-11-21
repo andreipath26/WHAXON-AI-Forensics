@@ -3593,6 +3593,11 @@ class JobStore:
                 if row["plan_status"] == "cancel_requested":
                     c.execute("COMMIT")
                     return False
+                if approval_required and not self.has_valid_workflow_approval(
+                    plan_id, row["task_key"],
+                ):
+                    c.execute("COMMIT")
+                    return False
                 deadline = c.execute(
                     "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?", (plan_id,),
                 ).fetchone()
