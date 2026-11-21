@@ -127,6 +127,21 @@ def _tool_available(tool) -> bool:
     return not binary or shutil.which(binary) is not None
 
 
+def _provider_execution_job_id(task: WorkflowTask) -> str:
+    """Return the durable attempt ID as job ID, or a random direct-call ID."""
+    attempt_id = getattr(task, "_attempt_id", None)
+    if attempt_id is None:
+        return uuid.uuid4().hex[:12]
+    if (
+        not isinstance(attempt_id, str)
+        or len(attempt_id) != 32
+        or any(char not in "0123456789abcdef" for char in attempt_id)
+        or getattr(task, "_provider_execution_id", None) != attempt_id
+    ):
+        raise ValueError("invalid durable V2 provider execution identity")
+    return attempt_id
+
+
 class CatalogAdapterProvider:
     """Resolve approved read-only catalog tools and execute through ToolRunner.
 
@@ -422,19 +437,7 @@ class CatalogAdapterProvider:
         # V2 attempts use a stable persisted job identity so a worker restart
         # can correlate a possibly-started external effect without replaying it.
         # Legacy/direct provider invocations retain their random job IDs.
-        attempt_id = getattr(task, "_attempt_id", None)
-        if attempt_id is None:
-            job_id = uuid.uuid4().hex[:12]
-        else:
-            expected_job_id = attempt_id
-            if (
-                not isinstance(attempt_id, str)
-                or len(attempt_id) != 32
-                or any(char not in "0123456789abcdef" for char in attempt_id)
-                or getattr(task, "_provider_execution_id", None) != expected_job_id
-            ):
-                raise ValueError("invalid durable V2 provider execution identity")
-            job_id = expected_job_id
+        job_id = _provider_execution_job_id(task)
         # Fail closed if the old Automator cannot be fenced. The fence must
         # happen before ToolRunner may publish any findings.
         if self._suppress_legacy_followup is not None:
@@ -811,55 +814,64 @@ class FindingVerificationProvider:
             Path(__file__).resolve().parents[1] / "data" / "payloads",
             authorize_request=authorize_probe,
         )
-        started = time.monotonic()
-        if task.capability_id in self._VERIFY_ONLY:
-            status, reason = validator.validate(finding, target_url=task.target)
-        else:
-            status, reason = validator.revalidate(finding, target_url=task.target)
-        reason = str(reason)[:2000]
-        evidence_job_id = uuid.uuid4().hex[:12]
+        evidence_job_id = _provider_execution_job_id(task)
         if self.store.get(evidence_job_id) is not None:
             raise RuntimeError("verification evidence id collision")
-        finding_data = finding.data if isinstance(finding.data, dict) else {}
-        observation_details = (
-            {"header": finding_data.get("header")}
-            if finding.kind == "http_header_missing"
-            else {
-                "cookie": finding_data.get("cookie"),
-                "missing": finding_data.get("missing"),
-            }
-            if finding.kind == "cookie_insecure"
-            else {}
-        )
         self.store.create(evidence_job_id)
         if not self.store.set_started(
             evidence_job_id, task.capability_id.removeprefix("tool."), task.target,
         ):
             raise RuntimeError("could not start verification evidence job")
         self.store.mark_engine_v2_execution_job(evidence_job_id)
-        evidence = Finding(
-            kind=finding.kind,
-            severity=finding.severity,
-            source="engine-v2-verifier",
-            data={
-                **observation_details,
-                "source_job_id": source_job_id,
-                "source_finding_seq": source_seq,
-                "operation": task.capability_id,
-                "status": status,
-                "reason": reason,
-            },
-            raw_line=f"{task.capability_id}: {status}: {reason}",
-            request_context={"method": "GET", "url": task.target,
-                             "parameter": finding.data.get("parameter", "")},
-        )
-        self.store.append_line(evidence_job_id, "stdout", evidence.raw_line)
-        self.store.append_finding(evidence_job_id, evidence, 0)
-        self.store.update_verification(
-            evidence_job_id, 0, status, by="engine-v2", reason=reason,
-        )
-        if not self.store.set_finished(evidence_job_id, 0, time.monotonic() - started):
-            raise RuntimeError("could not finish verification evidence job")
+        started = time.monotonic()
+        try:
+            if task.capability_id in self._VERIFY_ONLY:
+                status, reason = validator.validate(finding, target_url=task.target)
+            else:
+                status, reason = validator.revalidate(finding, target_url=task.target)
+            reason = str(reason)[:2000]
+            finding_data = finding.data if isinstance(finding.data, dict) else {}
+            observation_details = (
+                {"header": finding_data.get("header")}
+                if finding.kind == "http_header_missing"
+                else {
+                    "cookie": finding_data.get("cookie"),
+                    "missing": finding_data.get("missing"),
+                }
+                if finding.kind == "cookie_insecure"
+                else {}
+            )
+            evidence = Finding(
+                kind=finding.kind,
+                severity=finding.severity,
+                source="engine-v2-verifier",
+                data={
+                    **observation_details,
+                    "source_job_id": source_job_id,
+                    "source_finding_seq": source_seq,
+                    "operation": task.capability_id,
+                    "status": status,
+                    "reason": reason,
+                },
+                raw_line=f"{task.capability_id}: {status}: {reason}",
+                request_context={"method": "GET", "url": task.target,
+                                 "parameter": finding.data.get("parameter", "")},
+            )
+            self.store.append_line(evidence_job_id, "stdout", evidence.raw_line)
+            self.store.append_finding(evidence_job_id, evidence, 0)
+            self.store.update_verification(
+                evidence_job_id, 0, status, by="engine-v2", reason=reason,
+            )
+            if not self.store.set_finished(
+                evidence_job_id, 0, time.monotonic() - started,
+            ):
+                raise RuntimeError("could not finish verification evidence job")
+        except Exception as exc:
+            self.store.set_failed(
+                evidence_job_id,
+                f"verification provider stopped before sealing evidence: {type(exc).__name__}",
+            )
+            raise
         return {
             "job_id": evidence_job_id,
             "tool_id": task.capability_id.removeprefix("tool."),

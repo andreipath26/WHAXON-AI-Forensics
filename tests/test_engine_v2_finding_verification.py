@@ -217,6 +217,61 @@ def test_v2_verify_and_retest_are_scheduler_owned_and_sealed(tmp_path):
         server.server_close()
 
 
+def test_verifier_effect_is_correlated_before_evidence_persistence(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.vulnerable = True
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="crash-source-plan", target=target,
+            )
+            _bound_plan(
+                core, plan_id="crash-verification-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            original_append_finding = core.store.append_finding
+
+            def fail_evidence_write(job_id, finding, seq):
+                job = core.store.get(job_id)
+                if job and job.get("tool") == "verify_sqli":
+                    raise RuntimeError("simulated crash after probe")
+                return original_append_finding(job_id, finding, seq)
+
+            core.store.append_finding = fail_evidence_write
+            result = await core.run_workflow_plan(
+                "crash-verification-plan", max_tasks=1, max_concurrency=1,
+            )
+            assert result["tasks"] == [
+                {"id": "verification", "status": "uncertain"},
+            ]
+            reconciliation = core.workflow_dispatch_reconciliation(
+                "crash-verification-plan",
+            )
+            assert len(reconciliation) == 1
+            attempt = reconciliation[0]
+            assert attempt["provider_execution_id"] == attempt["attempt_id"]
+            assert attempt["provider_job_identity_mismatch"] is False
+            assert attempt["provider_job"]["job_id"] == attempt["attempt_id"]
+            assert attempt["provider_job"]["status"] == "failed"
+            assert attempt["provider_job"]["tool"] == "verify_sqli"
+            assert _SQLiFixture.requests == 6
+
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_v2_reflected_xss_verify_and_retest_are_scheduler_owned(tmp_path):
     _SQLiFixture.requests = 0
     _SQLiFixture.reflect_xss = True
