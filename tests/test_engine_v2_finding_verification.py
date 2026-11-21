@@ -902,9 +902,9 @@ def test_v2_verification_rechecks_exact_approval_before_each_request(
 
             def approval_is_current(plan_id, task_key):
                 approval_checks.append((plan_id, task_key))
-                # Scheduler dispatch checks are allowed; revoke before the
-                # verifier's second HTTP request.
-                return len(approval_checks) < 4
+                # Scheduler dispatch checks, including the atomic marker,
+                # are allowed; revoke before the verifier's second request.
+                return len(approval_checks) < 5
 
             monkeypatch.setattr(
                 core.store, "has_valid_workflow_approval", approval_is_current,
@@ -917,7 +917,7 @@ def test_v2_verification_rechecks_exact_approval_before_each_request(
             finding = evidence["attempts"][0]["findings"][0]
             assert finding["verification_status"] == "candidate"
             assert "scope authorization denied" in finding["verification_reason"]
-            assert len(approval_checks) == 4
+            assert len(approval_checks) == 5
             assert all(item == ("approval-revocation-plan", "verification")
                        for item in approval_checks)
             assert _SQLiFixture.requests == 1

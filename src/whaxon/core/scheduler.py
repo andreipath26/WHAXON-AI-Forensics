@@ -146,6 +146,9 @@ class WorkflowScheduler:
             if not self.store.mark_workflow_dispatch_started(
                 row["plan_id"], attempt_id,
                 provider_execution_id=provider_execution_id,
+                approval_required=(
+                    getattr(task, "_workflow_approval_required", False) is True
+                ),
             ):
                 # This gate may close for cancellation, deadline, resource or
                 # mission budget reasons. A budget refusal is NOT cancellation.

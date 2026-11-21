@@ -3561,19 +3561,24 @@ class JobStore:
 
     def mark_workflow_dispatch_started(
         self, plan_id, attempt_id, *, provider_execution_id=None,
+        approval_required=False,
     ):
         """Atomically record dispatch intent or reject a cancelled/stale attempt.
 
         The recorded event makes crash recovery distinguish pre-dispatch claims
-        from attempts that may have produced external side effects.
+        from attempts that may have produced external side effects. Required
+        approval is rechecked here so revocation serializes before or after the
+        dispatch commitment, never in an unprotected gap before it.
         """
+        if type(approval_required) is not bool:
+            raise ValueError("approval requirement must be boolean")
         now = time.time()
         with self._lock:
             c = self._conn()
             try:
                 c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
-                    "SELECT a.task_id, a.status AS attempt_status, "
+                    "SELECT a.task_id, t.task_key, a.status AS attempt_status, "
                     "t.status AS task_status, t.active_attempt_id, p.status AS plan_status "
                     "FROM task_attempts a "
                     "JOIN workflow_tasks t ON t.id=a.task_id "
@@ -3586,6 +3591,11 @@ class JobStore:
                 ):
                     raise ValueError("stale workflow dispatch attempt")
                 if row["plan_status"] == "cancel_requested":
+                    c.execute("COMMIT")
+                    return False
+                if approval_required and not self.has_valid_workflow_approval(
+                    plan_id, row["task_key"],
+                ):
                     c.execute("COMMIT")
                     return False
                 deadline = c.execute(

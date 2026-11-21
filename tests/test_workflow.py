@@ -1896,3 +1896,68 @@ async def test_scheduler_rejects_tampered_plan_after_all_tasks_succeed(tmp_path)
     with pytest.raises(ValueError, match="integrity"):
         await scheduler.run("p")
     assert dispatched == ["t"]
+
+
+@_run_async_test
+async def test_approval_revoked_before_dispatch_marker_blocks_provider(tmp_path):
+    """Revocation in the final-auth/dispatch gap must win before provider entry."""
+    import time
+
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "approval-revocation-race.db")
+    store.create_mission("mission", "controlled approval race")
+    plan = WorkflowPlan("mission", (
+        WorkflowTask(
+            "scan", "fixture.network_scan", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ),
+    ))
+    store.save_workflow_plan("plan", plan)
+    store.grant_workflow_approval(
+        "plan", "scan", "approval", "operator",
+        expires_at=time.time() + 300,
+    )
+
+    dispatched = []
+
+    def authorize(task):
+        # Mirror Core's plan-bound authorizer: the task needs exact approval,
+        # and the scheduler carries that requirement to the dispatch marker.
+        object.__setattr__(task, "_workflow_approval_required", True)
+        return store.has_valid_workflow_approval("plan", task.id) is True
+
+    original_mark = store.mark_workflow_dispatch_started
+
+    def revoke_between_authorization_and_marker(
+        plan_id, attempt_id, *, provider_execution_id=None,
+        approval_required=False,
+    ):
+        assert store.revoke_workflow_approval(
+            "plan", "approval", actor="operator",
+        ) is True
+        return original_mark(
+            plan_id, attempt_id,
+            provider_execution_id=provider_execution_id,
+            approval_required=approval_required,
+        )
+
+    store.mark_workflow_dispatch_started = revoke_between_authorization_and_marker
+
+    async def dispatch(task):
+        dispatched.append(task.id)
+        return {"ok": True}
+
+    result = await WorkflowScheduler(
+        store, authorize=authorize, dispatch=dispatch,
+    ).run("plan", max_tasks=1, max_attempts=1)
+
+    assert dispatched == []
+    assert result["outcomes"][0]["status"] == "blocked"
+    assert store.list_workflow_attempts("plan")[0]["status"] == "blocked"
+    assert not [
+        event for event in store.list_workflow_events("plan")
+        if event["event_type"] == "dispatch_started"
+    ]
