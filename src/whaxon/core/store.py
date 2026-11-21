@@ -3224,57 +3224,62 @@ class JobStore:
         c = self._conn()
         try:
             c.execute("BEGIN")
-            plan = c.execute(
-                "SELECT mission_id, status FROM workflow_plans WHERE id=?", (plan_id,)
-            ).fetchone()
-            if plan is None:
-                raise ValueError(f"unknown workflow plan: {plan_id}")
-            rows = c.execute(
-                "SELECT status, COUNT(*) AS n FROM workflow_tasks "
-                "WHERE plan_id=? GROUP BY status", (plan_id,),
-            ).fetchall()
-            attempts = c.execute(
-                "SELECT COUNT(*) AS n FROM task_attempts a "
-                "JOIN workflow_tasks t ON t.id=a.task_id "
-                "WHERE t.plan_id=?", (plan_id,),
-            ).fetchone()["n"]
-            usage = c.execute(
-                "SELECT COUNT(*) AS total, "
-                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
-                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
-                "WHERE t.plan_id=?", (plan_id,),
-            ).fetchone()
-            limits = c.execute(
-                "SELECT max_total_attempts, max_concurrency FROM workflow_limits WHERE plan_id=?",
-                (plan_id,),
-            ).fetchone()
-            budget = limits["max_total_attempts"] if limits else 100
-            concurrency = limits["max_concurrency"] if limits else 4
-            counts = {row["status"]: row["n"] for row in rows}
-            total = sum(counts.values())
-            # A failed task may still be retryable; without the caller's retry
-            # policy persisted here it must never count as verified complete.
-            terminal = sum(counts.get(status, 0) for status in (
-                "succeeded", "blocked", "cancelled", "uncertain",
-            ))
-            return {
-                "plan_id": plan_id,
-                "mission_id": plan["mission_id"],
-                "status": plan["status"],
-                "cancellation_requested": plan["status"] == "cancel_requested",
-                "total_tasks": total,
-                "terminal_tasks": terminal,
-                "attempts": attempts,
-                "active_attempts": usage["active"],
-                "remaining_attempt_budget": max(0, budget - usage["total"]),
-                "max_total_attempts": budget,
-                "max_concurrency": concurrency,
-                "attempt_budget_exhausted": usage["total"] >= budget,
-                "counts": counts,
-                "complete": terminal == total,
-            }
+            return self._get_workflow_progress_tx(c, plan_id)
         finally:
             c.close()
+
+    @staticmethod
+    def _get_workflow_progress_tx(c, plan_id):
+        """Read workflow progress using a caller-owned SQLite transaction."""
+        plan = c.execute(
+            "SELECT mission_id, status FROM workflow_plans WHERE id=?", (plan_id,)
+        ).fetchone()
+        if plan is None:
+            raise ValueError(f"unknown workflow plan: {plan_id}")
+        rows = c.execute(
+            "SELECT status, COUNT(*) AS n FROM workflow_tasks "
+            "WHERE plan_id=? GROUP BY status", (plan_id,),
+        ).fetchall()
+        attempts = c.execute(
+            "SELECT COUNT(*) AS n FROM task_attempts a "
+            "JOIN workflow_tasks t ON t.id=a.task_id "
+            "WHERE t.plan_id=?", (plan_id,),
+        ).fetchone()["n"]
+        usage = c.execute(
+            "SELECT COUNT(*) AS total, "
+            "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "WHERE t.plan_id=?", (plan_id,),
+        ).fetchone()
+        limits = c.execute(
+            "SELECT max_total_attempts, max_concurrency FROM workflow_limits WHERE plan_id=?",
+            (plan_id,),
+        ).fetchone()
+        budget = limits["max_total_attempts"] if limits else 100
+        concurrency = limits["max_concurrency"] if limits else 4
+        counts = {row["status"]: row["n"] for row in rows}
+        total = sum(counts.values())
+        # A failed task may still be retryable; without the caller's retry
+        # policy persisted here it must never count as verified complete.
+        terminal = sum(counts.get(status, 0) for status in (
+            "succeeded", "blocked", "cancelled", "uncertain",
+        ))
+        return {
+            "plan_id": plan_id,
+            "mission_id": plan["mission_id"],
+            "status": plan["status"],
+            "cancellation_requested": plan["status"] == "cancel_requested",
+            "total_tasks": total,
+            "terminal_tasks": terminal,
+            "attempts": attempts,
+            "active_attempts": usage["active"],
+            "remaining_attempt_budget": max(0, budget - usage["total"]),
+            "max_total_attempts": budget,
+            "max_concurrency": concurrency,
+            "attempt_budget_exhausted": usage["total"] >= budget,
+            "counts": counts,
+            "complete": terminal == total,
+        }
 
     def reconcile_workflow_plan(self, plan_id, *, stale_after_s=60.0):
         """Conservatively reconcile only expired attempts belonging to a plan.
