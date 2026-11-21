@@ -198,41 +198,26 @@ def test_recon_mission_and_plan_ids_select_proposal_mode(monkeypatch):
     })]
 
 
-def test_legacy_recon_requires_explicit_flag_and_opt_in(monkeypatch, capsys):
+@pytest.mark.parametrize("env_value", ["true", "1", "YES", "on"])
+def test_stale_legacy_recon_env_never_dispatches(monkeypatch, capsys, env_value):
     core = _FakeCore()
-    core.scope = type("Scope", (), {"check": lambda *_args: None})()
+    core.scope = type("Scope", (), {
+        "check": lambda *_args: pytest.fail("retired legacy dispatch must not check or execute"),
+    })()
     core.recon = type("Recon", (), {
         "run": lambda *_args, **_kwargs: pytest.fail("legacy dispatch must stay blocked"),
     })()
-    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
-    monkeypatch.delenv("WHAXON_LEGACY_RECON_ENABLED", raising=False)
+    constructed = []
+    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: constructed.append(True) or core)
+    monkeypatch.setenv("WHAXON_LEGACY_RECON_ENABLED", env_value)
 
     status = recon_cmd.main(["example.test", "--legacy"])
 
     assert status == recon_cmd.EXIT_V2_WORKFLOW_REQUIRED
+    assert constructed == []
     error = capsys.readouterr().err.lower()
-    assert "disabled" in error
-    assert "no request" not in error
-
-
-def test_legacy_recon_runs_only_with_explicit_flag_and_opt_in(monkeypatch, capsys):
-    core = _FakeCore()
-    core.scope = type("Scope", (), {
-        "check": lambda _self, _target: type("Decision", (), {
-            "allowed": True, "reason": "", "matched_rule": "",
-        })(),
-    })()
-    core.recon = type("Recon", (), {
-        "run": lambda _self, target, checks=None: "legacy-job",
-    })()
-    core.store = type("Store", (), {"get_findings": lambda _self, _job_id: []})()
-    monkeypatch.setattr(recon_cmd, "Core", lambda _data_dir: core)
-    monkeypatch.setenv("WHAXON_LEGACY_RECON_ENABLED", "true")
-
-    status = recon_cmd.main(["example.test", "--legacy"])
-
-    assert status == recon_cmd.EXIT_OK
-    assert "legacy-job" in capsys.readouterr().out
+    assert "retired" in error
+    assert "no legacy job was created" in error
 
 
 def test_v2_recon_partial_persisted_report_is_not_success(
