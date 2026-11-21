@@ -26,8 +26,12 @@ def _db(tmp: Path) -> Path:
     return tmp / "whaxon.db"
 
 
-def test_queue_then_drain_in_separate_process(tmp_path: Path) -> None:
+def test_legacy_queue_drain_is_retired_even_with_explicit_opt_in(
+    tmp_path: Path, monkeypatch,
+) -> None:
     from whaxon.core.store import JobStore
+
+    monkeypatch.setenv("WHAXON_LEGACY_QUEUE_DRAIN_ENABLED", "true")
     data = tmp_path / "data"
     data.mkdir()
     (data / "tools.json").write_text((REPO / "src" / "whaxon" / "data" / "tools.json").read_text())
@@ -36,22 +40,16 @@ def test_queue_then_drain_in_separate_process(tmp_path: Path) -> None:
         "in_scope": ["127.0.0.1"], "out_of_scope": [],
     }))
 
-    # Process 1: queue a pending echo job, then exit.
     store = JobStore(_db(data))
-    store.create_pending("chainjob", "echo", "127.0.0.1")
-    assert store.list_pending() == [{"id": "chainjob", "tool": "echo", "target": "127.0.0.1"}]
-    del store  # close; process would exit here
+    store.create_pending("legacy-pending", "echo", "127.0.0.1")
+    del store
 
-    # Process 2 (subprocess): drain picks it up.
-    r = _whaxon("jobs", "drain", "--data", str(data))
-    assert r.returncode == 0, r.stderr
-    assert "drained 1 job" in r.stdout
+    result = _whaxon("jobs", "drain", "--data", str(data))
 
-    # The row is no longer pending, and has a terminal status.
-    c = sqlite3.connect(_db(data))
-    status = c.execute("SELECT status FROM jobs WHERE id='chainjob'").fetchone()[0]
-    c.close()
-    assert status in ("finished", "failed"), status
+    assert result.returncode == 2
+    assert "legacy queue drain is retired" in result.stderr
+    reopened = JobStore(_db(data))
+    assert reopened.get("legacy-pending")["status"] == "pending"
 
 
 def test_reconcile_on_init_marks_old_running_failed(tmp_path: Path) -> None:
