@@ -165,7 +165,7 @@ def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id
     if (
         job is None or job["tool"] != expected_tool
         or job["target"] != target or job["status"] != "finished"
-        or job["exit_code"] != 0
+        or not isinstance(job["exit_code"], int) or isinstance(job["exit_code"], bool)
     ):
         return None
     snapshot = {
@@ -2123,7 +2123,7 @@ class JobStore:
                     or not isinstance(job["exit_code"], int)
                     or isinstance(job["exit_code"], bool)
                 ):
-                    raise ValueError("no matching terminal durable provider job is available")
+                    raise ValueError("no matching successful durable provider job is available")
                 findings = [dict(item) for item in c.execute(
                     "SELECT seq, kind, severity, source, data_json, raw_line, "
                     "enrichment_json, verification_status, verified_by, verification_reason "
@@ -4051,6 +4051,7 @@ class JobStore:
                     if (
                         isinstance(job_id, str) and bool(job_id)
                         and result.get("target") == task["target"]
+                        and result.get("exit_code") == 0
                         and result.get("tool_id") == provider_tool_id_for_capability(
                             task["capability_id"],
                         )
