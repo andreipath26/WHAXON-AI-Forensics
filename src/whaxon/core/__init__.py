@@ -1336,9 +1336,10 @@ class Core:
                 and task.target == "172.28.0.10"
             ):
                 return False
-        # Network execution uses the stricter DNS-rebinding gate. The one
-        # passive DNS-query operation has a narrower scope path because it
-        # does not connect to the hostname's resolved address.
+        # Provider scope mode selects the actual network authorization
+        # boundary: unpinned providers may connect only to literal IPs while
+        # scope is enabled; pinned providers resolve and authorize inside the
+        # supervised transport; DNS-query providers authorize the query name.
         try:
             # Scope may be revoked by another CLI/server process. Refresh the
             # persisted policy at each decision; malformed updates fail closed.
@@ -1358,10 +1359,12 @@ class Core:
                 return pinned_check(task.target).allowed is True
             if scope_mode != "network":
                 return False
-            execution_check = getattr(self.scope, "check_for_execution", None)
-            if not callable(execution_check):
-                execution_check = self.scope.check
-            return execution_check(task.target).allowed is True
+            unpinned_check = getattr(
+                self.scope, "check_for_unpinned_execution", None,
+            )
+            if not callable(unpinned_check):
+                return False
+            return unpinned_check(task.target).allowed is True
         except Exception:
             return False
 
