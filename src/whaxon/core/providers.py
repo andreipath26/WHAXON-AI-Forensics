@@ -779,10 +779,10 @@ class FindingVerificationProvider:
                 if validation_cancelled.is_set():
                     return False
                 self.scope.load()
-                return (
-                    not validation_cancelled.is_set()
-                    and self.scope.check_for_execution(url).allowed is True
-                )
+                if validation_cancelled.is_set():
+                    return False
+                scope_allowed = self.scope.check_for_execution(url).allowed is True
+                return not validation_cancelled.is_set() and scope_allowed
             except (AttributeError, TypeError, ValueError, RuntimeError):
                 return False
 
@@ -874,6 +874,11 @@ class FindingVerificationProvider:
                     validation_cancelled.set()
                 except Exception:
                     break
+            try:
+                if validation_task.done():
+                    validation_task.result()
+            except Exception:
+                pass
             try:
                 self.store.set_failed(
                     evidence_job_id,
