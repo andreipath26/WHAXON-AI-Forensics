@@ -7,6 +7,7 @@ import ipaddress
 import json
 import re
 import shutil
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -752,7 +753,11 @@ class FindingVerificationProvider:
             raise ValueError("verification requires an absolute HTTP(S) target")
         origin = (target_parts.scheme.lower(), target_host.lower(), target_parts.port, target_parts.path)
 
+        validation_cancelled = threading.Event()
+
         def authorize_probe(url: str) -> bool:
+            if validation_cancelled.is_set():
+                return False
             try:
                 parsed = urlsplit(url)
                 request_host = parsed.hostname
@@ -771,8 +776,13 @@ class FindingVerificationProvider:
                     return False
                 if self.authorize_task(plan_id, task) is not True:
                     return False
+                if validation_cancelled.is_set():
+                    return False
                 self.scope.load()
-                return self.scope.check_for_execution(url).allowed is True
+                return (
+                    not validation_cancelled.is_set()
+                    and self.scope.check_for_execution(url).allowed is True
+                )
             except (AttributeError, TypeError, ValueError, RuntimeError):
                 return False
 
@@ -802,11 +812,18 @@ class FindingVerificationProvider:
             raise RuntimeError("could not start verification evidence job")
         self.store.mark_engine_v2_execution_job(evidence_job_id)
         started = time.monotonic()
-        try:
+
+        def run_validation():
             if task.capability_id in self._VERIFY_ONLY:
-                status, reason = validator.validate(finding, target_url=task.target)
-            else:
-                status, reason = validator.revalidate(finding, target_url=task.target)
+                return validator.validate(finding, target_url=task.target)
+            return validator.revalidate(finding, target_url=task.target)
+
+        validation_task = asyncio.create_task(asyncio.to_thread(run_validation))
+        try:
+            # urllib calls are synchronous and bounded by the validator's
+            # per-request timeout. Keep them off the scheduler loop so its
+            # deadline, heartbeat, and cancellation handling remain live.
+            status, reason = await asyncio.shield(validation_task)
             reason = str(reason)[:2000]
             finding_data = finding.data if isinstance(finding.data, dict) else {}
             observation_details = (
@@ -844,6 +861,29 @@ class FindingVerificationProvider:
                 evidence_job_id, 0, time.monotonic() - started,
             ):
                 raise RuntimeError("could not finish verification evidence job")
+        except asyncio.CancelledError:
+            # Cancellation cannot abort an in-flight urllib request. Stop any
+            # follow-up probes, then drain the current bounded request before
+            # returning control to the scheduler. Its attempt remains uncertain
+            # because an external request may already have reached the target.
+            validation_cancelled.set()
+            while not validation_task.done():
+                try:
+                    await asyncio.shield(validation_task)
+                except asyncio.CancelledError:
+                    validation_cancelled.set()
+                except Exception:
+                    break
+            try:
+                self.store.set_failed(
+                    evidence_job_id,
+                    "verification provider cancelled before sealing evidence",
+                )
+            except Exception:
+                # Preserve scheduler cancellation; it records the dispatch as
+                # uncertain even if evidence persistence itself is unavailable.
+                pass
+            raise
         except Exception as exc:
             self.store.set_failed(
                 evidence_job_id,
