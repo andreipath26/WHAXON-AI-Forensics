@@ -9,6 +9,38 @@ from pathlib import Path
 
 from .provider_execution import provider_tool_id_for_capability
 
+
+def _workflow_attempt_error_category(status, error):
+    """Project persisted failure details to safe report categories only."""
+    if not isinstance(error, str) or not error or status == "succeeded":
+        return None
+    fixed_categories = {
+        "deterministic policy denied task": "authorization_denied",
+        "dispatch-boundary policy denied task": "dispatch_authorization_denied",
+        "cancelled before provider dispatch": "cancelled_before_dispatch",
+        "durable execution gate closed before provider dispatch": "dispatch_gate_closed",
+        "task timed out; reconcile before retry": "provider_timeout_uncertain",
+        "cancellation requested while provider was executing; outcome requires reconciliation":
+            "cancelled_outcome_uncertain",
+        "scheduler cancelled while task was active; reconcile before retry":
+            "scheduler_cancelled_outcome_uncertain",
+    }
+    if error in fixed_categories:
+        return fixed_categories[error]
+    if error.startswith("policy authorization failed closed:"):
+        return "authorization_check_failed_closed"
+    if error.startswith("dispatch-boundary authorization failed closed:"):
+        return "dispatch_authorization_check_failed_closed"
+    if error.startswith("provider outcome unknown after dispatch:"):
+        return "provider_outcome_uncertain"
+    return {
+        "blocked": "authorization_blocked",
+        "failed": "task_failed",
+        "cancelled": "task_cancelled",
+        "uncertain": "outcome_uncertain",
+    }.get(status, "attempt_error")
+
+
 _APPROVAL_CANDIDATE_PAGE_SIZE = 256
 _APPROVAL_CANDIDATE_SCAN_BUDGET = 10_000
 
@@ -2911,7 +2943,11 @@ class JobStore:
                     "task_key": row["task_key"], "target": row["target"],
                     "capability_id": row["capability_id"],
                     "attempt_id": row["attempt_id"], "attempt_no": row["attempt_no"],
-                    "attempt_status": row["status"], "job_id": None,
+                    "attempt_status": row["status"],
+                    "attempt_error_category": _workflow_attempt_error_category(
+                        row["status"], row["error"],
+                    ),
+                    "job_id": None,
                     "evidence_status": "unavailable", "integrity_status": "unsealed",
                     "finding_count": 0, "findings": [],
                 }
