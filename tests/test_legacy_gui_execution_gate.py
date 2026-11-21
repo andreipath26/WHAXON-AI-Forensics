@@ -124,7 +124,11 @@ def _cancel_window_harness(is_v2_job, cancelled, statuses):
         runner=SimpleNamespace(cancel=raw_cancel),
     )
     window.current_job_id = "provider-job"
-    window.statusBar = lambda: SimpleNamespace(showMessage=statuses.append)
+
+    def status_bar():
+        return SimpleNamespace(showMessage=statuses.append)
+
+    window.statusBar = status_bar
     return window
 
 
