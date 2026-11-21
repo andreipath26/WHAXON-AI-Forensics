@@ -823,19 +823,21 @@ class Core:
         return self.workflow_requests.get(request_id)
 
     def cancel_workflow_run_request(self, request_id: str):
-        """Request cancellation through the existing durable plan stop barrier.
+        """Cancel only a still-active request through its plan stop barrier.
 
-        A running external effect is not asserted to have stopped. Unknown
-        requests never cancel an unrelated plan.
+        The request status check and plan stop intent are persisted atomically.
+        A terminal request ID cannot cancel a later request for the same plan.
+        A running external effect is not asserted to have stopped.
         """
-        row = self.workflow_run_request(request_id)
-        if row is None:
-            raise ValueError("unknown workflow run request")
-        cancelled = self.cancel_workflow_plan(row["plan_id"])
+        result = self.workflow_requests.cancel_active(request_id)
+        cancelled = (
+            self.cancel_workflow_plan(result["plan_id"])
+            if result["cancellation_requested"] else 0
+        )
         return {
             "run_request_id": request_id,
-            "plan_id": row["plan_id"],
-            "cancellation_requested": True,
+            "plan_id": result["plan_id"],
+            "cancellation_requested": result["cancellation_requested"],
             "tasks_cancelled": cancelled,
             "external_effects_stopped": False,
             "request": self.workflow_run_request(request_id),
