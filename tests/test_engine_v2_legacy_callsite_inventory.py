@@ -98,8 +98,8 @@ EXPECTED_SERVICE_CALLS = Counter(
         ("core/runner.py", "_run_msf_session", "client.session_exec"): 1,
         ("adapters/msf.py", "run_module", "self._client.execute"): 2,
         ("core/validator.py", "revalidate", "self.validate"): 1,
-        ("core/providers.py", "dispatch", "validator.validate"): 1,
-        ("core/providers.py", "dispatch", "validator.revalidate"): 1,
+        ("core/providers.py", "dispatch.run_validation", "validator.validate"): 1,
+        ("core/providers.py", "dispatch.run_validation", "validator.revalidate"): 1,
     }
 )
 

@@ -328,6 +328,76 @@ def test_v2_reflected_xss_verify_and_retest_are_scheduler_owned(tmp_path):
         thread.join(timeout=5)
 
 
+
+def test_v2_verification_cancellation_drains_validator_and_fails_evidence(
+    tmp_path, monkeypatch,
+):
+    from whaxon.core.validator import Validator
+
+    started = threading.Event()
+    release = threading.Event()
+    followup_authorizations = []
+
+    def blocked_validation(self, _finding, *, target_url):
+        started.set()
+        assert release.wait(timeout=5), "test did not release the in-flight validation"
+        allowed = self.authorize_request(target_url)
+        followup_authorizations.append(allowed)
+        return "verified", "controlled test response"
+
+    monkeypatch.setattr(Validator, "validate", blocked_validation)
+    _SQLiFixture.requests = 0
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+    try:
+        async def exercise():
+            core = Core(tmp_path / "data")
+            await core.initialize(drain=False)
+            source_job = await _seed_sealed_source(
+                core, plan_id="cancel-drain-source-plan", target=target,
+            )
+            _bound_plan(
+                core, plan_id="cancel-drain-plan",
+                capability_id=FindingVerificationProvider.VERIFY,
+                target=target,
+                inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+
+            run = asyncio.create_task(core.run_workflow_plan(
+                "cancel-drain-plan", max_tasks=1, max_concurrency=1,
+            ))
+            assert await asyncio.to_thread(started.wait, 5), "validator did not start"
+            run.cancel()
+            # Let scheduler cancellation reach the provider before allowing the
+            # simulated in-flight request to complete and consider another.
+            await asyncio.sleep(0.01)
+            release.set()
+            try:
+                await run
+            except asyncio.CancelledError:
+                pass
+            else:
+                raise AssertionError("scheduler cancellation did not propagate")
+
+            reconciliation = core.workflow_dispatch_reconciliation("cancel-drain-plan")
+            assert len(reconciliation) == 1
+            attempt = reconciliation[0]
+            assert attempt["status"] == "uncertain"
+            assert attempt["provider_job"]["status"] == "failed"
+            assert followup_authorizations == [False]
+
+        asyncio.run(exercise())
+    finally:
+        release.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_v2_http_header_observation_verification_is_scheduler_owned(tmp_path):
     _SQLiFixture.requests = 0
     _SQLiFixture.scope_path = None
