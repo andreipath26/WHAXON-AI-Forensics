@@ -2902,13 +2902,18 @@ class JobStore:
                     "evidence_status": "unavailable", "integrity_status": "unsealed",
                     "finding_count": 0, "findings": [],
                 }
-                if row["status"] != "succeeded":
+                try:
+                    result = json.loads(row["result_json"] or "null")
+                except (TypeError, json.JSONDecodeError):
+                    result = None
+                recovered_failure = (
+                    row["status"] == "failed" and isinstance(result, dict)
+                    and result.get("recovered_from_durable_provider_job") is True
+                    and result.get("provider_effect_state") == "completed_with_nonzero_exit"
+                )
+                if row["status"] != "succeeded" and not recovered_failure:
                     entry["evidence_status"] = "not_successful"
                 else:
-                    try:
-                        result = json.loads(row["result_json"] or "null")
-                    except (TypeError, json.JSONDecodeError):
-                        result = None
                     job_id = result.get("job_id") if isinstance(result, dict) else None
                     if isinstance(job_id, str) and job_id:
                         job = c.execute(
@@ -2918,8 +2923,16 @@ class JobStore:
                         entry["job_id"] = job_id
                         if (
                             job is not None and job["target"] == row["target"]
-                            and job["status"] == "finished" and job["exit_code"] == 0
+                            and job["status"] == "finished"
+                            and job["exit_code"] == result.get("exit_code", 0)
+                            and (
+                                (row["status"] == "succeeded" and job["exit_code"] == 0)
+                                or (recovered_failure and job["exit_code"] != 0)
+                            )
                         ):
+                            if recovered_failure:
+                                entry["provider_effect_state"] = "completed_with_nonzero_exit"
+                                entry["provider_exit_code"] = job["exit_code"]
                             findings = c.execute(
                                 "SELECT seq, kind, severity, source, raw_line, "
                                 "verification_status, verification_reason "
@@ -2964,27 +2977,52 @@ class JobStore:
             c.close()
 
     def has_valid_workflow_evidence_seal(self, job_id):
-        """Require source findings to belong to an intact successful V2 attempt."""
+        """Require source findings to belong to an intact terminal V2 attempt."""
         c = self._conn()
         try:
             c.execute("BEGIN")
             rows = c.execute(
-                "SELECT s.attempt_id, s.digest, t.target, t.capability_id, p.digest AS plan_digest "
+                "SELECT s.attempt_id, s.digest, a.status, a.result_json, "
+                "t.target, t.capability_id, p.digest AS plan_digest "
                 "FROM workflow_evidence_seals s "
                 "JOIN task_attempts a ON a.id=s.attempt_id "
                 "JOIN workflow_tasks t ON t.id=a.task_id "
                 "JOIN workflow_plans p ON p.id=t.plan_id "
-                "WHERE s.job_id=? AND a.status='succeeded'",
+                "WHERE s.job_id=? AND a.status IN ('succeeded', 'failed')",
                 (job_id,),
             ).fetchall()
-            return any(
-                _workflow_evidence_digest(
+            for row in rows:
+                try:
+                    result = json.loads(row["result_json"] or "null")
+                except (TypeError, json.JSONDecodeError):
+                    result = None
+                if not isinstance(result, dict) or result.get("job_id") != job_id:
+                    continue
+                provider = c.execute(
+                    "SELECT status, exit_code FROM jobs WHERE id=?", (job_id,),
+                ).fetchone()
+                if provider is None or provider["status"] != "finished":
+                    continue
+                if row["status"] == "succeeded":
+                    outcome_matches = provider["exit_code"] == 0
+                else:
+                    outcome_matches = (
+                        result.get("recovered_from_durable_provider_job") is True
+                        and result.get("provider_effect_state") == "completed_with_nonzero_exit"
+                        and isinstance(provider["exit_code"], int)
+                        and not isinstance(provider["exit_code"], bool)
+                        and provider["exit_code"] != 0
+                        and result.get("exit_code") == provider["exit_code"]
+                    )
+                if not outcome_matches:
+                    continue
+                if _workflow_evidence_digest(
                     c, attempt_id=row["attempt_id"], job_id=job_id,
                     target=row["target"], capability_id=row["capability_id"],
                     plan_digest=row["plan_digest"],
-                ) == row["digest"]
-                for row in rows
-            )
+                ) == row["digest"]:
+                    return True
+            return False
         finally:
             c.close()
 
