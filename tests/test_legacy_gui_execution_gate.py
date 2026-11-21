@@ -132,29 +132,33 @@ def _cancel_window_harness(is_v2_job, cancelled, statuses):
     return window
 
 
+def _assert_qt_cancel_button_blocked(monkeypatch, ownership, expected):
+    cancelled = []
+    statuses = []
+    scheduled = []
+    window = _cancel_window_harness(ownership, cancelled, statuses)
+
+    def capture_task(coroutine):
+        scheduled.append(coroutine)
+
+    monkeypatch.setattr(asyncio, "create_task", capture_task)
+    window._cancel_job()
+
+    assert scheduled == []
+    assert cancelled == []
+    assert expected in statuses[-1]
+
+
 def test_qt_cancel_button_fails_closed_for_v2_and_ownership_errors(monkeypatch):
     def ownership_error(_job_id):
         raise RuntimeError("store unavailable")
 
-    for ownership, expected in (
-        (lambda _job_id: True, "Engine V2 work"),
-        (ownership_error, "ownership could not be checked"),
-    ):
-        cancelled = []
-        statuses = []
-        scheduled = []
-        window = _cancel_window_harness(ownership, cancelled, statuses)
-        monkeypatch.setattr(
-            asyncio, "create_task",
-            lambda coroutine: scheduled.append(coroutine),
-        )
-
-        window._cancel_job()
-
-        assert scheduled == []
-        assert cancelled == []
-        assert expected in statuses[-1]
-
+    _assert_qt_cancel_button_blocked(
+        monkeypatch, lambda _job_id: True, "Engine V2 work",
+    )
+    _assert_qt_cancel_button_blocked(
+        monkeypatch, ownership_error, "ownership could not be checked",
+    )
 
 def test_qt_cancel_async_dispatch_rechecks_v2_ownership(monkeypatch):
     ownership = iter((False, True))
