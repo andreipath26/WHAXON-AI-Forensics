@@ -797,6 +797,8 @@ def test_legacy_validation_api_runs_only_with_explicit_opt_in(tmp_path, monkeypa
 def test_legacy_validation_and_retest_recheck_scope_before_each_probe(
     tmp_path, monkeypatch,
 ):
+    from types import SimpleNamespace
+
     from whaxon.core.validator import Validator
 
     monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
