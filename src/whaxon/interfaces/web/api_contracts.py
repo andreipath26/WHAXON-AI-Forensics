@@ -134,6 +134,41 @@ class WorkflowPlanReconciliationRequest(BaseModel):
     stale_after_s: float = Field(default=60.0, allow_inf_nan=False)
 
 
+class WorkflowMissionCreateRequest(BaseModel):
+    """Mission identity and objective accepted by the existing V2 route."""
+
+    model_config = ConfigDict(strict=True, extra="ignore")
+
+    id: str
+    objective: str
+
+
+class WorkflowPlanCreateRequest(BaseModel):
+    """Persisted plan request accepted by the existing V2 route."""
+
+    model_config = ConfigDict(strict=True, extra="ignore")
+
+    id: str
+    plan: dict[str, Any]
+
+
+class WorkflowFollowupsRequest(BaseModel):
+    """Bounded evidence-derived follow-up proposal controls."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    max_tasks: int = Field(default=16, ge=1, le=100)
+    save: bool = False
+
+
+class WorkflowAuditVerifyRequest(BaseModel):
+    """Caller-held digest compared with a persisted workflow audit snapshot."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    expected_digest: str
+
+
 class WorkflowRunAccepted(BaseModel):
     """The unchanged 202 response returned by the workflow-run endpoint."""
 
