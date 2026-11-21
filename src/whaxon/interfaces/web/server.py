@@ -1551,9 +1551,10 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
         return {
             "error": (
-                "Legacy AI execution is retired. Use the V2 AI proposal flow "
-                "at POST /api/v2/ai/proposals, then separately review the proposal, "
-                "approve the exact task, and submit through the durable workflow API."
+                "Legacy AI execution is retired. Use POST /api/v2/ai/proposals with "
+                "a mission_id, plan id, goal, and exact target; then separately review "
+                "the proposal, approve the exact task, and submit through the durable "
+                "workflow API."
             ),
             "legacy_execution_enabled": False,
             "v2_proposal_endpoint": "/api/v2/ai/proposals",
