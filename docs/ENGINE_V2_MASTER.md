@@ -967,3 +967,12 @@ reasons. General workflow reports continue to expose task states, recorded skip
 reasons, attempt-page truncation, and per-finding verification requests. This
 is a bounded P1-07 slice: unsupported/inaccessible accounting outside recon
 proposals and requirement-level acceptance remain open.
+
+## Atomic V2 run reconnect snapshots — 2026-11-21
+
+`GET /api/v2/workflow-runs/<id>/snapshot` now reads the durable run-request
+row and workflow task progress from one SQLite read transaction. This prevents
+a request updated by a concurrent cancellation from being paired with progress
+read after that cancellation. Response schema and lease-token redaction remain
+unchanged; worker liveness stays explicitly unverified. Regression:
+`tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`.
