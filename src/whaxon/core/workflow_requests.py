@@ -221,6 +221,69 @@ class WorkflowRunQueue:
         finally:
             conn.close()
 
+    def cancel_active(self, request_id: str) -> dict:
+        """Atomically stop only a request that is still active for its plan.
+
+        The request identity and plan stop barrier share one SQLite write
+        transaction. A stale terminal request ID cannot cancel a later request
+        submitted for the same plan.
+        """
+        with self.store._lock:
+            conn = self.store._conn()
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                request = conn.execute(
+                    "SELECT id, plan_id, status FROM workflow_run_requests WHERE id=?",
+                    (request_id,),
+                ).fetchone()
+                if request is None:
+                    raise ValueError("unknown workflow run request")
+                status = request["status"]
+                if status not in {"queued", "running", "uncertain"}:
+                    conn.execute("COMMIT")
+                    return {
+                        "run_request_id": request_id,
+                        "plan_id": request["plan_id"],
+                        "cancellation_requested": False,
+                    }
+
+                plan = conn.execute(
+                    "SELECT status FROM workflow_plans WHERE id=?",
+                    (request["plan_id"],),
+                ).fetchone()
+                if plan is None:
+                    raise ValueError("unknown workflow plan")
+
+                now = time.time()
+                if plan["status"] != "cancel_requested":
+                    conn.execute(
+                        "UPDATE workflow_plans SET status='cancel_requested' WHERE id=?",
+                        (request["plan_id"],),
+                    )
+                    conn.execute(
+                        "INSERT INTO workflow_events (plan_id, event_type, at) "
+                        "VALUES (?, 'cancellation_requested', ?)",
+                        (request["plan_id"], now),
+                    )
+                conn.execute(
+                    "UPDATE workflow_run_requests SET status='cancelled', "
+                    "completed_at=?, error='plan cancelled before run claim' "
+                    "WHERE plan_id=? AND status='queued'",
+                    (now, request["plan_id"]),
+                )
+                conn.execute("COMMIT")
+                return {
+                    "run_request_id": request_id,
+                    "plan_id": request["plan_id"],
+                    "cancellation_requested": True,
+                }
+            except Exception:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise
+            finally:
+                conn.close()
+
     def queued_count(self) -> int:
         """Count remaining queued intents without claiming or executing them."""
         conn = self.store._conn()
