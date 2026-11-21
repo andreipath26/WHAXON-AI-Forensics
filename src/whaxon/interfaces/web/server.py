@@ -35,6 +35,7 @@ from whaxon.interfaces.web.api_contracts import (
     WorkflowEventAcknowledgementResult,
     WorkflowFindingProposalRequest,
     WorkflowPlanReconciliationRequest,
+    WorkflowProviderResultRecoveryRequest,
     WorkflowRunAccepted,
     WorkflowRunRequest,
     WorkflowToolProposalRequest,
@@ -1123,6 +1124,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
             payload = {}
         if not isinstance(payload, dict):
             return jsonify({"error": "JSON object required"}), 400
+        if "recover_provider_result" in payload:
+            try:
+                recovery = WorkflowProviderResultRecoveryRequest.model_validate(payload)
+            except ValidationError:
+                return jsonify({"error": "exact provider-result recovery fields are required"}), 400
+            try:
+                return jsonify(core.recover_workflow_attempt_from_provider_job(
+                    plan_id, recovery.attempt_id,
+                ))
+            except (ValueError, TypeError) as exc:
+                return jsonify({"error": str(exc)}), 400
         if "attempt_id" in payload:
             required = {"attempt_id", "disposition", "evidence_ref", "note"}
             if not required.issubset(payload) or set(payload) - required - {"actor"}:

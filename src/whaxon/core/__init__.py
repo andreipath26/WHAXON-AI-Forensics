@@ -291,6 +291,12 @@ class Core:
             evidence_ref=evidence_ref, note=note,
         )
 
+    def recover_workflow_attempt_from_provider_job(self, plan_id: str, attempt_id: str):
+        """Recover a lost acknowledgment from a verified durable provider result."""
+        return self.store.recover_workflow_attempt_from_provider_job(
+            plan_id, attempt_id,
+        )
+
     def workflow_event_cursor(self, plan_id: str, consumer_id: str):
         return self.store.get_workflow_event_cursor(plan_id, consumer_id)
 
