@@ -7,6 +7,135 @@ import shutil
 import pytest
 
 
+
+def _v2_workflow_report_payload():
+    return {
+        "schema_version": "whaxon.workflow-report.v1",
+        "plan_id": "plan-v2-report",
+        "mission_id": "mission-v2-report",
+        "plan_digest": "digest-v2-report",
+        "status": "partial",
+        "truncated": False,
+        "summary": {
+            "planned_tasks": 4,
+            "task_status_counts": {"succeeded": 2, "failed": 1, "pending": 1},
+            "pending_tasks": 1,
+            "task_attempts": 3,
+            "recorded_attempts": 2,
+            "verified_seals": 2,
+            "findings": 3,
+        },
+        "limitations": [
+            "This report contains only evidence linked to the named workflow plan.",
+            "A partial report is not a successful completion or a release acceptance record.",
+        ],
+        "findings": [
+            {"seq": 1, "kind": "sqli", "severity": "high", "job_id": "source-job-1",
+             "task_key": "scan", "verification_outcome": {
+                 "status": "recorded", "verification_status": "verified",
+                 "job_id": "verifier-job-1", "task_key": "verify-1",
+             }},
+            {"seq": 2, "kind": "xss", "severity": "medium", "job_id": "source-job-2",
+             "task_key": "scan", "verification_outcome": {"status": "not_requested"}},
+            {"seq": 3, "kind": "http_header_missing", "severity": "low",
+             "job_id": "source-job-3", "task_key": "scan",
+             "verification_outcome": {"status": "pending", "task_key": "verify-3"}},
+        ],
+    }
+
+
+def _serve_v2_report_missions(route):
+    route.fulfill(status=200, content_type="application/json", body=json.dumps([
+        {"id": "mission-v2-report", "objective": "bounded fixture"},
+    ]))
+
+
+def _serve_v2_report_plans(route):
+    route.fulfill(status=200, content_type="application/json", body=json.dumps([
+        {"id": "plan-v2-report", "status": "partial", "digest": "digest-v2-report"},
+    ]))
+
+
+def test_report_page_renders_plan_scoped_v2_verification_outcomes(page, live_server):
+    legacy_calls = []
+    page.route(
+        "**/api/v2/missions?limit=100",
+        _serve_v2_report_missions,
+    )
+    page.route(
+        "**/api/v2/missions/mission-v2-report/plans",
+        _serve_v2_report_plans,
+    )
+    page.route(
+        "**/api/v2/workflows/plan-v2-report/report?limit=100",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps(_v2_workflow_report_payload()),
+        ),
+    )
+    page.route(
+        "**/api/report?format=json",
+        lambda route: (
+            legacy_calls.append(route.request.url),
+            route.fulfill(status=503, content_type="application/json", body='{"error":"legacy report unavailable"}'),
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/report")
+    page.locator("#v2-report-mission").select_option("mission-v2-report")
+    page.locator("#v2-report-plan").select_option("plan-v2-report")
+    page.wait_for_function(
+        "() => document.querySelector('#v2-report-status')?.textContent.includes('Loaded persisted V2 workflow evidence')",
+        timeout=8000,
+    )
+    panel = page.locator("#v2-workflow-report")
+    assert "report status: partial" in panel.inner_text()
+    assert "Task outcome categories" in panel.inner_text()
+    assert "failed: 1" in panel.inner_text()
+    assert "pending: 1" in panel.inner_text()
+    assert "recorded: 1" in panel.inner_text()
+    assert "not_requested: 1" in panel.inner_text()
+    assert "Verification outcome: recorded · recorded verification status: verified" in panel.inner_text()
+    assert "Verification outcome: not_requested" in panel.inner_text()
+    assert "Verification outcome: pending" in panel.inner_text()
+    assert "assessment coverage" in panel.inner_text()
+    assert "independent attestation" in panel.inner_text()
+    assert len(legacy_calls) == 1  # The separate legacy panel load only; no V2 fallback.
+
+
+def test_v2_report_failure_does_not_fallback_to_legacy_report(page, live_server):
+    legacy_calls = []
+    page.route("**/api/v2/missions?limit=100", _serve_v2_report_missions)
+    page.route("**/api/v2/missions/mission-v2-report/plans", _serve_v2_report_plans)
+    page.route(
+        "**/api/v2/workflows/plan-v2-report/report?limit=100",
+        lambda route: route.fulfill(
+            status=503, content_type="application/json", body='{"error":"workflow report unavailable"}',
+        ),
+    )
+    page.route(
+        "**/api/report?format=json",
+        lambda route: (
+            legacy_calls.append(route.request.url),
+            route.fulfill(status=200, content_type="application/json",
+                          body='{"jobs":[],"job_count":0,"finding_count":0,"generated":"fixture"}'),
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/report")
+    page.locator("#v2-report-mission").select_option("mission-v2-report")
+    page.locator("#v2-report-plan").select_option("plan-v2-report")
+    page.wait_for_function(
+        "() => document.querySelector('#v2-report-status')?.textContent.includes('V2 workflow report unavailable')",
+        timeout=8000,
+    )
+    status = page.locator("#v2-report-status").inner_text()
+    assert "503" in status
+    assert "No legacy report fallback was used." in status
+    assert "legacy" not in page.locator("#v2-workflow-report").inner_text().lower().replace(
+        "no legacy report fallback was used.", ""
+    )
+    assert len(legacy_calls) == 1  # Only the separate legacy panel fetch.
+
+
 def test_report_page_loads_and_uses_live_report_counts(page, live_server):
     response = page.goto(f"{live_server}/ui-v2/report")
     assert response is not None and response.status == 200
