@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 WORKFLOW_SCHEMA_VERSION = "whaxon.workflow.v1"
+AI_PROPOSAL_SCHEMA_VERSION = "whaxon.ai-proposal.v1"
 _ALLOWED_IMPACTS = {"read_only", "low", "moderate", "high", "critical"}
 
 
@@ -232,6 +233,91 @@ class WorkflowPlan:
             metadata=value.get("metadata", {}),
             tasks=tuple(WorkflowTask.from_dict(task) for task in value["tasks"]),
         )
+
+
+@dataclass(frozen=True)
+class AIProposalTrace:
+    """Reviewable provenance for an AI-authored plan proposal.
+
+    A trace distinguishes a model inference from persisted observations. It
+    carries only a digest of the operator's prompt, never treats caller
+    supplied chat history as evidence, and is included in the plan digest.
+    """
+
+    producer: str
+    request_digest: str
+    capability_id: str
+    target: str
+    rationale: str
+    confidence: float
+    source_record_refs: tuple[dict[str, str], ...] = ()
+    schema_version: str = AI_PROPOSAL_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != AI_PROPOSAL_SCHEMA_VERSION:
+            raise ValueError(f"unsupported AI proposal schema: {self.schema_version}")
+        for label, value in (
+            ("producer", self.producer), ("capability_id", self.capability_id),
+            ("target", self.target),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"AI proposal {label} is required")
+        if (
+            not isinstance(self.request_digest, str)
+            or len(self.request_digest) != 64
+            or any(char not in "0123456789abcdef" for char in self.request_digest)
+        ):
+            raise ValueError("AI proposal request_digest must be a lowercase SHA-256")
+        if not isinstance(self.rationale, str) or len(self.rationale) > 2_000:
+            raise ValueError("AI proposal rationale must be text up to 2000 characters")
+        if (
+            isinstance(self.confidence, bool)
+            or not isinstance(self.confidence, (int, float))
+            or not math.isfinite(self.confidence)
+            or not 0 <= self.confidence <= 1
+        ):
+            raise ValueError("AI proposal confidence must be finite and between 0 and 1")
+        if not isinstance(self.source_record_refs, tuple):
+            raise TypeError("AI proposal source_record_refs must be a tuple")
+        normalized_refs: list[dict[str, str]] = []
+        for ref in self.source_record_refs:
+            if (
+                not isinstance(ref, dict)
+                or set(ref) != {"record_type", "record_id", "record_digest"}
+                or any(not isinstance(value, str) or not value.strip()
+                       for value in ref.values())
+            ):
+                raise ValueError("AI proposal source references require type, id and digest")
+            digest = ref["record_digest"]
+            if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+                raise ValueError("AI proposal source reference digest must be SHA-256")
+            normalized_refs.append(dict(ref))
+        object.__setattr__(
+            self, "source_record_refs", tuple(_freeze(ref) for ref in normalized_refs),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "producer": self.producer,
+            "request_digest": self.request_digest,
+            "capability_id": self.capability_id,
+            "target": self.target,
+            "observations": [],
+            "source_record_refs": [dict(ref) for ref in self.source_record_refs],
+            "inference": {
+                "rationale": self.rationale,
+                "confidence": float(self.confidence),
+                "confidence_semantics": "model-reported heuristic, not measured certainty",
+            },
+            "uncertainty": (
+                ["No persisted observation was supplied to this proposal."]
+                if not self.source_record_refs else
+                ["Cited source records are context; the proposed action is still an inference."]
+            ),
+            "approval_granted": False,
+            "execution_submitted": False,
+        }
 
 
 @dataclass(frozen=True)
