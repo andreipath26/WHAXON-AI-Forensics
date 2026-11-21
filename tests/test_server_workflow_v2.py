@@ -953,6 +953,55 @@ def test_v2_ai_proposals_api_validates_and_never_submits_execution(tmp_path, mon
     assert core.store.get_workflow_plan("p-ai") is None
 
 
+def test_v2_ai_proposal_bounds_history_and_step_at_http_contract(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-ai-bound", "bounded proposal")
+    calls = []
+
+    def fake_propose(received_core, **kwargs):
+        assert received_core is core
+        calls.append(kwargs)
+        return {
+            "status": "blocked", "reason": "provider unavailable",
+            "approval_granted": False, "execution_submitted": False,
+        }
+
+    monkeypatch.setattr("whaxon.core.ai_bridge.propose_v2_workflow_plan", fake_propose)
+    base = {
+        "mission_id": "m-ai-bound", "id": "p-ai-bound",
+        "goal": "inspect lab", "target": "192.0.2.10",
+    }
+
+    max_valid = client.post("/api/v2/ai/proposals", json={
+        **base, "history": [{}] * 32, "step": 33,
+    })
+    assert max_valid.status_code == 200
+    assert len(calls) == 1
+    assert calls[0]["step"] == 33
+
+    invalid_requests = (
+        (
+            {**base, "history": [{}] * 33, "step": 34},
+            "AI proposal history exceeds allowed limits",
+        ),
+        (
+            {**base, "history": [{"untrusted": "x" * 4097}]},
+            "AI proposal history exceeds allowed limits",
+        ),
+        (
+            {**base, "step": 34},
+            "AI proposal step must follow the supplied history",
+        ),
+    )
+    for payload, expected_error in invalid_requests:
+        response = client.post("/api/v2/ai/proposals", json=payload)
+        assert response.status_code == 400
+        assert response.get_json()["error"] == expected_error
+
+    assert len(calls) == 1
+    assert core.store.get_workflow_plan("p-ai-bound") is None
+
+
 def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monkeypatch):
     from whaxon.core.ai_bridge import propose_v2_workflow_plan
 
