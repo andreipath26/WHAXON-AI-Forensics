@@ -74,6 +74,12 @@ class _FakeCore:
     ):
         self.mission_caps = (mission_id, max_total_attempts, max_concurrency)
 
+    def configure_mission_runtime_limit(self, mission_id, *, max_runtime_s):
+        self.runtime_cap = (mission_id, max_runtime_s)
+
+    def mission_runtime_limit(self, mission_id):
+        return {"mission_id": mission_id, "max_runtime_s": self.runtime_cap[1]}
+
     def missions(self, *, limit=100, after_created=0.0):
         return [{"id": "mission-1", "created_at": after_created + 1}][:limit]
 
@@ -428,6 +434,16 @@ def test_mission_limits_cli(monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out)["max_concurrency"] == 1
     assert workflow_cmd.main(["mission", "budget", "--id", "m"]) == 0
     assert json.loads(capsys.readouterr().out)["max_total_attempts"] == 2
+
+
+def test_mission_runtime_limit_cli(monkeypatch, capsys):
+    monkeypatch.setattr(workflow_cmd, "Core", _FakeCore)
+    assert workflow_cmd.main([
+        "mission", "runtime-limit", "--id", "m", "--max-runtime-s", "45.5",
+    ]) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "mission_id": "m", "max_runtime_s": 45.5,
+    }
 
 
 def test_mission_deadline_cli(monkeypatch, capsys):

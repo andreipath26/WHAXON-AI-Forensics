@@ -9,6 +9,7 @@ binding the six callables the executor needs to real Core methods.
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import asdict
 from typing import Any
 
@@ -40,7 +41,7 @@ def propose_v2_workflow_plan(
     import uuid
 
     from whaxon.ai import Agent
-    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+    from whaxon.core.workflow import AIProposalTrace, WorkflowPlan, WorkflowTask
 
     for name, value in (("mission_id", mission_id), ("plan_id", plan_id),
                         ("goal", goal), ("target", target)):
@@ -121,7 +122,7 @@ def propose_v2_workflow_plan(
             or readiness.get("executable") is not True
             or manifest.impact != "moderate"
             or manifest.input_schema.get("properties") != {}
-            or manifest.input_schema.get("required", []) != []
+            or tuple(manifest.input_schema.get("required", ())) != ()
             or manifest.input_schema.get("additionalProperties") is not False
         ):
             continue
@@ -204,12 +205,34 @@ def propose_v2_workflow_plan(
     except (LookupError, ValueError, TypeError, RuntimeError) as exc:
         return {"status": "blocked", "action": action.to_dict(),
                 "reason": f"V2 provider revalidation failed: {exc}"}
+    request_digest = hashlib.sha256(json.dumps(
+        {
+            "mission_id": mission_id, "goal": goal, "target": target,
+            "history": history, "step": step,
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    try:
+        trace = AIProposalTrace(
+            producer=action.ai_source or getattr(provider, "name", "unspecified"),
+            request_digest=request_digest,
+            capability_id=selected_manifest.capability_id,
+            target=target,
+            rationale=action.rationale,
+            confidence=action.confidence,
+        )
+    except (TypeError, ValueError) as exc:
+        return {
+            "status": "blocked", "action": action.to_dict(),
+            "reason": f"AI proposal provenance is invalid: {exc}",
+            "execution_submitted": False, "approval_granted": False,
+        }
     plan = WorkflowPlan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": selected_manifest.provider_id,
             "manifest_fingerprint": selected_manifest.fingerprint,
-        }}},
+        }}, "ai_proposal": trace.to_dict()},
         tasks=(task,),
     )
     return {
@@ -220,6 +243,7 @@ def propose_v2_workflow_plan(
         "digest": plan.digest,
         "provider_id": selected_manifest.provider_id,
         "manifest_fingerprint": selected_manifest.fingerprint,
+        "proposal_trace": trace.to_dict(),
         "execution_submitted": False,
         "approval_granted": False,
     }

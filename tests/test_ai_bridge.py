@@ -113,3 +113,82 @@ def test_bridge_unknown_provider_falls_back(monkeypatch) -> None:
         core = Core(data_dir=d)
         ex = build_executor(core)
         assert isinstance(ex.agent.provider, NullProvider)
+
+
+def test_ai_plan_persists_a_typed_inference_trace(core: Core, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from whaxon.ai import Action as ProposedAction
+    from whaxon.ai import Provider as BaseProvider
+    from whaxon.core.ai_bridge import propose_v2_workflow_plan
+    from whaxon.core.capabilities import CapabilityManifest
+    from whaxon.core.providers import SEMANTIC_OPERATION_IDS
+
+    capability_id = SEMANTIC_OPERATION_IDS.get("nmap", "tool.nmap")
+
+    class OneShot(BaseProvider):
+        name = "trace-fixture"
+
+        def plan_step(self, *args, **kwargs):
+            return ProposedAction.run_tool(
+                "nmap", "192.0.2.10", rationale="Inventory the authorized lab.",
+                confidence=0.8, ai_source="trace-fixture",
+            )
+
+    class OneShotAgent:
+        def __init__(self, provider):
+            self.provider = provider
+
+        def audit(self, _goal):
+            return {"feasible": True}
+
+        def next_action(self, **kwargs):
+            return self.provider.plan_step(**kwargs)
+
+    manifest = CapabilityManifest(
+        capability_id, "trace-fixture", "1", ("local_process",),
+        impact="moderate", input_schema={
+            "type": "object", "properties": {}, "required": [],
+            "additionalProperties": False,
+        },
+    )
+
+    class Providers:
+        def manifest_for(self, _capability_id):
+            return manifest
+
+        def resolve_task(self, _task, *, require_installed=False):
+            assert require_installed is True
+            return SimpleNamespace(manifest=manifest)
+
+    core.create_mission("trace-mission", "authorized lab")
+    core.scope.check = lambda _target: SimpleNamespace(allowed=True, reason="")
+    core.providers = Providers()
+    core.capability_inventory = lambda: [{
+        "capability_id": capability_id, "provider_id": manifest.provider_id,
+        "selected_for_execution": True, "installed": True, "executable": True,
+    }]
+    core.catalog.list = lambda: [SimpleNamespace(
+        id="nmap", name="Nmap", category="network",
+    )]
+    monkeypatch.setattr("whaxon.ai.Agent", OneShotAgent)
+
+    result = propose_v2_workflow_plan(
+        core, mission_id="trace-mission", plan_id="trace-plan",
+        goal="Inventory my authorized lab", target="192.0.2.10",
+        provider=OneShot(),
+    )
+    assert result["status"] == "proposed", result
+    trace = result["proposal_trace"]
+    assert trace["schema_version"] == "whaxon.ai-proposal.v1"
+    assert trace["inference"]["rationale"] == "Inventory the authorized lab."
+    assert trace["source_record_refs"] == []
+    assert trace["observations"] == []
+    assert trace["uncertainty"] == [
+        "No persisted observation was supplied to this proposal."
+    ]
+    import json
+    saved_trace = json.loads(json.dumps(result["plan"]["metadata"]["ai_proposal"]))
+    assert saved_trace == trace
+    assert result["approval_granted"] is False
+    assert result["execution_submitted"] is False

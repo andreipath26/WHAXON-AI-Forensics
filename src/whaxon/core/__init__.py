@@ -353,6 +353,14 @@ class Core:
     def mission_execution_limits(self, mission_id: str):
         return self.store.get_mission_execution_limits(mission_id)
 
+    def configure_mission_runtime_limit(self, mission_id: str, *, max_runtime_s: float):
+        return self.store.set_mission_runtime_limit(
+            mission_id, max_runtime_s=max_runtime_s,
+        )
+
+    def mission_runtime_limit(self, mission_id: str):
+        return self.store.get_mission_runtime_limit(mission_id)
+
     def configure_mission_execution_limits(
         self, mission_id: str, *, max_total_attempts: int, max_concurrency: int,
     ):
@@ -403,6 +411,7 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
+        persisted_tasks = None
         task_reader = getattr(getattr(self, "store", None), "list_workflow_tasks", None)
         if callable(task_reader):
             try:
@@ -546,6 +555,109 @@ class Core:
             status: count for status, count in task_status_counts.items()
             if isinstance(status, str) and type(count) is int and count >= 0
         }
+        verification_outcome_counts: dict[str, int] = {}
+        for finding in findings:
+            verification_outcome = finding.get("verification_outcome")
+            outcome_status = (
+                verification_outcome.get("status")
+                if isinstance(verification_outcome, dict) else None
+            )
+            if isinstance(outcome_status, str):
+                verification_outcome_counts[outcome_status] = (
+                    verification_outcome_counts.get(outcome_status, 0) + 1
+                )
+        skip_counts: dict[str, int] = {}
+        for attempt in attempts:
+            for outcome in attempt.get("coverage_outcomes", []):
+                if not isinstance(outcome, dict) or outcome.get("status") != "skipped":
+                    continue
+                kind = outcome.get("kind")
+                kind = kind if isinstance(kind, str) else "unknown"
+                skip_counts[kind] = skip_counts.get(kind, 0) + 1
+        persisted_attempt_count = evidence.get("attempt_count")
+        if type(persisted_attempt_count) is not int or persisted_attempt_count < 0:
+            persisted_attempt_count = progress.get("attempts")
+        planned_task_count = (
+            len(persisted_tasks) if isinstance(persisted_tasks, list)
+            else progress.get("total_tasks")
+        )
+        omitted_dispositions: list[dict[str, str]] = []
+        requested_checks: list[str] | None = None
+        included_checks: list[str] | None = None
+        plan_details_reader = getattr(self, "workflow_plan_details", None)
+        if callable(plan_details_reader):
+            try:
+                plan_details = plan_details_reader(plan_id)
+                from .workflow import WorkflowPlan
+
+                persisted_plan = WorkflowPlan.from_dict(plan_details["plan"])
+                if persisted_plan.digest == evidence.get("plan_digest"):
+                    for field_name in ("requested_checks", "included_checks"):
+                        raw_checks = persisted_plan.metadata.get(field_name)
+                        if (
+                            isinstance(raw_checks, (list, tuple))
+                            and len(raw_checks) <= 128
+                            and all(
+                                isinstance(item, str) and item
+                                and item == item.strip()
+                                and len(item) <= 128 for item in raw_checks
+                            )
+                            and len(set(raw_checks)) == len(raw_checks)
+                        ):
+                            if field_name == "requested_checks":
+                                requested_checks = list(raw_checks)
+                            else:
+                                included_checks = list(raw_checks)
+                    raw_omissions = persisted_plan.metadata.get("omitted_checks", [])
+                    if isinstance(raw_omissions, (list, tuple)):
+                        for omission in raw_omissions:
+                            if not isinstance(omission, dict):
+                                continue
+                            check = omission.get("check")
+                            disposition = omission.get("disposition")
+                            if (
+                                disposition is None
+                                and omission.get("reason")
+                                == "legacy-only; no admitted V2 provider"
+                            ):
+                                # Preserve the exact legacy planner record
+                                # without treating arbitrary free-form reasons
+                                # as a typed disposition.
+                                disposition = "unsupported"
+                            if (
+                                isinstance(check, str) and check
+                                and len(check) <= 128
+                                and disposition in {
+                                    "unsupported", "provider_unavailable", "inaccessible",
+                                }
+                            ):
+                                omitted_dispositions.append({
+                                    "check": check,
+                                    "disposition": disposition,
+                                })
+            except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
+                omitted_dispositions = []
+        coverage = {
+            "basis": "persisted workflow plan, task, attempt, and evidence records",
+            "planned_tasks": planned_task_count,
+            "task_status_counts": task_status_counts,
+            "persisted_attempts": persisted_attempt_count,
+            "returned_attempts": len(attempts),
+            "attempt_history_truncated": truncated,
+            "requested_checks": requested_checks,
+            "included_checks": included_checks,
+            "recorded_skips": skip_counts,
+            "finding_verification_outcomes": verification_outcome_counts,
+            "unrequested_verification_findings": verification_outcome_counts.get(
+                "not_requested", 0,
+            ),
+            "unsupported_or_inaccessible_work": {
+                "status": "recorded" if omitted_dispositions else "not_recorded",
+                "count": len(omitted_dispositions) if omitted_dispositions else None,
+                "items": omitted_dispositions,
+            },
+            "completeness_claim": False,
+        }
         return {
             "schema_version": "whaxon.workflow-report.v1",
             "plan_id": evidence["plan_id"],
@@ -554,6 +666,7 @@ class Core:
             "status": "complete" if complete else "partial",
             "readiness": readiness,
             "truncated": truncated,
+            "coverage": coverage,
             "evidence": evidence,
             "summary": {
                 "planned_tasks": progress.get("total_tasks"),
@@ -572,6 +685,9 @@ class Core:
             "limitations": [
                 "This report contains only evidence linked to the named workflow plan.",
                 "A partial report is not a successful completion or a release acceptance record.",
+                "Unrequested verification is counted only for persisted findings; work omitted from the plan is unknown.",
+                "Unsupported or inaccessible work is not classified unless a persisted record explicitly identifies it.",
+                "Coverage totals are not heuristic recall, endpoint completeness, or proof that all relevant checks ran.",
             ],
         }
 
@@ -1220,9 +1336,10 @@ class Core:
                 and task.target == "172.28.0.10"
             ):
                 return False
-        # Network execution uses the stricter DNS-rebinding gate. The one
-        # passive DNS-query operation has a narrower scope path because it
-        # does not connect to the hostname's resolved address.
+        # Provider scope mode selects the actual network authorization
+        # boundary: unpinned providers may connect only to literal IPs while
+        # scope is enabled; pinned providers resolve and authorize inside the
+        # supervised transport; DNS-query providers authorize the query name.
         try:
             # Scope may be revoked by another CLI/server process. Refresh the
             # persisted policy at each decision; malformed updates fail closed.
@@ -1242,12 +1359,99 @@ class Core:
                 return pinned_check(task.target).allowed is True
             if scope_mode != "network":
                 return False
-            execution_check = getattr(self.scope, "check_for_execution", None)
-            if not callable(execution_check):
-                execution_check = self.scope.check
-            return execution_check(task.target).allowed is True
+            unpinned_check = getattr(
+                self.scope, "check_for_unpinned_execution", None,
+            )
+            if not callable(unpinned_check):
+                return False
+            return unpinned_check(task.target).allowed is True
         except Exception:
             return False
+
+    def _workflow_followup_provenance_valid(self, plan, task) -> bool:
+        """Revalidate the exact sealed finding behind an E4 follow-up node."""
+        import hashlib
+        import json
+
+        if plan.metadata.get("followup_schema") != "whaxon.followup.v1":
+            return True
+        refs = plan.metadata.get("provenance")
+        source_plan_id = plan.metadata.get("source_plan")
+        source_digest = plan.metadata.get("source_digest")
+        if not isinstance(refs, (list, tuple)) or not isinstance(source_plan_id, str):
+            return False
+        matching = [
+            ref for ref in refs
+            if isinstance(ref, dict) and ref.get("task_id") == task.id
+        ]
+        if len(matching) != 1:
+            return False
+        ref = matching[0]
+        source_task = ref.get("source_task")
+        source_job = ref.get("source_job")
+        source_attempt = ref.get("source_attempt")
+        finding_seq = ref.get("finding_seq")
+        finding_digest = ref.get("finding_digest")
+        if (
+            not isinstance(source_task, str) or not source_task
+            or not isinstance(source_job, str) or not source_job
+            or not isinstance(source_attempt, str) or not source_attempt
+            or not isinstance(source_digest, str) or not source_digest
+            or not isinstance(finding_digest, str)
+            or type(finding_seq) is not int or finding_seq < 0
+            or len(finding_digest) != 64
+            or any(char not in "0123456789abcdef" for char in finding_digest)
+        ):
+            return False
+        bindings = plan.metadata.get("provider_bindings")
+        binding = bindings.get(task.id) if isinstance(bindings, dict) else None
+        if (
+            not isinstance(binding, dict)
+            or binding.get("manifest_fingerprint") != ref.get("provider_fingerprint")
+        ):
+            return False
+        try:
+            evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
+        except (ValueError, TypeError, RuntimeError):
+            return False
+        if (
+            not isinstance(evidence, dict)
+            or evidence.get("plan_id") != source_plan_id
+            or evidence.get("mission_id") != plan.mission_id
+            or evidence.get("plan_digest") != source_digest
+            or evidence.get("all_evidence_recorded") is not True
+            or evidence.get("all_evidence_integrity_verified") is not True
+        ):
+            return False
+        attempts = evidence.get("attempts")
+        if not isinstance(attempts, list):
+            return False
+        source_rows = [
+            row for row in attempts
+            if isinstance(row, dict)
+            and row.get("task_key") == source_task
+            and row.get("job_id") == source_job
+            and row.get("attempt_id") == source_attempt
+            and row.get("attempt_status") == "succeeded"
+            and row.get("evidence_status") == "recorded"
+            and row.get("integrity_status") == "verified"
+        ]
+        if len(source_rows) != 1:
+            return False
+        findings = source_rows[0].get("findings")
+        if not isinstance(findings, list):
+            return False
+        source_findings = [
+            finding for finding in findings
+            if isinstance(finding, dict) and finding.get("seq") == finding_seq
+        ]
+        if len(source_findings) != 1:
+            return False
+        actual = hashlib.sha256(json.dumps(
+            source_findings[0], sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        return actual == finding_digest
 
     def authorize_workflow_task_for_plan(self, plan_id: str, task) -> bool:
         """Require exact consent for moderate-impact or network-effect tasks.
@@ -1300,6 +1504,8 @@ class Core:
                 else:
                     return False
             if not any(candidate == task for candidate in plan.tasks):
+                return False
+            if not self._workflow_followup_provenance_valid(plan, task):
                 return False
             self.store.verify_workflow_plan_integrity(plan_id)
             provider = getattr(self, "providers", None)
@@ -1418,7 +1624,11 @@ class Core:
             self.store.reconcile_stale()
             # Do not steal a live worker's attempt when another CLI/daemon
             # process starts. Workflow workers renew this lease while executing.
-            self.store.reconcile_workflow_attempts(stale_after_s=60.0)
+            # Reconcile every stale page before readiness. Each transaction
+            # is bounded by JobStore; repeating until empty avoids stranding
+            # older attempts behind a fixed startup batch size.
+            while self.store.reconcile_workflow_attempts(stale_after_s=60.0):
+                pass
         except Exception as exc:
             # Recovery is part of the durable execution boundary. Starting
             # after silently skipping it can strand claims or report false

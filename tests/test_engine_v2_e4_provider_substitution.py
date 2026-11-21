@@ -53,7 +53,7 @@ def _setup(tmp_path, *, selected: str):
     core.store = JobStore(tmp_path / "e4-provider-substitution.db")
     core.store.create_mission("mission", "synthetic provider-substitution lab")
     core.scope = SimpleNamespace(
-        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+        check_for_unpinned_execution=lambda _target: SimpleNamespace(allowed=True),
     )
     core.providers = BoundProviderRouter(
         (first, second), preferred_providers={_CAPABILITY: selected},

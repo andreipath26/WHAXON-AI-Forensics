@@ -1,7 +1,12 @@
 """E2 workflow schema rejects ambiguous or non-JSON task and plan values."""
 import pytest
 
-from whaxon.core.workflow import ApprovalBinding, WorkflowPlan, WorkflowTask
+from whaxon.core.workflow import (
+    AIProposalTrace,
+    ApprovalBinding,
+    WorkflowPlan,
+    WorkflowTask,
+)
 
 
 @pytest.mark.parametrize("payload", [
@@ -63,3 +68,41 @@ def test_e2_shared_references_are_valid_and_stably_canonicalized():
 def test_e2_approval_input_digest_never_serializes_nan_as_json_extension():
     with pytest.raises(ValueError, match="finite"):
         ApprovalBinding.digest_inputs({"result": float("nan")})
+
+
+def test_e2_ai_proposal_trace_separates_inference_from_persisted_observations():
+    trace = AIProposalTrace(
+        producer="test-provider", request_digest="a" * 64,
+        capability_id="tool.nmap", target="192.0.2.10",
+        rationale="A service inventory is relevant to the stated goal.",
+        confidence=0.7,
+    ).to_dict()
+    assert trace["schema_version"] == "whaxon.ai-proposal.v1"
+    assert trace["observations"] == []
+    assert trace["source_record_refs"] == []
+    assert trace["inference"]["confidence_semantics"] == (
+        "model-reported heuristic, not measured certainty"
+    )
+    assert trace["uncertainty"] == [
+        "No persisted observation was supplied to this proposal."
+    ]
+    assert trace["approval_granted"] is False
+    assert trace["execution_submitted"] is False
+
+
+@pytest.mark.parametrize("changes", [
+    {"request_digest": "not-a-digest"},
+    {"confidence": True},
+    {"confidence": float("nan")},
+    {"rationale": "x" * 2001},
+    {"source_record_refs": ({"record_type": "finding", "record_id": "f1"},)},
+])
+def test_e2_ai_proposal_trace_rejects_malformed_provenance(changes):
+    values = {
+        "producer": "provider", "request_digest": "b" * 64,
+        "capability_id": "tool.nmap", "target": "192.0.2.10",
+        "rationale": "bounded", "confidence": 0.5,
+    }
+    values.update(changes)
+    with pytest.raises((TypeError, ValueError)):
+        AIProposalTrace(**values)

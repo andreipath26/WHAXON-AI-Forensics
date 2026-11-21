@@ -230,11 +230,20 @@ def test_v2_report_and_audit_digest_api_match_shared_core(tmp_path, monkeypatch)
     core.create_mission("m-audit", "controlled")
     core.save_workflow_plan("p-audit", WorkflowPlan("m-audit", (
         WorkflowTask("scan", "fixture", "192.0.2.10"),
-    )))
+    ), metadata={
+        "omitted_checks": [{
+            "check": "cookies", "reason": "legacy-only",
+            "disposition": "unsupported",
+        }],
+    }))
     report = client.get("/api/v2/workflows/p-audit/report?limit=10")
     assert report.status_code == 200
     assert report.get_json() == core.workflow_report("p-audit", limit=10)
     assert report.get_json()["status"] != "complete"
+    assert report.get_json()["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "recorded", "count": 1,
+        "items": [{"check": "cookies", "disposition": "unsupported"}],
+    }
 
     snapshot = client.get("/api/v2/workflows/p-audit/audit-snapshot")
     assert snapshot.status_code == 200
@@ -416,6 +425,24 @@ def test_workflow_v2_mission_budget_is_shared_with_store(tmp_path, monkeypatch):
     assert response.status_code == 400
     assert response.get_json() == {"error": "mission limits must be positive integers"}
     assert client.get("/api/v2/missions/missing/budget").status_code == 404
+
+
+def test_workflow_v2_mission_runtime_budget_is_shared_with_store(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    response = client.post(
+        "/api/v2/missions/m/runtime-budget", json={"max_runtime_s": 30.5},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["max_runtime_s"] == 30.5
+    assert core.store.get_mission_runtime_limit("m")["max_runtime_s"] == 30.5
+    assert client.get("/api/v2/missions/m/runtime-budget").get_json()[
+        "runtime_budget_exhausted"
+    ] is False
+    assert client.post(
+        "/api/v2/missions/m/runtime-budget", json={"max_runtime_s": float("inf")},
+    ).status_code == 400
+    assert client.get("/api/v2/missions/missing/runtime-budget").status_code == 404
 
 
 def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
@@ -700,6 +727,54 @@ def test_v2_evidence_api_links_actual_job_and_never_fabricates_findings(tmp_path
     assert mismatch["all_evidence_recorded"] is False
     assert mismatch["attempts"][0]["evidence_status"] == "job_not_verified"
     assert mismatch["attempts"][0]["findings"] == []
+
+
+def test_v2_evidence_page_never_claims_completeness_for_a_truncated_lifecycle(
+    tmp_path, monkeypatch,
+):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-pages", "authorized lab")
+    core.save_workflow_plan("p-pages", WorkflowPlan("m-pages", (
+        WorkflowTask("scan-a", "tool.nmap", "192.0.2.10"),
+        WorkflowTask("scan-b", "tool.nmap", "192.0.2.11"),
+    )))
+    first = core.store.claim_ready_workflow_task("p-pages", "worker")
+    second = core.store.claim_ready_workflow_task("p-pages", "worker")
+    assert first is not None and second is not None
+
+    with core.store._conn() as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, tool, target, status, exit_code) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("page-job", "nmap", first["target"], "finished", 0),
+        )
+        connection.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, "
+            "data_json, raw_line, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("page-job", 0, "open_port", "info", "nmap", '{"port":80}',
+             "80/tcp open http", "candidate"),
+        )
+    core.store.finish_task_attempt(first["attempt_id"], "succeeded", result={
+        "job_id": "page-job", "tool_id": "nmap", "target": first["target"],
+    })
+    core.store.finish_task_attempt(second["attempt_id"], "succeeded", result={
+        "job_id": "missing-page-job", "tool_id": "nmap", "target": second["target"],
+    })
+    with core.store._conn() as connection:
+        connection.execute(
+            "UPDATE task_attempts SET started_at=1 WHERE id=?", (first["attempt_id"],),
+        )
+        connection.execute(
+            "UPDATE task_attempts SET started_at=2 WHERE id=?", (second["attempt_id"],),
+        )
+
+    bounded = client.get("/api/v2/workflows/p-pages/evidence?limit=1").get_json()
+    assert bounded["attempt_count"] == 2
+    assert bounded["returned_attempt_count"] == 1
+    assert bounded["truncated"] is True
+    assert bounded["attempts"][0]["evidence_status"] == "recorded"
+    assert bounded["all_evidence_recorded"] is False
+    assert bounded["all_evidence_integrity_verified"] is False
 
 
 def test_v2_evidence_api_rejects_bad_bounds_and_unknown_plans(tmp_path, monkeypatch):

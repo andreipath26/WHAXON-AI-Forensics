@@ -79,6 +79,11 @@ def _parser() -> argparse.ArgumentParser:
     mission_limits.add_argument("--id", required=True)
     mission_limits.add_argument("--max-total-attempts", type=int, required=True)
     mission_limits.add_argument("--max-concurrency", type=int, required=True)
+    mission_runtime = mission_commands.add_parser(
+        "runtime-limit", help="set a cumulative mission attempt wall-time cap in seconds",
+    )
+    mission_runtime.add_argument("--id", required=True)
+    mission_runtime.add_argument("--max-runtime-s", type=float, required=True)
     mission_status = mission_commands.add_parser(
         "budget", help="show mission-wide usage and configured limits",
     )
@@ -431,6 +436,12 @@ def main(args: list[str] | None = None) -> int:
             return 0
         if options.command == "mission" and options.mission_command == "budget":
             print(json.dumps(core.mission_execution_limits(options.id), sort_keys=True))
+            return 0
+        if options.command == "mission" and options.mission_command == "runtime-limit":
+            core.configure_mission_runtime_limit(
+                options.id, max_runtime_s=options.max_runtime_s,
+            )
+            print(json.dumps(core.mission_runtime_limit(options.id), sort_keys=True))
             return 0
         if options.command == "mission" and options.mission_command == "list":
             print(json.dumps(core.missions(

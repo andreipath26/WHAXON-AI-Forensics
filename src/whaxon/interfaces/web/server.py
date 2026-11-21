@@ -27,6 +27,7 @@ from whaxon.interfaces.web.api_contracts import (
     DeadlineRequest,
     ExecutionLimitsRequest,
     MissionCostLimitRequest,
+    MissionRuntimeLimitRequest,
     RateLimitRequest,
     WorkflowApprovalGrantRequest,
     WorkflowAttemptReconciliationRequest,
@@ -955,6 +956,30 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                     max_concurrency=limits.max_concurrency,
                 )
             return jsonify(core.mission_execution_limits(mission_id))
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
+    @app.route("/api/v2/missions/<mission_id>/runtime-budget", methods=["GET", "POST"])
+    def workflow_v2_mission_runtime_budget(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict):
+                    return jsonify({"error": "max_runtime_s required"}), 400
+                try:
+                    limit = MissionRuntimeLimitRequest.model_validate(payload)
+                except ValidationError as exc:
+                    missing = any(error["type"] == "missing" for error in exc.errors())
+                    message = (
+                        "max_runtime_s required" if missing
+                        else "max_runtime_s must be finite and positive"
+                    )
+                    return jsonify({"error": message}), 400
+                core.configure_mission_runtime_limit(
+                    mission_id, max_runtime_s=limit.max_runtime_s,
+                )
+            return jsonify(core.mission_runtime_limit(mission_id))
         except (ValueError, TypeError) as exc:
             status = 404 if "unknown mission" in str(exc) else 400
             return jsonify({"error": str(exc)}), status

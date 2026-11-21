@@ -14,7 +14,7 @@ class Store:
             "task_key": "recon", "capability_id": "tool.nmap",
             "target": "192.0.2.10", "attempt_status": "succeeded",
             "integrity_status": "verified", "evidence_status": "recorded",
-            "job_id": "j1",
+            "job_id": "j1", "attempt_id": "attempt-1",
         }]
         self.job = {
             "id": "j1", "tool": "nmap", "target": "192.0.2.10",
@@ -33,7 +33,11 @@ class Store:
     def get_workflow_evidence(self, plan_id, *, limit):
         return {
             "plan_id": plan_id, "mission_id": self.row["mission_id"],
-            "plan_digest": self.row["digest"], "attempts": self.evidence,
+            "plan_digest": self.row["digest"],
+            "attempts": [
+                {**item, "findings": list(self.findings)}
+                for item in self.evidence
+            ],
             "all_evidence_recorded": True,
             "all_evidence_integrity_verified": True,
         }
@@ -88,9 +92,29 @@ def test_e4_proposal_is_deterministic_not_executable_or_approved():
     ]
     assert all(task.impact == "moderate" for task in result.plan.tasks)
     assert result.plan.metadata["provenance"][0]["source_job"] == "j1"
+    provenance = result.plan.metadata["provenance"][0]
+    assert provenance["task_id"] == result.plan.tasks[0].id
+    assert provenance["source_attempt"] == "attempt-1"
+    assert len(provenance["finding_digest"]) == 64
     assert result.to_dict()["execution_started"] is False
     assert result.to_dict()["approval_granted"] is False
     assert planner().propose("source").plan_id == result.plan_id
+
+
+def test_e4_followup_authorization_rechecks_its_exact_source_finding():
+    from whaxon.core import Core
+
+    store = Store()
+    proposal = planner(store=store).propose("source")
+    core = Core.__new__(Core)
+    core.store = store
+    task = proposal.plan.tasks[0]
+
+    assert core._workflow_followup_provenance_valid(proposal.plan, task) is True
+    # The source plan stays unchanged, but changing the cited persisted finding
+    # after proposal creation invalidates the follow-up at dispatch time.
+    store.findings[0]["data"]["port"] = 8080
+    assert core._workflow_followup_provenance_valid(proposal.plan, task) is False
 
 
 @pytest.mark.parametrize("change", ["tamper", "unknown", "running", "mismatch"])

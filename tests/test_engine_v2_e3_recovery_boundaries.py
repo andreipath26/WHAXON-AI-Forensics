@@ -1,6 +1,8 @@
 """Engine V2 E3: cross-boundary recovery input and plan identity hardening."""
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from whaxon.core import Core
@@ -73,3 +75,61 @@ def test_recovery_with_valid_threshold_preserves_fresh_lease(tmp_path):
     assert claimed is not None
     assert core.store.reconcile_workflow_attempts(stale_after_s=60) == 0
     assert core.store.workflow_attempt_owned(claimed["attempt_id"])
+
+
+@pytest.mark.parametrize("limit", [True, False, 0, -1, 1025, 1.5, "128"])
+def test_recovery_rejects_invalid_batch_limit_without_mutation(tmp_path, limit):
+    core = _core(tmp_path)
+    claimed = core.store.claim_ready_workflow_task("plan", "original-worker")
+    assert claimed is not None
+    before = core.store.list_workflow_attempts("plan")
+    with pytest.raises(ValueError, match="limit must be an integer"):
+        core.store.reconcile_workflow_attempts(limit=limit)
+    assert core.store.list_workflow_attempts("plan") == before
+
+
+def test_initialize_drains_stale_attempts_in_bounded_pages(tmp_path, monkeypatch):
+    core = Core(tmp_path)
+    core.create_mission("mission", "bounded stale-attempt recovery")
+    attempt_count = 129
+    core.configure_mission_execution_limits(
+        "mission", max_total_attempts=attempt_count,
+        max_concurrency=attempt_count,
+    )
+    attempt_ids = []
+    for index in range(attempt_count):
+        plan_id = f"plan-{index:03d}"
+        core.save_workflow_plan(
+            plan_id,
+            WorkflowPlan("mission", (
+                WorkflowTask(f"task-{index:03d}", "fixture", "192.0.2.10"),
+            )),
+        )
+        claim = core.store.claim_ready_workflow_task(
+            plan_id, f"worker-{index:03d}",
+        )
+        assert claim is not None
+        attempt_ids.append(claim["attempt_id"])
+
+    conn = core.store._conn()
+    try:
+        conn.execute("UPDATE task_attempts SET heartbeat_at=0, started_at=0")
+    finally:
+        conn.close()
+
+    reconcile = core.store.reconcile_workflow_attempts
+    page_results = []
+
+    def record_pages(*args, **kwargs):
+        result = reconcile(*args, **kwargs)
+        page_results.append(result)
+        return result
+
+    monkeypatch.setattr(core.store, "reconcile_workflow_attempts", record_pages)
+    asyncio.run(core.initialize(drain=False))
+
+    assert page_results == [128, 1, 0]
+    assert all(
+        core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+        for attempt_id in attempt_ids
+    )

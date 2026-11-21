@@ -267,3 +267,51 @@ def test_scope_mode_rejects_unknown_values():
 
     with pytest.raises(ValueError, match="scope mode"):
         _manifest("provider.invalid_scope_mode", scope_mode="resolve_then_connect")
+
+
+def test_capability_schema_rejects_unknown_or_non_json_contracts():
+    import math
+
+    import pytest
+
+    with pytest.raises(ValueError, match="unsupported schema keyword"):
+        _manifest("provider.unknown_key", input_schema={"type": "object", "magic": True})
+    with pytest.raises(ValueError, match="finite"):
+        _manifest("provider.nonfinite", output_schema={"type": "number", "minimum": math.inf})
+    with pytest.raises(ValueError, match="object keys must be strings"):
+        _manifest("provider.nonstring_key", input_schema={"const": {1: "bad"}})
+
+
+def test_capability_schema_validation_supports_provider_one_of_contracts():
+    import pytest
+
+    from whaxon.core.json_schema import SchemaContractError, validate_instance
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "data": {"oneOf": [
+                {"type": "object", "required": ["port"], "properties": {
+                    "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                }, "additionalProperties": False},
+                {"type": "object", "required": ["header"], "properties": {
+                    "header": {"type": "string", "minLength": 1},
+                }, "additionalProperties": False},
+            ]},
+        },
+        "required": ["data"],
+        "additionalProperties": False,
+    }
+    validate_instance(schema, {"data": {"port": 443}})
+    validate_instance(schema, {"data": {"header": "content-security-policy"}})
+    with pytest.raises(SchemaContractError, match="exactly one"):
+        validate_instance(schema, {"data": {"port": 443, "header": "x"}})
+    with pytest.raises(SchemaContractError):
+        validate_instance({"type": "integer", "enum": [1, 2]}, True)
+    with pytest.raises(SchemaContractError, match="outside enum"):
+        validate_instance({"enum": [1]}, True)
+    with pytest.raises(SchemaContractError, match="does not match const"):
+        validate_instance({"const": 1}, True)
+    with pytest.raises(SchemaContractError, match="items are not allowed"):
+        validate_instance({"type": "array", "items": False}, [1])
+    validate_instance({"type": "array", "items": False}, [])

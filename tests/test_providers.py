@@ -191,8 +191,11 @@ def test_core_default_workflow_policy_requires_scope_permission_and_matching_imp
         permissions=("network.scan",),
         impact="moderate",
     ))
+    def scope_check(target):
+        return SimpleNamespace(allowed=target == "192.0.2.10")
+
     core.scope = SimpleNamespace(
-        check=lambda target: SimpleNamespace(allowed=target == "192.0.2.10"),
+        check=scope_check, check_for_unpinned_execution=scope_check,
     )
     allowed = WorkflowTask(
         "scan", "tool.nmap", "192.0.2.10",
@@ -232,8 +235,11 @@ def test_core_plan_bound_policy_requires_exact_unrevoked_approval(tmp_path):
         permissions=("network.scan",),
         impact="moderate",
     ))
+    def scope_check(target):
+        return SimpleNamespace(allowed=target == "192.0.2.10")
+
     core.scope = SimpleNamespace(
-        check=lambda target: SimpleNamespace(allowed=target == "192.0.2.10"),
+        check=scope_check, check_for_unpinned_execution=scope_check,
     )
     task = WorkflowTask(
         "scan", "tool.nmap", "192.0.2.10",
@@ -316,7 +322,10 @@ def test_engine_v2_plan_authorization_rejects_modified_low_impact_nodes(tmp_path
         provider_version="catalog-v1", transports=("local_process",),
         permissions=(), impact="low",
     ))
-    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=True),
+        check_for_unpinned_execution=lambda target: SimpleNamespace(allowed=True),
+    )
     original = WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low")
     core.store.create_mission("m", "controlled lab")
     core.store.save_workflow_plan("p", WorkflowPlan("m", (original,)))
@@ -345,7 +354,10 @@ def test_engine_v2_plan_authorization_rejects_tampered_sqlite_plan(tmp_path):
         provider_version="catalog-v1", transports=("local_process",),
         permissions=(), impact="low",
     ))
-    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=True),
+        check_for_unpinned_execution=lambda target: SimpleNamespace(allowed=True),
+    )
     task = WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low")
     core.store.create_mission("m", "controlled lab")
     core.store.save_workflow_plan("p", WorkflowPlan("m", (task,)))
@@ -420,7 +432,7 @@ def test_engine_v2_scope_revocation_from_another_process_takes_effect(tmp_path):
     core.capabilities.register(CapabilityManifest(
         capability_id="tool.fixture", provider_id="whaxon.adapter.fixture",
         provider_version="catalog-v1", transports=("local_process",),
-        permissions=(), impact="low",
+        permissions=(), impact="low", scope_mode="pinned_network",
     ))
     core.scope = ScopeManager(scope_path)
     task = WorkflowTask("scan", "tool.fixture", "lab.example", impact="low")
@@ -803,6 +815,119 @@ def test_router_dispatches_through_registered_provider_not_scheduler(monkeypatch
     assert len(runner.calls) == 1
 
 
+def test_router_enforces_provider_input_and_output_contracts(tmp_path):
+    import asyncio
+    from types import SimpleNamespace
+
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan
+
+    class ContractProvider:
+        def __init__(self):
+            self.manifest = CapabilityManifest(
+                "service.contract", "trusted.contract", "1", ("local_process",),
+                input_schema={
+                    "type": "object", "properties": {"count": {"type": "integer", "minimum": 1}},
+                    "required": ["count"], "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object", "properties": {
+                        "provider_id": {"const": "trusted.contract"},
+                        "provider_version": {"const": "1"},
+                        "manifest_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                        "status": {"enum": ["succeeded", "blocked"]},
+                    },
+                    "required": ["provider_id", "provider_version", "manifest_fingerprint", "status"],
+                    "additionalProperties": False,
+                },
+            )
+            self.calls = 0
+            self.malformed_output = False
+
+        def bindings(self):
+            return (self.manifest,)
+
+        def resolve_task(self, task, *, require_installed=False):
+            return SimpleNamespace(manifest=self.manifest)
+
+        async def dispatch(self, task):
+            self.calls += 1
+            result = {
+                "provider_id": self.manifest.provider_id,
+                "provider_version": self.manifest.provider_version,
+                "manifest_fingerprint": self.manifest.fingerprint,
+                "status": "succeeded",
+            }
+            if self.malformed_output:
+                result["status"] = "pretended_success"
+            return result
+
+        def inventory(self):
+            return []
+
+    provider = ContractProvider()
+    router = BoundProviderRouter((provider,))
+    invalid = WorkflowTask(
+        "task", "service.contract", "example.test", inputs={"count": True},
+    )
+    with pytest.raises(CapabilityUnavailable, match="inputs violate"):
+        asyncio.run(router.dispatch(invalid))
+    assert provider.calls == 0
+
+    store = JobStore(tmp_path / "provider-schema-dispatch.db")
+    store.create_mission("schema-mission", "inert provider contract test")
+    store.save_workflow_plan("schema-plan", WorkflowPlan(
+        "schema-mission", (invalid,), metadata={
+            "provider_bindings": {
+                "task": {
+                    "provider_id": provider.manifest.provider_id,
+                    "manifest_fingerprint": provider.manifest.fingerprint,
+                },
+            },
+        },
+    ))
+
+    def authorize_before_claim(task):
+        try:
+            router.resolve_task(task)
+        except CapabilityUnavailable:
+            return False
+        return True
+
+    run = asyncio.run(WorkflowScheduler(
+        store, authorize=authorize_before_claim, dispatch=router.dispatch,
+    ).run("schema-plan"))
+    assert run["tasks"] == [{"id": "task", "status": "blocked"}]
+    assert provider.calls == 0
+
+    valid = WorkflowTask(
+        "task", "service.contract", "example.test", inputs={"count": 1},
+    )
+    provider.malformed_output = True
+    with pytest.raises(RuntimeError, match="output contract"):
+        asyncio.run(router.dispatch(valid))
+    assert provider.calls == 1
+
+    store.save_workflow_plan("malformed-output-plan", WorkflowPlan(
+        "schema-mission", (valid,), metadata={
+            "provider_bindings": {
+                "task": {
+                    "provider_id": provider.manifest.provider_id,
+                    "manifest_fingerprint": provider.manifest.fingerprint,
+                },
+            },
+        },
+    ))
+    run = asyncio.run(WorkflowScheduler(
+        store, authorize=authorize_before_claim, dispatch=router.dispatch,
+    ).run("malformed-output-plan"))
+    assert run["tasks"] == [{"id": "task", "status": "uncertain"}]
+    assert provider.calls == 2
+
+
 def test_router_rejects_duplicate_capabilities_and_untrusted_registry_only(monkeypatch):
     import asyncio
 
@@ -1050,7 +1175,8 @@ def test_multi_provider_execution_requires_approval_bound_manifest(tmp_path):
         def __init__(self, provider_id):
             self.manifest = CapabilityManifest(
                 "service.http.enumerate", provider_id, "1", ("local_process",),
-                target_types=("hostname",), impact="low",
+            target_types=("hostname",), impact="low",
+            scope_mode="pinned_network",
             )
 
         def bindings(self):
@@ -1078,7 +1204,7 @@ def test_multi_provider_execution_requires_approval_bound_manifest(tmp_path):
         preferred_providers={"service.http.enumerate": "trusted.beta"},
     )
     core.scope = SimpleNamespace(
-        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+            check_for_pinned_execution=lambda _target: SimpleNamespace(allowed=True),
     )
     core.store.save_workflow_plan("unpinned", WorkflowPlan("m", (task,)))
     assert core.authorize_workflow_task_for_plan("unpinned", task) is False
@@ -1275,11 +1401,20 @@ def test_e4_optional_portfolio_audit_preserves_minimal_provider_contract():
 
     router = BoundProviderRouter((MinimalProvider(),))
     report = router.portfolio_audit()
-    assert report == {
-        "schema_version": "whaxon.portfolio-audit.v1",
-        "provider_audits": [],
-        "execution_enabled_by_audit": False,
-    }
+    assert report["schema_version"] == "whaxon.portfolio-audit.v1"
+    assert report["provider_audits"] == []
+    assert report["execution_enabled_by_audit"] is False
+    capability_provider = report["capability_providers"][0]
+    assert capability_provider["capability_id"] == "operation.example"
+    assert capability_provider["provider_id"] == "trusted.minimal"
+    assert capability_provider["provider_version"] == "1"
+    assert capability_provider["manifest_fingerprint"]
+    assert capability_provider["manifest"]["capability_id"] == "operation.example"
+    assert capability_provider["declared_readiness"] == "registered"
+    assert capability_provider["live_readiness"] == "unknown"
+    assert capability_provider["state"] == "registered"
+    assert capability_provider["authorization_required"] is True
+    assert capability_provider["execution_enabled_by_audit"] is False
 
 
 
@@ -1417,6 +1552,7 @@ def _followup_auth_core(tmp_path):
             "service.http.enumerate", "trusted.http", "1", ("local_process",),
             target_types=("hostname",), permissions=("network.scan",),
             side_effects=("network_traffic",), impact="moderate",
+            scope_mode="pinned_network",
         )
 
         def bindings(self):
@@ -1437,7 +1573,7 @@ def _followup_auth_core(tmp_path):
     provider = Provider()
     core.providers = BoundProviderRouter((provider,))
     core.scope = SimpleNamespace(
-        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+        check_for_pinned_execution=lambda _target: SimpleNamespace(allowed=True),
     )
 
     def save_plan(plan_id, source_plan_id=None, source_digest=None):
