@@ -391,3 +391,59 @@ def test_msf_exec_rejects_session_type_drift(tmp_path, monkeypatch):
     assert response.status_code == 409
     assert "type changed" in response.get_json()["error"]
     assert fake.exec_calls == []
+
+
+# ---------------------------------------------------------------- pivot candidate session probes
+
+def test_pivot_candidates_are_default_denied_without_probing_sessions(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
+    fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "10.0.0.9", "type": "shell"}}
+    app, _ = _make_app(tmp_path, monkeypatch, fake)
+    calls = []
+
+    from whaxon.core import autopivot
+    monkeypatch.setattr(
+        autopivot, "detect", lambda *args: calls.append(args) or [{"cidr": "10.0.0.0/24"}],
+    )
+
+    response = app.test_client().get("/api/pivot/candidates")
+
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["legacy_execution_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_submitted"] is False
+    assert calls == []
+
+
+def test_pivot_candidates_skip_sessions_outside_current_scope(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
+    (tmp_path / "scope.json").write_text(
+        '{"enabled": true, "in_scope": ["10.0.0.9"], "out_of_scope": []}',
+        encoding="utf-8",
+    )
+    fake = FakeMSF(up=True)
+    fake._sessions = {
+        "1": {"target_host": "10.0.0.9", "type": "shell"},
+        "2": {"target_host": "8.8.8.8", "type": "shell"},
+    }
+    app, _ = _make_app(tmp_path, monkeypatch, fake)
+    from whaxon.core import autopivot
+
+    calls = []
+    monkeypatch.setattr(
+        autopivot, "detect",
+        lambda client, sid: calls.append(str(sid)) or [{"cidr": "10.1.0.0/24"}],
+    )
+
+    response = app.test_client().get("/api/pivot/candidates")
+
+    assert response.status_code == 200
+    assert calls == ["1"]
+    sessions = {row["session_id"]: row for row in response.get_json()["sessions"]}
+    assert sessions["1"]["candidates"] == [{"cidr": "10.1.0.0/24"}]
+    assert sessions["2"]["candidates"] == []
+    assert "no command was sent" in sessions["2"]["error"]
