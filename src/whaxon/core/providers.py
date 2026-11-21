@@ -20,6 +20,7 @@ from .capabilities import (
     CapabilityResolution,
     CapabilityUnavailable,
 )
+from .json_schema import SchemaContractError, validate_instance
 from .provider_execution import (
     SEMANTIC_OPERATION_TO_TOOL,
 )
@@ -1077,6 +1078,13 @@ class BoundProviderRouter:
         if not isinstance(task, WorkflowTask):
             raise TypeError("provider task must be a WorkflowTask")
         manifest = self.manifest_for(task.capability_id)
+        try:
+            validate_instance(manifest.input_schema, task.inputs, path="task.inputs")
+        except SchemaContractError as exc:
+            raise CapabilityUnavailable(
+                task.capability_id,
+                (f"task inputs violate the selected provider contract: {exc}",),
+            ) from exc
         provider = self._routes[task.capability_id]
         resolution = provider.resolve_task(task, require_installed=require_installed)
         if resolution.manifest.fingerprint != manifest.fingerprint:
@@ -1095,6 +1103,37 @@ class BoundProviderRouter:
             or result.get("manifest_fingerprint") != resolution.manifest.fingerprint
         ):
             raise RuntimeError("provider result identity does not match resolved manifest")
+        # Evidence stores add observation sequence, enrichment and
+        # verification fields after the provider has produced each finding.
+        # Those WHAXON-owned fields are not provider output, so validate a
+        # detached provider-contract view while preserving the persisted
+        # result unchanged for reports and callers.
+        evidence_metadata = {
+            "seq", "enrichment", "verification_status", "verified_by",
+            "verification_reason", "proof",
+        }
+        contract_result = dict(result)
+        findings = contract_result.get("findings")
+        if isinstance(findings, list):
+            contract_result["findings"] = [
+                {
+                    key: value for key, value in finding.items()
+                    if key not in evidence_metadata
+                }
+                if isinstance(finding, dict) else finding
+                for finding in findings
+            ]
+        try:
+            validate_instance(
+                resolution.manifest.output_schema, contract_result,
+                path="provider.result",
+            )
+        except SchemaContractError as exc:
+            # Dispatch has crossed the effect boundary. The scheduler records
+            # this provider failure as uncertain and requires reconciliation.
+            raise RuntimeError(
+                f"provider result violates its declared output contract: {exc}",
+            ) from exc
         return result
 
     def operation_reconciliation(self) -> list[dict]:
