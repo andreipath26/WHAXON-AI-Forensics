@@ -12,7 +12,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -61,7 +60,7 @@ def main() -> None:
                     time.sleep(0.3)
             else:
                 raise AssertionError("Installed web service did not start")
-            status, body, kind = get(url + "/ui-v2")
+            status, body, _kind = get(url + "/ui-v2")
             assert status == 200 and b"Security Operations Engine" in body
             assert b"/static/dashboard-v2.css" in body
             assert b"fonts.googleapis.com" not in body

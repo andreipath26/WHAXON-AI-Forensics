@@ -3,7 +3,8 @@
 
 Run only when online; later import/refresh works without internet.
 """
-import hashlib, urllib.request
+import hashlib
+import urllib.request
 from pathlib import Path
 
 URL = "https://raw.githubusercontent.com/offensive-security/exploitdb/master/files_exploits.csv"
