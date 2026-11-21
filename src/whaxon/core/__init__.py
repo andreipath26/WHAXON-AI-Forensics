@@ -557,9 +557,10 @@ class Core:
         }
         verification_outcome_counts: dict[str, int] = {}
         for finding in findings:
-            outcome = finding.get("verification_outcome")
+            verification_outcome = finding.get("verification_outcome")
             outcome_status = (
-                outcome.get("status") if isinstance(outcome, dict) else None
+                verification_outcome.get("status")
+                if isinstance(verification_outcome, dict) else None
             )
             if isinstance(outcome_status, str):
                 verification_outcome_counts[outcome_status] = (
