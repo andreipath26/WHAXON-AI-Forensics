@@ -11,7 +11,11 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
+from whaxon.core.catalog import Tool, ToolCatalog
+from whaxon.core.events import EventBus
+from whaxon.core.runner import ToolRunner
 from whaxon.core.scheduler import WorkflowScheduler
 from whaxon.core.store import JobStore
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
@@ -220,3 +224,53 @@ def test_cancel_after_real_http_effect_is_uncertain_and_never_replayed(tmp_path)
         ).run("plan", max_tasks=3, max_attempts=3))
         assert retried["attempts"] == 0
         assert receiver.server.received == [b"effect-before-cancel"]
+
+
+def test_scheduler_shutdown_cancellation_kills_runner_and_keeps_attempt_uncertain(tmp_path):
+    """Cancelling a dispatched Engine V2 worker cannot orphan its child tool."""
+    store = JobStore(tmp_path / "runner-cancel.db")
+    _plan(store)
+    bus = EventBus()
+    catalog = ToolCatalog(bus, Path("/does/not/exist"))
+    catalog._tools = {
+        "slow": Tool(
+            id="slow", name="Slow", category="test",
+            binary="/bin/sleep", args="30",
+        ),
+    }
+    runner = ToolRunner(bus, catalog=catalog)
+
+    async def dispatch(task):
+        return await runner.run_tool(
+            "slow", task.target, job_id=task._provider_execution_id, timeout_s=30,
+        )
+
+    async def cancel_after_dispatch():
+        scheduled = asyncio.create_task(WorkflowScheduler(
+            store, authorize=lambda task: True, dispatch=dispatch,
+        ).run("plan", max_tasks=1, max_attempts=1))
+        deadline = time.monotonic() + 5
+        while not runner._procs:
+            if time.monotonic() >= deadline:
+                raise AssertionError("provider child did not start")
+            await asyncio.sleep(0.02)
+        process = next(iter(runner._procs.values()))
+        scheduled.cancel()
+        try:
+            await asyncio.wait_for(scheduled, timeout=5)
+        except asyncio.CancelledError:
+            pass
+        else:
+            raise AssertionError("cancelled scheduler did not propagate cancellation")
+        return process
+
+    process = asyncio.run(cancel_after_dispatch())
+    assert process.returncode is not None
+    assert not runner._procs
+    attempts = store.list_workflow_attempts("plan")
+    assert len(attempts) == 1
+    assert attempts[0]["status"] == "uncertain"
+    assert any(
+        event["event_type"] == "dispatch_started"
+        for event in store.list_workflow_events("plan")
+    )
