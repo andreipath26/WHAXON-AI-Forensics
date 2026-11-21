@@ -171,13 +171,38 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
     assert page.locator("#whaxon-findings-list #whaxon-findings-empty").count() == 0
 
 def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw_line(page, live_server):
+    payload = {
+        "jobs": [{
+            "job": {"id": "search-findings", "target": "127.0.0.1", "tool": "nmap"},
+            "findings": [
+                {"seq": 0, "title": "22/tcp open ssh", "severity": "low",
+                 "source": "nmap", "verification_status": "candidate",
+                 "raw_line": "22/tcp open ssh OpenSSH 9.6",
+                 "data": {"port": 22, "protocol": "tcp", "service": "ssh"}},
+                {"seq": 1, "title": "443/tcp open https", "severity": "medium",
+                 "source": "nmap", "verification_status": "candidate",
+                 "raw_line": "443/tcp open https",
+                 "data": {"port": 443, "protocol": "tcp", "service": "https"}},
+                {"seq": 2, "title": "53/udp open domain", "severity": "info",
+                 "source": "nmap", "verification_status": "candidate",
+                 "raw_line": "53/udp open domain",
+                 "data": {"port": 53, "service": "domain"}},
+            ],
+        }],
+    }
+    page.route(
+        "**/api/report?format=json",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(payload),
+        ),
+    )
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
-        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
-        timeout=15000,
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
+        timeout=5000,
     )
 
-    # "protocol" exists in the structured finding data, not the scanner raw line.
+    # "protocol" exists in structured finding data, not the scanner raw line.
     search = page.locator("#whaxon-finding-filter")
     search.fill("protocol")
     page.wait_for_function(
@@ -197,7 +222,6 @@ def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw
     assert "22/tcp open ssh OpenSSH 9.6" in proof.inner_text()
     assert "Verification Outcomes" in page.locator("body").evaluate("(el) => el.textContent")
     assert "Refuted" in page.locator("#whaxon-kpi-fixed").evaluate("(el) => el.parentElement.textContent")
-
 
 def test_findings_header_uses_live_scope_without_claiming_unverified_enforcement(page, live_server):
     page.route(

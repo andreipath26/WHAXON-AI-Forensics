@@ -11,6 +11,7 @@ import pytest
 
 from scripts.engine_v2_acceptance import (
     _artifact_check,
+    _distribution_artifacts,
     _source_revision,
     run_engine_v2_acceptance,
 )
@@ -34,15 +35,18 @@ def test_revision_requires_a_hex_sha_and_never_guesses_git_state(monkeypatch: py
 
 def test_runner_records_all_results_and_never_self_approves_deployment(tmp_path: Path) -> None:
     root = _repo(tmp_path)
+    output = tmp_path / "evidence"
     calls = 0
 
     def fake_runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         nonlocal calls
         calls += 1
         kwargs["stdout"].write(f"ran {command[0]}\n".encode())  # type: ignore[union-attr]
+        artifact_dir = output / "dist"
+        artifact_dir.mkdir(exist_ok=True)
+        (artifact_dir / "whaxon-fixture.whl").write_bytes(b"wheel bytes")
         return subprocess.CompletedProcess(command, 1 if calls == 1 else 0)
 
-    output = tmp_path / "evidence"
     report = run_engine_v2_acceptance(
         root, output, source_revision="abcdef1",
         checks=[
@@ -56,6 +60,10 @@ def test_runner_records_all_results_and_never_self_approves_deployment(tmp_path:
     assert report["internal_status"] == "failed"
     assert report["deployment_decision"] == "HOLD"
     assert all(gate["status"] == "pending" for gate in report["external_gates"])
+    assert report["distribution_artifacts"] == [{
+        "filename": "whaxon-fixture.whl", "size_bytes": 11,
+        "sha256": hashlib.sha256(b"wheel bytes").hexdigest(),
+    }]
     for check in report["checks"]:
         log_path = output / check["log"]
         assert hashlib.sha256(log_path.read_bytes()).hexdigest() == check["log_sha256"]
@@ -71,6 +79,18 @@ def test_runner_refuses_to_overwrite_an_existing_evidence_bundle(tmp_path: Path)
     output.mkdir()
     with pytest.raises(FileExistsError):
         run_engine_v2_acceptance(root, output, checks=[])
+
+
+def test_artifact_report_hashes_only_wheels_and_source_archives(tmp_path: Path) -> None:
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "whaxon.whl").write_bytes(b"wheel")
+    (dist / "whaxon.tar.gz").write_bytes(b"source")
+    (dist / "unrelated.log").write_text("skip")
+    records = _distribution_artifacts(dist)
+    assert [item["filename"] for item in records] == ["whaxon.whl", "whaxon.tar.gz"]
+    assert [item["size_bytes"] for item in records] == [5, 6]
+    assert records[0]["sha256"] == hashlib.sha256(b"wheel").hexdigest()
 
 
 def test_sdist_check_requires_manifests_and_at_least_one_payload(tmp_path: Path) -> None:

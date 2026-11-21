@@ -18,7 +18,7 @@ overwritten. The bundle contains an incrementally checkpointed `report.json`,
 `report.sha256`, complete command logs, built wheel and source archive, and a
 fresh virtual environment used for the installed-wheel smoke. The report
 records versions/platform, command, status, return code, duration, log digest,
-and unresolved gates. The SHA-256 sidecar detects accidental changes only when
+package filenames, sizes and SHA-256 digests, and unresolved gates. The SHA-256 sidecar detects accidental changes only when
 the report and digest are retained independently; it is not a signed audit
 anchor.
 

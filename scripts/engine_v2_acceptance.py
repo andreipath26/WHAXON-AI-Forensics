@@ -75,6 +75,15 @@ def _default_output_root(repo_root: Path, revision: str) -> Path:
     return repo_root / "artifacts" / "engine-v2-acceptance" / f"{stamp}-{label}"
 
 
+def _distribution_artifacts(dist_dir: Path) -> list[dict[str, Any]]:
+    """Identify exact package outputs so the evidence report binds their bytes."""
+    paths = sorted(dist_dir.glob("*.whl")) + sorted(dist_dir.glob("*.tar.gz"))
+    return [
+        {"filename": path.name, "size_bytes": path.stat().st_size, "sha256": _sha256(path)}
+        for path in paths if path.is_file()
+    ]
+
+
 def _checks(bundle: Path) -> list[dict[str, Any]]:
     dist_dir = bundle / "dist"
     python = sys.executable
@@ -211,9 +220,13 @@ def _run_check(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     if check.get("kind"):
         started = time.monotonic()
-        status, reason, return_code = _artifact_check(
-            check, repo_root=repo_root, bundle=bundle, runner=runner,
-        )
+        try:
+            status, reason, return_code = _artifact_check(
+                check, repo_root=repo_root, bundle=bundle, runner=runner,
+            )
+        except Exception as exc:
+            status, return_code = "blocked", None
+            reason = f"artifact-check harness raised {type(exc).__name__}"
         with log_path.open("a", encoding="utf-8") as log:
             log.write(f"status={status}\n")
             if reason:
@@ -304,6 +317,7 @@ def run_engine_v2_acceptance(
             "platform": platform.platform(), "machine": platform.machine(),
         },
         "checks": [],
+        "distribution_artifacts": [],
         "external_gates": [
             {"id": gate_id, "status": status, "required_evidence": description}
             for gate_id, status, description in _EXTERNAL_GATES
@@ -326,6 +340,7 @@ def run_engine_v2_acceptance(
         print(f"[engine-v2-acceptance] {result['id']}: {result['status']}", flush=True)
     failed = [item for item in report["checks"] if item["status"] == "failed"]
     blocked = [item for item in report["checks"] if item["status"] == "blocked"]
+    report["distribution_artifacts"] = _distribution_artifacts(output_dir / "dist")
     report["internal_status"] = "failed" if failed else "blocked" if blocked else "passed"
     report["finished_at"] = _utc_now()
     report["deployment_decision"] = "HOLD"
