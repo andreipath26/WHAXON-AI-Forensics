@@ -345,6 +345,33 @@ def test_run_tool_rechecks_persisted_pivot_session_before_process_creation():
     assert process_calls == []
 
 
+@pytest.mark.parametrize(
+    "target,route_port",
+    [
+        ("http://10.0.0.7:8080/", 80),
+        ("https://10.0.0.7/", 80),
+    ],
+)
+def test_run_tool_rejects_pivot_route_for_different_target_port(target, route_port):
+    route = Route(
+        target_host="10.0.0.7", target_port=route_port, local_port=18080,
+        via_session="3", session_host="10.0.0.5",
+    )
+    runner = _pivot_runner(
+        route, lambda _sid: {"status": "open", "host": "10.0.0.5"},
+    )
+    process_calls = []
+
+    async def fake_run(**kwargs):
+        process_calls.append(kwargs)
+        return "should not start"
+
+    runner.run = fake_run
+    with pytest.raises(ValueError, match="does not match requested target port"):
+        asyncio.run(runner.run_tool("nikto", target, timeout_s=5.0))
+    assert process_calls == []
+
+
 def test_run_tool_rechecks_scope_after_route_resolution():
     """A scope tightened during route lookup blocks before process creation."""
     class _ChangingScope:
