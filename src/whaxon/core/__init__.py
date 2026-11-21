@@ -1282,10 +1282,11 @@ class Core:
         finding_seq = ref.get("finding_seq")
         finding_digest = ref.get("finding_digest")
         if (
-            not all(isinstance(value, str) and value for value in (
-                source_task, source_job, source_attempt, source_digest,
-                finding_digest,
-            ))
+            not isinstance(source_task, str) or not source_task
+            or not isinstance(source_job, str) or not source_job
+            or not isinstance(source_attempt, str) or not source_attempt
+            or not isinstance(source_digest, str) or not source_digest
+            or not isinstance(finding_digest, str)
             or type(finding_seq) is not int or finding_seq < 0
             or len(finding_digest) != 64
             or any(char not in "0123456789abcdef" for char in finding_digest)
