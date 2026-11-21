@@ -794,6 +794,58 @@ def test_legacy_validation_api_runs_only_with_explicit_opt_in(tmp_path, monkeypa
     assert core.store.get_findings("j1")[0]["verification_status"] == "verified"
 
 
+def test_legacy_validation_and_retest_recheck_scope_before_each_probe(
+    tmp_path, monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from whaxon.core.validator import Validator
+
+    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding(kind="sqli")])
+    client = app.test_client()
+    attempted = []
+
+    def fake_fetch(url, param, value, *, authorize_request=None):
+        allowed = authorize_request(url) if callable(authorize_request) else None
+        attempted.append((url, allowed))
+        if allowed is not True:
+            raise ValueError("scope authorization denied validation request")
+        return "no proof", 0.0
+
+    monkeypatch.setattr(Validator, "_fetch", staticmethod(fake_fetch))
+
+    for endpoint, expected_status in (
+        ("/api/validate/j1/0", "candidate"),
+        ("/api/retest/j1/0", "inconclusive"),
+    ):
+        if endpoint.startswith("/api/retest"):
+            core.store.update_verification(
+                "j1", 0, "verified", by="test", reason="seeded proof",
+            )
+        decisions = iter((True, False))
+        scope_targets = []
+
+        def check_for_execution(target):
+            scope_targets.append(target)
+            return SimpleNamespace(
+                allowed=next(decisions),
+                reason="in scope" if len(scope_targets) == 1 else "revoked",
+                matched_rule="test",
+            )
+
+        monkeypatch.setattr(
+            core.scope, "check_for_execution", check_for_execution,
+        )
+        attempted.clear()
+        response = client.post(endpoint)
+
+        assert response.status_code == 200
+        assert response.get_json()["status"] == expected_status
+        assert scope_targets == ["http://10.0.0.5", "http://10.0.0.5"]
+        assert attempted == [("http://10.0.0.5", False)]
+
 def test_legacy_retest_api_is_default_denied_before_read_or_replay(tmp_path, monkeypatch):
     from whaxon.core.validator import Validator
 
