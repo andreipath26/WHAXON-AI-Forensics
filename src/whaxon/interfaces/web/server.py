@@ -632,7 +632,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 message = "step must be a positive integer"
             else:
                 message = "AI proposal history must be an array of objects"
-            return jsonify({"error": message, "execution_submitted": False}), 400
+            return jsonify({"error": message}), 400
         try:
             proposal = propose_v2_workflow_plan(
                 core,
