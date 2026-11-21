@@ -763,8 +763,10 @@ class Core:
         # every linked descendant, including plans saved during this scan.
         cancelled = self.store.request_workflow_cancellation(plan_id)
         self.workflow_requests.cancel_queued(plan_id)
-        mission_plans = self.store.list_workflow_mission_plans(root["mission_id"])
         max_plans = 1000
+        mission_plans = self.store.list_workflow_mission_plans(
+            root["mission_id"], limit=max_plans,
+        )
         children: dict[str, list[str]] = {}
         for candidate in mission_plans[:max_plans]:
             child_id = candidate.get("id")
