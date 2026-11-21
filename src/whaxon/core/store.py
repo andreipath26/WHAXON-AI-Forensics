@@ -139,6 +139,10 @@ CREATE TABLE IF NOT EXISTS mission_execution_limits (
     max_total_attempts INTEGER NOT NULL,
     max_concurrency INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mission_runtime_limits (
+    mission_id TEXT PRIMARY KEY,
+    max_runtime_s REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS workflow_limits (
     plan_id TEXT PRIMARY KEY,
     max_total_attempts INTEGER NOT NULL,
@@ -3593,17 +3597,103 @@ class JobStore:
             deadline = c.execute(
                 "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?", (mission_id,),
             ).fetchone()
+            runtime = self._mission_runtime_usage(c, mission_id, now=time.time())
             return {
                 "mission_id": mission_id,
                 "deadline_at": deadline["deadline_at"] if deadline else None,
                 "deadline_exceeded": bool(deadline and time.time() >= deadline["deadline_at"]),
                 "max_total_attempts": limits["max_total_attempts"] if limits else None,
                 "max_concurrency": limits["max_concurrency"] if limits else None,
+                "max_runtime_s": runtime["max_runtime_s"],
+                "runtime_s": runtime["runtime_s"],
+                "runtime_budget_exhausted": runtime["runtime_budget_exhausted"],
                 "attempts": usage["attempts"], "active_attempts": usage["active"],
-                "enforced": limits is not None,
+                "enforced": limits is not None or runtime["max_runtime_s"] is not None,
             }
         finally:
             c.close()
+
+    @staticmethod
+    def _mission_runtime_usage(c, mission_id, *, now=None):
+        """Measure elapsed attempt wall time across every plan in a mission."""
+        now = time.time() if now is None else now
+        row = c.execute(
+            "SELECT COALESCE(SUM(CASE "
+            "WHEN a.finished_at IS NOT NULL THEN MAX(0, a.finished_at-a.started_at) "
+            "WHEN a.status='running' THEN MAX(0, ?-a.started_at) ELSE 0 END), 0) AS runtime_s "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
+            (now, mission_id),
+        ).fetchone()
+        limit = c.execute(
+            "SELECT max_runtime_s FROM mission_runtime_limits WHERE mission_id=?",
+            (mission_id,),
+        ).fetchone()
+        runtime_s = float(row["runtime_s"] or 0.0)
+        max_runtime_s = float(limit["max_runtime_s"]) if limit else None
+        return {
+            "runtime_s": runtime_s,
+            "max_runtime_s": max_runtime_s,
+            "runtime_budget_exhausted": max_runtime_s is not None and runtime_s >= max_runtime_s,
+        }
+
+    def set_mission_runtime_limit(self, mission_id, *, max_runtime_s):
+        """Set a durable cumulative wall-time cap; later changes may only tighten it."""
+        import math
+
+        if (isinstance(max_runtime_s, bool) or not isinstance(max_runtime_s, (int, float))
+                or not math.isfinite(max_runtime_s) or max_runtime_s <= 0):
+            raise ValueError("mission max_runtime_s must be finite and positive")
+        max_runtime_s = float(max_runtime_s)
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT max_runtime_s FROM mission_runtime_limits WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchone()
+                if old is not None and max_runtime_s > old["max_runtime_s"]:
+                    raise ValueError("mission runtime limit cannot be relaxed")
+                if old is None or max_runtime_s != old["max_runtime_s"]:
+                    c.execute(
+                        "INSERT INTO mission_runtime_limits (mission_id,max_runtime_s) "
+                        "VALUES (?,?) ON CONFLICT(mission_id) DO UPDATE SET "
+                        "max_runtime_s=excluded.max_runtime_s",
+                        (mission_id, max_runtime_s),
+                    )
+                    self._audit_mission_execution_change(
+                        c, mission_id, "mission_runtime_limit_set",
+                        {"max_runtime_s": max_runtime_s},
+                    )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_runtime_limit(self, mission_id):
+        """Return the cap and live measured usage for the mission."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            return {"mission_id": mission_id, **self._mission_runtime_usage(c, mission_id)}
+        finally:
+            c.close()
+
+    def _mission_runtime_allows_claim(self, c, plan_id, *, now=None):
+        mission = c.execute(
+            "SELECT mission_id FROM workflow_plans WHERE id=?", (plan_id,),
+        ).fetchone()
+        if mission is None:
+            return False
+        usage = self._mission_runtime_usage(c, mission["mission_id"], now=now)
+        return not usage["runtime_budget_exhausted"]
 
     def _mission_budget_available(self, c, plan_id):
         """Call inside BEGIN IMMEDIATE; serializes claims from different workers."""
@@ -3666,6 +3756,8 @@ class JobStore:
                 or mission_usage["active"] > mission_limits["max_concurrency"]
             ):
                 return False
+        if not self._mission_runtime_allows_claim(c, plan_id):
+            return False
         return self._mission_cost_allows_claim(c, plan_id)
 
     def get_workflow_limits(self, plan_id):
@@ -3877,6 +3969,7 @@ class JobStore:
                     usage["attempts"] >= max_total
                     or usage["active"] >= max_parallel
                     or not self._mission_budget_available(c, plan_id)
+                    or not self._mission_runtime_allows_claim(c, plan_id)
                     or not self._mission_cost_allows_claim(c, plan_id)
                 ):
                     c.execute("COMMIT")
@@ -4063,6 +4156,8 @@ class JobStore:
                     raise ValueError("workflow concurrency budget exhausted")
                 if not self._mission_budget_available(c, effective_plan):
                     raise ValueError("mission execution budget exhausted")
+                if not self._mission_runtime_allows_claim(c, effective_plan, now=now):
+                    raise ValueError("mission runtime budget exhausted")
                 if not self._mission_cost_allows_claim(c, effective_plan):
                     raise ValueError("mission cost budget blocked or reporting incomplete")
                 task = c.execute(
