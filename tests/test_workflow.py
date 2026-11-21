@@ -922,6 +922,7 @@ def test_reconciliation_report_identifies_dispatch_uncertainty(tmp_path):
     assert after[0]["status"] == "uncertain"
     assert after[0]["provider_execution_id"] == provider_execution_id
     assert after[0]["provider_job_identity_mismatch"] is False
+    assert after[0]["provider_job_identity_verified"] is False
     assert after[0]["provider_job"] == {
         "job_id": provider_execution_id,
         "tool": "nmap",
@@ -932,6 +933,10 @@ def test_reconciliation_report_identifies_dispatch_uncertainty(tmp_path):
         "finding_count": 0,
     }
     assert store.get_workflow_audit_integrity("p")["consistent"] is True
+    with pytest.raises(ValueError, match="identity is unknown"):
+        store.recover_workflow_attempt_from_provider_job(
+            "p", claim["attempt_id"],
+        )
     with sqlite3.connect(path) as db:
         db.execute(
             "UPDATE workflow_events SET detail_json=? "
