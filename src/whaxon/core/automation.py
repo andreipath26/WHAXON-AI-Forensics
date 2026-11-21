@@ -22,7 +22,8 @@ _WEB_PORTS = {80, 443, 8000, 8080, 8188, 8180, 8443, 8888, 9000}
 
 
 def _autochain_enabled() -> bool:
-    return os.environ.get('WHAXON_AUTOCHAIN', 'true').lower() in ('1', 'true', 'yes', 'on')
+    """Enable legacy follow-ups only with an explicit compatibility opt-in."""
+    return os.environ.get('WHAXON_AUTOCHAIN', 'false').lower() in ('1', 'true', 'yes', 'on')
 
 
 class Automator:

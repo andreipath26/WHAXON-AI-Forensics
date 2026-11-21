@@ -19,9 +19,9 @@ def _mk_automator(tmp_path: Path):
     return a, bus, store, runner
 
 
-def test_web_port_fanout_queues_nikto(tmp_path):
-    os.environ.pop('WHAXON_AUTOCHAIN', None)
-    _a, bus, store, runner = _mk_automator(tmp_path)
+def test_legacy_autochain_requires_explicit_opt_in(tmp_path, monkeypatch):
+    monkeypatch.setenv('WHAXON_AUTOCHAIN', 'true')
+    _a, bus, store, _runner = _mk_automator(tmp_path)
     store.create('nmapjob')
     store.set_started('nmapjob', 'nmap', '127.0.0.1')
     findings = (
@@ -29,13 +29,29 @@ def test_web_port_fanout_queues_nikto(tmp_path):
          'data': {'port': 8080, 'service': 'http'}, 'raw_line': ''},
         {'kind': 'open_port', 'severity': 'info', 'source': 'nmap',
          'data': {'port': 8090, 'service': 'http'}, 'raw_line': ''},
-        {'kind': 'open_port', 'severity': 'info', 'source': 'nmap',
-         'data': {'port': 22, 'service': 'ssh'}, 'raw_line': ''},
     )
+
     bus.publish(JobFindings(job_id='nmapjob', findings=findings))
-    import time
-    time.sleep(0.3)
-    assert runner.run_tool.call_count >= 0  # background thread; smoke check
+
+    pending = store.list_pending()
+    assert len(pending) == 2
+    assert {row['target'] for row in pending} == {
+        '127.0.0.1:8080', '127.0.0.1:8090',
+    }
+
+
+def test_legacy_autochain_is_disabled_by_default(tmp_path, monkeypatch):
+    monkeypatch.delenv('WHAXON_AUTOCHAIN', raising=False)
+    _a, bus, store, _runner = _mk_automator(tmp_path)
+    store.create('nmapjob')
+    store.set_started('nmapjob', 'nmap', '127.0.0.1')
+
+    bus.publish(JobFindings(job_id='nmapjob', findings=(
+        {'kind': 'open_port', 'severity': 'info', 'source': 'nmap',
+         'data': {'port': 8080, 'service': 'http'}, 'raw_line': ''},
+    )))
+
+    assert store.list_pending() == []
 
 
 def test_autochain_disabled_env(tmp_path):
@@ -121,9 +137,9 @@ def test_has_tool_returns_true_for_present_tool(tmp_path):
     assert runner.has_tool("nikto") is False
 
 
-def test_engine_v2_findings_do_not_trigger_legacy_auto_chain(tmp_path):
-    """V2 findings stay under V2 follow-up approval, legacy jobs stay legacy."""
-    os.environ.pop('WHAXON_AUTOCHAIN', None)
+def test_engine_v2_findings_do_not_trigger_legacy_auto_chain(tmp_path, monkeypatch):
+    """Explicit legacy opt-in cannot bypass V2 ownership fencing."""
+    monkeypatch.setenv('WHAXON_AUTOCHAIN', 'true')
     automator, bus, store, _runner = _mk_automator(tmp_path)
     finding = {
         'kind': 'open_port', 'severity': 'info', 'source': 'nmap',
@@ -180,7 +196,8 @@ def test_legacy_autochain_fails_closed_when_provenance_cannot_be_read(tmp_path, 
     assert store.list_pending() == []
 
 
-def test_terminal_followup_releases_source_tracking(tmp_path):
+def test_terminal_followup_releases_source_tracking(tmp_path, monkeypatch):
+    monkeypatch.setenv('WHAXON_AUTOCHAIN', 'true')
     auto, bus, store, _runner = _mk_automator(tmp_path)
     store.create('nmapjob')
     store.set_started('nmapjob', 'nmap', '127.0.0.1')
@@ -197,7 +214,8 @@ def test_terminal_followup_releases_source_tracking(tmp_path):
     assert auto._source_by_followup == {}
 
 
-def test_failed_followup_releases_source_tracking(tmp_path):
+def test_failed_followup_releases_source_tracking(tmp_path, monkeypatch):
+    monkeypatch.setenv('WHAXON_AUTOCHAIN', 'true')
     auto, bus, store, _runner = _mk_automator(tmp_path)
     store.create('nmapjob')
     store.set_started('nmapjob', 'nmap', '127.0.0.1')
