@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from whaxon.core.capabilities import CapabilityRegistry
+from whaxon.core.provider_execution import provider_execution_job_id
 from whaxon.core.providers import CatalogAdapterProvider
 from whaxon.core.workflow import WorkflowTask
 
@@ -37,6 +38,18 @@ class _Store:
 
     def get_findings(self, job_id):
         return [{"kind": "open_port", "data": {"port": 443}}]
+
+
+def test_provider_execution_identity_is_attempt_bound_and_fail_closed():
+    task = WorkflowTask("scan", "tool.nmap", "192.0.2.10")
+    attempt_id = "a" * 32
+    object.__setattr__(task, "_attempt_id", attempt_id)
+    object.__setattr__(task, "_provider_execution_id", attempt_id)
+    assert provider_execution_job_id(task) == attempt_id
+
+    object.__setattr__(task, "_provider_execution_id", "b" * 32)
+    with pytest.raises(ValueError, match="durable V2 provider execution identity"):
+        provider_execution_job_id(task)
 
 
 def _tool(tool_id="nmap", *, available=True, category="recon"):

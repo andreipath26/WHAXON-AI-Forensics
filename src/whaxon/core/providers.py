@@ -7,7 +7,6 @@ import ipaddress
 import json
 import re
 import shutil
-import uuid
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
@@ -20,6 +19,7 @@ from .capabilities import (
     CapabilityResolution,
     CapabilityUnavailable,
 )
+from .provider_execution import provider_execution_job_id as _provider_execution_job_id
 from .workflow import WorkflowTask
 
 # Conservative target formats supported by the actual packaged argv templates.
@@ -125,21 +125,6 @@ def _tool_available(tool) -> bool:
         return False
     binary = getattr(tool, "binary", "")
     return not binary or shutil.which(binary) is not None
-
-
-def _provider_execution_job_id(task: WorkflowTask) -> str:
-    """Return the durable attempt ID as job ID, or a random direct-call ID."""
-    attempt_id = getattr(task, "_attempt_id", None)
-    if attempt_id is None:
-        return uuid.uuid4().hex[:12]
-    if (
-        not isinstance(attempt_id, str)
-        or len(attempt_id) != 32
-        or any(char not in "0123456789abcdef" for char in attempt_id)
-        or getattr(task, "_provider_execution_id", None) != attempt_id
-    ):
-        raise ValueError("invalid durable V2 provider execution identity")
-    return attempt_id
 
 
 class CatalogAdapterProvider:
