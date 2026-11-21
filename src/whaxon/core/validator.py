@@ -195,7 +195,7 @@ class Validator:
         return "candidate", "replay produced no conclusive, payload-specific proof"
 
     def _validate_observation(
-        self, finding: Finding, target_url: str | None,
+        self, finding: Finding, target_url: str | None, *, revalidation: bool = False,
     ) -> tuple[str, str]:
         """Re-check environmental observations without sending exploit payloads."""
         import socket
@@ -310,7 +310,8 @@ class Validator:
                     return "candidate", "missing-header finding has no header name"
                 if headers.get(header) is None:
                     return "verified", f"HTTP response still lacks {header}"
-                return "candidate", f"HTTP response includes {header}; finding did not reproduce"
+                status = "refuted" if revalidation else "candidate"
+                return status, f"HTTP response now includes {header}; missing-header finding did not reproduce"
 
             cookie_name = data.get("cookie")
             missing_flag = str(data.get("missing") or "").lower()
@@ -329,7 +330,8 @@ class Validator:
                 }
                 if missing_flag not in attributes:
                     return "verified", f"cookie {cookie_name!r} still lacks {missing_flag}"
-                return "candidate", f"cookie {cookie_name!r} now includes {missing_flag}"
+                status = "refuted" if revalidation else "candidate"
+                return status, f"cookie {cookie_name!r} now includes {missing_flag}"
             return "candidate", f"cookie {cookie_name!r} was not observed in the response"
 
     @staticmethod
@@ -445,7 +447,12 @@ class Validator:
         inconclusive proof returns "inconclusive"; proving absence requires a
         separate remediation check and cannot be inferred from one replay.
         """
-        status, reason = self.validate(finding, target_url=target_url)
+        if finding.kind in self.OBSERVATION_KINDS:
+            status, reason = self._validate_observation(
+                finding, target_url, revalidation=True,
+            )
+        else:
+            status, reason = self.validate(finding, target_url=target_url)
         if status == "verified":
             return "still_vulnerable", f"replay still verifies: {reason}"
         if status == "refuted":

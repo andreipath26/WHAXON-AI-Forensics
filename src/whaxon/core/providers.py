@@ -583,14 +583,16 @@ class FindingVerificationProvider:
     VERIFY_XSS = "tool.verify_xss"
     RETEST_XSS = "tool.retest_xss"
     VERIFY_HTTP_OBSERVATION = "tool.verify_http_observation"
+    RETEST_HTTP_OBSERVATION = "tool.retest_http_observation"
     PROVIDER_ID = "whaxon.verifier.http"
-    PROVIDER_VERSION = "v2-http-verifier.2"
+    PROVIDER_VERSION = "v2-http-verifier.3"
     _KINDS = {
         VERIFY: frozenset({"sqli", "sql_injection"}),
         RETEST: frozenset({"sqli", "sql_injection"}),
         VERIFY_XSS: frozenset({"xss"}),
         RETEST_XSS: frozenset({"xss"}),
         VERIFY_HTTP_OBSERVATION: frozenset({"http_header_missing", "cookie_insecure"}),
+        RETEST_HTTP_OBSERVATION: frozenset({"http_header_missing", "cookie_insecure"}),
     }
     _VERIFY_ONLY = frozenset({VERIFY, VERIFY_XSS, VERIFY_HTTP_OBSERVATION})
 
@@ -617,6 +619,7 @@ class FindingVerificationProvider:
             (self.VERIFY_XSS, "independent reflected XSS verification"),
             (self.RETEST_XSS, "conservative reflected XSS remediation retest"),
             (self.VERIFY_HTTP_OBSERVATION, "HTTP header and cookie observation verification"),
+            (self.RETEST_HTTP_OBSERVATION, "conservative HTTP header and cookie remediation retest"),
         ):
             manifest = CapabilityManifest(
                 capability_id=capability_id,
@@ -722,6 +725,7 @@ class FindingVerificationProvider:
         verify_capability = {
             self.RETEST: self.VERIFY,
             self.RETEST_XSS: self.VERIFY_XSS,
+            self.RETEST_HTTP_OBSERVATION: self.VERIFY_HTTP_OBSERVATION,
         }.get(task.capability_id)
         if verify_capability and (
             source_job.get("tool") != verify_capability.removeprefix("tool.")
@@ -801,6 +805,17 @@ class FindingVerificationProvider:
         evidence_job_id = uuid.uuid4().hex[:12]
         if self.store.get(evidence_job_id) is not None:
             raise RuntimeError("verification evidence id collision")
+        finding_data = finding.data if isinstance(finding.data, dict) else {}
+        observation_details = (
+            {"header": finding_data.get("header")}
+            if finding.kind == "http_header_missing"
+            else {
+                "cookie": finding_data.get("cookie"),
+                "missing": finding_data.get("missing"),
+            }
+            if finding.kind == "cookie_insecure"
+            else {}
+        )
         self.store.create(evidence_job_id)
         if not self.store.set_started(
             evidence_job_id, task.capability_id.removeprefix("tool."), task.target,
@@ -812,6 +827,7 @@ class FindingVerificationProvider:
             severity=finding.severity,
             source="engine-v2-verifier",
             data={
+                **observation_details,
                 "source_job_id": source_job_id,
                 "source_finding_seq": source_seq,
                 "operation": task.capability_id,

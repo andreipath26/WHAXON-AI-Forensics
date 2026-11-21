@@ -583,6 +583,8 @@ def propose_finding_verification_plan(
         ("retest", "sqli"): "tool.retest_sqli",
         ("retest", "sql_injection"): "tool.retest_sqli",
         ("retest", "xss"): "tool.retest_xss",
+        ("retest", "http_header_missing"): "tool.retest_http_observation",
+        ("retest", "cookie_insecure"): "tool.retest_http_observation",
     }
     capability_id = capability_by_kind.get((mode, kind))
     if capability_id is None:

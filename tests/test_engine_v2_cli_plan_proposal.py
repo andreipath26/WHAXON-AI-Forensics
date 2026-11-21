@@ -229,7 +229,9 @@ def test_http_observation_proposal_uses_bounded_v2_verifier():
         ),
         scope=SimpleNamespace(check=lambda _target: SimpleNamespace(allowed=True)),
         providers=SimpleNamespace(
-            manifest_for=lambda _capability: manifest,
+            manifest_for=lambda capability: SimpleNamespace(
+                **{**manifest.__dict__, "capability_id": capability},
+            ),
             resolve_task=lambda task, **kwargs: resolved.append((task, kwargs)),
         ),
     )
@@ -251,8 +253,10 @@ def test_http_observation_proposal_uses_bounded_v2_verifier():
         core, mission_id="mission-1", plan_id="plan-header-retest",
         source_job_id=source_job_id, finding_seq=2, mode="retest",
     )
-    assert retest["status"] == "blocked"
-    assert "unsupported by the V2 verifier" in retest["reason"]
+    assert retest["status"] == "proposed"
+    retest_task = WorkflowPlan.from_dict(retest["plan"]).tasks[0]
+    assert retest_task.capability_id == "tool.retest_http_observation"
+    assert retest_task.inputs == {"source_job_id": source_job_id, "finding_seq": 2}
 
 
 def test_finding_verification_proposal_blocks_unsealed_source():

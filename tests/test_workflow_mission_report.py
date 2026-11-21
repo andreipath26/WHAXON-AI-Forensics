@@ -10,13 +10,15 @@ _PLAN_STAGES = ("recon", "enumeration", "initial_access", "verification", "retes
 _STAGES = ("scope", "recon", "enumeration", "initial_access", "verification", "report", "retest")
 
 
-def _core_for(stages, *, statuses=None):
+def _core_for(
+    stages, *, statuses=None, retest_capability="tool.retest_sqli", retest_kind="sqli",
+):
     core = Core.__new__(Core)
     rows = [{"id": f"plan-{i}", "created_at": i} for i, _ in enumerate(stages)]
     capabilities = {
         "recon": "tool.nmap", "enumeration": "tool.gobuster",
         "initial_access": "lab.initial_access.samba_usermap",
-        "verification": "tool.verify_sqli", "retest": "tool.retest_sqli",
+        "verification": "tool.verify_sqli", "retest": retest_capability,
     }
     from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
@@ -36,7 +38,7 @@ def _core_for(stages, *, statuses=None):
         stage = metadata[plan_id]["metadata"]["release_stage"]
         finding = (
             {"kind": "msf_session"} if stage == "initial_access"
-            else {"kind": "sqli", "source": "engine-v2-verifier"}
+            else {"kind": retest_kind, "source": "engine-v2-verifier"}
             if stage in {"verification", "retest"}
             else {"kind": "open_port"}
         )
@@ -71,10 +73,10 @@ def _core_for(stages, *, statuses=None):
                 }]
             if job_id == "job-4":
                 return [{
-                    "kind": "sqli", "source": "engine-v2-verifier",
-                    "verification_status": "still_vulnerable", "verified_by": "engine-v2",
+                    "kind": retest_kind, "source": "engine-v2-verifier",
+                    "verification_status": "fixed", "verified_by": "engine-v2",
                     "data": {
-                        "operation": "tool.retest_sqli", "status": "still_vulnerable",
+                        "operation": retest_capability, "status": "fixed",
                         "source_job_id": "job-3", "source_finding_seq": 0,
                     },
                 }]
@@ -98,6 +100,19 @@ def test_mission_report_requires_every_stage_in_order():
         "status": "complete", "target": "127.0.0.1", "mismatched_plans": [],
         "rule": "every task in every plan must resolve to the same single target",
     }
+
+
+def test_mission_report_accepts_fixed_http_observation_retest():
+    core = _core_for(
+        _PLAN_STAGES,
+        retest_capability="tool.retest_http_observation",
+        retest_kind="http_header_missing",
+    )
+    report = Core.workflow_mission_report(core, "mission-1")
+    assert report["status"] == "complete"
+    retest = report["stages"][-1]
+    assert retest["stage"] == "retest"
+    assert retest["status"] == "complete"
 
 
 def test_mission_report_rejects_cross_target_stage_chains():

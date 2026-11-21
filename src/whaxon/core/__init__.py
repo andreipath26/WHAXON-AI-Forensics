@@ -472,7 +472,10 @@ class Core:
                 "tool.verify_sqli", "tool.verify_xss",
                 "tool.verify_http_observation",
             },
-            "retest": {"tool.retest_sqli", "tool.retest_xss"},
+            "retest": {
+                "tool.retest_sqli", "tool.retest_xss",
+                "tool.retest_http_observation",
+            },
         }
         for plan_id in selected_ids:
             details = self.workflow_plan_details(plan_id)
@@ -547,7 +550,10 @@ class Core:
                     }
                 else:
                     accepted_statuses = {"still_vulnerable", "fixed"}
-                    accepted_capabilities = {"tool.retest_sqli", "tool.retest_xss"}
+                    accepted_capabilities = {
+                        "tool.retest_sqli", "tool.retest_xss",
+                        "tool.retest_http_observation",
+                    }
                 stage_evidence_ok = stage_evidence_ok and any(
                     attempt.get("capability_id") in accepted_capabilities
                     and finding.get("source") == "engine-v2-verifier"
