@@ -584,6 +584,7 @@ class Core:
         omitted_dispositions: list[dict[str, str]] = []
         requested_checks: list[str] | None = None
         included_checks: list[str] | None = None
+        unrequested_checks: list[str] | None = None
         plan_details_reader = getattr(self, "workflow_plan_details", None)
         if callable(plan_details_reader):
             try:
@@ -608,6 +609,17 @@ class Core:
                                 requested_checks = list(raw_checks)
                             else:
                                 included_checks = list(raw_checks)
+                    if (
+                        persisted_plan.metadata.get("proposal_type") == "passive_recon"
+                        and requested_checks is not None
+                    ):
+                        from .workflow_proposals import PASSIVE_RECON_CHECKS
+
+                        if set(requested_checks).issubset(PASSIVE_RECON_CHECKS):
+                            unrequested_checks = [
+                                check for check in PASSIVE_RECON_CHECKS
+                                if check not in requested_checks
+                            ]
                     raw_omissions = persisted_plan.metadata.get("omitted_checks", [])
                     if isinstance(raw_omissions, (list, tuple)):
                         for omission in raw_omissions:
@@ -646,6 +658,7 @@ class Core:
             "attempt_history_truncated": truncated,
             "requested_checks": requested_checks,
             "included_checks": included_checks,
+            "unrequested_checks": unrequested_checks,
             "recorded_skips": skip_counts,
             "finding_verification_outcomes": verification_outcome_counts,
             "unrequested_verification_findings": verification_outcome_counts.get(

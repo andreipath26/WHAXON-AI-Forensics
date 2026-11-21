@@ -895,8 +895,14 @@ port-forward deletion remains available for cleanup.
 available fixed V2 recon providers. The plan proposal itself never approves or
 dispatches tasks. An explicit `--checks` selection is all-or-nothing: an
 unsupported or unavailable requested provider blocks the proposal. The default
-proposal lists omitted legacy-only or unavailable checks so partial coverage is
-visible; `tech`, `cookies`, and `waf` are not claimed as migrated. The legacy
+proposal lists omitted unavailable checks so partial coverage is visible. The
+fixed `web.recon.passive` HTTPS profile performs one GET and emits header,
+technology, cookie, and WAF observations together, so explicit `headers`,
+`tech`, `cookies`, and `waf` selections bind to that single task. The plan records
+the provider output kinds and avoids duplicate requests when several bundled
+checks are selected. Digest-matched reports also list the standard passive-recon checks
+left unrequested, so a limited profile cannot be mistaken for full recon coverage.
+The legacy
 runner requires both `--legacy` and
 `WHAXON_LEGACY_RECON_ENABLED=true`. An approved saved plan can still be run via
 `--engine v2 --plan-id`, which accepts only fixed recon capabilities against

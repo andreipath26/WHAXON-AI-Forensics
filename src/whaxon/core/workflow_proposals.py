@@ -6,6 +6,11 @@ import uuid
 from .providers import SEMANTIC_OPERATION_IDS
 from .workflow import WorkflowPlan, WorkflowTask
 
+PASSIVE_RECON_CHECKS = (
+    "dns", "dns_full", "ssl", "https", "headers", "redirects", "robots",
+    "security_txt", "tech", "cookies", "waf",
+)
+
 
 def propose_passive_dns_plan(
     core,
@@ -996,12 +1001,17 @@ def propose_passive_recon_plan(
         "dns_full": propose_dns_full_posture_plan,
         "ssl": propose_tls_certificate_plan,
         "https": propose_passive_https_recon_plan,
-        "headers": propose_passive_headers_recon_plan,
         "redirects": propose_passive_redirect_observation_plan,
         "robots": propose_passive_robots_recon_plan,
         "security_txt": propose_passive_security_txt_recon_plan,
     }
-    legacy_only = ("tech", "cookies", "waf")
+    # The fixed HTTPS profile performs one GET and emits header, technology,
+    # cookie, and WAF observations together. These aliases select that one
+    # admitted task; they must not be reported as unsupported or dispatched as
+    # duplicate requests when more than one bundled check is requested.
+    bundled_checks = {
+        "headers": "https", "tech": "https", "cookies": "https", "waf": "https",
+    }
     for name, value in (("mission_id", mission_id), ("plan_id", plan_id), ("target", target)):
         if not isinstance(value, str) or not value.strip() or value != value.strip():
             return {"status": "blocked", "reason": f"{name} must be normalized non-empty text"}
@@ -1010,12 +1020,12 @@ def propose_passive_recon_plan(
         or any(not isinstance(name, str) or not name or name != name.strip() for name in checks)
     ):
         return {"status": "blocked", "reason": "recon checks must be normalized strings"}
-    requested = tuple(checks) if checks is not None else tuple(builders) + legacy_only
+    requested = tuple(checks) if checks is not None else PASSIVE_RECON_CHECKS
     explicit = checks is not None
     if not requested or len(set(requested)) != len(requested):
         return {"status": "blocked", "reason": "recon checks must be a non-empty unique list"}
-    unsupported = [name for name in requested if name not in builders]
-    if any(name not in legacy_only for name in unsupported) or (explicit and unsupported):
+    unsupported = [name for name in requested if name not in builders and name not in bundled_checks]
+    if unsupported:
         return {
             "status": "blocked",
             "reason": f"no V2 recon provider is admitted for checks: {', '.join(unsupported)}",
@@ -1028,21 +1038,32 @@ def propose_passive_recon_plan(
     tasks: list[WorkflowTask] = []
     provider_bindings: dict[str, dict[str, str]] = {}
     included: list[str] = []
-    omitted: list[dict[str, str]] = [
-        {
-            "check": name,
-            "reason": "legacy-only; no admitted V2 provider",
-            "disposition": "unsupported",
-        }
-        for name in unsupported
-    ]
+    omitted: list[dict[str, str]] = []
+    processed: dict[str, tuple[bool, str | None]] = {}
+    provider_outputs_by_check = {
+        "https": [
+            "http_header_missing", "tech_detected", "open_port",
+            "cookie_insecure", "waf_detected",
+        ],
+    }
+    provider_outputs: dict[str, list[str]] = {}
     for check in requested:
-        builder = builders.get(check)
-        if builder is None:
+        provider_check = bundled_checks.get(check, check)
+        if provider_check in processed:
+            ready, reason = processed[provider_check]
+            if ready:
+                included.append(check)
+            elif not explicit:
+                omitted.append({
+                    "check": check,
+                    "reason": str(reason or "provider proposal unavailable")[:512],
+                    "disposition": "provider_unavailable",
+                })
             continue
+        builder = builders[provider_check]
         proposal = builder(
             core, mission_id=mission_id,
-            plan_id=f"{plan_id}-{check}", target=target,
+            plan_id=f"{plan_id}-{provider_check}", target=target,
         )
         if not isinstance(proposal, dict) or proposal.get("status") != "proposed":
             reason = (
@@ -1056,6 +1077,7 @@ def propose_passive_recon_plan(
                     "execution_submitted": False,
                     "approval_granted": False,
                 }
+            processed[provider_check] = (False, str(reason))
             omitted.append({
                 "check": check,
                 "reason": str(reason)[:512],
@@ -1087,7 +1109,7 @@ def propose_passive_recon_plan(
                 "execution_submitted": False,
                 "approval_granted": False,
             }
-        task_id = f"task-{check}"
+        task_id = f"task-{provider_check}"
         try:
             task = WorkflowTask.from_dict({**source_task, "id": task_id})
         except (TypeError, ValueError, KeyError) as exc:
@@ -1102,7 +1124,14 @@ def propose_passive_recon_plan(
             "provider_id": binding["provider_id"],
             "manifest_fingerprint": binding["manifest_fingerprint"],
         }
+        provider_outputs[task_id] = provider_outputs_by_check.get(provider_check, [])
+        processed[provider_check] = (True, None)
         included.append(check)
+
+    included = [
+        check for check in requested
+        if processed.get(bundled_checks.get(check, check), (False, None))[0]
+    ]
 
     if not tasks:
         return {
@@ -1122,6 +1151,7 @@ def propose_passive_recon_plan(
             "requested_checks": list(requested),
             "included_checks": included,
             "omitted_checks": omitted,
+            "provider_outputs": provider_outputs,
         },
     )
     return {
@@ -1134,3 +1164,4 @@ def propose_passive_recon_plan(
         "execution_submitted": False,
         "approval_granted": False,
     }
+
