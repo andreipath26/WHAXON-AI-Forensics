@@ -49,6 +49,16 @@ def test_dashboard_links_to_ai_strategy_gate(page, live_server):
     assert link.get_attribute("href") == "/ui-v2/ai"
 
 def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofed(page, live_server):
+    submitted = {"mission": None, "proposal": None}
+    api_calls = []
+    def record_request(request):
+        api_calls.append((request.method, request.url))
+        if request.method == "POST" and request.url.endswith("/api/v2/missions"):
+            submitted["mission"] = request.post_data_json
+        if request.method == "POST" and request.url.endswith("/api/v2/ai/proposals"):
+            submitted["proposal"] = request.post_data_json
+
+    page.on("request", record_request)
     page.route(
         "**/api/scope/check",
         lambda route: route.fulfill(
@@ -74,6 +84,30 @@ def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofe
     page.wait_for_function(
         "() => document.querySelector('#ai-run-status')?.textContent.toLowerCase().includes('outside current scope')",
         timeout=8000,
+    )
+    status = page.locator("#ai-run-status").inner_text()
+    assert submitted["mission"] and submitted["proposal"]
+    mission_id = submitted["mission"]["id"]
+    assert submitted["proposal"]["mission_id"] == mission_id
+    assert f"Mission {mission_id} was created" in status
+    assert "no V2 plan was saved" in status
+    assert "no approval or execution was submitted" in status.lower()
+    missions = page.evaluate(
+        "async () => (await (await fetch('/api/v2/missions?limit=100')).json())"
+    )
+    assert any(item["id"] == mission_id for item in missions)
+    plan_id = submitted["proposal"]["id"]
+    plan_lookup = page.evaluate(
+        """async id => {
+          const response = await fetch('/api/v2/workflows/' + encodeURIComponent(id));
+          return {status: response.status, body: await response.json()};
+        }""",
+        plan_id,
+    )
+    assert plan_lookup["status"] == 404
+    assert not any(
+        method == "POST" and (url.endswith("/approvals") or url.endswith("/run"))
+        for method, url in api_calls
     )
 
 
