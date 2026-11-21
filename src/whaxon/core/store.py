@@ -1804,8 +1804,15 @@ class JobStore:
             finally:
                 c.close()
 
-    def reconcile_workflow_attempts(self, stale_after_s=None):
-        """Mark orphaned attempts uncertain; optionally preserve fresh worker leases."""
+    def reconcile_workflow_attempts(self, stale_after_s=None, *, limit=128):
+        """Mark one bounded page of orphaned attempts uncertain.
+
+        Callers that need a complete startup sweep must repeat until this
+        returns zero. Each page uses its own short write transaction so a
+        large stale backlog does not monopolize SQLite for one transaction.
+        """
+        if type(limit) is not int or not 1 <= limit <= 1024:
+            raise ValueError("limit must be an integer in [1, 1024]")
         now = time.time()
         if stale_after_s is not None:
             if isinstance(stale_after_s, bool):
@@ -1824,15 +1831,16 @@ class JobStore:
                 if stale_after_s is None:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
-                        "WHERE status='running' ORDER BY started_at, id"
+                        "WHERE status='running' ORDER BY started_at, id LIMIT ?",
+                        (limit,),
                     ).fetchall()
                 else:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
                         "WHERE status='running' "
                         "AND COALESCE(heartbeat_at, started_at) < ? "
-                        "ORDER BY started_at, id",
-                        (stale_before,),
+                        "ORDER BY started_at, id LIMIT ?",
+                        (stale_before, limit),
                     ).fetchall()
                 for row in rows:
                     error = "worker stopped before recording an outcome; reconcile before retry"
