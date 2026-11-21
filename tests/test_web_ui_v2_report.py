@@ -7,7 +7,6 @@ import shutil
 import pytest
 
 
-
 def _v2_workflow_report_payload():
     return {
         "schema_version": "whaxon.workflow-report.v1",
