@@ -331,6 +331,21 @@ def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(
     assert save_button.is_disabled()
 
     requests = []
+    api_requests = []
+    def track_api_request(request):
+        if "/api/v2/" in request.url:
+            api_requests.append((request.method, request.url))
+
+    page.on("request", track_api_request)
+    persisted_plans = [{"id": "ui-test-plan", "status": "draft", "digest": "source-digest"}]
+    def missions(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps([
+            {"id": "m", "objective": "Mission", "status": "active"},
+        ]))
+
+    def mission_plans(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(persisted_plans))
+
     def details(route):
         route.fulfill(status=200, content_type="application/json", body=(
             '{"plan":{"mission_id":"m","tasks":[]},"tasks":[]}'
@@ -350,6 +365,8 @@ def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(
         payload = route.request.post_data_json
         requests.append(("followups", payload))
         saved = payload.get("save") is True
+        if saved:
+            persisted_plans.append({"id": "followup-plan", "status": "draft", "digest": "followup-digest"})
         route.fulfill(status=200, content_type="application/json", body=json.dumps({
             "plan": {"tasks": [{"id": "followup-task"}]} if saved else None,
             "plan_id": "followup-plan" if saved else None,
@@ -359,6 +376,8 @@ def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(
             "approval_granted": False,
         }))
 
+    page.route("**/api/v2/missions?limit=100", missions)
+    page.route("**/api/v2/missions/m/plans", mission_plans)
     page.route("**/api/v2/workflows/ui-test-plan/approvals", approvals)
     page.route("**/api/v2/workflows/ui-test-plan/report?limit=100", report)
     page.route("**/api/v2/workflows/ui-test-plan/followups", followups)
@@ -383,13 +402,23 @@ def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(
     assert "nothing was saved, approved or submitted" in page.locator(
         "#v2-evidence-preview"
     ).inner_text()
+    save_request_start = len(api_requests)
     save_button.click()
     page.wait_for_function(
         "() => document.querySelector('#v2-evidence-preview')?.textContent.includes('Saved follow-up plan followup-plan')",
         timeout=8000,
     )
+    page.wait_for_function(
+        "() => document.querySelector('#v2-plan-select')?.value === 'followup-plan'",
+        timeout=8000,
+    )
+    assert page.locator("#v2-plan-select").locator("option[value='followup-plan']").count() == 1
     saved_message = page.locator("#v2-evidence-preview").inner_text()
+    assert "selected in the mission plan list for review" in saved_message
     assert "no approval or run request was created" in saved_message
+    save_requests = api_requests[save_request_start:]
+    assert any(method == "GET" and url.endswith("/api/v2/missions/m/plans") for method, url in save_requests)
+    assert not any("/approvals" in url or url.endswith("/run") for _, url in save_requests)
     assert requests == [
         ("report", "GET"),
         ("followups", {"max_tasks": 16, "save": False}),
