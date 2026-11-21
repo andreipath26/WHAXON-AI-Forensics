@@ -1418,7 +1418,11 @@ class Core:
             self.store.reconcile_stale()
             # Do not steal a live worker's attempt when another CLI/daemon
             # process starts. Workflow workers renew this lease while executing.
-            self.store.reconcile_workflow_attempts(stale_after_s=60.0)
+            # Reconcile every stale page before readiness. Each transaction
+            # is bounded by JobStore; repeating until empty avoids stranding
+            # older attempts behind a fixed startup batch size.
+            while self.store.reconcile_workflow_attempts(stale_after_s=60.0):
+                pass
         except Exception as exc:
             # Recovery is part of the durable execution boundary. Starting
             # after silently skipping it can strand claims or report false
