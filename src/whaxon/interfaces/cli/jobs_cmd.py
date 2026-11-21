@@ -11,12 +11,14 @@ from whaxon.core import Core
 
 
 def _drain(data_dir: Path) -> None:
-    """Run every pending job. The CLI escape hatch for the durable
-    auto-chain: a row a previous process queued is executed here."""
-    from whaxon.core.worker import drain
-    core = Core(data_dir=data_dir)
-    n = drain(core.store, core.runner)
-    print(f'drained {n} job' + ('s' if n != 1 else ''))
+    """Reject the retired legacy execution queue in every configuration."""
+    del data_dir
+    print(
+        "legacy queue drain is retired; submit work through an approved "
+        "Engine V2 workflow request",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
 
 
 def _export(job_id: str, fmt: str, out: Path | None, data_dir: Path) -> None:

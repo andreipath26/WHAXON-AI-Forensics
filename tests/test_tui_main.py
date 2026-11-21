@@ -212,6 +212,51 @@ async def test_cancel_with_nothing_running_sets_status(tmp_path):
         assert "nothing to cancel" in status.content
 
 
+async def test_cancel_v2_job_uses_durable_workflow_path_only(tmp_path, monkeypatch):
+    app = await _boot(tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, MainScreen)
+        cancelled = []
+
+        monkeypatch.setattr(
+            app.core.store, "is_engine_v2_execution_job", lambda job_id: True,
+        )
+
+        async def raw_cancel(job_id):
+            cancelled.append(job_id)
+        monkeypatch.setattr(app.core.runner, "cancel", raw_cancel)
+
+        screen.current_job_id = "v2-provider-job"
+        screen.action_cancel_job()
+        await pilot.pause()
+
+        assert cancelled == []
+        assert "V2 Workflows" in screen.query_one("#status", Static).content
+
+
+async def test_graceful_quit_does_not_raw_cancel_v2_job(tmp_path, monkeypatch):
+    app = await _boot(tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, MainScreen)
+        cancelled = []
+
+        monkeypatch.setattr(
+            app.core.store, "is_engine_v2_execution_job", lambda job_id: True,
+        )
+        async def raw_cancel(job_id):
+            cancelled.append(job_id)
+        monkeypatch.setattr(app.core.runner, "cancel", raw_cancel)
+
+        screen.current_job_id = "v2-provider-job"
+        await screen.action_graceful_quit()
+
+        assert cancelled == []
+
+
 # ---------------------------------------------------------------- event reactions
 
 async def test_job_started_enables_cancel(tmp_path):

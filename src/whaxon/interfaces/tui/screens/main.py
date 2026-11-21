@@ -306,16 +306,36 @@ class MainScreen(Screen):
 
         self.app.push_screen(WorkflowScreen(tool_id=tool.id, target=target))
 
+    def _allow_direct_cancel(self, job_id: str) -> bool:
+        """Legacy jobs may use ToolRunner.cancel; V2 jobs require the durable barrier."""
+        try:
+            is_v2_job = self.app.core.store.is_engine_v2_execution_job(job_id)
+        except Exception:
+            self._set_status(
+                "cannot cancel: job ownership could not be checked; "
+                "use V2 Workflows to inspect durable requests"
+            )
+            return False
+        if is_v2_job:
+            self._set_status(
+                "Engine V2 work must be cancelled through its durable request "
+                "in V2 Workflows"
+            )
+            return False
+        return True
+
     def action_cancel_job(self) -> None:
         if not self.current_job_id:
             self._set_status("nothing to cancel")
             return
+        if not self._allow_direct_cancel(self.current_job_id):
+            return
         self._cancel_job(self.current_job_id)
-        self._set_status(f"cancelling job {self.current_job_id}\u2026")
+        self._set_status(f"cancelling job {self.current_job_id}…")
 
     async def action_graceful_quit(self) -> None:
-        """Cancel any running job, wait for it, then exit cleanly."""
-        if self.current_job_id:
+        """Cancel a legacy job if present, then exit without bypassing V2 barriers."""
+        if self.current_job_id and self._allow_direct_cancel(self.current_job_id):
             try:
                 await self.app.core.runner.cancel(self.current_job_id)
             except Exception:
@@ -437,6 +457,10 @@ class MainScreen(Screen):
 
     @work(exclusive=False)
     async def _cancel_job(self, job_id: str) -> None:
+        # Recheck at dispatch time so ownership changes or a stale UI event
+        # cannot turn a V2 provider job into a raw ToolRunner cancellation.
+        if not self._allow_direct_cancel(job_id):
+            return
         await self.app.core.runner.cancel(job_id)
 
     def _set_status(self, text: str) -> None:
