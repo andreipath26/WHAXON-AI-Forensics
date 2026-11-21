@@ -1388,11 +1388,20 @@ def test_e4_optional_portfolio_audit_preserves_minimal_provider_contract():
 
     router = BoundProviderRouter((MinimalProvider(),))
     report = router.portfolio_audit()
-    assert report == {
-        "schema_version": "whaxon.portfolio-audit.v1",
-        "provider_audits": [],
-        "execution_enabled_by_audit": False,
-    }
+    assert report["schema_version"] == "whaxon.portfolio-audit.v1"
+    assert report["provider_audits"] == []
+    assert report["execution_enabled_by_audit"] is False
+    capability_provider = report["capability_providers"][0]
+    assert capability_provider["capability_id"] == "operation.example"
+    assert capability_provider["provider_id"] == "trusted.minimal"
+    assert capability_provider["provider_version"] == "1"
+    assert capability_provider["manifest_fingerprint"]
+    assert capability_provider["manifest"]["capability_id"] == "operation.example"
+    assert capability_provider["declared_readiness"] == "registered"
+    assert capability_provider["live_readiness"] == "unknown"
+    assert capability_provider["state"] == "registered"
+    assert capability_provider["authorization_required"] is True
+    assert capability_provider["execution_enabled_by_audit"] is False
 
 
 
