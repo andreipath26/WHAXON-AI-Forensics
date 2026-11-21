@@ -1001,14 +1001,17 @@ are unchanged; worker liveness remains explicitly unverified. Regression:
 
 ## Conservative workflow report completion — 2026-11-21
 
-The plan report now treats its persisted evidence truncation flag as
-authoritative even when a separately read progress count has not advanced.
-It only returns `complete` when the progress snapshot also says all tasks are
-complete, every task is succeeded, and cancellation is not requested. This
-prevents a stale readiness read from making a concurrently cancelled or
-otherwise inconsistent workflow look successful. The report's separate store
-reads are not yet one SQLite snapshot, so the stronger G04 reproducibility and
-report-provenance gate remains open. Regressions:
+The plan report now reads persisted evidence, readiness, task progress, plan
+metadata and task rows from one SQLite read snapshot. It also requires that
+snapshot to show every task succeeded, no cancellation, and an untruncated
+evidence page before returning `complete`. This prevents a concurrently
+cancelled or otherwise inconsistent workflow from appearing successful, and
+keeps plan-bound verification and coverage projections aligned with the same
+stored tasks. This closes the report-read consistency race; G04's broader
+reproducibility, redaction, external trust-anchor and fault-recovery gates
+remain open. Regressions:
 `tests/test_workflow_report.py::test_core_workflow_report_refuses_stale_readiness_after_cancellation`,
 `test_core_workflow_report_refuses_inconsistent_terminal_counts`, and
-`test_core_workflow_report_honors_evidence_snapshot_truncation_flag`.
+`test_core_workflow_report_honors_evidence_snapshot_truncation_flag`,
+`test_workflow_report_inputs_share_one_sqlite_snapshot`, and
+`test_core_report_uses_store_report_snapshot_when_available`.

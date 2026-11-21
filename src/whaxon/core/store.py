@@ -1694,8 +1694,9 @@ class JobStore:
             finally:
                 c.close()
 
-    def get_workflow_deadline(self, plan_id):
-        c = self._conn()
+    def get_workflow_deadline(self, plan_id, *, _connection=None):
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
@@ -1704,7 +1705,8 @@ class JobStore:
             ).fetchone()
             return row["deadline_at"] if row else None
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def set_workflow_limits(self, plan_id, *, max_total_attempts, max_concurrency):
         """Set conservative backend-enforced limits; never relax active limits."""
@@ -1758,8 +1760,9 @@ class JobStore:
             finally:
                 c.close()
 
-    def get_workflow_plan(self, plan_id):
-        c = self._conn()
+    def get_workflow_plan(self, plan_id, *, _connection=None):
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             row = c.execute("SELECT * FROM workflow_plans WHERE id=?", (plan_id,)).fetchone()
             if row is None:
@@ -1768,7 +1771,8 @@ class JobStore:
             value["plan"] = json.loads(value.pop("plan_json"))
             return value
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def verify_workflow_plan_integrity(self, plan_id):
         """Verify the immutable DAG snapshot against persisted executable rows.
@@ -1837,8 +1841,9 @@ class JobStore:
         return {"plan_id": plan_id, "valid": True, "digest": row["digest"],
                 "task_count": len(plan.tasks)}
 
-    def list_workflow_tasks(self, plan_id):
-        c = self._conn()
+    def list_workflow_tasks(self, plan_id, *, _connection=None):
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             rows = c.execute(
                 "SELECT id AS task_ref, task_key AS id, plan_id, capability_id, target, "
@@ -1867,7 +1872,8 @@ class JobStore:
                 result.append(value)
             return result
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def workflow_attempt_owned(self, attempt_id):
         """Read ownership fencing state before invoking any provider."""
@@ -2508,9 +2514,10 @@ class JobStore:
             finally:
                 c.close()
 
-    def get_workflow_dispatch_reconciliation(self, plan_id):
+    def get_workflow_dispatch_reconciliation(self, plan_id, *, _connection=None):
         """Separate uncertain attempts and expose any operator resolution record."""
-        c = self._conn()
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
@@ -2604,7 +2611,8 @@ class JobStore:
                 })
             return results
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def get_workflow_audit_snapshot(self, plan_id):
         """Digest a consistent lifecycle snapshot for *external* anchoring.
@@ -2683,12 +2691,13 @@ class JobStore:
         actual = self.get_workflow_audit_snapshot(plan_id)["digest"]
         return hmac.compare_digest(actual, expected_digest)
 
-    def get_workflow_audit_integrity(self, plan_id):
+    def get_workflow_audit_integrity(self, plan_id, *, _connection=None):
         """Check that every persisted attempt has exactly one claim event.
 
         This is an internal consistency check, not a cryptographic trust anchor.
         """
-        c = self._conn()
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
@@ -3012,14 +3021,30 @@ class JobStore:
                 ),
             }
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def get_workflow_readiness(self, plan_id):
         """Fail-safe operational summary of outstanding reconciliation and controls."""
-        snapshot = self.get_workflow_progress(plan_id)
-        reconciliation = self.get_workflow_dispatch_reconciliation(plan_id)
-        audit = self.get_workflow_audit_integrity(plan_id)
-        deadline = self.get_workflow_deadline(plan_id)
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            return self._get_workflow_readiness_tx(c, plan_id)
+        finally:
+            c.close()
+
+    def _get_workflow_readiness_tx(self, c, plan_id, *, progress=None):
+        """Project readiness from the caller's SQLite read snapshot."""
+        snapshot = progress or self._get_workflow_progress_tx(c, plan_id)
+        reconciliation = self.get_workflow_dispatch_reconciliation(
+            plan_id, _connection=c,
+        )
+        audit = self.get_workflow_audit_integrity(plan_id, _connection=c)
+        deadline_row = c.execute(
+            "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?",
+            (plan_id,),
+        ).fetchone()
+        deadline = deadline_row["deadline_at"] if deadline_row else None
         blockers = []
         if not audit["consistent"]:
             blockers.append("workflow_audit_inconsistent")
@@ -3048,7 +3073,7 @@ class JobStore:
             and snapshot["total_tasks"] == snapshot["counts"].get("succeeded", 0),
         }
 
-    def get_workflow_evidence(self, plan_id, *, limit=100):
+    def get_workflow_evidence(self, plan_id, *, limit=100, _connection=None):
         """Link successful workflow attempts to their real persisted tool evidence.
 
         This is a read-only reporting boundary. Missing, contradictory or
@@ -3056,9 +3081,11 @@ class JobStore:
         """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("limit must be between 1 and 1000")
-        c = self._conn()
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
-            c.execute("BEGIN")
+            if owns_connection:
+                c.execute("BEGIN")
             plan = c.execute(
                 "SELECT mission_id, digest FROM workflow_plans WHERE id=?", (plan_id,),
             ).fetchone()
@@ -3231,6 +3258,33 @@ class JobStore:
                 and len(evidence) == attempt_count and all(
                     item["integrity_status"] == "verified" for item in evidence
                 ),
+            }
+        finally:
+            if owns_connection:
+                c.close()
+
+    def get_workflow_report_snapshot(self, plan_id, *, limit=100):
+        """Read every plan-report projection from one SQLite read snapshot."""
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            evidence = self.get_workflow_evidence(
+                plan_id, limit=limit, _connection=c,
+            )
+            progress = self._get_workflow_progress_tx(c, plan_id)
+            readiness = self._get_workflow_readiness_tx(
+                c, plan_id, progress=progress,
+            )
+            tasks = self.list_workflow_tasks(plan_id, _connection=c)
+            plan = self.get_workflow_plan(plan_id, _connection=c)
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            return {
+                "evidence": evidence,
+                "progress": progress,
+                "readiness": readiness,
+                "tasks": tasks,
+                "plan": plan["plan"],
             }
         finally:
             c.close()

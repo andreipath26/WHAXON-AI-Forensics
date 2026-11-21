@@ -196,6 +196,55 @@ def test_workflow_report_projects_failed_attempt_without_raw_error(tmp_path):
     assert "provider response contained" not in rendered
 
 
+def test_workflow_report_inputs_share_one_sqlite_snapshot(tmp_path, monkeypatch):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-report-snapshot.db")
+    store.create_mission("snapshot-mission", "pin report reads")
+    store.save_workflow_plan("snapshot-plan", WorkflowPlan("snapshot-mission", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    original_progress = store._get_workflow_progress_tx
+    cancellation_committed = False
+
+    def cancel_after_evidence_snapshot(conn, plan_id):
+        nonlocal cancellation_committed
+        store.request_workflow_cancellation(plan_id)
+        cancellation_committed = True
+        return original_progress(conn, plan_id)
+
+    monkeypatch.setattr(
+        store, "_get_workflow_progress_tx", cancel_after_evidence_snapshot,
+    )
+    snapshot = store.get_workflow_report_snapshot("snapshot-plan")
+
+    assert cancellation_committed is True
+    assert snapshot["progress"]["cancellation_requested"] is False
+    assert snapshot["readiness"]["blockers"] == []
+    assert snapshot["tasks"][0]["status"] == "pending"
+    assert store.get_workflow_progress("snapshot-plan")["cancellation_requested"] is True
+
+
+def test_core_report_uses_store_report_snapshot_when_available(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-report-core-snapshot.db")
+    store.create_mission("snapshot-mission", "core report snapshot")
+    store.save_workflow_plan("snapshot-plan", WorkflowPlan("snapshot-mission", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    core = Core.__new__(Core)
+    core.store = store
+
+    report = Core.workflow_report(core, "snapshot-plan")
+
+    assert report["status"] == "partial"
+    assert report["summary"]["planned_tasks"] == 1
+    assert report["summary"]["task_status_counts"] == {"pending": 1}
+
+
 
 def test_workflow_report_projects_scope_skip_without_raw_coverage_details(tmp_path):
     from whaxon.core.store import JobStore

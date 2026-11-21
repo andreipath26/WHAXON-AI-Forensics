@@ -391,15 +391,23 @@ class Core:
         Partial, failed, missing, or unsealed attempts remain visible but can
         never receive a complete/success status.
         """
-        evidence = self.workflow_evidence(plan_id, limit=limit)
-        readiness = self.workflow_readiness(plan_id)
-        progress = self.workflow_progress(plan_id)
+        store = getattr(self, "store", None)
+        snapshot_reader = getattr(store, "get_workflow_report_snapshot", None)
+        report_snapshot = (
+            snapshot_reader(plan_id, limit=limit)
+            if callable(snapshot_reader) else None
+        )
+        if isinstance(report_snapshot, dict):
+            evidence = report_snapshot["evidence"]
+            readiness = report_snapshot["readiness"]
+            progress = report_snapshot["progress"]
+        else:
+            evidence = self.workflow_evidence(plan_id, limit=limit)
+            readiness = self.workflow_readiness(plan_id)
+            progress = self.workflow_progress(plan_id)
         attempts = evidence["attempts"]
-        # Evidence, readiness and progress are read through separate store
-        # snapshots today. Use the most conservative value across those reads
-        # so a concurrent attempt cannot make a partial evidence page appear
-        # complete, and reject a stale readiness result if the later progress
-        # snapshot shows cancellation or a non-success terminal state.
+        # Keep conservative checks even for snapshot-backed sources. They
+        # protect compatibility stores and malformed injected test doubles.
         progress_attempts = progress.get("attempts")
         truncated = evidence.get("truncated") is True or (
             type(progress_attempts) is int
@@ -436,9 +444,12 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
-        persisted_tasks = None
-        task_reader = getattr(getattr(self, "store", None), "list_workflow_tasks", None)
-        if callable(task_reader):
+        persisted_tasks = (
+            report_snapshot.get("tasks")
+            if isinstance(report_snapshot, dict) else None
+        )
+        task_reader = getattr(store, "list_workflow_tasks", None)
+        if persisted_tasks is None and callable(task_reader):
             try:
                 persisted_tasks = task_reader(plan_id)
             except (AttributeError, TypeError, ValueError, RuntimeError):
@@ -610,13 +621,22 @@ class Core:
         requested_checks: list[str] | None = None
         included_checks: list[str] | None = None
         unrequested_checks: list[str] | None = None
+        persisted_plan = (
+            report_snapshot.get("plan")
+            if isinstance(report_snapshot, dict) else None
+        )
         plan_details_reader = getattr(self, "workflow_plan_details", None)
-        if callable(plan_details_reader):
+        if persisted_plan is None and callable(plan_details_reader):
             try:
                 plan_details = plan_details_reader(plan_id)
+                persisted_plan = plan_details["plan"]
+            except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
+                persisted_plan = None
+        if persisted_plan is not None:
+            try:
                 from .workflow import WorkflowPlan
 
-                persisted_plan = WorkflowPlan.from_dict(plan_details["plan"])
+                persisted_plan = WorkflowPlan.from_dict(persisted_plan)
                 if persisted_plan.digest == evidence.get("plan_digest"):
                     for field_name in ("requested_checks", "included_checks"):
                         raw_checks = persisted_plan.metadata.get(field_name)
