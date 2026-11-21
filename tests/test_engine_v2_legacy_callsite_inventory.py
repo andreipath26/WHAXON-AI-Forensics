@@ -90,7 +90,6 @@ EXPECTED_RUNNER_CALLS = Counter(
 # their public execution entry points visible separately from runner calls.
 EXPECTED_SERVICE_CALLS = Counter(
     {
-        ("interfaces/cli/recon_cmd.py", "main", "core.recon.run"): 1,
         ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
         ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.msf_run._do_run", "adapter.run_module"): 1,
