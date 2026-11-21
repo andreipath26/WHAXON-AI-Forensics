@@ -103,6 +103,45 @@ class ToolRunner:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         return host
 
+    def _authorize_pivot_route(self, target_host: str, route: object):
+        """Bind a pivot to an open, persisted session and its live peer identity."""
+        route_host = self._session_host(getattr(route, "target_host", ""))
+        local_port = getattr(route, "local_port", None)
+        target_port = getattr(route, "target_port", None)
+        via_session = getattr(route, "via_session", None)
+        if self._canonical_session_host(route_host) != self._canonical_session_host(target_host):
+            raise ValueError("pivot route target does not match the authorized target")
+        if (
+            not isinstance(local_port, int) or isinstance(local_port, bool)
+            or not 1 <= local_port <= 65535
+        ):
+            raise ValueError("pivot route has an invalid local forwarding port")
+        if (
+            not isinstance(target_port, int) or isinstance(target_port, bool)
+            or not 1 <= target_port <= 65535
+        ):
+            raise ValueError("pivot route has an invalid remote target port")
+        if not isinstance(via_session, str) or not via_session or self._session_lookup is None:
+            raise RuntimeError("pivot route requires persisted session authorization context")
+        stored_session = self._session_lookup(via_session)
+        if not stored_session or stored_session.get("status") != "open":
+            raise ValueError("pivot route session is not an open persisted session")
+        stored_host = self._authorize_session_host(
+            stored_session.get("host"), source="persisted pivot session",
+        )
+        live_host = self._authorize_session_host(
+            getattr(route, "session_host", ""), source="live pivot session",
+        )
+        stored_identity = self._canonical_session_host(stored_host)
+        live_identity = self._canonical_session_host(live_host)
+        if stored_identity != live_identity:
+            raise ValueError("pivot session identity changed since it was persisted")
+        binding = (
+            self._canonical_session_host(route_host), target_port, local_port,
+            via_session, stored_identity, live_identity,
+        )
+        return binding, "127.0.0.1:" + str(local_port)
+
     def has_tool(self, tool_id: str) -> bool:
         """True if tool_id is in the bound catalog. False if no catalog."""
         if self._catalog is None:
@@ -294,6 +333,8 @@ class ToolRunner:
         # was scope-checked above, but the forwarding session must also be a
         # persisted, open, in-scope session before its local port is trusted.
         effective_target = target
+        pivot_host = ""
+        pivot_binding = None
         if (self._route_resolver is not None
                 and tool is not None
                 and getattr(tool, "pivot_capable", False)):
@@ -303,34 +344,10 @@ class ToolRunner:
             host_only = parsed_target.hostname or ""
             route = self._route_resolver(host_only)
             if route is not None:
-                route_host = self._session_host(getattr(route, "target_host", ""))
-                local_port = getattr(route, "local_port", None)
-                target_port = getattr(route, "target_port", None)
-                via_session = str(getattr(route, "via_session", "") or "")
-                if route_host.lower().rstrip(".") != host_only.lower().rstrip("."):
-                    raise ValueError("pivot route target does not match the authorized target")
-                if (not isinstance(local_port, int) or isinstance(local_port, bool)
-                        or not 1 <= local_port <= 65535):
-                    raise ValueError("pivot route has an invalid local forwarding port")
-                if (not isinstance(target_port, int) or isinstance(target_port, bool)
-                        or not 1 <= target_port <= 65535):
-                    raise ValueError("pivot route has an invalid remote target port")
-                if not via_session or self._session_lookup is None:
-                    raise RuntimeError(
-                        "pivot route requires persisted session authorization context"
-                    )
-                stored_session = self._session_lookup(via_session)
-                if not stored_session or stored_session.get("status") != "open":
-                    raise ValueError("pivot route session is not an open persisted session")
-                stored_host = self._authorize_session_host(
-                    stored_session.get("host"), source="persisted pivot session"
+                pivot_binding, effective_target = self._authorize_pivot_route(
+                    host_only, route,
                 )
-                live_host = self._authorize_session_host(
-                    getattr(route, "session_host", ""), source="live pivot session"
-                )
-                if stored_host.lower().rstrip(".") != live_host.lower().rstrip("."):
-                    raise ValueError("pivot session identity changed since it was persisted")
-                effective_target = "127.0.0.1:" + str(local_port)
+                pivot_host = host_only
 
         # Re-authorize immediately before process creation. This catches an
         # engagement scope tightened while route discovery or argv preparation
@@ -361,6 +378,18 @@ class ToolRunner:
 
         try:
             argv = self.build_argv(tool_id, effective_target, extra_args=extra_args, outfile=outfile)
+            if pivot_binding is not None:
+                # Route and session state can change while scope and argv checks
+                # run. Re-read both immediately before process creation; a
+                # changed or closed pivot never inherits the earlier approval.
+                current_route = self._route_resolver(pivot_host)
+                if current_route is None:
+                    raise ValueError("pivot route changed before process creation")
+                current_binding, _ = self._authorize_pivot_route(
+                    pivot_host, current_route,
+                )
+                if current_binding != pivot_binding:
+                    raise ValueError("pivot route or session changed before process creation")
             return await self.run(
                 tool_id=tool_id,
                 job_id=job_id,
