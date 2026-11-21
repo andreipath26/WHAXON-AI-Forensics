@@ -289,6 +289,62 @@ def test_run_tool_rejects_pivot_without_live_session_peer():
         asyncio.run(runner.run_tool("nikto", "10.0.0.7", timeout_s=5.0))
 
 
+def test_run_tool_rechecks_pivot_route_immediately_before_process_creation():
+    initial = Route(
+        target_host="10.0.0.7", target_port=80, local_port=18080,
+        via_session="3", session_host="10.0.0.5",
+    )
+    changed = Route(
+        target_host="10.0.0.7", target_port=80, local_port=18081,
+        via_session="3", session_host="10.0.0.5",
+    )
+    route_reads = []
+    runner = _pivot_runner(
+        initial, lambda _sid: {"status": "open", "host": "10.0.0.5"},
+    )
+    runner._route_resolver = lambda _host: (
+        route_reads.append(True) or (initial if len(route_reads) == 1 else changed)
+    )
+    process_calls = []
+
+    async def fake_run(**kwargs):
+        process_calls.append(kwargs)
+        return "should not start"
+
+    runner.run = fake_run
+    with pytest.raises(ValueError, match="route or session changed"):
+        asyncio.run(runner.run_tool("nikto", "10.0.0.7", timeout_s=5.0))
+    assert len(route_reads) == 2
+    assert process_calls == []
+
+
+def test_run_tool_rechecks_persisted_pivot_session_before_process_creation():
+    route = Route(
+        target_host="10.0.0.7", target_port=80, local_port=18080,
+        via_session="3", session_host="10.0.0.5",
+    )
+    session_reads = []
+
+    def lookup(_session_id):
+        session_reads.append(True)
+        if len(session_reads) == 1:
+            return {"status": "open", "host": "10.0.0.5"}
+        return {"status": "closed", "host": "10.0.0.5"}
+
+    runner = _pivot_runner(route, lookup)
+    process_calls = []
+
+    async def fake_run(**kwargs):
+        process_calls.append(kwargs)
+        return "should not start"
+
+    runner.run = fake_run
+    with pytest.raises(ValueError, match="open persisted session"):
+        asyncio.run(runner.run_tool("nikto", "10.0.0.7", timeout_s=5.0))
+    assert len(session_reads) == 2
+    assert process_calls == []
+
+
 def test_run_tool_rechecks_scope_after_route_resolution():
     """A scope tightened during route lookup blocks before process creation."""
     class _ChangingScope:
