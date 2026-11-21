@@ -998,3 +998,17 @@ request updated by a concurrent cancellation from being paired with progress
 read after that cancellation. The response schema and lease-token redaction
 are unchanged; worker liveness remains explicitly unverified. Regression:
 `tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`.
+
+## Conservative workflow report completion — 2026-11-21
+
+The plan report now treats its persisted evidence truncation flag as
+authoritative even when a separately read progress count has not advanced.
+It only returns `complete` when the progress snapshot also says all tasks are
+complete, every task is succeeded, and cancellation is not requested. This
+prevents a stale readiness read from making a concurrently cancelled or
+otherwise inconsistent workflow look successful. The report's separate store
+reads are not yet one SQLite snapshot, so the stronger G04 reproducibility and
+report-provenance gate remains open. Regressions:
+`tests/test_workflow_report.py::test_core_workflow_report_refuses_stale_readiness_after_cancellation`,
+`test_core_workflow_report_refuses_inconsistent_terminal_counts`, and
+`test_core_workflow_report_honors_evidence_snapshot_truncation_flag`.

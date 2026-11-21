@@ -2916,6 +2916,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         if (
             len(request.args.getlist("limit")) > 1
             or len(request.args.getlist("offset")) > 1
+            or len(raw_limit) > 3 or len(raw_offset) > 10
             or not raw_limit.isascii() or not raw_limit.isdecimal()
             or not raw_offset.isascii() or not raw_offset.isdecimal()
         ):

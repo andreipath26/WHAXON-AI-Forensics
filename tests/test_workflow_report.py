@@ -33,6 +33,8 @@ def _core_with(evidence, *, ready=True, persisted_attempts=None):
         "attempts": persisted_attempts if persisted_attempts is not None
         else len(evidence["attempts"]),
         "total_tasks": 1,
+        "complete": True,
+        "cancellation_requested": False,
         "counts": {"succeeded": 1} if ready else {"failed": 1},
     }
     return core
@@ -95,6 +97,45 @@ def test_core_workflow_report_flags_truncated_attempt_history():
     )
     assert report["status"] == "partial"
     assert report["truncated"] is True
+
+
+def test_core_workflow_report_refuses_stale_readiness_after_cancellation():
+    core = _core_with(_evidence(), ready=True)
+    core.workflow_progress = lambda _plan_id: {
+        "plan_id": "plan-1", "attempts": 1, "total_tasks": 1,
+        "complete": True, "cancellation_requested": True,
+        "counts": {"succeeded": 1},
+    }
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["status"] == "partial"
+    assert report["readiness"]["ready_to_report_success"] is True
+
+
+def test_core_workflow_report_refuses_inconsistent_terminal_counts():
+    core = _core_with(_evidence(), ready=True)
+    core.workflow_progress = lambda _plan_id: {
+        "plan_id": "plan-1", "attempts": 1, "total_tasks": 1,
+        "complete": True, "cancellation_requested": False,
+        "counts": {"succeeded": 0, "failed": 1},
+    }
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["status"] == "partial"
+
+
+def test_core_workflow_report_honors_evidence_snapshot_truncation_flag():
+    evidence = _evidence()
+    evidence["truncated"] = True
+    core = _core_with(evidence, ready=True, persisted_attempts=1)
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["truncated"] is True
+    assert report["coverage"]["attempt_history_truncated"] is True
+    assert report["status"] == "partial"
 
 
 def test_plan_report_cli_prints_json_and_returns_failure_for_partial(monkeypatch, capsys):

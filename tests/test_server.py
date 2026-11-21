@@ -274,6 +274,7 @@ def test_ui_v2_findings_endpoint_returns_stable_pages_without_report_enrichment(
 
     for query in (
         "limit=0", "limit=501", "limit=1&limit=2", "offset=-1", "offset=1&offset=2",
+        "limit=" + "9" * 5000, "offset=" + "9" * 11,
     ):
         assert client.get("/api/ui-v2/findings?" + query).status_code == 400
 

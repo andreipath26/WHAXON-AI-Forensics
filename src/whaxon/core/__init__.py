@@ -395,9 +395,34 @@ class Core:
         readiness = self.workflow_readiness(plan_id)
         progress = self.workflow_progress(plan_id)
         attempts = evidence["attempts"]
-        truncated = len(attempts) < progress["attempts"]
+        # Evidence, readiness and progress are read through separate store
+        # snapshots today. Use the most conservative value across those reads
+        # so a concurrent attempt cannot make a partial evidence page appear
+        # complete, and reject a stale readiness result if the later progress
+        # snapshot shows cancellation or a non-success terminal state.
+        progress_attempts = progress.get("attempts")
+        truncated = evidence.get("truncated") is True or (
+            type(progress_attempts) is int
+            and progress_attempts >= 0
+            and len(attempts) < progress_attempts
+        )
+        progress_counts = progress.get("counts")
+        progress_total = progress.get("total_tasks")
+        progress_all_succeeded = (
+            isinstance(progress_counts, dict)
+            and type(progress_total) is int
+            and progress_total >= 0
+            and progress_counts.get("succeeded") == progress_total
+            and all(
+                isinstance(status, str) and type(count) is int and count >= 0
+                for status, count in progress_counts.items()
+            )
+        )
         complete = bool(
             readiness["ready_to_report_success"]
+            and progress.get("complete") is True
+            and progress.get("cancellation_requested") is not True
+            and progress_all_succeeded
             and evidence["all_evidence_recorded"]
             and evidence["all_evidence_integrity_verified"]
             and attempts
@@ -615,11 +640,10 @@ class Core:
                     ):
                         from .workflow_proposals import PASSIVE_RECON_CHECKS
 
-                        if set(requested_checks).issubset(PASSIVE_RECON_CHECKS):
-                            unrequested_checks = [
-                                check for check in PASSIVE_RECON_CHECKS
-                                if check not in requested_checks
-                            ]
+                        unrequested_checks = [
+                            check for check in PASSIVE_RECON_CHECKS
+                            if check not in requested_checks
+                        ]
                     raw_omissions = persisted_plan.metadata.get("omitted_checks", [])
                     if isinstance(raw_omissions, (list, tuple)):
                         for omission in raw_omissions:
