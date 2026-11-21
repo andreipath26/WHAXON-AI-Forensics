@@ -823,8 +823,20 @@
     if (v2PlanInput) v2PlanInput.value = v2PlanSelect.value;
     await v2LoadPlan();
   }
+  const v2ClearLoadedPlan = () => {
+    v2Plan = null;
+    v2Tasks?.replaceChildren();
+    if (v2EvidencePreview) {
+      v2EvidencePreview.hidden = true;
+      v2EvidencePreview.replaceChildren();
+    }
+  };
   async function v2LoadPlan() {
     const planId = v2PlanInput?.value.trim();
+    if (!v2RequestId) {
+      v2ClearLoadedPlan();
+      v2SetControls();
+    }
     if (!planId) { v2Say("Enter an existing Engine V2 workflow plan ID.", true); return; }
     try {
       v2Say("Loading immutable plan and task details…");
@@ -882,10 +894,7 @@
       v2Say(`Plan ${planId} reviewed (${tasks.length} task${tasks.length === 1 ? "" : "s"}).${approvalNote}`);
       v2SetControls();
     } catch (error) {
-      if (!v2RequestId) {
-        v2Plan = null;
-        v2Tasks?.replaceChildren();
-      }
+      if (!v2RequestId) v2ClearLoadedPlan();
       v2SetControls();
       v2Say("Could not review plan: " + error.message, true);
     }
@@ -1070,6 +1079,11 @@
       v2Poll();
     } catch (error) { v2Say("V2 cancellation request failed: " + error.message, true); }
   }
+  v2PlanInput?.addEventListener("input", () => {
+    if (v2RequestId || !v2Plan || v2PlanInput.value.trim() === v2Plan.id) return;
+    v2ClearLoadedPlan();
+    v2SetControls();
+  });
   $("v2-load-plan")?.addEventListener("click", v2LoadPlan);
   $("v2-refresh-missions")?.addEventListener("click", v2LoadMissions);
   v2MissionSelect?.addEventListener("change", v2LoadMissionPlans);

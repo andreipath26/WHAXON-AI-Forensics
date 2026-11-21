@@ -423,3 +423,68 @@ def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(
         ("followups", {"max_tasks": 16, "save": False}),
         ("followups", {"max_tasks": 16, "save": True}),
     ]
+
+
+def test_replacing_reviewed_plan_invalidates_dispatch_until_new_plan_is_loaded(page, live_server):
+    """Changing the plan ID cannot leave an earlier plan ready to dispatch."""
+    requests = []
+
+    def record_request(request):
+        if "/api/v2/" in request.url:
+            requests.append((request.method, request.url))
+
+    def valid_plan(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({
+            "plan": {"mission_id": "mission-1", "tasks": [{"id": "task-1"}]},
+            "tasks": [{
+                "id": "task-1",
+                "task_key": "task-1",
+                "capability_id": "dns.recon.passive",
+                "target": "example.test",
+                "impact": "low",
+            }],
+        }))
+
+    def approvals(route):
+        route.fulfill(status=200, content_type="application/json", body="[]")
+
+    def missing_plan(route):
+        route.fulfill(status=404, content_type="application/json", body=json.dumps({
+            "error": "Workflow plan not found",
+        }))
+
+    page.on("request", record_request)
+    page.route("**/api/v2/workflows/valid-plan/approvals", approvals)
+    page.route("**/api/v2/workflows/valid-plan", valid_plan)
+    page.route("**/api/v2/workflows/missing-plan", missing_plan)
+    page.goto(f"{live_server}/ui-v2/run")
+
+    plan_id = page.locator("#v2-plan-id")
+    submit = page.locator("#v2-submit-run")
+    plan_id.fill("valid-plan")
+    page.locator("#v2-load-plan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#v2-run-message')?.textContent.includes('Plan valid-plan reviewed')",
+        timeout=8000,
+    )
+    assert not submit.is_disabled()
+
+    plan_id.fill("missing-plan")
+    assert submit.is_disabled()
+    assert page.locator("#v2-plan-tasks").inner_text() == ""
+    assert page.locator("#v2-evidence-preview").is_hidden()
+
+    page.locator("#v2-load-plan").click()
+    page.wait_for_function(
+        "() => document.querySelector('#v2-run-message')?.textContent.includes('Could not review plan')",
+        timeout=8000,
+    )
+    assert submit.is_disabled()
+    run_requests_before_disabled_click = [
+        request for request in requests if request[0] == "POST" and request[1].endswith("/run")
+    ]
+    page.evaluate("document.querySelector('#v2-submit-run').click()")
+    run_requests_after_disabled_click = [
+        request for request in requests if request[0] == "POST" and request[1].endswith("/run")
+    ]
+    assert run_requests_after_disabled_click == run_requests_before_disabled_click == []
