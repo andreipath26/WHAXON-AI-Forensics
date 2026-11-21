@@ -184,37 +184,23 @@ def test_msf_session_info_when_down(tmp_path, monkeypatch):
     assert r.status_code == 503
 
 
-# ---------------------------------------------------------------- /api/msf/sessions/<id>/exec
-
-def test_msf_exec_no_command(tmp_path, monkeypatch):
+# ---------------------------------------------------------------- retired legacy execution
+def test_msf_session_exec_stays_blocked_with_stale_opt_in(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
+    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/sessions/1/exec", json={})
-    assert r.status_code == 400
-    assert "command required" in r.get_json()["error"]
 
+    response = app.test_client().post(
+        "/api/msf/sessions/1/exec", json={"command": "id"},
+    )
 
-def test_msf_exec_when_down(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=False)
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/sessions/1/exec", json={"command": "whoami"})
-    assert r.status_code == 503
-
-
-def test_msf_exec_success(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    fake._sessions = {"1": {"target_host": "10.0.0.9", "type": "shell"}}
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/sessions/1/exec", json={"command": "id"})
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data["session_id"] == "1"
-    assert data["command"] == "id"
-    assert "uid=" in data["output"]
-    assert fake.exec_calls == [("1", "id", 15.0)]
+    assert response.status_code == 410
+    body = response.get_json()
+    assert body["legacy_execution_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["execution_submitted"] is False
+    assert fake.exec_calls == []
 
 
 # ---------------------------------------------------------------- /api/msf/modules/<type>
@@ -243,10 +229,9 @@ def test_msf_modules_when_down(tmp_path, monkeypatch):
     assert r.status_code == 503
 
 
-# ---------------------------------------------------------------- /api/msf/run (validation only)
-
-def test_msf_run_is_default_denied_without_creating_job(tmp_path, monkeypatch):
-    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
+# ---------------------------------------------------------------- retired legacy launch
+def test_msf_run_stays_blocked_with_stale_opt_in_without_creating_job(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     app, core = _make_app(tmp_path, monkeypatch, fake)
     before = core.store.history()
@@ -266,147 +251,17 @@ def test_msf_run_is_default_denied_without_creating_job(tmp_path, monkeypatch):
     assert core.store.history() == before
 
 
-def test_msf_run_missing_module_path(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/run", json={"module_type": "exploit"})
-    assert r.status_code == 400
-    assert "module_path" in r.get_json()["error"]
-
-
-def test_msf_run_bad_module_type(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/run", json={
-        "module_path": "unix/ftp/vsftpd_234_backdoor",
-        "module_type": "nonsense",
-    })
-    assert r.status_code == 400
-    assert "bad module_type" in r.get_json()["error"]
-
-
-def test_msf_run_out_of_scope_target(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/run", json={
-        "module_path": "unix/ftp/vsftpd_234_backdoor",
-        "module_type": "exploit",
-        "target": "8.8.8.8",
-        "options": {"RHOSTS": "8.8.8.8"},
-    })
-    assert r.status_code == 403
-    body = r.get_json()
-    assert "out of scope" in body["error"]
-    assert "matched_rule" in body
-
-
-def test_msf_run_accepts_in_scope(tmp_path, monkeypatch):
-    """Full request accepted. We do not wait for the background thread."""
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    app, _core = _make_app(tmp_path, monkeypatch, fake)
-    r = app.test_client().post("/api/msf/run", json={
-        "module_path": "unix/ftp/vsftpd_234_backdoor",
-        "module_type": "exploit",
-        "target": "127.0.0.1",
-        "options": {"RHOSTS": "127.0.0.1"},
-    })
-    assert r.status_code == 202
-    body = r.get_json()
-    assert "job_id" in body
-    assert len(body["job_id"]) == 12
-
-# ---------------------------------------------------------------- persisted identity binding
-
-def test_msf_exec_rejects_live_session_host_drift(tmp_path, monkeypatch):
+def test_pivot_candidates_stay_blocked_with_stale_opt_in(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     fake = FakeMSF(up=True)
     fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    # A reused session ID now points at a different (still in-scope) host.
-    fake._sessions = {"1": {"target_host": "10.0.0.8", "type": "shell"}}
-    response = app.test_client().post(
-        "/api/msf/sessions/1/exec", json={"command": "id"}
-    )
-    assert response.status_code == 409
-    assert "identity changed" in response.get_json()["error"]
-    assert fake.exec_calls == []
-
-
-def test_msf_exec_rejects_session_without_persisted_identity(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
-    app, core = _make_app(tmp_path, monkeypatch, fake)
-    core.store.close_session("1")
-    response = app.test_client().post(
-        "/api/msf/sessions/1/exec", json={"command": "id"}
-    )
-    assert response.status_code == 403
-    assert fake.exec_calls == []
-
-
-def test_msf_exec_accepts_matching_persisted_identity(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    response = app.test_client().post(
-        "/api/msf/sessions/1/exec", json={"command": "id"}
-    )
-    assert response.status_code == 200
-    assert fake.exec_calls == [("1", "id", 15.0)]
-
-
-def test_msf_exec_is_default_denied_without_invoking_session_command(tmp_path, monkeypatch):
-    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
-    fake = FakeMSF(up=True)
-    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
-    app, _core = _make_app(tmp_path, monkeypatch, fake)
-
-    response = app.test_client().post(
-        "/api/msf/sessions/1/exec", json={"command": "id"},
-    )
-
-    assert response.status_code == 410
-    body = response.get_json()
-    assert body["legacy_execution_enabled"] is False
-    assert body["approval_granted"] is False
-    assert body["execution_submitted"] is False
-    assert fake.exec_calls == []
-
-
-def test_msf_exec_rejects_session_type_drift(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    fake = FakeMSF(up=True)
-    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "shell"}}
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    fake._sessions = {"1": {"target_host": "127.0.0.1", "type": "meterpreter"}}
-    response = app.test_client().post(
-        "/api/msf/sessions/1/exec", json={"command": "id"}
-    )
-    assert response.status_code == 409
-    assert "type changed" in response.get_json()["error"]
-    assert fake.exec_calls == []
-
-
-# ---------------------------------------------------------------- pivot candidate session probes
-
-def test_pivot_candidates_are_default_denied_without_probing_sessions(
-    tmp_path, monkeypatch,
-):
-    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
-    fake = FakeMSF(up=True)
-    fake._sessions = {"1": {"target_host": "10.0.0.9", "type": "shell"}}
     app, _ = _make_app(tmp_path, monkeypatch, fake)
     calls = []
 
     from whaxon.core import autopivot
     monkeypatch.setattr(
-        autopivot, "detect", lambda *args: calls.append(args) or [{"cidr": "10.0.0.0/24"}],
+        autopivot, "detect",
+        lambda *args: calls.append(args) or [{"cidr": "10.0.0.0/24"}],
     )
 
     response = app.test_client().get("/api/pivot/candidates")
@@ -419,31 +274,3 @@ def test_pivot_candidates_are_default_denied_without_probing_sessions(
     assert calls == []
 
 
-def test_pivot_candidates_skip_sessions_outside_current_scope(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    (tmp_path / "scope.json").write_text(
-        '{"enabled": true, "in_scope": ["10.0.0.9"], "out_of_scope": []}',
-        encoding="utf-8",
-    )
-    fake = FakeMSF(up=True)
-    fake._sessions = {
-        "1": {"target_host": "10.0.0.9", "type": "shell"},
-        "2": {"target_host": "8.8.8.8", "type": "shell"},
-    }
-    app, _ = _make_app(tmp_path, monkeypatch, fake)
-    from whaxon.core import autopivot
-
-    calls = []
-    monkeypatch.setattr(
-        autopivot, "detect",
-        lambda client, sid: calls.append(str(sid)) or [{"cidr": "10.1.0.0/24"}],
-    )
-
-    response = app.test_client().get("/api/pivot/candidates")
-
-    assert response.status_code == 200
-    assert calls == ["1"]
-    sessions = {row["session_id"]: row for row in response.get_json()["sessions"]}
-    assert sessions["1"]["candidates"] == [{"cidr": "10.1.0.0/24"}]
-    assert sessions["2"]["candidates"] == []
-    assert "no command was sent" in sessions["2"]["error"]

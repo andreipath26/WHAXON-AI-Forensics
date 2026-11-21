@@ -287,6 +287,15 @@ class MainWindow(QMainWindow):
         if not target:
             self.statusBar().showMessage("enter a target first")
             return
+        if not legacy_gui_execution_enabled():
+            self.output.appendPlainText(
+                "blocked: legacy desktop dispatch is retired; use the "
+                "Engine V2 desktop workflow"
+            )
+            self.statusBar().showMessage(
+                "legacy dispatch retired — use the Engine V2 workflow"
+            )
+            return
         self.output.appendPlainText(f"$ {tool.binary} {target} {extra_args}".rstrip())
         self._run_task = asyncio.create_task(self._run_tool(tool.id, target, extra_args))
 

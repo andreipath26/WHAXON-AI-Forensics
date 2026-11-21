@@ -7,15 +7,10 @@ from pathlib import Path
 from whaxon.interfaces.legacy_execution import legacy_gui_execution_enabled
 
 
-def test_legacy_gui_execution_is_default_denied_and_requires_explicit_opt_in(
-    monkeypatch,
-):
-    monkeypatch.delenv("WHAXON_LEGACY_GUI_EXECUTION_ENABLED", raising=False)
-    assert legacy_gui_execution_enabled() is False
-
+def test_legacy_gui_execution_is_retired_even_with_stale_environment_flag(monkeypatch):
     for value in ("1", "true", "YES", " true "):
         monkeypatch.setenv("WHAXON_LEGACY_GUI_EXECUTION_ENABLED", value)
-        assert legacy_gui_execution_enabled() is True
+        assert legacy_gui_execution_enabled() is False
 
     for value in ("", "false", "on"):
         monkeypatch.setenv("WHAXON_LEGACY_GUI_EXECUTION_ENABLED", value)
@@ -52,3 +47,32 @@ def test_legacy_qt_dispatch_checks_gate_before_toolrunner_call():
     ]
     assert gate_lines and dispatch_lines
     assert min(gate_lines) < min(dispatch_lines)
+
+
+def test_legacy_qt_run_action_blocks_before_queuing_task():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "whaxon"
+        / "interfaces"
+        / "gui"
+        / "main_window.py"
+    )
+    module = ast.parse(source.read_text(encoding="utf-8"))
+    run_selected = next(
+        node for node in ast.walk(module)
+        if isinstance(node, ast.FunctionDef) and node.name == "_run_selected"
+    )
+    calls = [node for node in ast.walk(run_selected) if isinstance(node, ast.Call)]
+    gate_lines = [
+        node.lineno for node in calls
+        if isinstance(node.func, ast.Name)
+        and node.func.id == "legacy_gui_execution_enabled"
+    ]
+    task_lines = [
+        node.lineno for node in calls
+        if isinstance(node.func, ast.Attribute)
+        and node.func.attr == "create_task"
+    ]
+    assert gate_lines and task_lines
+    assert min(gate_lines) < min(task_lines)

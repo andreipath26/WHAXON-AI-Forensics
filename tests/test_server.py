@@ -937,26 +937,7 @@ def test_evidence_download_rejects_path_traversal(tmp_path, monkeypatch):
     assert response.status_code == 403
     assert response.get_json()["error"] == "unsafe evidence path"
 
-def test_msf_session_exec_refuses_out_of_scope_session(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    monkeypatch.setattr(core.msf, "is_up", lambda: True)
-    monkeypatch.setattr(core.msf, "sessions", lambda: {
-        "9": {"target_host": "8.8.8.8", "type": "shell"}
-    })
-    executed = []
-    monkeypatch.setattr(core.msf, "session_exec", lambda *a, **kw: executed.append(a))
-
-    response = app.test_client().post(
-        "/api/msf/sessions/9/exec",
-        json={"command": "id"},
-        environ_base={"REMOTE_ADDR": "127.0.0.1"},
-    )
-    assert response.status_code == 403
-    assert executed == []
-
-
-def test_msf_port_forward_refuses_out_of_scope_destination(tmp_path, monkeypatch):
+def test_legacy_msf_routes_stay_blocked_with_stale_opt_in(tmp_path, monkeypatch):
     from whaxon.core import portfwd
 
     monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
@@ -965,28 +946,35 @@ def test_msf_port_forward_refuses_out_of_scope_destination(tmp_path, monkeypatch
     monkeypatch.setattr(core.msf, "sessions", lambda: {
         "9": {"target_host": "127.0.0.1", "type": "shell"}
     })
-    created = []
-    monkeypatch.setattr(portfwd, "add_forward", lambda *a, **kw: created.append(a))
-
-    response = app.test_client().post(
-        "/api/msf/sessions/9/portfwd",
-        json={"lport": 4444, "rhost": "8.8.8.8", "rport": 80},
-        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    session_calls = []
+    portfwd_calls = []
+    monkeypatch.setattr(
+        core.msf, "session_exec",
+        lambda *a, **kw: session_calls.append(a),
     )
-    assert response.status_code == 403
-    assert created == []
-
-
-def test_msf_run_rejects_path_traversal_module_path(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    app, _ = _make_app(tmp_path, monkeypatch)
-    response = app.test_client().post(
-        "/api/msf/run",
-        json={"module_type": "exploit", "module_path": "../arbitrary", "target": "127.0.0.1"},
-        environ_base={"REMOTE_ADDR": "127.0.0.1"},
+    monkeypatch.setattr(
+        portfwd, "add_forward",
+        lambda *a, **kw: portfwd_calls.append(a),
     )
-    assert response.status_code == 400
-    assert "module path" in response.get_json()["error"]
+    client = app.test_client()
+
+    responses = [
+        client.post("/api/msf/sessions/9/exec", json={"command": "id"}),
+        client.post("/api/msf/sessions/9/portfwd", json={
+            "lport": 4444, "rhost": "127.0.0.1", "rport": 80,
+        }),
+        client.post("/api/msf/run", json={
+            "module_type": "exploit",
+            "module_path": "unix/example",
+            "target": "127.0.0.1",
+        }),
+    ]
+
+    assert [response.status_code for response in responses] == [410, 410, 410]
+    assert all(response.get_json()["execution_submitted"] is False for response in responses)
+    assert session_calls == []
+    assert portfwd_calls == []
+
 
 def test_loopback_listener_rejects_cross_site_get_requests(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_HOST", "127.0.0.1")
