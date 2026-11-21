@@ -209,6 +209,42 @@ async def test_lab_access_does_not_reuse_a_preexisting_matching_session(
 
 
 @pytest.mark.asyncio
+async def test_lab_access_cancellation_waits_for_rpc_job_id_then_cleans(
+    lab_provider, monkeypatch,
+):
+    import asyncio
+    import threading
+
+    provider, store, msf = lab_provider
+    rpc_started = threading.Event()
+    release_rpc = threading.Event()
+    execute_rpc = msf.execute_rpc
+
+    def delayed_execute_rpc(*args, **kwargs):
+        rpc_started.set()
+        assert release_rpc.wait(timeout=3)
+        return execute_rpc(*args, **kwargs)
+
+    monkeypatch.setattr(msf, "execute_rpc", delayed_execute_rpc)
+    dispatch = asyncio.create_task(provider.dispatch(_task()))
+    assert await asyncio.wait_for(asyncio.to_thread(rpc_started.wait, 2), timeout=3)
+    dispatch.cancel()
+    await asyncio.sleep(0.02)
+    release_rpc.set()
+
+    with pytest.raises(asyncio.CancelledError):
+        await dispatch
+
+    assert msf.stopped_jobs == ["msf-remote-23"]
+    assert msf.stopped == ["7"]
+    row = store.history(limit=10)[0]
+    assert row["status"] == "failed"
+    lines = " ".join(line["text"] for line in store.get(row["id"])["lines"])
+    assert "dispatch cancelled during Metasploit RPC" in lines
+    assert "cleanup_errors=none" in lines
+
+
+@pytest.mark.asyncio
 async def test_lab_access_cancellation_during_session_poll_cleans_remote_effect(
     lab_provider, monkeypatch,
 ):
