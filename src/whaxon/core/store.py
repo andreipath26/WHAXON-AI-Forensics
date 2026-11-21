@@ -3566,8 +3566,12 @@ class JobStore:
         """Atomically record dispatch intent or reject a cancelled/stale attempt.
 
         The recorded event makes crash recovery distinguish pre-dispatch claims
-        from attempts that may have produced external side effects.
+        from attempts that may have produced external side effects. Required
+        approval is rechecked here so revocation serializes before or after the
+        dispatch commitment, never in an unprotected gap before it.
         """
+        if type(approval_required) is not bool:
+            raise ValueError("approval requirement must be boolean")
         now = time.time()
         with self._lock:
             c = self._conn()
