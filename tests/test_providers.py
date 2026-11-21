@@ -803,6 +803,74 @@ def test_router_dispatches_through_registered_provider_not_scheduler(monkeypatch
     assert len(runner.calls) == 1
 
 
+def test_router_enforces_provider_input_and_output_contracts():
+    import asyncio
+    from types import SimpleNamespace
+
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityUnavailable
+    from whaxon.core.providers import BoundProviderRouter
+
+    class ContractProvider:
+        def __init__(self):
+            self.manifest = CapabilityManifest(
+                "service.contract", "trusted.contract", "1", ("local_process",),
+                input_schema={
+                    "type": "object", "properties": {"count": {"type": "integer", "minimum": 1}},
+                    "required": ["count"], "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object", "properties": {
+                        "provider_id": {"const": "trusted.contract"},
+                        "provider_version": {"const": "1"},
+                        "manifest_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                        "status": {"enum": ["succeeded", "blocked"]},
+                    },
+                    "required": ["provider_id", "provider_version", "manifest_fingerprint", "status"],
+                    "additionalProperties": False,
+                },
+            )
+            self.calls = 0
+            self.malformed_output = False
+
+        def bindings(self):
+            return (self.manifest,)
+
+        def resolve_task(self, task, *, require_installed=False):
+            return SimpleNamespace(manifest=self.manifest)
+
+        async def dispatch(self, task):
+            self.calls += 1
+            result = {
+                "provider_id": self.manifest.provider_id,
+                "provider_version": self.manifest.provider_version,
+                "manifest_fingerprint": self.manifest.fingerprint,
+                "status": "succeeded",
+            }
+            if self.malformed_output:
+                result["status"] = "pretended_success"
+            return result
+
+        def inventory(self):
+            return []
+
+    provider = ContractProvider()
+    router = BoundProviderRouter((provider,))
+    invalid = WorkflowTask(
+        "task", "service.contract", "example.test", inputs={"count": True},
+    )
+    with pytest.raises(CapabilityUnavailable, match="inputs violate"):
+        asyncio.run(router.dispatch(invalid))
+    assert provider.calls == 0
+
+    valid = WorkflowTask(
+        "task", "service.contract", "example.test", inputs={"count": 1},
+    )
+    provider.malformed_output = True
+    with pytest.raises(RuntimeError, match="output contract"):
+        asyncio.run(router.dispatch(valid))
+    assert provider.calls == 1
+
+
 def test_router_rejects_duplicate_capabilities_and_untrusted_registry_only(monkeypatch):
     import asyncio
 
