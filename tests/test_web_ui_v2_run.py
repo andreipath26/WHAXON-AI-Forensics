@@ -322,14 +322,6 @@ def test_run_page_exposes_one_truthful_dispatch_action(page, live_server):
 
 def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(page, live_server):
     """UI uses V2 follow-up services; saving persists review-only work."""
-    page.goto(f"{live_server}/ui-v2/run")
-    report_button = page.locator("#v2-inspect-report")
-    followup_button = page.locator("#v2-propose-followups")
-    save_button = page.locator("#v2-save-followups")
-    assert report_button.is_disabled()
-    assert followup_button.is_disabled()
-    assert save_button.is_disabled()
-
     requests = []
     api_requests = []
     def track_api_request(request):
@@ -382,6 +374,13 @@ def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(
     page.route("**/api/v2/workflows/ui-test-plan/report?limit=100", report)
     page.route("**/api/v2/workflows/ui-test-plan/followups", followups)
     page.route("**/api/v2/workflows/ui-test-plan", details)
+    page.goto(f"{live_server}/ui-v2/run")
+    report_button = page.locator("#v2-inspect-report")
+    followup_button = page.locator("#v2-propose-followups")
+    save_button = page.locator("#v2-save-followups")
+    assert report_button.is_disabled()
+    assert followup_button.is_disabled()
+    assert save_button.is_disabled()
     page.locator("#v2-plan-id").fill("ui-test-plan")
     page.locator("#v2-load-plan").click()
     page.wait_for_function(
