@@ -148,3 +148,52 @@ def test_workflow_report_projects_failed_attempt_without_raw_error(tmp_path):
     rendered = json.dumps(report)
     assert secret not in rendered
     assert "provider response contained" not in rendered
+
+
+
+def test_workflow_report_projects_scope_skip_without_raw_coverage_details(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-skip-report.db")
+    store.create_mission("skip-mission", "report skipped coverage")
+    target = "192.0.2.11"
+    store.save_workflow_plan(
+        "skip-plan",
+        WorkflowPlan("skip-mission", (
+            WorkflowTask("scan", "tool.nmap", target),
+        )),
+    )
+    claim = store.claim_ready_workflow_task("skip-plan", "skip-report-worker")
+    assert claim is not None
+    attempt_id = claim["attempt_id"]
+    store.mark_workflow_dispatch_started(
+        "skip-plan", attempt_id, provider_execution_id=attempt_id,
+    )
+    secret_detail = f"scope denial included private context for {target}"
+    store.record_coverage(
+        attempt_id, "nmap", target, "scope_blocked", secret_detail, phase="workflow",
+    )
+    store.finish_task_attempt(
+        attempt_id, "uncertain",
+        error="provider outcome unknown after dispatch: OutOfScopeError; reconcile before retry",
+    )
+
+    core = Core.__new__(Core)
+    core.workflow_evidence = lambda plan_id, limit=100: store.get_workflow_evidence(
+        plan_id, limit=limit,
+    )
+    core.workflow_readiness = store.get_workflow_readiness
+    core.workflow_progress = store.get_workflow_progress
+
+    report = Core.workflow_report(core, "skip-plan")
+    attempt = report["evidence"]["attempts"][0]
+    assert attempt["attempt_status"] == "uncertain"
+    assert attempt["attempt_error_category"] == "provider_outcome_uncertain"
+    assert attempt["coverage_outcomes"] == [{
+        "status": "skipped", "kind": "scope_blocked", "phase": "workflow",
+    }]
+    rendered = json.dumps(report)
+    assert secret_detail not in rendered
+    assert "private context" not in rendered
+    assert "target" not in attempt["coverage_outcomes"][0]
