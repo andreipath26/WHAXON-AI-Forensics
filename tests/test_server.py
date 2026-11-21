@@ -803,7 +803,8 @@ def test_legacy_validation_and_retest_recheck_scope_before_each_probe(
 
     monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
-    _seed_job(core, findings=[_finding(kind="sqli")])
+    finding = {**_finding(kind="sqli"), "data": {"parameter": "q"}}
+    _seed_job(core, findings=[finding])
     client = app.test_client()
     attempted = []
 
