@@ -1095,21 +1095,8 @@ class Core:
         }
 
     def workflow_run_snapshot(self, request_id: str):
-        """Reconnect-safe persisted run and task progress, without lease secrets.
-
-        The request and task views are individually persisted snapshots, not
-        a claim that external effects completed or that a worker is alive.
-        """
-        row = self.workflow_run_request(request_id)
-        if row is None:
-            return None
-        return {
-            "schema_version": "whaxon.workflow-run-snapshot.v1",
-            "request": row,
-            "progress": self.workflow_progress(row["plan_id"]),
-            "worker_liveness_verified": False,
-            "automatic_uncertain_replay": False,
-        }
+        """Reconnect-safe request and task progress from one SQLite snapshot."""
+        return self.workflow_requests.snapshot(request_id)
 
     async def drain_workflow_run_requests(self, *, max_runs: int = 20,
                                           initialized: bool = False,
