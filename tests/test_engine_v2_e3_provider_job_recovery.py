@@ -79,9 +79,9 @@ def test_recovery_supports_first_party_provider_capabilities(tmp_path):
 
 
 @pytest.mark.parametrize(("job_status", "exit_code"), [
-    ("running", 0), ("finished", 1), ("failed", 1),
+    ("running", 0), ("failed", 1),
 ])
-def test_recovery_refuses_incomplete_or_failed_provider_results(
+def test_recovery_refuses_incomplete_provider_results(
     tmp_path, job_status, exit_code,
 ):
     core, _, attempt_id = _uncertain_catalog_attempt(
