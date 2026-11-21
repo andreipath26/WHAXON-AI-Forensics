@@ -2948,10 +2948,30 @@ class JobStore:
                                 entry["provider_exit_code"] = job["exit_code"]
                             findings = c.execute(
                                 "SELECT seq, kind, severity, source, raw_line, "
-                                "verification_status, verification_reason "
+                                "verification_status, verification_reason, data_json "
                                 "FROM findings WHERE job_id=? ORDER BY seq", (job_id,),
                             ).fetchall()
-                            entry["findings"] = [dict(finding) for finding in findings]
+                            report_findings = []
+                            for finding in findings:
+                                item = dict(finding)
+                                raw_data_json = item.pop("data_json", None)
+                                try:
+                                    finding_data = json.loads(raw_data_json or "{}")
+                                except (TypeError, json.JSONDecodeError):
+                                    finding_data = None
+                                if isinstance(finding_data, dict):
+                                    source_job_id = finding_data.get("source_job_id")
+                                    source_seq = finding_data.get("source_finding_seq")
+                                    if (
+                                        isinstance(source_job_id, str) and source_job_id
+                                        and type(source_seq) is int and source_seq >= 0
+                                    ):
+                                        item["source_observation"] = {
+                                            "job_id": source_job_id,
+                                            "finding_seq": source_seq,
+                                        }
+                                report_findings.append(item)
+                            entry["findings"] = report_findings
                             entry["finding_count"] = len(findings)
                             entry["evidence_status"] = "recorded"
                             seal = c.execute(

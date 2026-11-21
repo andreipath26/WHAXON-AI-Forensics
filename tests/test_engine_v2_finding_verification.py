@@ -178,6 +178,10 @@ def test_v2_verify_and_retest_are_scheduler_owned_and_sealed(tmp_path):
             assert verify_attempt["findings"][0]["verification_reason"].startswith(
                 "SQL error signature"
             )
+            report = core.workflow_report("verification-plan")
+            assert report["findings"][0]["source_observation"] == {
+                "job_id": source_job, "finding_seq": 0,
+            }
 
             _bound_plan(
                 core, plan_id="retest-plan",
