@@ -7,7 +7,10 @@ import threading
 import time
 from pathlib import Path
 
-from .provider_execution import provider_tool_id_for_capability
+from .provider_execution import (
+    provider_capability_identity_is_known,
+    provider_tool_id_for_capability,
+)
 
 
 def _workflow_attempt_error_category(status, error):
@@ -2134,6 +2137,13 @@ class JobStore:
                 capability_id = row["capability_id"]
                 if not isinstance(capability_id, str) or not capability_id:
                     raise ValueError("workflow capability identity is invalid")
+                identity_is_known = provider_capability_identity_is_known(
+                    capability_id,
+                )
+                if not identity_is_known:
+                    raise ValueError(
+                        "provider capability identity is unknown; manual reconciliation required",
+                    )
                 tool_id = provider_tool_id_for_capability(capability_id)
                 dispatch_events = c.execute(
                     "SELECT detail_json FROM workflow_events WHERE plan_id=? "
@@ -2412,6 +2422,7 @@ class JobStore:
                     if isinstance(dispatch_detail, dict) else None
                 )
                 provider_job = None
+                provider_job_identity_verified = False
                 if isinstance(provider_execution_id, str):
                     job = c.execute(
                         "SELECT j.id AS job_id, j.tool, j.target, j.status, j.exit_code, "
@@ -2421,24 +2432,30 @@ class JobStore:
                         "ON v2.job_id=j.id WHERE j.id=?",
                         (provider_execution_id,),
                     ).fetchone()
+                    capability_id = row["capability_id"]
+                    expected_tool = provider_tool_id_for_capability(capability_id)
+                    identity_is_known = provider_capability_identity_is_known(
+                        capability_id,
+                    )
                     if (
                         job is not None
                         and job["target"] == row["target"]
                         and (
-                            provider_tool_id_for_capability(row["capability_id"])
-                            == row["capability_id"]
-                            or job["tool"] == provider_tool_id_for_capability(
-                                row["capability_id"],
-                            )
+                            not identity_is_known
+                            or job["tool"] == expected_tool
                         )
                     ):
                         provider_job = dict(job)
+                        provider_job_identity_verified = (
+                            identity_is_known and job["tool"] == expected_tool
+                        )
                 results.append({
                     "attempt_id": row["attempt_id"],
                     "task_key": row["task_key"], "status": row["status"],
                     "external_effect_possible": bool(row["dispatch_recorded"]),
                     "provider_execution_id": provider_execution_id,
                     "provider_job": provider_job,
+                    "provider_job_identity_verified": provider_job_identity_verified,
                     "provider_job_identity_mismatch": bool(
                         provider_job is None
                         and isinstance(provider_execution_id, str)

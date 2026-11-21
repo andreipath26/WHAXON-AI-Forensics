@@ -18,6 +18,32 @@ SEMANTIC_OPERATION_TO_TOOL = {
     "web.parameters.discover": "arjun",
 }
 
+# Built-in first-party providers persist jobs with their capability ID as tool ID.
+FIRST_PARTY_PROVIDER_CAPABILITY_IDS = frozenset({
+    "recon.http",
+    "dns.recon.passive",
+    "dns.recon.full",
+    "web.recon.passive",
+    "web.recon.headers",
+    "web.recon.robots",
+    "web.recon.security_txt",
+    "web.recon.redirect_observe",
+    "tls.certificate.inspect",
+    "lab.initial_access.samba_usermap",
+})
+
+
+def provider_capability_identity_is_known(capability_id: str) -> bool:
+    """Whether capability ID carries an exact durable provider tool contract."""
+    return (
+        isinstance(capability_id, str)
+        and (
+            capability_id.startswith("tool.")
+            or capability_id in SEMANTIC_OPERATION_TO_TOOL
+            or capability_id in FIRST_PARTY_PROVIDER_CAPABILITY_IDS
+        )
+    )
+
 
 def provider_tool_id_for_capability(capability_id: str) -> str:
     """Resolve the persisted provider tool identity for a workflow capability."""

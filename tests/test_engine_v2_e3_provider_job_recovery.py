@@ -48,6 +48,11 @@ def _uncertain_catalog_attempt(
 def test_recovery_seals_successful_job_and_never_replays(tmp_path):
     core, request, attempt_id = _uncertain_catalog_attempt(tmp_path)
 
+    reconciliation = core.store.get_workflow_dispatch_reconciliation("p")[0]
+    assert reconciliation["provider_job"]["tool"] == "nmap"
+    assert reconciliation["provider_job_identity_verified"] is True
+    assert reconciliation["provider_job_identity_mismatch"] is False
+
     recovered = core.recover_workflow_attempt_from_provider_job("p", attempt_id)
 
     assert recovered["task_status"] == "succeeded"
@@ -153,3 +158,31 @@ def test_recovery_api_does_not_accept_caller_supplied_results(tmp_path):
         "result": {"status": "success"},
     })
     assert rejected.status_code == 400
+
+
+
+def test_reconciliation_requires_exact_tool_for_first_party_provider(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, capability_id="recon.http",
+    )
+
+    valid = core.store.get_workflow_dispatch_reconciliation("p")[0]
+    assert valid["provider_job"]["job_id"] == attempt_id
+    assert valid["provider_job"]["tool"] == "recon.http"
+    assert valid["provider_job_identity_verified"] is True
+    assert valid["provider_job_identity_mismatch"] is False
+
+    conn = core.store._conn()
+    try:
+        conn.execute("UPDATE jobs SET tool='dns.full' WHERE id=?", (attempt_id,))
+    finally:
+        conn.close()
+
+    mismatched = core.store.get_workflow_dispatch_reconciliation("p")[0]
+    assert mismatched["provider_job"] is None
+    assert mismatched["provider_job_identity_verified"] is False
+    assert mismatched["provider_job_identity_mismatch"] is True
+    assert mismatched["manual_reconciliation_required"] is True
+    with pytest.raises(ValueError, match="no matching successful durable"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
