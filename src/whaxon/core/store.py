@@ -9,6 +9,38 @@ from pathlib import Path
 
 from .provider_execution import provider_tool_id_for_capability
 
+
+def _workflow_attempt_error_category(status, error):
+    """Project persisted failure details to safe report categories only."""
+    if not isinstance(error, str) or not error or status == "succeeded":
+        return None
+    fixed_categories = {
+        "deterministic policy denied task": "authorization_denied",
+        "dispatch-boundary policy denied task": "dispatch_authorization_denied",
+        "cancelled before provider dispatch": "cancelled_before_dispatch",
+        "durable execution gate closed before provider dispatch": "dispatch_gate_closed",
+        "task timed out; reconcile before retry": "provider_timeout_uncertain",
+        "cancellation requested while provider was executing; outcome requires reconciliation":
+            "cancelled_outcome_uncertain",
+        "scheduler cancelled while task was active; reconcile before retry":
+            "scheduler_cancelled_outcome_uncertain",
+    }
+    if error in fixed_categories:
+        return fixed_categories[error]
+    if error.startswith("policy authorization failed closed:"):
+        return "authorization_check_failed_closed"
+    if error.startswith("dispatch-boundary authorization failed closed:"):
+        return "dispatch_authorization_check_failed_closed"
+    if error.startswith("provider outcome unknown after dispatch:"):
+        return "provider_outcome_uncertain"
+    return {
+        "blocked": "authorization_blocked",
+        "failed": "task_failed",
+        "cancelled": "task_cancelled",
+        "uncertain": "outcome_uncertain",
+    }.get(status, "attempt_error")
+
+
 _APPROVAL_CANDIDATE_PAGE_SIZE = 256
 _APPROVAL_CANDIDATE_SCAN_BUDGET = 10_000
 
@@ -2900,7 +2932,10 @@ class JobStore:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
             rows = c.execute(
                 "SELECT t.task_key, t.target, t.capability_id, a.id AS attempt_id, "
-                "a.attempt_no, a.status, a.result_json, a.error "
+                "a.attempt_no, a.status, a.result_json, a.error, "
+                "(SELECT e.detail_json FROM workflow_events e "
+                "WHERE e.plan_id=t.plan_id AND e.attempt_id=a.id "
+                "AND e.event_type='dispatch_started' LIMIT 1) AS dispatch_detail "
                 "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                 "WHERE t.plan_id=? ORDER BY a.started_at, a.id LIMIT ?",
                 (plan_id, limit),
@@ -2911,7 +2946,12 @@ class JobStore:
                     "task_key": row["task_key"], "target": row["target"],
                     "capability_id": row["capability_id"],
                     "attempt_id": row["attempt_id"], "attempt_no": row["attempt_no"],
-                    "attempt_status": row["status"], "job_id": None,
+                    "attempt_status": row["status"],
+                    "attempt_error_category": _workflow_attempt_error_category(
+                        row["status"], row["error"],
+                    ),
+                    "job_id": None,
+                    "coverage_outcomes": [],
                     "evidence_status": "unavailable", "integrity_status": "unsealed",
                     "finding_count": 0, "findings": [],
                 }
@@ -2919,6 +2959,47 @@ class JobStore:
                     result = json.loads(row["result_json"] or "null")
                 except (TypeError, json.JSONDecodeError):
                     result = None
+                try:
+                    dispatch_detail = json.loads(row["dispatch_detail"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    dispatch_detail = None
+                provider_job_id = (
+                    dispatch_detail.get("provider_execution_id")
+                    if isinstance(dispatch_detail, dict) else None
+                )
+                result_job_id = (
+                    result.get("job_id") if isinstance(result, dict) else None
+                )
+                if (
+                    isinstance(provider_job_id, str) and provider_job_id
+                    and (
+                        not isinstance(result_job_id, str)
+                        or result_job_id == provider_job_id
+                    )
+                ):
+                    expected_tool_id = provider_tool_id_for_capability(
+                        row["capability_id"],
+                    )
+                    coverage_rows = c.execute(
+                        "SELECT tool_id, target, kind, phase FROM coverage "
+                        "WHERE job_id=? ORDER BY seq", (provider_job_id,),
+                    ).fetchall()
+                    known_coverage_kinds = {
+                        "scope_blocked", "binary_missing", "timeout",
+                    }
+                    for coverage in coverage_rows:
+                        if (
+                            coverage["tool_id"] != expected_tool_id
+                            or coverage["target"] != row["target"]
+                        ):
+                            continue
+                        entry["coverage_outcomes"].append({
+                            "status": "skipped",
+                            "kind": coverage["kind"]
+                            if coverage["kind"] in known_coverage_kinds else "other",
+                            "phase": "workflow"
+                            if coverage["phase"] == "workflow" else "other",
+                        })
                 recovered_failure = (
                     row["status"] == "failed" and isinstance(result, dict)
                     and result.get("recovered_from_durable_provider_job") is True
