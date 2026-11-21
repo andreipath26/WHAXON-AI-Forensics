@@ -320,13 +320,15 @@ def test_run_page_exposes_one_truthful_dispatch_action(page, live_server):
     assert 'fetch("/api/run"' not in response.text()
 
 
-def test_v2_run_page_evidence_report_and_followups_are_preview_only(page, live_server):
-    """UI uses the shared V2 endpoints and never saves or executes proposals."""
+def test_v2_run_page_previews_and_saves_followups_without_approval_or_execution(page, live_server):
+    """UI uses V2 follow-up services; saving persists review-only work."""
     page.goto(f"{live_server}/ui-v2/run")
     report_button = page.locator("#v2-inspect-report")
     followup_button = page.locator("#v2-propose-followups")
+    save_button = page.locator("#v2-save-followups")
     assert report_button.is_disabled()
     assert followup_button.is_disabled()
+    assert save_button.is_disabled()
 
     requests = []
     def details(route):
@@ -345,11 +347,17 @@ def test_v2_run_page_evidence_report_and_followups_are_preview_only(page, live_s
         ))
 
     def followups(route):
-        requests.append(("followups", route.request.post_data_json))
-        route.fulfill(status=200, content_type="application/json", body=(
-            '{"plan":null,"plan_id":null,"blocked":[],"created":false,'
-            '"execution_started":false,"approval_granted":false}'
-        ))
+        payload = route.request.post_data_json
+        requests.append(("followups", payload))
+        saved = payload.get("save") is True
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({
+            "plan": {"tasks": [{"id": "followup-task"}]} if saved else None,
+            "plan_id": "followup-plan" if saved else None,
+            "blocked": [],
+            "created": saved,
+            "execution_started": False,
+            "approval_granted": False,
+        }))
 
     page.route("**/api/v2/workflows/ui-test-plan/approvals", approvals)
     page.route("**/api/v2/workflows/ui-test-plan/report?limit=100", report)
@@ -372,10 +380,18 @@ def test_v2_run_page_evidence_report_and_followups_are_preview_only(page, live_s
         "() => document.querySelector('#v2-evidence-preview')?.textContent.includes('Preview only')",
         timeout=8000,
     )
-    assert requests == [
-        ("report", "GET"),
-        ("followups", {"max_tasks": 16, "save": False}),
-    ]
     assert "nothing was saved, approved or submitted" in page.locator(
         "#v2-evidence-preview"
     ).inner_text()
+    save_button.click()
+    page.wait_for_function(
+        "() => document.querySelector('#v2-evidence-preview')?.textContent.includes('Saved follow-up plan followup-plan')",
+        timeout=8000,
+    )
+    saved_message = page.locator("#v2-evidence-preview").inner_text()
+    assert "no approval or run request was created" in saved_message
+    assert requests == [
+        ("report", "GET"),
+        ("followups", {"max_tasks": 16, "save": False}),
+        ("followups", {"max_tasks": 16, "save": True}),
+    ]
