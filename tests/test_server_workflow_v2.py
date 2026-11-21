@@ -418,6 +418,24 @@ def test_workflow_v2_mission_budget_is_shared_with_store(tmp_path, monkeypatch):
     assert client.get("/api/v2/missions/missing/budget").status_code == 404
 
 
+def test_workflow_v2_mission_runtime_budget_is_shared_with_store(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    response = client.post(
+        "/api/v2/missions/m/runtime-budget", json={"max_runtime_s": 30.5},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["max_runtime_s"] == 30.5
+    assert core.store.get_mission_runtime_limit("m")["max_runtime_s"] == 30.5
+    assert client.get("/api/v2/missions/m/runtime-budget").get_json()[
+        "runtime_budget_exhausted"
+    ] is False
+    assert client.post(
+        "/api/v2/missions/m/runtime-budget", json={"max_runtime_s": float("inf")},
+    ).status_code == 400
+    assert client.get("/api/v2/missions/missing/runtime-budget").status_code == 404
+
+
 def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
     import time
 
