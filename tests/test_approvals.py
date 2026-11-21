@@ -116,71 +116,28 @@ def test_api_answer_is_disabled_by_default(tmp_path, monkeypatch) -> None:
     assert r.get_json()["execution_submitted"] is False
 
 
-def test_api_answer_requires_body(tmp_path, monkeypatch) -> None:
+def test_api_answer_stale_opt_in_cannot_resume_or_approve(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
-    core.store.create_ai_run("ai-a", "g")
-    core.store.set_ai_run_waiting("ai-a", "{}")
-    r = app.test_client().post("/api/ai/runs/ai-a/answer", json={})
-    assert r.status_code == 400
+    core.store.create_ai_run("ai-waiting", "goal")
+    core.store.set_ai_run_waiting("ai-waiting", '{"q": "?"}')
+    core.store.create_ai_run("ai-running", "goal")
 
-
-def test_api_answer_404_unknown_run(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().post("/api/ai/runs/nope/answer", json={"answer": "y"})
-    assert r.status_code == 404
-
-
-def test_api_answer_409_not_waiting(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    core.store.create_ai_run("ai-r", "g")  # status running
-    r = app.test_client().post("/api/ai/runs/ai-r/answer", json={"answer": "y"})
-    assert r.status_code == 409
-
-
-def test_api_answer_records_approval(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    core.store.create_ai_run("ai-a", "g", owner="alice")
-    core.store.set_ai_run_waiting("ai-a", '{"q": "?"}')
-    r = app.test_client().post(
-        "/api/ai/runs/ai-a/answer",
-        json={"answer": "y", "user": "alice", "note": "ok"},
+    client = app.test_client()
+    responses = (
+        client.post("/api/ai/runs/ai-waiting/answer", json={}),
+        client.post("/api/ai/runs/nope/answer", json={"answer": "y"}),
+        client.post("/api/ai/runs/ai-running/answer", json={"answer": "y"}),
+        client.post("/api/ai/runs/ai-waiting/answer", json={"answer": "y"}),
     )
-    assert r.status_code == 200
-    body = r.get_json()
-    assert body["ok"] is True
-    assert body["run_id"] == "ai-a"
-    rows = core.store.list_approvals("ai-a")
-    assert len(rows) == 1
-    assert rows[0]["user"] == "local"  # client JSON cannot assign audit identity
-    assert rows[0]["answer"] == "y"
-    assert rows[0]["note"] == "ok"
 
-
-def test_api_answer_does_not_trust_loopback_basic_identity(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    core.store.create_ai_run("ai-a", "g")
-    core.store.set_ai_run_waiting("ai-a", "{}")
-    r = app.test_client().post(
-        "/api/ai/runs/ai-a/answer",
-        json={"answer": "y", "user": "spoofed-name"},
-        auth=("alice", "test-password"),
-    )
-    assert r.status_code == 200
-    rows = core.store.list_approvals("ai-a")
-    assert rows[0]["user"] == "local"
-
-
-def test_api_answer_default_user(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    core.store.create_ai_run("ai-a", "g")
-    core.store.set_ai_run_waiting("ai-a", "{}")
-    r = app.test_client().post("/api/ai/runs/ai-a/answer", json={"answer": "skip"})
-    assert r.status_code == 200
-    rows = core.store.list_approvals("ai-a")
-    assert rows[0]["user"] == "local"
+    assert all(response.status_code == 410 for response in responses)
+    for response in responses:
+        body = response.get_json()
+        assert body["legacy_execution_enabled"] is False
+        assert body["approval_granted"] is False
+        assert body["execution_submitted"] is False
+    assert core.store.get_ai_run("ai-waiting")["status"] == "waiting"
+    assert core.store.get_ai_run("ai-running")["status"] == "running"
+    assert core.store.list_approvals("ai-waiting") == []
+    assert core.store.list_approvals("ai-running") == []
