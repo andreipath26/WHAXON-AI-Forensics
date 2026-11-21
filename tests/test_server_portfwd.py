@@ -1,29 +1,10 @@
-"""Tests for the portfwd server endpoints.
-
-The portfwd endpoints (GET/POST/DELETE on /api/msf/sessions/<id>/portfwd)
-delegate to whaxon.core.portfwd's free functions. Those functions walk
-client.connect().sessions.session(id) to reach a write/read handle — a
-deep stack that's tedious to fake correctly.
-
-These tests mock the three free functions instead:
-
-    whaxon.core.portfwd.list_live
-    whaxon.core.portfwd.add_forward
-    whaxon.core.portfwd.remove_forward
-
-That verifies the HTTP contract (validation, status codes, response shape)
-without pulling in the RPC plumbing. The portfwd functions themselves are
-not exercised here.
-"""
+"""Legacy Metasploit port-forward endpoints cannot dispatch session commands."""
 from __future__ import annotations
 
-from whaxon.core import Core
-from whaxon.core import portfwd as _pf
-from whaxon.interfaces.web.server import (
-    AsyncRunner,
-    JobRegistry,
-    create_app,
-)
+import pytest
+
+from whaxon.core import Core, portfwd
+from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app
 
 
 class _FakeMSF:
@@ -31,226 +12,40 @@ class _FakeMSF:
         return True
 
     def sessions(self):
-        return {
-            sid: {"target_host": "10.0.0.9", "type": "shell"}
-            for sid in ("1", "3", "7")
-        }
-
-    def version(self):
-        return "6.5.3"
+        return {"1": {"target_host": "127.0.0.1", "type": "shell"}}
 
 
 def _make_app(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_DATA", str(tmp_path))
     monkeypatch.delenv("WHAXON_AUTH_USER", raising=False)
     monkeypatch.delenv("WHAXON_AUTH_PASS_HASH", raising=False)
-    # Make the authorization boundary explicit instead of depending on the
-    # generated default policy in this endpoint test.
-    (tmp_path / "scope.json").write_text(
-        '{"enabled": true, "in_scope": ["10.0.0.9"], "out_of_scope": []}',
-        encoding="utf-8",
-    )
     core = Core(data_dir=tmp_path)
-    fake_msf = _FakeMSF()
-    monkeypatch.setattr(core, "msf", fake_msf)
-    # The API now requires a persisted open identity as well as a live RPC
-    # session; mirror the tracker state used by production.
-    for session_id, info in fake_msf.sessions().items():
-        core.store.upsert_session(
-            str(session_id),
-            str(info.get("target_host") or "?"),
-            str(info.get("type") or "?"),
-            info,
-        )
-    registry = JobRegistry(core)
-    runner = AsyncRunner(core)
-    app = create_app(core, registry, runner)
+    fake = _FakeMSF()
+    monkeypatch.setattr(core, "msf", fake)
+    core.store.upsert_session("1", "127.0.0.1", "shell", fake.sessions()["1"])
+    app = create_app(core, JobRegistry(core), AsyncRunner(core))
     app.config["TESTING"] = True
-    return app, core
+    return app
 
 
-# ---------------------------------------------------------------- GET list
-
-def test_pf_list_empty(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    monkeypatch.setattr(_pf, "list_live", lambda client, sid: [])
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().get("/api/msf/sessions/1/portfwd")
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data["session_id"] == "1"
-    assert data["live"] == []
-
-
-def test_pf_list_returns_rows(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    rows = [{"pid": 4242, "lport": 8080, "rhost": "10.0.0.9", "rport": 80,
-             "cmd": "socat TCP-LISTEN:8080,fork TCP:10.0.0.9:80"}]
-    monkeypatch.setattr(_pf, "list_live", lambda client, sid: rows)
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().get("/api/msf/sessions/1/portfwd")
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data["live"] == rows
-
-
-def test_pf_list_error_is_swallowed(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    """If list_live raises, the endpoint returns 200 with error + empty list."""
-    def boom(client, sid):
-        raise RuntimeError("connection lost")
-    monkeypatch.setattr(_pf, "list_live", boom)
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().get("/api/msf/sessions/1/portfwd")
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data["live"] == []
-    assert "connection lost" in data["error"]
-
-
-# ---------------------------------------------------------------- POST add
-
-def test_pf_add_missing_fields(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().post("/api/msf/sessions/1/portfwd", json={"lport": 8080})
-    assert r.status_code == 400
-    assert "required" in r.get_json()["error"]
-
-
-def test_pf_add_missing_rhost_only(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().post("/api/msf/sessions/1/portfwd",
-                               json={"lport": 8080, "rport": 80})
-    assert r.status_code == 400
-
-
-def test_pf_add_calls_add_forward_and_returns_dict(tmp_path, monkeypatch):
+@pytest.mark.parametrize("method,path,payload,operation", [
+    ("get", "/api/msf/sessions/1/portfwd", None, "list_live"),
+    ("post", "/api/msf/sessions/1/portfwd", {"lport": 8080, "rhost": "127.0.0.1", "rport": 80}, "add_forward"),
+    ("delete", "/api/msf/sessions/1/portfwd", {"lport": 8080}, "remove_forward"),
+])
+def test_port_forward_operations_stay_blocked_with_stale_opt_in(
+    tmp_path, monkeypatch, method, path, payload, operation,
+):
     monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     calls = []
+    monkeypatch.setattr(portfwd, operation, lambda *args, **kwargs: calls.append(args))
+    app = _make_app(tmp_path, monkeypatch)
 
-    def fake_add(client, session_id, lport, rhost, rport, label):
-        calls.append((session_id, lport, rhost, rport, label))
-        return _pf.Forward(session_id=str(session_id), lport=int(lport),
-                           rhost=str(rhost), rport=int(rport), label=label)
-
-    monkeypatch.setattr(_pf, "add_forward", fake_add)
-    app, core = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().post("/api/msf/sessions/7/portfwd",
-                               json={"lport": 8080, "rhost": "10.0.0.9",
-                                     "rport": 80, "label": "web"})
-    assert r.status_code == 200
-    data = r.get_json()
-    assert data["session_id"] == "7"
-    assert data["lport"] == 8080
-    assert data["rhost"] == "10.0.0.9"
-    assert data["rport"] == 80
-    assert data["label"] == "web"
-    assert calls == [("7", 8080, "10.0.0.9", 80, "web")]
-    # pivot edge was written
-    conn = core.store._conn()
-    try:
-        edges = _pf.__dict__.get("_dummy")
-        from whaxon.core import pivot
-        edges = pivot.list_edges(conn)
-    finally:
-        conn.close()
-    assert any(e["parent"]["id"] == "7" and e["relation"] == "tunnels_via"
-               for e in edges)
-
-
-def test_pf_add_error_returns_500(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    def boom(*a, **kw):
-        raise RuntimeError("socat not found on target")
-    monkeypatch.setattr(_pf, "add_forward", boom)
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().post("/api/msf/sessions/1/portfwd",
-                               json={"lport": 8080, "rhost": "10.0.0.9", "rport": 80})
-    assert r.status_code == 500
-    assert "socat" in r.get_json()["error"]
-
-
-def test_pf_add_is_default_denied_without_creating_forward(tmp_path, monkeypatch):
-    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
-    calls = []
-    monkeypatch.setattr(_pf, "add_forward", lambda *args, **kwargs: calls.append(args))
-    app, _ = _make_app(tmp_path, monkeypatch)
-
-    response = app.test_client().post(
-        "/api/msf/sessions/7/portfwd",
-        json={"lport": 8080, "rhost": "10.0.0.9", "rport": 80},
-    )
+    response = getattr(app.test_client(), method)(path, json=payload)
 
     assert response.status_code == 410
     body = response.get_json()
     assert body["legacy_execution_enabled"] is False
     assert body["approval_granted"] is False
     assert body["execution_submitted"] is False
-    assert calls == []
-
-
-# ---------------------------------------------------------------- DELETE remove
-
-def test_pf_del_missing_lport(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().delete("/api/msf/sessions/1/portfwd", json={})
-    assert r.status_code == 400
-    assert "lport required" in r.get_json()["error"]
-
-
-def test_pf_del_success(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    captured = []
-
-    def fake_remove(client, fwd):
-        captured.append(fwd)
-        return {"ok": True, "method": "pid", "pid": 4242}
-
-    monkeypatch.setattr(_pf, "remove_forward", fake_remove)
-    app, _ = _make_app(tmp_path, monkeypatch)
-    r = app.test_client().delete("/api/msf/sessions/3/portfwd",
-                                 json={"lport": 8080})
-    assert r.status_code == 200
-    assert r.get_json() == {"ok": True, "method": "pid", "pid": 4242}
-    assert len(captured) == 1
-    fwd = captured[0]
-    assert fwd.session_id == "3"
-    assert fwd.lport == 8080
-
-def test_pf_del_rejects_invalid_port_types(tmp_path, monkeypatch):
-    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
-    app, _ = _make_app(tmp_path, monkeypatch)
-    client = app.test_client()
-    for value in (True, False, [], {}, "80x", 0, 65536):
-        response = client.delete(
-            "/api/msf/sessions/3/portfwd",
-            json={"lport": value},
-        )
-        assert response.status_code == 400, value
-        assert "lport must be an integer" in response.get_json()["error"]
-
-
-def test_pf_inspection_and_cleanup_are_default_denied(tmp_path, monkeypatch):
-    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
-    calls = []
-    monkeypatch.setattr(_pf, "list_live", lambda *args: calls.append(("list", args)))
-    monkeypatch.setattr(_pf, "remove_forward", lambda *args: calls.append(("remove", args)))
-    app, _ = _make_app(tmp_path, monkeypatch)
-    client = app.test_client()
-
-    inspected = client.get("/api/msf/sessions/1/portfwd")
-    removed = client.delete(
-        "/api/msf/sessions/1/portfwd", json={"lport": 8080}
-    )
-
-    assert inspected.status_code == removed.status_code == 410
-    for response in (inspected, removed):
-        body = response.get_json()
-        assert body["legacy_execution_enabled"] is False
-        assert body["approval_granted"] is False
-        assert body["execution_submitted"] is False
     assert calls == []
