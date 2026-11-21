@@ -384,6 +384,10 @@ The first provider-backed task uses a capability such as `tool.nmap`, with `perm
 ### 2026-11-02 scheduler deadline correction
 
 A task's declared timeout now covers both deterministic authorization and provider dispatch. Synchronous callbacks execute in worker threads rather than blocking the event loop, preserving lease heartbeats and independent task progress. Authorization timeout fails closed as `blocked` and never dispatches; provider timeout remains `uncertain` because cancelling an await or timing out a worker thread cannot prove that an external effect stopped. Regression tests cover synchronous and asynchronous authorization timeouts. This closes a scheduler correctness gap; whole-phase cancellation, audit/outbox and recovery acceptance remain open.
+
+### 2026-11-21 Engine V2 subprocess cancellation
+
+When a dispatched scheduler task is cancelled during worker shutdown, `ToolRunner` now kills the isolated child process group, persists a cancelled provider-job event, and cleans its process/output bookkeeping before propagating cancellation. The workflow attempt remains `uncertain` after the dispatch marker because killing the scanner cannot reverse requests already sent. `tests/test_engine_v2_e3_external_effect_crash.py::test_scheduler_shutdown_cancellation_kills_runner_and_keeps_attempt_uncertain` exercises this boundary. This local regression does not close external-effect, multi-worker, or deployment recovery acceptance.
 ---
 
 ## Source 2: [ENGINE_V2_BASELINE_INVENTORY.md](ENGINE_V2_BASELINE_INVENTORY.md)
