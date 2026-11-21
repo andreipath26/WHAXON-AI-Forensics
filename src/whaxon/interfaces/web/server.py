@@ -71,9 +71,8 @@ def _legacy_msf_execution_enabled() -> bool:
 
 
 def _legacy_validation_enabled() -> bool:
-    return os.environ.get(
-        "WHAXON_LEGACY_VALIDATION_ENABLED", "false",
-    ).strip().lower() in ("1", "true", "yes")
+    """Direct legacy validation/retest probes are retired in every configuration."""
+    return False
 
 
 def _redact_sensitive_settings(value: Any) -> Any:
