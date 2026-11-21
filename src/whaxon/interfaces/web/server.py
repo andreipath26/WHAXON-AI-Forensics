@@ -1522,12 +1522,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         # persisted V2 plans, approvals, attempts, and run requests.
         return {
             "error": (
-                "Legacy direct tool execution is retired. Use the Engine V2 "
-                "workflow UI or POST /api/v2/workflow-proposals to create a "
-                "reviewable plan, then separately approve its exact task and "
-                "submit it through POST /api/v2/workflows/<plan_id>/run."
+                "Legacy direct tool execution is disabled and retired. Use the "
+                "Engine V2 workflow UI or POST /api/v2/workflow-proposals to "
+                "create a reviewable plan, then separately approve its exact "
+                "task and submit it through POST /api/v2/workflows/<plan_id>/run."
             ),
             "legacy_execution_enabled": False,
+            "v2_plan_endpoint": "/api/v2/workflows",
             "v2_proposal_endpoint": "/api/v2/workflow-proposals",
             "v2_run_endpoint": "/api/v2/workflows/<plan_id>/run",
             "approval_granted": False,
