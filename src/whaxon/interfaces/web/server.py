@@ -66,12 +66,6 @@ def _request_actor() -> str:
     return auth.username if auth and auth.username else "authenticated-operator"
 
 
-def _legacy_ai_execution_enabled() -> bool:
-    return os.environ.get(
-        "WHAXON_LEGACY_AI_EXECUTION_ENABLED", "false",
-    ).strip().lower() in ("1", "true", "yes")
-
-
 def _legacy_msf_execution_enabled() -> bool:
     return os.environ.get(
         "WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "false",
@@ -191,31 +185,6 @@ _PROCS: dict[str, subprocess.Popen] = {}
 _RUN_LOOPS: dict[str, asyncio.AbstractEventLoop] = {}
 _PROCS_LOCK = threading.Lock()
 
-
-def _ai_run_blocking(core, executor_factory, run_id, goal, store):
-    """Run the AI executor in a background thread, recording steps."""
-    import asyncio as _aio
-    import traceback as _tb
-    provider_name = "null"
-    try:
-        ex = executor_factory()
-        provider_name = getattr(getattr(ex, "agent", None), "provider", None)
-        provider_name = getattr(provider_name, "name", "null") or "null"
-        seq = {"n": 0}
-        def on_action(a):
-            pass
-        def on_result(r):
-            seq["n"] += 1
-            store.append_ai_run_step(run_id, seq["n"], r.action.to_dict(), r.to_dict())
-        ex.on_result = on_result
-        history = _aio.run(ex.run(goal, job_id_prefix=run_id))
-        last_err = ""
-        if history and not history[-1].ok:
-            last_err = history[-1].error or ""
-        store.set_ai_run_finished(run_id, status="done" if not last_err else "failed", error=last_err)
-    except Exception as e:
-        _tb.print_exc()
-        store.set_ai_run_finished(run_id, status="error", error=repr(e))
 
 def _run_job_blocking(
     core: Core, registry: JobRegistry, tool_id: str, target: str,
@@ -1540,9 +1509,6 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     @app.post("/api/ai/run")
     @limiter.limit("10 per minute")
     def ai_run():
-        import json as _json
-        import time as _time
-
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return {"error": "request body must be a JSON object; AI run was not started"}, 400
@@ -1578,59 +1544,18 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 "matched_rule": getattr(match, "matched_rule", None),
             }, 403
 
-        if not _legacy_ai_execution_enabled():
-            return {
-                "error": (
-                    "Legacy AI execution is disabled. Use the V2 AI proposal "
-                    "flow at POST /api/v2/ai/proposals; proposals require an "
-                    "operator-supplied mission_id, plan id, goal, and exact target, "
-                    "then separate review, task approval, and durable submission."
-                ),
-                "legacy_execution_enabled": False,
-                "v2_proposal_endpoint": "/api/v2/ai/proposals",
-                "approval_granted": False,
-                "execution_submitted": False,
-            }, 410
-
-        run_id = "ai-" + uuid.uuid4().hex[:12]
-        core.store.create_ai_run(run_id, goal)
-
-        async def ask_human(action):
-            # Persist the exact pending action and pause until the operator
-            # answers through /api/ai/runs/<run_id>/answer.
-            question = {
-                "run_id": run_id,
-                "kind": action.kind,
-                "rationale": action.rationale,
-                "tool_id": action.tool_id,
-                "target": action.target or target,
-                "extra_args": action.extra_args,
-                "confidence": action.confidence,
-                "proposed_phase": action.proposed_phase,
-            }
-            store = registry.core.store
-            store.set_ai_run_waiting(run_id, _json.dumps(question))
-            current = store.get_ai_run(run_id) or {}
-            answer_seq = len(current.get("steps") or []) + 1
-            deadline = _time.monotonic() + 1800
-            while _time.monotonic() < deadline:
-                for approval in store.list_approvals(run_id):
-                    if int(approval.get("seq", -1)) == answer_seq:
-                        return str(approval.get("answer") or "")
-                await asyncio.sleep(0.25)
-            raise TimeoutError("operator approval timed out; AI run stopped")
-
-        def _factory():
-            from whaxon.core.ai_bridge import build_executor
-            return build_executor(
-                core,
-                target_lock=target,
-                ai_run_id=run_id,
-                ask_human=ask_human,
-            )
-
-        runner.submit(lambda: _ai_run_blocking(core, _factory, run_id, goal, core.store))
-        return {"run_id": run_id}, 202
+        return {
+            "error": (
+                "Legacy AI execution is retired. Use POST /api/v2/ai/proposals with "
+                "a mission_id, plan id, goal, and exact target; then separately review "
+                "the proposal, approve the exact task, and submit through the durable "
+                "workflow API."
+            ),
+            "legacy_execution_enabled": False,
+            "v2_proposal_endpoint": "/api/v2/ai/proposals",
+            "approval_granted": False,
+            "execution_submitted": False,
+        }, 410
 
     @app.get("/api/ai/runs")
     def ai_runs_list():
@@ -1644,34 +1569,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/ai/runs/<run_id>/answer")
     def ai_run_answer(run_id: str):
-        if not _legacy_ai_execution_enabled():
-            return {
-                "error": (
-                    "Legacy AI execution is disabled. Pending legacy runs are "
-                    "read-only; use the V2 proposal, approval, and durable run flow."
-                ),
-                "legacy_execution_enabled": False,
-                "v2_proposal_endpoint": "/api/v2/ai/proposals",
-                "approval_granted": False,
-                "execution_submitted": False,
-            }, 410
-        data = request.get_json(silent=True) or {}
-        answer = (data.get("answer") or "").strip()
-        if not answer:
-            return {"error": "answer required"}, 400
-        # Never trust an operator identity supplied in the JSON body or
-        # an unvalidated Basic header on the loopback bypass path. Remote
-        # requests have passed _auth_gate before this handler runs.
-        user = _request_actor()
-        note = (data.get("note") or "")
-        run = core.store.get_ai_run(run_id)
-        if run is None:
-            return {"error": "run not found"}, 404
-        if run.get("status") != "waiting":
-            return {"error": "run is not waiting"}, 409
-        next_seq = len(run.get("steps") or []) + 1
-        core.store.add_approval(run_id, next_seq, user, answer, note)
-        return {"ok": True, "run_id": run_id, "seq": next_seq}
+        return {
+            "error": (
+                "Legacy AI run answers are retired and cannot approve or resume "
+                "pending runs. Use the V2 proposal, exact-task approval, and durable "
+                "run flow."
+            ),
+            "legacy_execution_enabled": False,
+            "v2_proposal_endpoint": "/api/v2/ai/proposals",
+            "approval_granted": False,
+            "execution_submitted": False,
+        }, 410
 
     @app.get("/api/ai/runs/<run_id>")
     def ai_run_get(run_id: str):
