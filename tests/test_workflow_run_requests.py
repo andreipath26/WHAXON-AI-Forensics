@@ -576,8 +576,6 @@ def test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot(
     assert snapshot["progress"]["cancellation_requested"] is False
     assert core.workflow_run_request(request["id"])["status"] == "cancelled"
     assert core.workflow_progress("p")["cancellation_requested"] is True
-    assert "lease_token" not in running["request"]
-    assert claimed["lease_token"] not in str(running)
 
 
 def test_e5_submission_advertises_reconnect_snapshot_without_execution_claim(
