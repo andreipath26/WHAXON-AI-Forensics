@@ -191,8 +191,11 @@ def test_core_default_workflow_policy_requires_scope_permission_and_matching_imp
         permissions=("network.scan",),
         impact="moderate",
     ))
+    def scope_check(target):
+        return SimpleNamespace(allowed=target == "192.0.2.10")
+
     core.scope = SimpleNamespace(
-        check=lambda target: SimpleNamespace(allowed=target == "192.0.2.10"),
+        check=scope_check, check_for_unpinned_execution=scope_check,
     )
     allowed = WorkflowTask(
         "scan", "tool.nmap", "192.0.2.10",
@@ -232,8 +235,11 @@ def test_core_plan_bound_policy_requires_exact_unrevoked_approval(tmp_path):
         permissions=("network.scan",),
         impact="moderate",
     ))
+    def scope_check(target):
+        return SimpleNamespace(allowed=target == "192.0.2.10")
+
     core.scope = SimpleNamespace(
-        check=lambda target: SimpleNamespace(allowed=target == "192.0.2.10"),
+        check=scope_check, check_for_unpinned_execution=scope_check,
     )
     task = WorkflowTask(
         "scan", "tool.nmap", "192.0.2.10",
@@ -316,7 +322,10 @@ def test_engine_v2_plan_authorization_rejects_modified_low_impact_nodes(tmp_path
         provider_version="catalog-v1", transports=("local_process",),
         permissions=(), impact="low",
     ))
-    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=True),
+        check_for_unpinned_execution=lambda target: SimpleNamespace(allowed=True),
+    )
     original = WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low")
     core.store.create_mission("m", "controlled lab")
     core.store.save_workflow_plan("p", WorkflowPlan("m", (original,)))
@@ -345,7 +354,10 @@ def test_engine_v2_plan_authorization_rejects_tampered_sqlite_plan(tmp_path):
         provider_version="catalog-v1", transports=("local_process",),
         permissions=(), impact="low",
     ))
-    core.scope = SimpleNamespace(check=lambda target: SimpleNamespace(allowed=True))
+    core.scope = SimpleNamespace(
+        check=lambda target: SimpleNamespace(allowed=True),
+        check_for_unpinned_execution=lambda target: SimpleNamespace(allowed=True),
+    )
     task = WorkflowTask("scan", "tool.fixture", "192.0.2.10", impact="low")
     core.store.create_mission("m", "controlled lab")
     core.store.save_workflow_plan("p", WorkflowPlan("m", (task,)))
@@ -420,7 +432,7 @@ def test_engine_v2_scope_revocation_from_another_process_takes_effect(tmp_path):
     core.capabilities.register(CapabilityManifest(
         capability_id="tool.fixture", provider_id="whaxon.adapter.fixture",
         provider_version="catalog-v1", transports=("local_process",),
-        permissions=(), impact="low",
+        permissions=(), impact="low", scope_mode="pinned_network",
     ))
     core.scope = ScopeManager(scope_path)
     task = WorkflowTask("scan", "tool.fixture", "lab.example", impact="low")
@@ -1163,7 +1175,8 @@ def test_multi_provider_execution_requires_approval_bound_manifest(tmp_path):
         def __init__(self, provider_id):
             self.manifest = CapabilityManifest(
                 "service.http.enumerate", provider_id, "1", ("local_process",),
-                target_types=("hostname",), impact="low",
+            target_types=("hostname",), impact="low",
+            scope_mode="pinned_network",
             )
 
         def bindings(self):
@@ -1191,7 +1204,7 @@ def test_multi_provider_execution_requires_approval_bound_manifest(tmp_path):
         preferred_providers={"service.http.enumerate": "trusted.beta"},
     )
     core.scope = SimpleNamespace(
-        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+            check_for_pinned_execution=lambda _target: SimpleNamespace(allowed=True),
     )
     core.store.save_workflow_plan("unpinned", WorkflowPlan("m", (task,)))
     assert core.authorize_workflow_task_for_plan("unpinned", task) is False
@@ -1539,6 +1552,7 @@ def _followup_auth_core(tmp_path):
             "service.http.enumerate", "trusted.http", "1", ("local_process",),
             target_types=("hostname",), permissions=("network.scan",),
             side_effects=("network_traffic",), impact="moderate",
+            scope_mode="pinned_network",
         )
 
         def bindings(self):
@@ -1559,7 +1573,7 @@ def _followup_auth_core(tmp_path):
     provider = Provider()
     core.providers = BoundProviderRouter((provider,))
     core.scope = SimpleNamespace(
-        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+        check_for_pinned_execution=lambda _target: SimpleNamespace(allowed=True),
     )
 
     def save_plan(plan_id, source_plan_id=None, source_digest=None):
