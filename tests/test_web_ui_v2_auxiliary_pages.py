@@ -127,7 +127,7 @@ def test_approval_queue_grants_v2_task_consent_and_keeps_legacy_runs_read_only(p
     assert page.get_by_text("Plan digest: sha256:plan-digest", exact=False).is_visible()
     assert page.get_by_text("Mission: mission-2 · Plan: plan-2 · Task: task-2", exact=True).is_visible()
     expiry_label = page.evaluate("seconds => new Date(seconds * 1000).toLocaleString()", 1893456000)
-    assert page.get_by_text("Exact-task approval active for operator-3 until " + expiry_label, exact=True).is_visible()
+    assert page.get_by_text("Exact-task approval active for operator-3 until " + expiry_label + ".", exact=True).is_visible()
     page.wait_for_function(
         "() => document.querySelector('#whaxon-legacy-approval-readonly')?.innerText.includes('Legacy waiting run')",
         timeout=8000,
