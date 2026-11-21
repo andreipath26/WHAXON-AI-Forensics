@@ -221,6 +221,35 @@ class WorkflowRunQueue:
         finally:
             conn.close()
 
+    def snapshot(self, request_id: str) -> dict | None:
+        """Read the durable request and task progress from one DB snapshot."""
+        conn = self.store._conn()
+        try:
+            conn.execute("BEGIN")
+            row = conn.execute(
+                "SELECT * FROM workflow_run_requests WHERE id=?",
+                (request_id,),
+            ).fetchone()
+            if row is None:
+                conn.execute("COMMIT")
+                return None
+            request = self._public_record(row)
+            progress = self.store._get_workflow_progress_tx(conn, row["plan_id"])
+            conn.execute("COMMIT")
+            return {
+                "schema_version": "whaxon.workflow-run-snapshot.v1",
+                "request": request,
+                "progress": progress,
+                "worker_liveness_verified": False,
+                "automatic_uncertain_replay": False,
+            }
+        except Exception:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
+        finally:
+            conn.close()
+
     def cancel_active(self, request_id: str) -> dict:
         """Atomically stop only a request that is still active for its plan.
 
