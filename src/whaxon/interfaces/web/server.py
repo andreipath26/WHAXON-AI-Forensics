@@ -66,9 +66,8 @@ def _request_actor() -> str:
 
 
 def _legacy_msf_execution_enabled() -> bool:
-    return os.environ.get(
-        "WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "false",
-    ).strip().lower() in ("1", "true", "yes")
+    """Legacy Metasploit command dispatch is retired in every configuration."""
+    return False
 
 
 def _legacy_validation_enabled() -> bool:
