@@ -180,6 +180,7 @@
     <button id="v2-cancel-run" class="px-space-sm py-1 rounded bg-error-container/40 text-error font-code-sm text-code-sm" type="button" disabled>Request Cancel</button>
     <button id="v2-inspect-report" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled>Inspect Evidence Report</button>
     <button id="v2-propose-followups" class="px-space-sm py-1 rounded bg-surface-container-high text-on-surface font-code-sm text-code-sm" type="button" disabled>Preview Evidence Follow-ups</button>
+    <button id="v2-save-followups" class="px-space-sm py-1 rounded bg-secondary-container/30 text-secondary font-code-sm text-code-sm" type="button" disabled>Save Follow-up Proposal</button>
   </div>
   <div id="v2-evidence-preview" class="mt-space-xs rounded bg-surface-container-lowest p-space-sm font-code-sm text-code-sm text-on-surface-variant" role="status" aria-live="polite" hidden></div>
   <p id="v2-run-message" class="mt-space-sm font-code-sm text-code-sm text-on-surface-variant" role="status" aria-live="polite">No V2 workflow selected.</p>
@@ -610,6 +611,7 @@
   const v2Cancel = $("v2-cancel-run");
   const v2InspectReport = $("v2-inspect-report");
   const v2PreviewFollowups = $("v2-propose-followups");
+  const v2SaveFollowups = $("v2-save-followups");
   const v2EvidencePreview = $("v2-evidence-preview");
   let v2PreviewInProgress = false;
   let v2Plan = null;
@@ -634,6 +636,7 @@
     if (v2UsePlan) v2UsePlan.disabled = !v2PlanSelect?.value;
     if (v2InspectReport) v2InspectReport.disabled = !v2Plan || v2PreviewInProgress;
     if (v2PreviewFollowups) v2PreviewFollowups.disabled = !v2Plan || v2PreviewInProgress;
+    if (v2SaveFollowups) v2SaveFollowups.disabled = !v2Plan || v2PreviewInProgress;
     if (v2CreateButton) v2CreateButton.disabled = v2CreateInProgress || Boolean(v2RequestId) || v2Capabilities.size === 0;
   };
   async function v2LoadMissions() {
@@ -946,6 +949,41 @@
       v2SetControls();
     }
   }
+  async function v2SaveEvidenceFollowups() {
+    if (!v2Plan || v2PreviewInProgress) return;
+    const planId = v2Plan.id;
+    v2PreviewInProgress = true;
+    v2SetControls();
+    v2ShowEvidence("Saving an evidence-derived follow-up proposal for operator review…");
+    try {
+      const proposal = await api("/api/v2/workflows/" + encodeURIComponent(planId) + "/followups", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({max_tasks: 16, save: true}),
+      });
+      if (v2Plan?.id !== planId) return;
+      const tasks = Array.isArray(proposal.plan?.tasks) ? proposal.plan.tasks : [];
+      const blocked = Array.isArray(proposal.blocked) ? proposal.blocked.length : 0;
+      if (proposal.created === true && proposal.plan_id) {
+        v2ShowEvidence(
+          "Saved follow-up plan " + proposal.plan_id + " from " + planId +
+          " with " + tasks.length + " task(s); " + blocked +
+          " candidate(s) remain blocked. It is review-only: no approval or run request was created."
+        );
+      } else {
+        v2ShowEvidence(
+          "No follow-up plan was saved from " + planId + ". " +
+          tasks.length + " eligible task(s), " + blocked +
+          " blocked candidate(s). No approval or run request was created."
+        );
+      }
+    } catch (error) {
+      if (v2Plan?.id === planId) v2ShowEvidence("Follow-up proposal could not be saved: " + error.message, true);
+    } finally {
+      v2PreviewInProgress = false;
+      v2SetControls();
+    }
+  }
   async function v2GrantApproval(planId, task) {
     const taskKey = task.task_key || task.id;
     const target = task.target || "target unavailable";
@@ -1026,6 +1064,7 @@
   v2Cancel?.addEventListener("click", v2CancelRun);
   v2InspectReport?.addEventListener("click", v2InspectEvidenceReport);
   v2PreviewFollowups?.addEventListener("click", v2PreviewEvidenceFollowups);
+  v2SaveFollowups?.addEventListener("click", v2SaveEvidenceFollowups);
   const savedRequest = sessionStorage.getItem("whaxon.v2.run_request_id");
   const savedPlan = sessionStorage.getItem("whaxon.v2.plan_id");
   if (savedPlan && savedRequest && v2PlanInput) {
