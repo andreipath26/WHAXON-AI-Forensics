@@ -221,19 +221,32 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
     }
 
     def make_report(tasks, extra_attempts=()):
+        report_attempts = [scan_attempt, *extra_attempts]
         evidence = {
             "plan_id": "plan-1", "mission_id": "mission-1",
             "plan_digest": "digest-1",
-            "attempts": [scan_attempt, *extra_attempts],
-            "all_evidence_recorded": True,
-            "all_evidence_integrity_verified": True,
+            "attempts": report_attempts,
+            "all_evidence_recorded": all(
+                attempt.get("evidence_status") == "recorded"
+                for attempt in report_attempts
+            ),
+            "all_evidence_integrity_verified": all(
+                attempt.get("integrity_status") == "verified"
+                for attempt in report_attempts
+            ),
         }
         core = _core_with(evidence, ready=False)
         core.store = TaskStore(tasks)
+        def task_counts():
+            counts = {}
+            for task in tasks:
+                status = task.get("status")
+                counts[status] = counts.get(status, 0) + 1
+            return counts
         core.workflow_progress = lambda _plan_id: {
             "plan_id": "plan-1", "attempts": len(evidence["attempts"]),
-            "total_tasks": len(tasks) + 1,
-            "counts": {"succeeded": 1, "pending": max(0, len(tasks) - 1)},
+            "total_tasks": len(tasks),
+            "counts": task_counts(),
         }
         return Core.workflow_report(core, "plan-1")
 
@@ -288,6 +301,10 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
         "status": "recorded", "task_key": "verify",
         "attempt_statuses": ["succeeded"],
         "verification_status": "verified", "job_id": "abcdef123456",
+    }
+    assert recorded["findings"][1]["verification_outcome"] == {
+        "status": "recorded", "verification_status": "verified",
+        "job_id": "abcdef123456",
     }
     assert "source_job_id" not in json.dumps(recorded)
     assert "source_finding_seq" not in json.dumps(recorded)
