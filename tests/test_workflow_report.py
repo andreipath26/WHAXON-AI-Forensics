@@ -246,6 +246,25 @@ def test_workflow_report_projects_plan_bound_unsupported_and_unavailable_checks(
         ],
     }
 
+    # The report must not trust a changed omission list that no longer matches
+    # the immutable plan digest stored with the workflow evidence.
+    with store._conn() as connection:
+        raw_plan = connection.execute(
+            "SELECT plan_json FROM workflow_plans WHERE id=?", ("omissions-plan",),
+        ).fetchone()["plan_json"]
+        changed_plan = json.loads(raw_plan)
+        changed_plan["metadata"]["omitted_checks"].append({
+            "check": "forged", "disposition": "unsupported",
+        })
+        connection.execute(
+            "UPDATE workflow_plans SET plan_json=? WHERE id=?",
+            (json.dumps(changed_plan), "omissions-plan"),
+        )
+    changed_report = Core.workflow_report(core, "omissions-plan")
+    assert changed_report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "not_recorded", "count": None, "items": [],
+    }
+
 
 
 def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks():
