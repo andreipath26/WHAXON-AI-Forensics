@@ -476,6 +476,33 @@ class ScopeManager:
             )
         return checked
 
+    def check_for_unpinned_execution(self, raw_target: str) -> ScopeMatch:
+        """Authorize a provider that will resolve the target on its own.
+
+        Explicit hostname rules are useful as query-name permissions and for
+        providers that pin their sockets, but they cannot constrain the
+        address selected later by an external tool's resolver. Under an active
+        scope, an unpinned provider therefore accepts only an IP literal.
+        Hostname work must use a provider with ``pinned_network`` or
+        ``dns_query`` scope semantics. An explicitly disabled scope retains
+        its existing operator-selected behavior.
+        """
+        if not self._enabled:
+            return self.check_for_execution(raw_target)
+        host, _kind = _normalize_target(raw_target)
+        if not host:
+            return ScopeMatch(False, "invalid unpinned network target")
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            return ScopeMatch(
+                False,
+                "un-pinned network execution requires an IP literal; use a pinned provider for hostnames",
+                host,
+                overridable=False,
+            )
+        return self.check_for_execution(raw_target)
+
     def check_for_pinned_execution(self, raw_target: str) -> ScopeMatch:
         """Perform a non-resolving preflight for a provider that pins its connect.
 
