@@ -290,6 +290,7 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
         "integrity_status": "verified", "finding_count": 1,
         "findings": [{
             "seq": 0, "kind": "sqli", "severity": "high",
+            "source": "engine-v2-verifier",
             "verification_status": "verified",
             "source_observation": {"job_id": source_job, "finding_seq": 0},
         }],
