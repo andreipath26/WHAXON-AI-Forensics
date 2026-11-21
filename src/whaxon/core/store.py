@@ -2959,6 +2959,11 @@ class JobStore:
             ).fetchone()
             if plan is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
+            attempt_count = c.execute(
+                "SELECT COUNT(*) AS n FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id WHERE t.plan_id=?",
+                (plan_id,),
+            ).fetchone()["n"]
             rows = c.execute(
                 "SELECT t.task_key, t.target, t.capability_id, a.id AS attempt_id, "
                 "a.attempt_no, a.status, a.result_json, a.error, "
@@ -2969,6 +2974,7 @@ class JobStore:
                 "WHERE t.plan_id=? ORDER BY a.started_at, a.id LIMIT ?",
                 (plan_id, limit),
             ).fetchall()
+            truncated = attempt_count > len(rows)
             evidence = []
             for row in rows:
                 entry = {
@@ -3108,11 +3114,16 @@ class JobStore:
             return {
                 "plan_id": plan_id, "mission_id": plan["mission_id"],
                 "plan_digest": plan["digest"],
+                "attempt_count": attempt_count,
+                "returned_attempt_count": len(evidence),
+                "truncated": truncated,
                 "attempts": evidence,
-                "all_evidence_recorded": bool(evidence) and all(
+                "all_evidence_recorded": bool(evidence) and not truncated
+                and len(evidence) == attempt_count and all(
                     item["evidence_status"] == "recorded" for item in evidence
                 ),
-                "all_evidence_integrity_verified": bool(evidence) and all(
+                "all_evidence_integrity_verified": bool(evidence) and not truncated
+                and len(evidence) == attempt_count and all(
                     item["integrity_status"] == "verified" for item in evidence
                 ),
             }
