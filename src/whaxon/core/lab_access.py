@@ -212,6 +212,29 @@ class MetasploitableLabAccessProvider:
             # The original dispatch/storage failure remains authoritative.
             pass
 
+    async def _cleanup_cancelled_dispatch(
+        self, remote_job_id: str | None, before_sessions: dict[str, dict],
+        evidence_job_id: str, *, phase: str, known_session_ids=(),
+    ) -> None:
+        """Finish bounded cleanup before propagating cancellation to the scheduler."""
+        cleanup_task = asyncio.create_task(self._cleanup_remote_resources(
+            remote_job_id, before_sessions, evidence_job_id,
+            known_session_ids=known_session_ids,
+        ))
+        try:
+            errors = await asyncio.shield(cleanup_task)
+        except asyncio.CancelledError:
+            # A second cancellation must not cancel cleanup of an already
+            # acknowledged external job/session.
+            errors = await cleanup_task
+        except Exception as exc:
+            errors = [f"cleanup failed: {type(exc).__name__}"]
+        self._fail_evidence_job(
+            evidence_job_id,
+            f"Metasploit dispatch cancelled during {phase}; "
+            f"cleanup_errors={','.join(errors) or 'none'}",
+        )
+
     async def dispatch(self, task: WorkflowTask) -> dict:
         resolution = self.resolve_task(task, require_installed=True)
         expected = resolution.manifest
@@ -226,15 +249,36 @@ class MetasploitableLabAccessProvider:
         self.store.mark_engine_v2_execution_job(job_id)
         remote_job_id = None
         before_sessions = {}
+        before_snapshot_complete = False
+        cancel_cleanup_complete = False
         try:
             before_sessions = await self._session_snapshot()
-            result = await asyncio.to_thread(
+            before_snapshot_complete = True
+            rpc_task = asyncio.create_task(asyncio.to_thread(
                 self.msf.execute_rpc,
                 "exploit", self.MODULE,
                 {"RHOSTS": self.TARGET, "RPORT": "139", "LHOST": self.CALLBACK,
                  "LPORT": self.CALLBACK_PORT},
                 payload=self.PAYLOAD, timeout_s=60.0,
-            )
+            ))
+            try:
+                result = await asyncio.shield(rpc_task)
+            except asyncio.CancelledError:
+                # Cancelling asyncio.to_thread cannot stop the RPC thread.
+                # Keep the bounded call alive long enough to learn its durable
+                # remote job ID, then stop that job and any matching session.
+                try:
+                    result = await asyncio.shield(rpc_task)
+                    late_job_id = result.get("job_id") if isinstance(result, dict) else None
+                    if late_job_id is not None and str(late_job_id).strip():
+                        remote_job_id = str(late_job_id)
+                except Exception:
+                    pass
+                await self._cleanup_cancelled_dispatch(
+                    remote_job_id, before_sessions, job_id, phase="Metasploit RPC",
+                )
+                cancel_cleanup_complete = True
+                raise
             job_value = result.get("job_id") if isinstance(result, dict) else None
             if job_value is None or not str(job_value).strip():
                 detail = self._safe_diagnostic(result)
@@ -244,6 +288,17 @@ class MetasploitableLabAccessProvider:
             self.store.append_line(
                 job_id, "stdout", f"Metasploit remote job started: {remote_job_id}",
             )
+        except asyncio.CancelledError:
+            if not cancel_cleanup_complete:
+                if before_snapshot_complete:
+                    await self._cleanup_cancelled_dispatch(
+                        remote_job_id, before_sessions, job_id, phase="dispatch setup",
+                    )
+                else:
+                    self._fail_evidence_job(
+                        job_id, "Metasploit dispatch cancelled before RPC",
+                    )
+            raise
         except Exception as exc:
             cleanup_errors = await self._cleanup_remote_resources(
                 remote_job_id, before_sessions, job_id,
@@ -273,6 +328,11 @@ class MetasploitableLabAccessProvider:
                 if session_id:
                     break
                 await asyncio.sleep(self.SESSION_POLL_INTERVAL_S)
+        except asyncio.CancelledError:
+            await self._cleanup_cancelled_dispatch(
+                remote_job_id, before_sessions, job_id, phase="session polling",
+            )
+            raise
         except Exception as exc:
             await self._cleanup_remote_resources(
                 remote_job_id, before_sessions, job_id,
@@ -321,6 +381,12 @@ class MetasploitableLabAccessProvider:
             self.store.append_line(job_id, "stdout", finding.raw_line)
             self.store.append_finding(job_id, finding, 0)
             self.store.set_finished(job_id, 0, 0.0)
+        except asyncio.CancelledError:
+            await self._cleanup_cancelled_dispatch(
+                remote_job_id, before_sessions, job_id,
+                phase="evidence persistence", known_session_ids=(session_id,),
+            )
+            raise
         except Exception as exc:
             cleanup_errors = await self._cleanup_remote_resources(
                 remote_job_id, before_sessions, job_id,
