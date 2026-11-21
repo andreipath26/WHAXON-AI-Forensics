@@ -79,10 +79,20 @@ def test_approval_queue_grants_v2_task_consent_and_keeps_legacy_runs_read_only(p
         route.fulfill(
             status=200,
             content_type="application/json",
-            body='{"items":[{"mission_id":"mission-1","objective":"Review an authorized target",'
+            body='{"items":['
+                 '{"mission_id":"mission-1","objective":"Review an authorized target",'
                  '"plan_id":"plan-1","task_key":"task-1","capability_id":"web.server.audit",'
                  '"target":"example.test","impact":"moderate","task_status":"pending","digest":"sha256:plan-digest",'
-                 '"approval_valid":false,"current_approval":null}]}',
+                 '"approval_valid":false,"current_approval":null},'
+                 '{"mission_id":"mission-2","objective":"Review another authorized target",'
+                 '"plan_id":"plan-2","task_key":"task-2","capability_id":"dns.recon.passive",'
+                 '"target":"other.test","impact":"moderate","task_status":"pending","digest":"sha256:second-digest",'
+                 '"approval_valid":false,"current_approval":null},'
+                 '{"mission_id":"mission-3","objective":"Previously approved task",'
+                 '"plan_id":"plan-3","task_key":"task-3","capability_id":"web.server.audit",'
+                 '"target":"approved.test","impact":"moderate","task_status":"pending","digest":"sha256:approved-digest",'
+                 '"approval_valid":true,"current_approval":{"approval_id":"approval-3","actor":"operator-3","expires_at":1893456000}}'
+                 ']}' ,
         )
 
     def pending(route):
@@ -93,25 +103,31 @@ def test_approval_queue_grants_v2_task_consent_and_keeps_legacy_runs_read_only(p
                  '"pending_question":"Legacy executor question"}]',
         )
 
+    grant_urls = []
     def grant(route):
+        grant_urls.append(route.request.url)
         grants.append(route.request.post_data_json)
         route.fulfill(
             status=200,
             content_type="application/json",
-            body='{"plan_id":"plan-1","granted":true}',
+            body='{"plan_id":"plan-2","granted":true}',
         )
 
     legacy_writes = []
     page.route("**/api/v2/approval-queue**", queue)
     page.route("**/api/ai/pending", pending)
-    page.route("**/api/v2/workflows/plan-1/approvals", grant)
+    page.route("**/api/v2/workflows/plan-2/approvals", grant)
     page.route("**/api/ai/runs/**", lambda route: legacy_writes.append(route.request.url))
     page.goto(f"{live_server}/ui-v2/approvals")
     page.wait_for_function(
-        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('1 pending or previously blocked V2 task(s)')",
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('3 pending or previously blocked V2 task(s)')",
         timeout=8000,
     )
     assert page.get_by_text("web.server.audit → example.test", exact=False).is_visible()
+    assert page.get_by_text("Plan digest: sha256:plan-digest", exact=False).is_visible()
+    assert page.get_by_text("Mission: mission-2 · Plan: plan-2 · Task: task-2", exact=True).is_visible()
+    expiry_label = page.evaluate("seconds => new Date(seconds * 1000).toLocaleString()", 1893456000)
+    assert page.get_by_text("Exact-task approval active for operator-3 until " + expiry_label, exact=True).is_visible()
     page.wait_for_function(
         "() => document.querySelector('#whaxon-legacy-approval-readonly')?.innerText.includes('Legacy waiting run')",
         timeout=8000,
@@ -119,14 +135,16 @@ def test_approval_queue_grants_v2_task_consent_and_keeps_legacy_runs_read_only(p
     assert page.get_by_text("Legacy AI runs (read-only)").is_visible()
     assert page.get_by_text("cannot grant a V2 task approval or resume its legacy executor", exact=False).is_visible()
     assert page.locator("#whaxon-legacy-approval-readonly").get_by_role("textbox").count() == 0
-    page.get_by_role("checkbox", name="I reviewed this exact capability, target, impact, and plan digest and grant a one-hour task approval.").check()
+    page.get_by_role("checkbox", name="I reviewed this exact capability, target, impact, and plan digest and grant a one-hour task approval.").nth(1).check()
     with page.expect_response(
         lambda response: response.request.method == "POST"
-        and response.url.endswith("/api/v2/workflows/plan-1/approvals")
+        and response.url.endswith("/api/v2/workflows/plan-2/approvals")
     ):
-        page.get_by_role("button", name="Grant one-hour task approval").click()
-    assert grants and grants[0]["task_key"] == "task-1"
-    assert grants[0]["expires_at"] > 0
+        page.get_by_role("button", name="Grant one-hour task approval").nth(1).click()
+    assert grants and grants[0]["task_key"] == "task-2"
+    assert len(grant_urls) == 1 and grant_urls[0].endswith("/api/v2/workflows/plan-2/approvals")
+    now = page.evaluate("Date.now() / 1000")
+    assert now + 3595 <= grants[0]["expires_at"] <= now + 3605
     assert legacy_writes == []
 
 def test_bug_bounty_workspace_filters_live_jobs_and_refreshes(page, live_server):
@@ -648,3 +666,53 @@ def test_threat_intel_halt_uses_active_workflow_apis_and_disables_unwired_contro
         else:
             assert button.is_disabled(), f"Unwired threat-intel control remains enabled: {button.inner_text()}"
     assert panel.get_by_role("button", name="Refresh catalog").is_enabled()
+
+
+def test_approval_queue_does_not_claim_success_for_duplicate_grant(page, live_server):
+    queue_calls = []
+    grants = []
+
+    def queue(route):
+        queue_calls.append(route.request.method)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"items":[{"mission_id":"mission-1","objective":"Review an authorized target",'
+                 '"plan_id":"plan-1","task_key":"task-1","capability_id":"web.server.audit",'
+                 '"target":"example.test","impact":"moderate","task_status":"pending","digest":"sha256:plan-digest",'
+                 '"approval_valid":false,"current_approval":null}]}',
+        )
+
+    def grant(route):
+        grants.append(route.request.post_data_json)
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"plan_id":"plan-1","granted":false}',
+        )
+
+    page.route("**/api/v2/approval-queue**", queue)
+    page.route("**/api/v2/workflows/plan-1/approvals", grant)
+    page.goto(f"{live_server}/ui-v2/approvals")
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('1 pending or previously blocked V2 task(s)')",
+        timeout=8000,
+    )
+
+    page.get_by_role("checkbox", name="I reviewed this exact capability, target, impact, and plan digest and grant a one-hour task approval.").check()
+    with page.expect_response(
+        lambda response: response.request.method == "POST"
+        and response.url.endswith("/api/v2/workflows/plan-1/approvals")
+    ):
+        page.get_by_role("button", name="Grant one-hour task approval").click()
+    page.wait_for_function(
+        "() => document.querySelector('#whaxon-live-approvals')?.innerText.includes('No new approval was recorded')",
+        timeout=8000,
+    )
+
+    status = page.locator("#whaxon-live-approvals").inner_text()
+    assert grants and grants[0]["task_key"] == "task-1"
+    assert "Approval recorded" not in status
+    assert "refresh the queue to verify its current approval state" in status.lower()
+    assert len(queue_calls) == 1
+    assert page.get_by_role("button", name="Grant one-hour task approval").is_enabled()
