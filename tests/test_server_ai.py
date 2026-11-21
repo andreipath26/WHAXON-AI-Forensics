@@ -64,7 +64,9 @@ def test_ai_run_cannot_be_enabled_by_stale_env_opt_in(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_LEGACY_AI_EXECUTION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     submitted = []
-    monkeypatch.setattr(AsyncRunner, "submit", lambda self, task: submitted.append(task))
+    monkeypatch.setattr(
+        AsyncRunner, "submit", lambda self, task: submitted.append(task),
+    )
     response = app.test_client().post(
         "/api/ai/run", json={
             "goal": "scan 127.0.0.1",
@@ -80,6 +82,7 @@ def test_ai_run_cannot_be_enabled_by_stale_env_opt_in(tmp_path, monkeypatch):
     assert "mission_id" in data["error"] and "exact target" in data["error"]
     assert core.store.list_ai_runs() == []
     assert submitted == []
+
 
 def test_ai_run_requires_a_resolvable_target(tmp_path, monkeypatch):
     app, core = _make_app(tmp_path, monkeypatch)
