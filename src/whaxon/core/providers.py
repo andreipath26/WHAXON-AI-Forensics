@@ -19,6 +19,9 @@ from .capabilities import (
     CapabilityResolution,
     CapabilityUnavailable,
 )
+from .provider_execution import (
+    SEMANTIC_OPERATION_TO_TOOL,
+)
 from .provider_execution import provider_execution_job_id as _provider_execution_job_id
 from .workflow import WorkflowTask
 
@@ -42,18 +45,8 @@ _CATALOG_TARGETS = {
 # conservative aliases for the currently admitted, fixed-argv local adapters.
 # An alias has no permission/validation authority of its own.
 SEMANTIC_OPERATION_IDS = {
-    "nmap": "network.services.discover",
-    "nikto": "web.server.audit",
-    "gobuster": "web.directories.enumerate",
-    "ffuf": "web.paths.fuzz",
-    "nuclei": "web.templates.assess",
-    "wpscan": "web.wordpress.audit",
-    "sqlmap": "web.sql_injection.assess",
-    "whois": "domain.registration.lookup",
-    "dig": "dns.records.query",
-    "theharvester": "osint.domain.contacts.search",
-    "dnsrecon": "dns.records.enumerate",
-    "arjun": "web.parameters.discover",
+    tool_id: capability_id
+    for capability_id, tool_id in SEMANTIC_OPERATION_TO_TOOL.items()
 }
 if set(SEMANTIC_OPERATION_IDS) != set(_CATALOG_TARGETS):
     raise RuntimeError("semantic operation map and admitted adapter list differ")

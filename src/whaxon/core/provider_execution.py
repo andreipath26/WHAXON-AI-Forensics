@@ -3,6 +3,30 @@ from __future__ import annotations
 
 import uuid
 
+SEMANTIC_OPERATION_TO_TOOL = {
+    "network.services.discover": "nmap",
+    "web.server.audit": "nikto",
+    "web.directories.enumerate": "gobuster",
+    "web.paths.fuzz": "ffuf",
+    "web.templates.assess": "nuclei",
+    "web.wordpress.audit": "wpscan",
+    "web.sql_injection.assess": "sqlmap",
+    "domain.registration.lookup": "whois",
+    "dns.records.query": "dig",
+    "osint.domain.contacts.search": "theharvester",
+    "dns.records.enumerate": "dnsrecon",
+    "web.parameters.discover": "arjun",
+}
+
+
+def provider_tool_id_for_capability(capability_id: str) -> str:
+    """Resolve the persisted provider tool identity for a workflow capability."""
+    if not isinstance(capability_id, str) or not capability_id:
+        raise ValueError("workflow capability identity is required")
+    if capability_id.startswith("tool."):
+        return capability_id.removeprefix("tool.")
+    return SEMANTIC_OPERATION_TO_TOOL.get(capability_id, capability_id)
+
 
 def provider_execution_job_id(task) -> str:
     """Use a durable attempt ID for workflow jobs; keep direct calls random."""

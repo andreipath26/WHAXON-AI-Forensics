@@ -7,6 +7,8 @@ import threading
 import time
 from pathlib import Path
 
+from .provider_execution import provider_tool_id_for_capability
+
 _APPROVAL_CANDIDATE_PAGE_SIZE = 256
 _APPROVAL_CANDIDATE_SCAN_BUDGET = 10_000
 
@@ -159,10 +161,7 @@ def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id
     ).fetchone()
     if not isinstance(capability_id, str) or not capability_id:
         return None
-    expected_tool = (
-        capability_id.removeprefix("tool.")
-        if capability_id.startswith("tool.") else capability_id
-    )
+    expected_tool = provider_tool_id_for_capability(capability_id)
     if (
         job is None or job["tool"] != expected_tool
         or job["target"] != target or job["status"] != "finished"
@@ -2089,10 +2088,7 @@ class JobStore:
                 capability_id = row["capability_id"]
                 if not isinstance(capability_id, str) or not capability_id:
                     raise ValueError("workflow capability identity is invalid")
-                tool_id = (
-                    capability_id.removeprefix("tool.")
-                    if capability_id.startswith("tool.") else capability_id
-                )
+                tool_id = provider_tool_id_for_capability(capability_id)
                 dispatch_events = c.execute(
                     "SELECT detail_json FROM workflow_events WHERE plan_id=? "
                     "AND attempt_id=? AND event_type='dispatch_started'",
@@ -2370,8 +2366,11 @@ class JobStore:
                         job is not None
                         and job["target"] == row["target"]
                         and (
-                            not row["capability_id"].startswith("tool.")
-                            or job["tool"] == row["capability_id"][5:]
+                            provider_tool_id_for_capability(row["capability_id"])
+                            == row["capability_id"]
+                            or job["tool"] == provider_tool_id_for_capability(
+                                row["capability_id"],
+                            )
                         )
                     ):
                         provider_job = dict(job)
@@ -2672,11 +2671,10 @@ class JobStore:
                             target=task["target"], capability_id=task["capability_id"],
                             plan_digest=task["digest"],
                         )
-                    expected_tool = None
-                    if task is not None:
-                        expected_tool = task["capability_id"]
-                        if expected_tool.startswith("tool."):
-                            expected_tool = expected_tool.removeprefix("tool.")
+                    expected_tool = (
+                        provider_tool_id_for_capability(task["capability_id"])
+                        if task is not None else None
+                    )
                     expected_detail = {
                         "from_status": "uncertain", "to_status": "succeeded",
                         "provider_execution_id": attempt_id,
@@ -3998,7 +3996,9 @@ class JobStore:
                     if (
                         isinstance(job_id, str) and bool(job_id)
                         and result.get("target") == task["target"]
-                        and result.get("tool_id") == task["capability_id"].removeprefix("tool.")
+                        and result.get("tool_id") == provider_tool_id_for_capability(
+                            task["capability_id"],
+                        )
                     ):
                         digest = _workflow_evidence_digest(
                             c, attempt_id=attempt_id, job_id=job_id,
