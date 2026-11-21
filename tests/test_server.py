@@ -526,8 +526,8 @@ def test_run_defaults_to_v2_plan_response_and_ignores_json_opt_in(tmp_path, monk
     assert submitted == []
 
 
-def test_run_legacy_execution_requires_server_operator_opt_in(tmp_path, monkeypatch):
-    """Only the server-side operator setting can retain the compatibility path."""
+def test_run_legacy_operator_opt_in_cannot_reopen_retired_route(tmp_path, monkeypatch):
+    """A stale opt-in cannot dispatch through the retired direct-execution path."""
     from types import SimpleNamespace
 
     monkeypatch.setenv("WHAXON_LEGACY_TOOL_EXECUTION_ENABLED", "true")
@@ -547,9 +547,13 @@ def test_run_legacy_execution_requires_server_operator_opt_in(tmp_path, monkeypa
         json={"tool_id": "echo", "target": "127.0.0.1"},
     )
 
-    assert response.status_code == 202
-    assert response.get_json()["job_id"]
-    assert len(submitted) == 1
+    assert response.status_code == 410
+    payload = response.get_json()
+    assert payload["legacy_execution_enabled"] is False
+    assert payload["v2_proposal_endpoint"] == "/api/v2/workflow-proposals"
+    assert payload["approval_granted"] is False
+    assert payload["execution_submitted"] is False
+    assert submitted == []
 
 
 def test_run_legacy_opt_in_does_not_override_scope_denial(tmp_path, monkeypatch):
