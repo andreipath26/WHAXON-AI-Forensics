@@ -1047,8 +1047,10 @@ def test_legacy_validation_routes_refuse_engine_v2_evidence(tmp_path, monkeypatc
     validate = client.post(f"/api/validate/{job_id}/0")
     retest = client.post(f"/api/retest/{job_id}/0")
 
-    assert validate.status_code == 409
-    assert retest.status_code == 409
-    assert "plan-bound" in validate.get_json()["error"]
-    assert "plan-bound" in retest.get_json()["error"]
+    assert validate.status_code == 410
+    assert retest.status_code == 410
+    assert validate.get_json()["legacy_validation_enabled"] is False
+    assert retest.get_json()["legacy_validation_enabled"] is False
+    assert validate.get_json()["replay_attempted"] is False
+    assert retest.get_json()["replay_attempted"] is False
     assert core.store.get_findings(job_id) == before
