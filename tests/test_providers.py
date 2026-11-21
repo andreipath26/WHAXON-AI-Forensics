@@ -899,6 +899,22 @@ def test_router_enforces_provider_input_and_output_contracts(tmp_path):
         asyncio.run(router.dispatch(valid))
     assert provider.calls == 1
 
+    store.save_workflow_plan("malformed-output-plan", WorkflowPlan(
+        "schema-mission", (valid,), metadata={
+            "provider_bindings": {
+                "task": {
+                    "provider_id": provider.manifest.provider_id,
+                    "manifest_fingerprint": provider.manifest.fingerprint,
+                },
+            },
+        },
+    ))
+    run = asyncio.run(WorkflowScheduler(
+        store, authorize=authorize_before_claim, dispatch=router.dispatch,
+    ).run("malformed-output-plan"))
+    assert run["tasks"] == [{"id": "task", "status": "uncertain"}]
+    assert provider.calls == 2
+
 
 def test_router_rejects_duplicate_capabilities_and_untrusted_registry_only(monkeypatch):
     import asyncio
