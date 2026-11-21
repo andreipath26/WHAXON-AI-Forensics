@@ -42,7 +42,6 @@ class _FakeMSF:
 
 def _make_app(tmp_path, monkeypatch):
     monkeypatch.setenv("WHAXON_DATA", str(tmp_path))
-    monkeypatch.delenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", raising=False)
     monkeypatch.delenv("WHAXON_AUTH_USER", raising=False)
     monkeypatch.delenv("WHAXON_AUTH_PASS_HASH", raising=False)
     # Make the authorization boundary explicit instead of depending on the
@@ -162,6 +161,7 @@ def test_pf_add_calls_add_forward_and_returns_dict(tmp_path, monkeypatch):
 
 
 def test_pf_add_error_returns_500(tmp_path, monkeypatch):
+    monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     monkeypatch.setenv("WHAXON_LEGACY_MSF_EXECUTION_ENABLED", "true")
     def boom(*a, **kw):
         raise RuntimeError("socat not found on target")
