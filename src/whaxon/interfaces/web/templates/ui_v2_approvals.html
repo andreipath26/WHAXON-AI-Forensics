@@ -702,6 +702,13 @@ Authorization: Bearer redacted_token_sess_089
        const approvalId="ui-v2-"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2));
        const response=await fetch("/api/v2/workflows/"+encodeURIComponent(item.plan_id)+"/approvals",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task_key:item.task_key,approval_id:approvalId,expires_at:Date.now()/1000+3600})});
        const body=await response.json();if(!response.ok)throw new Error(body.error||("HTTP "+response.status));
+       if(body.plan_id!==item.plan_id)throw new Error("server confirmation did not match the selected plan");
+       if(body.granted!==true){
+        status.textContent="No new approval was recorded for "+item.plan_id+"/"+item.task_key+
+         ". Refresh the queue to verify its current approval state.";
+        grant.disabled=false;
+        return;
+       }
        await loadApprovalQueue();
        status.textContent="Approval recorded for "+item.plan_id+"/"+item.task_key+". Run submission remains separate.";
       }catch(error){status.textContent="Approval was not recorded: "+error.message;grant.disabled=false;}
