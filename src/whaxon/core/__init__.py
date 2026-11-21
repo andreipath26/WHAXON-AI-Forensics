@@ -404,6 +404,142 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
+        task_reader = getattr(getattr(self, "store", None), "list_workflow_tasks", None)
+        if callable(task_reader):
+            try:
+                persisted_tasks = task_reader(plan_id)
+            except (AttributeError, TypeError, ValueError, RuntimeError):
+                persisted_tasks = None
+            if isinstance(persisted_tasks, list):
+                verifier_capabilities = {
+                    "tool.verify_sqli", "tool.verify_xss",
+                    "tool.verify_http_observation", "tool.retest_sqli",
+                    "tool.retest_xss", "tool.retest_http_observation",
+                }
+                allowed_outcome_statuses = {
+                    "not_requested", "pending", "in_progress", "recorded",
+                    "failed", "blocked", "cancelled", "uncertain",
+                    "evidence_missing", "multiple_requests", "unknown",
+                }
+                allowed_verification_statuses = {
+                    "verified", "candidate", "inconclusive", "refuted",
+                    "still_vulnerable", "fixed",
+                }
+                attempts_by_task: dict[str, list[dict]] = {}
+                for attempt in attempts:
+                    task_key = attempt.get("task_key")
+                    if isinstance(task_key, str):
+                        attempts_by_task.setdefault(task_key, []).append(attempt)
+                outcomes_by_source: dict[tuple[str, int], list[dict]] = {}
+                for task in persisted_tasks:
+                    if (
+                        not isinstance(task, dict)
+                        or task.get("capability_id") not in verifier_capabilities
+                    ):
+                        continue
+                    inputs = task.get("inputs")
+                    if not isinstance(inputs, dict):
+                        continue
+                    source_job_id = inputs.get("source_job_id")
+                    source_seq = inputs.get("finding_seq")
+                    if (
+                        not isinstance(source_job_id, str) or not source_job_id
+                        or type(source_seq) is not int or source_seq < 0
+                    ):
+                        continue
+                    task_key = task.get("id")
+                    task_status = task.get("status")
+                    related_attempts = (
+                        attempts_by_task.get(task_key, [])
+                        if isinstance(task_key, str) else []
+                    )
+                    attempt_statuses = [
+                        status for status in (
+                            attempt.get("attempt_status") for attempt in related_attempts
+                        )
+                        if status in {
+                            "pending", "running", "succeeded", "failed",
+                            "blocked", "cancelled", "uncertain",
+                        }
+                    ]
+                    outcome: dict[str, Any] = {
+                        "status": "unknown",
+                    }
+                    if isinstance(task_key, str):
+                        outcome["task_key"] = task_key
+                    if attempt_statuses:
+                        outcome["attempt_statuses"] = attempt_statuses
+                    if task_status in {"pending", "queued"}:
+                        outcome["status"] = "pending"
+                    elif task_status == "running":
+                        outcome["status"] = "in_progress"
+                    elif task_status in {"failed", "blocked", "cancelled", "uncertain"}:
+                        outcome["status"] = task_status
+                    elif task_status == "succeeded":
+                        recorded = [
+                            (attempt, verifier_finding)
+                            for attempt in related_attempts
+                            if attempt.get("attempt_status") == "succeeded"
+                            and attempt.get("evidence_status") == "recorded"
+                            and attempt.get("integrity_status") == "verified"
+                            for verifier_finding in attempt.get("findings", [])
+                            if verifier_finding.get("source_observation") == {
+                                "job_id": source_job_id,
+                                "finding_seq": source_seq,
+                            }
+                        ]
+                        if recorded:
+                            latest_attempt, verifier_finding = recorded[-1]
+                            outcome["status"] = "recorded"
+                            verification_status = verifier_finding.get(
+                                "verification_status",
+                            )
+                            outcome["verification_status"] = (
+                                verification_status
+                                if verification_status in allowed_verification_statuses
+                                else "unknown"
+                            )
+                            if isinstance(latest_attempt.get("job_id"), str):
+                                outcome["job_id"] = latest_attempt["job_id"]
+                        else:
+                            outcome["status"] = "evidence_missing"
+                    if outcome["status"] not in allowed_outcome_statuses:
+                        outcome["status"] = "unknown"
+                    outcomes_by_source.setdefault(
+                        (source_job_id, source_seq), [],
+                    ).append(outcome)
+
+                for finding in findings:
+                    source_job_id = finding.get("job_id")
+                    source_seq = finding.get("seq")
+                    if (
+                        not isinstance(source_job_id, str) or not source_job_id
+                        or type(source_seq) is not int or source_seq < 0
+                    ):
+                        continue
+                    requests = outcomes_by_source.get((source_job_id, source_seq), [])
+                    if not requests and finding.get("source") == "engine-v2-verifier":
+                        recorded_status = finding.get("verification_status")
+                        finding["verification_outcome"] = {
+                            "status": "recorded",
+                            "verification_status": (
+                                recorded_status
+                                if recorded_status in allowed_verification_statuses
+                                else "unknown"
+                            ),
+                            "job_id": finding["job_id"],
+                        }
+                    elif not requests:
+                        finding["verification_outcome"] = {
+                            "status": "not_requested",
+                        }
+                    elif len(requests) == 1:
+                        finding["verification_outcome"] = requests[0]
+                    else:
+                        finding["verification_outcome"] = {
+                            "status": "multiple_requests",
+                            "requests": requests,
+                        }
         task_status_counts = progress.get("counts")
         if not isinstance(task_status_counts, dict):
             task_status_counts = {}
