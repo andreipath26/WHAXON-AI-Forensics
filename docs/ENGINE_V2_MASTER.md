@@ -953,3 +953,15 @@ the older import-compatible Qt module remained in the wheel with direct
 execution-path inventory identifies this compatibility path, and focused gate,
 callsite-inventory, and GUI-entrypoint tests pass; the current change still
 requires exact-head CI.
+
+## Persisted plan coverage dispositions — 2026-11-21
+
+Default recon proposals now persist explicit `unsupported` and
+`provider_unavailable` dispositions for checks omitted because no admitted V2
+provider exists or a provider cannot produce a ready plan. The workflow report
+projects only the check and typed disposition from digest-matched persisted
+plan metadata; it does not expose free-form provider reasons. General workflow
+reports continue to expose task states, recorded skip reasons, attempt-page
+truncation, and per-finding verification requests. This is a bounded P1-07
+slice: unsupported/inaccessible accounting outside recon proposals and
+requirement-level acceptance remain open.

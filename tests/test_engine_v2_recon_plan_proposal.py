@@ -78,6 +78,45 @@ def test_default_recon_proposal_combines_ready_providers_and_lists_omissions(mon
     assert [item["check"] for item in result["omitted_checks"]] == [
         "tech", "cookies", "waf",
     ]
+    assert [item["disposition"] for item in result["omitted_checks"]] == [
+        "unsupported", "unsupported", "unsupported",
+    ]
+    assert list(result["plan"]["metadata"]["omitted_checks"]) == result["omitted_checks"]
+
+
+def test_default_recon_plan_persists_provider_unavailable_disposition(monkeypatch):
+    builders = {
+        "propose_passive_dns_plan": "dns",
+        "propose_dns_full_posture_plan": "dns_full",
+        "propose_tls_certificate_plan": "ssl",
+        "propose_passive_https_recon_plan": "https",
+        "propose_passive_headers_recon_plan": "headers",
+        "propose_passive_redirect_observation_plan": "redirects",
+        "propose_passive_robots_recon_plan": "robots",
+        "propose_passive_security_txt_recon_plan": "security_txt",
+    }
+    for name, check in builders.items():
+        proposal = (
+            {"status": "blocked", "reason": "provider is not ready"}
+            if check == "dns" else _proposal("mission-1", check)
+        )
+        monkeypatch.setattr(
+            workflow_proposals, name,
+            lambda _core, *, mission_id, plan_id, target, proposal=proposal: proposal,
+        )
+
+    result = workflow_proposals.propose_passive_recon_plan(
+        _Core(), mission_id="mission-1", plan_id="recon-1", target="example.test",
+    )
+
+    unavailable = [
+        item for item in result["plan"]["metadata"]["omitted_checks"]
+        if item["check"] == "dns"
+    ]
+    assert unavailable == [{
+        "check": "dns", "reason": "provider is not ready",
+        "disposition": "provider_unavailable",
+    }]
 
 
 def test_explicit_legacy_only_check_blocks_entire_proposal():

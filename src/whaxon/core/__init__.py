@@ -581,6 +581,35 @@ class Core:
             len(persisted_tasks) if isinstance(persisted_tasks, list)
             else progress.get("total_tasks")
         )
+        omitted_dispositions: list[dict[str, str]] = []
+        plan_details_reader = getattr(self, "workflow_plan_details", None)
+        if callable(plan_details_reader):
+            try:
+                plan_details = plan_details_reader(plan_id)
+                from .workflow import WorkflowPlan
+
+                persisted_plan = WorkflowPlan.from_dict(plan_details["plan"])
+                if persisted_plan.digest == evidence.get("plan_digest"):
+                    raw_omissions = persisted_plan.metadata.get("omitted_checks", [])
+                    if isinstance(raw_omissions, (list, tuple)):
+                        for omission in raw_omissions:
+                            if not isinstance(omission, dict):
+                                continue
+                            check = omission.get("check")
+                            disposition = omission.get("disposition")
+                            if (
+                                isinstance(check, str) and check
+                                and len(check) <= 128
+                                and disposition in {
+                                    "unsupported", "provider_unavailable", "inaccessible",
+                                }
+                            ):
+                                omitted_dispositions.append({
+                                    "check": check,
+                                    "disposition": disposition,
+                                })
+            except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
+                omitted_dispositions = []
         coverage = {
             "basis": "persisted workflow plan, task, attempt, and evidence records",
             "planned_tasks": planned_task_count,
@@ -594,8 +623,9 @@ class Core:
                 "not_requested", 0,
             ),
             "unsupported_or_inaccessible_work": {
-                "status": "not_explicitly_recorded",
-                "count": None,
+                "status": "recorded" if omitted_dispositions else "not_recorded",
+                "count": len(omitted_dispositions) if omitted_dispositions else None,
+                "items": omitted_dispositions,
             },
             "completeness_claim": False,
         }

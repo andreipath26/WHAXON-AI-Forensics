@@ -230,11 +230,20 @@ def test_v2_report_and_audit_digest_api_match_shared_core(tmp_path, monkeypatch)
     core.create_mission("m-audit", "controlled")
     core.save_workflow_plan("p-audit", WorkflowPlan("m-audit", (
         WorkflowTask("scan", "fixture", "192.0.2.10"),
-    )))
+    ), metadata={
+        "omitted_checks": [{
+            "check": "cookies", "reason": "legacy-only",
+            "disposition": "unsupported",
+        }],
+    }))
     report = client.get("/api/v2/workflows/p-audit/report?limit=10")
     assert report.status_code == 200
     assert report.get_json() == core.workflow_report("p-audit", limit=10)
     assert report.get_json()["status"] != "complete"
+    assert report.get_json()["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "recorded", "count": 1,
+        "items": [{"check": "cookies", "disposition": "unsupported"}],
+    }
 
     snapshot = client.get("/api/v2/workflows/p-audit/audit-snapshot")
     assert snapshot.status_code == 200
@@ -718,7 +727,6 @@ def test_v2_evidence_api_links_actual_job_and_never_fabricates_findings(tmp_path
     assert mismatch["all_evidence_recorded"] is False
     assert mismatch["attempts"][0]["evidence_status"] == "job_not_verified"
     assert mismatch["attempts"][0]["findings"] == []
-
 
 
 def test_v2_evidence_page_never_claims_completeness_for_a_truncated_lifecycle(

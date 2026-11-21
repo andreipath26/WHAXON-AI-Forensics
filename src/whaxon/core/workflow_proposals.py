@@ -1029,7 +1029,11 @@ def propose_passive_recon_plan(
     provider_bindings: dict[str, dict[str, str]] = {}
     included: list[str] = []
     omitted: list[dict[str, str]] = [
-        {"check": name, "reason": "legacy-only; no admitted V2 provider"}
+        {
+            "check": name,
+            "reason": "legacy-only; no admitted V2 provider",
+            "disposition": "unsupported",
+        }
         for name in unsupported
     ]
     for check in requested:
@@ -1052,7 +1056,11 @@ def propose_passive_recon_plan(
                     "execution_submitted": False,
                     "approval_granted": False,
                 }
-            omitted.append({"check": check, "reason": str(reason)[:512]})
+            omitted.append({
+                "check": check,
+                "reason": str(reason)[:512],
+                "disposition": "provider_unavailable",
+            })
             continue
         child_plan = proposal.get("plan")
         child_tasks = child_plan.get("tasks") if isinstance(child_plan, dict) else None
