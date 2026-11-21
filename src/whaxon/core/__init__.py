@@ -1257,6 +1257,90 @@ class Core:
         except Exception:
             return False
 
+    def _workflow_followup_provenance_valid(self, plan, task) -> bool:
+        """Revalidate the exact sealed finding behind an E4 follow-up node."""
+        import hashlib
+        import json
+
+        if plan.metadata.get("followup_schema") != "whaxon.followup.v1":
+            return True
+        refs = plan.metadata.get("provenance")
+        source_plan_id = plan.metadata.get("source_plan")
+        source_digest = plan.metadata.get("source_digest")
+        if not isinstance(refs, (list, tuple)) or not isinstance(source_plan_id, str):
+            return False
+        matching = [
+            ref for ref in refs
+            if isinstance(ref, dict) and ref.get("task_id") == task.id
+        ]
+        if len(matching) != 1:
+            return False
+        ref = matching[0]
+        source_task = ref.get("source_task")
+        source_job = ref.get("source_job")
+        source_attempt = ref.get("source_attempt")
+        finding_seq = ref.get("finding_seq")
+        finding_digest = ref.get("finding_digest")
+        if (
+            not all(isinstance(value, str) and value for value in (
+                source_task, source_job, source_attempt, source_digest,
+                finding_digest,
+            ))
+            or type(finding_seq) is not int or finding_seq < 0
+            or len(finding_digest) != 64
+            or any(char not in "0123456789abcdef" for char in finding_digest)
+        ):
+            return False
+        bindings = plan.metadata.get("provider_bindings")
+        binding = bindings.get(task.id) if isinstance(bindings, dict) else None
+        if (
+            not isinstance(binding, dict)
+            or binding.get("manifest_fingerprint") != ref.get("provider_fingerprint")
+        ):
+            return False
+        try:
+            evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
+        except (ValueError, TypeError, RuntimeError):
+            return False
+        if (
+            not isinstance(evidence, dict)
+            or evidence.get("plan_id") != source_plan_id
+            or evidence.get("mission_id") != plan.mission_id
+            or evidence.get("plan_digest") != source_digest
+            or evidence.get("all_evidence_recorded") is not True
+            or evidence.get("all_evidence_integrity_verified") is not True
+        ):
+            return False
+        attempts = evidence.get("attempts")
+        if not isinstance(attempts, list):
+            return False
+        source_rows = [
+            row for row in attempts
+            if isinstance(row, dict)
+            and row.get("task_key") == source_task
+            and row.get("job_id") == source_job
+            and row.get("attempt_id") == source_attempt
+            and row.get("attempt_status") == "succeeded"
+            and row.get("evidence_status") == "recorded"
+            and row.get("integrity_status") == "verified"
+        ]
+        if len(source_rows) != 1:
+            return False
+        findings = source_rows[0].get("findings")
+        if not isinstance(findings, list):
+            return False
+        source_findings = [
+            finding for finding in findings
+            if isinstance(finding, dict) and finding.get("seq") == finding_seq
+        ]
+        if len(source_findings) != 1:
+            return False
+        actual = hashlib.sha256(json.dumps(
+            source_findings[0], sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        return actual == finding_digest
+
     def authorize_workflow_task_for_plan(self, plan_id: str, task) -> bool:
         """Require exact consent for moderate-impact or network-effect tasks.
 
@@ -1308,6 +1392,8 @@ class Core:
                 else:
                     return False
             if not any(candidate == task for candidate in plan.tasks):
+                return False
+            if not self._workflow_followup_provenance_valid(plan, task):
                 return False
             self.store.verify_workflow_plan_integrity(plan_id)
             provider = getattr(self, "providers", None)
