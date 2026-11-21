@@ -1,4 +1,4 @@
-"""whaxon ai: V2 plan proposals by default; legacy autonomous runs are opt-in."""
+"""whaxon ai: create reviewable V2 plans; legacy execution is retired."""
 from __future__ import annotations
 
 import asyncio
@@ -228,8 +228,7 @@ def _propose_v2(goal: str, target: str, data_dir: Path) -> int:
     ):
         print(
             "V2 AI planning is disabled. Set WHAXON_AI_ENABLED=1 and configure "
-            "WHAXON_AI_PROVIDER, then retry. Use --legacy only to explicitly "
-            "invoke the old autonomous executor.",
+            "WHAXON_AI_PROVIDER, then retry.",
             file=sys.stderr,
         )
         return 2
@@ -448,8 +447,6 @@ def main(args: list[str] | None = None) -> None:
     args = list(sys.argv[2:] if args is None else args)
     if not args or args[0] in ("-h", "--help"):
         print('usage: whaxon ai "<goal>" [--data DIR] [--target HOST]')
-        print('       whaxon ai "<goal>" --legacy [--auto] [--verbose] [--data DIR] [--max-steps N]')
-        print('       whaxon ai --legacy --resume <run_id> [--answer <text>] [--override] [--data DIR] [--max-steps N]')
         print('       whaxon ai --approvals <run_id> [--data DIR]  (read-only legacy history)')
         return
 
@@ -494,6 +491,15 @@ def main(args: list[str] | None = None) -> None:
             goal = args[i]; i += 1
         else:
             i += 1
+
+    if legacy or resume_id is not None:
+        print(
+            "legacy autonomous AI execution and resume are retired; no action "
+            "was dispatched. Create a V2 proposal, review it, and approve its "
+            "exact plan before execution.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     if auto:
         _flag = (os.environ.get("WHAXON_AI_AUTO_ALLOW") or "").strip().lower()

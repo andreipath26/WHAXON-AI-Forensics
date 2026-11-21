@@ -79,8 +79,6 @@ EXPECTED_RUNNER_CALLS = Counter(
         ("core/ai_bridge.py", "build_executor._run_in_session", "run_in_session"): 1,
         ("core/providers.py", "dispatch", "run_tool"): 1,
         ("core/worker.py", "drain_async", "run_tool"): 1,
-        ("interfaces/cli/run_cmd.py", "main._go", "run_tool"): 1,
-        ("interfaces/cli/run_cmd.py", "main._go", "run_in_session"): 1,
         ("interfaces/gui/main_window.py", "_run_tool", "run_tool"): 2,
         ("interfaces/web/server.py", "_run_job_blocking", "run_tool"): 1,
     }
