@@ -1400,3 +1400,123 @@ def test_e4_catalog_audit_does_not_claim_bound_after_registry_drift(monkeypatch)
     assert report["rows"][0]["state"] == "stale_binding"
     assert report["rows"][0]["v2_provider_bound"] is False
     assert report["execution_enabled_by_audit"] is False
+
+
+def _followup_auth_core(tmp_path):
+    import time
+    from types import SimpleNamespace
+
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest
+    from whaxon.core.providers import BoundProviderRouter
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    class Provider:
+        manifest = CapabilityManifest(
+            "service.http.enumerate", "trusted.http", "1", ("local_process",),
+            target_types=("hostname",), permissions=("network.scan",),
+            side_effects=("network_traffic",), impact="moderate",
+        )
+
+        def bindings(self):
+            return (self.manifest,)
+
+        def resolve_task(self, task, *, require_installed=False):
+            return SimpleNamespace(manifest=self.manifest)
+
+        async def dispatch(self, task):
+            raise AssertionError("authorization regression must block dispatch")
+
+        def inventory(self):
+            return []
+
+    core = Core.__new__(Core)
+    core.store = JobStore(tmp_path / "followup-cancel.db")
+    core.store.create_mission("mission", "controlled authorization regression")
+    provider = Provider()
+    core.providers = BoundProviderRouter((provider,))
+    core.scope = SimpleNamespace(
+        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+    )
+
+    def save_plan(plan_id, source_plan_id=None, source_digest=None):
+        task_id = f"task-{plan_id}"
+        task = WorkflowTask(
+            task_id, provider.manifest.capability_id, "example.test",
+            permissions=provider.manifest.permissions,
+            impact=provider.manifest.impact,
+        )
+        metadata = {
+            "provider_bindings": {
+                task_id: {
+                    "provider_id": provider.manifest.provider_id,
+                    "manifest_fingerprint": provider.manifest.fingerprint,
+                },
+            },
+        }
+        if source_plan_id is not None:
+            metadata["source_plan"] = source_plan_id
+            metadata["source_digest"] = source_digest
+        plan = WorkflowPlan("mission", (task,), metadata=metadata)
+        core.store.save_workflow_plan(plan_id, plan)
+        core.store.grant_workflow_approval(
+            plan_id, task_id, f"approval-{plan_id}", "operator",
+            expires_at=time.time() + 3600,
+        )
+        return plan, task
+
+    source, _ = save_plan("source")
+    child, child_task = save_plan(
+        "child", "source", source.digest,
+    )
+    grandchild, grandchild_task = save_plan(
+        "grandchild", "child", child.digest,
+    )
+    return core, source, child, grandchild, child_task, grandchild_task
+
+
+def test_approved_followup_is_denied_after_source_cancellation(tmp_path):
+    """An approved child cannot dispatch once its source is cancelled."""
+    from types import SimpleNamespace
+
+    core, _source, _child, _grandchild, child_task, _grandchild_task = (
+        _followup_auth_core(tmp_path)
+    )
+    core.workflow_requests = SimpleNamespace(cancel_queued=lambda _plan_id: None)
+
+    assert core.authorize_workflow_task_for_plan("child", child_task) is True
+
+    # Model cancellation racing with a child's second dispatch-boundary
+    # authorization. The child remains pending here so only ancestor fencing
+    # can deny it; the scheduler must therefore never call its provider.
+    core.store.request_workflow_cancellation("source")
+    assert core.store.get_workflow_plan("child")["status"] != "cancel_requested"
+    assert core.authorize_workflow_task_for_plan("child", child_task) is False
+
+
+def test_source_cancellation_cascades_through_approved_followups(tmp_path):
+    """Stop intent reaches persisted children and grandchildren without cycles."""
+    from types import SimpleNamespace
+
+    core, _source, _child, _grandchild, child_task, grandchild_task = (
+        _followup_auth_core(tmp_path)
+    )
+    cancelled_queues = []
+    core.workflow_requests = SimpleNamespace(
+        cancel_queued=lambda plan_id: cancelled_queues.append(plan_id),
+    )
+
+    assert core.authorize_workflow_task_for_plan("child", child_task) is True
+    assert core.authorize_workflow_task_for_plan("grandchild", grandchild_task) is True
+
+    core.cancel_workflow_plan("source")
+
+    assert core.store.get_workflow_plan("source")["status"] == "cancel_requested"
+    assert core.store.get_workflow_plan("child")["status"] == "cancel_requested"
+    assert core.store.get_workflow_plan("grandchild")["status"] == "cancel_requested"
+    assert set(cancelled_queues) == {"source", "child", "grandchild"}
+    assert core.authorize_workflow_task_for_plan("child", child_task) is False
+    assert core.authorize_workflow_task_for_plan(
+        "grandchild", grandchild_task,
+    ) is False
