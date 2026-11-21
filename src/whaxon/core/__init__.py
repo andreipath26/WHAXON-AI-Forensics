@@ -1408,9 +1408,8 @@ class Core:
         """Called once by any interface. Awaitable inside a splash screen.
 
         drain=True (default): long-lived hosts reconcile stale rows. Legacy
-        JobStore rows are drained only when
-        WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true is explicitly configured.
-        Engine V2 requests are serviced by their dedicated durable worker.
+        JobStore rows are never automatically dispatched. Engine V2 requests
+        are serviced by their dedicated durable worker.
         drain=False: one-shot CLI commands never drain prior legacy jobs.
         """
         self.bus.bind_loop(asyncio.get_running_loop())
@@ -1427,12 +1426,3 @@ class Core:
             # after silently skipping it can strand claims or report false
             # readiness, so fail closed and let the supervisor retry.
             raise RuntimeError("workflow recovery failed; execution is not ready") from exc
-        legacy_drain_enabled = os.environ.get(
-            "WHAXON_LEGACY_QUEUE_DRAIN_ENABLED", "false",
-        ).strip().lower() in {"1", "true", "yes"}
-        if drain and legacy_drain_enabled:
-            try:
-                from .worker import drain_async
-                await drain_async(self.store, self.runner)
-            except Exception:
-                pass
