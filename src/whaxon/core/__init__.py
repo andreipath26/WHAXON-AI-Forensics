@@ -411,6 +411,7 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
+        persisted_tasks = None
         task_reader = getattr(getattr(self, "store", None), "list_workflow_tasks", None)
         if callable(task_reader):
             try:
@@ -554,6 +555,49 @@ class Core:
             status: count for status, count in task_status_counts.items()
             if isinstance(status, str) and type(count) is int and count >= 0
         }
+        verification_outcome_counts: dict[str, int] = {}
+        for finding in findings:
+            outcome = finding.get("verification_outcome")
+            outcome_status = (
+                outcome.get("status") if isinstance(outcome, dict) else None
+            )
+            if isinstance(outcome_status, str):
+                verification_outcome_counts[outcome_status] = (
+                    verification_outcome_counts.get(outcome_status, 0) + 1
+                )
+        skip_counts: dict[str, int] = {}
+        for attempt in attempts:
+            for outcome in attempt.get("coverage_outcomes", []):
+                if not isinstance(outcome, dict) or outcome.get("status") != "skipped":
+                    continue
+                kind = outcome.get("kind")
+                kind = kind if isinstance(kind, str) else "unknown"
+                skip_counts[kind] = skip_counts.get(kind, 0) + 1
+        persisted_attempt_count = evidence.get("attempt_count")
+        if type(persisted_attempt_count) is not int or persisted_attempt_count < 0:
+            persisted_attempt_count = progress.get("attempts")
+        planned_task_count = (
+            len(persisted_tasks) if isinstance(persisted_tasks, list)
+            else progress.get("total_tasks")
+        )
+        coverage = {
+            "basis": "persisted workflow plan, task, attempt, and evidence records",
+            "planned_tasks": planned_task_count,
+            "task_status_counts": task_status_counts,
+            "persisted_attempts": persisted_attempt_count,
+            "returned_attempts": len(attempts),
+            "attempt_history_truncated": truncated,
+            "recorded_skips": skip_counts,
+            "finding_verification_outcomes": verification_outcome_counts,
+            "unrequested_verification_findings": verification_outcome_counts.get(
+                "not_requested", 0,
+            ),
+            "unsupported_or_inaccessible_work": {
+                "status": "not_explicitly_recorded",
+                "count": None,
+            },
+            "completeness_claim": False,
+        }
         return {
             "schema_version": "whaxon.workflow-report.v1",
             "plan_id": evidence["plan_id"],
@@ -562,6 +606,7 @@ class Core:
             "status": "complete" if complete else "partial",
             "readiness": readiness,
             "truncated": truncated,
+            "coverage": coverage,
             "evidence": evidence,
             "summary": {
                 "planned_tasks": progress.get("total_tasks"),
@@ -580,6 +625,9 @@ class Core:
             "limitations": [
                 "This report contains only evidence linked to the named workflow plan.",
                 "A partial report is not a successful completion or a release acceptance record.",
+                "Unrequested verification is counted only for persisted findings; work omitted from the plan is unknown.",
+                "Unsupported or inaccessible work is not classified unless a persisted record explicitly identifies it.",
+                "Coverage totals are not heuristic recall, endpoint completeness, or proof that all relevant checks ran.",
             ],
         }
 

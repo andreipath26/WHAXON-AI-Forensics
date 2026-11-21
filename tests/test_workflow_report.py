@@ -48,6 +48,11 @@ def test_core_workflow_report_uses_only_sealed_plan_evidence():
         "task_attempts": 1, "recorded_attempts": 1,
         "verified_seals": 1, "findings": 1,
     }
+    assert report["coverage"]["completeness_claim"] is False
+    assert report["coverage"]["persisted_attempts"] == 1
+    assert report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "not_explicitly_recorded", "count": None,
+    }
     assert report["findings"][0]["job_id"] == "123456789abc"
     assert report["findings"][0]["target"].startswith("http://127.0.0.1")
 
@@ -197,6 +202,8 @@ def test_workflow_report_projects_scope_skip_without_raw_coverage_details(tmp_pa
     assert secret_detail not in rendered
     assert "private context" not in rendered
     assert "target" not in attempt["coverage_outcomes"][0]
+    assert report["coverage"]["recorded_skips"] == {"scope_blocked": 1}
+    assert report["coverage"]["attempt_history_truncated"] is False
 
 
 
@@ -262,6 +269,10 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
     not_requested = make_report([scan_task])
     assert not_requested["findings"][0]["verification_outcome"] == {
         "status": "not_requested",
+    }
+    assert not_requested["coverage"]["unrequested_verification_findings"] == 1
+    assert not_requested["coverage"]["finding_verification_outcomes"] == {
+        "not_requested": 1,
     }
 
     pending = make_report([scan_task, {**verify_task, "status": "pending"}])
