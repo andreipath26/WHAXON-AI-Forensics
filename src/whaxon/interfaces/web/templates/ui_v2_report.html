@@ -661,6 +661,118 @@
     if(standardsLabel?.parentElement)standardsLabel.parentElement.style.display="none";
     document.documentElement.dataset.reportReady="true";
   }
+
+  // V2 workflow reporting is plan-scoped and separate from the engagement report above.
+  const v2Panel=document.createElement("section");
+  v2Panel.id="v2-workflow-report";
+  v2Panel.className="mx-margin my-space-md rounded-xl border border-secondary/30 bg-surface-container-low p-space-md";
+  v2Panel.innerHTML='<div class="flex flex-wrap items-start justify-between gap-space-md"><div><h2 class="font-headline-md text-headline-md">V2 Plan Evidence Report</h2><p class="mt-1 max-w-3xl text-body-sm text-on-surface-variant">Shows persisted evidence for one selected workflow plan. This panel does not assert assessment coverage, independent attestation, or release acceptance.</p></div><button id="v2-report-refresh" type="button" class="rounded bg-surface-container-high px-space-md py-space-sm font-code-sm">Refresh plans</button></div><div class="mt-space-md flex flex-wrap gap-space-md"><label class="flex flex-col gap-1 font-label-sm text-outline">Mission<select id="v2-report-mission" class="min-w-64 rounded bg-surface-container-high px-space-sm py-space-sm text-on-surface"><option value="">Loading missions…</option></select></label><label class="flex flex-col gap-1 font-label-sm text-outline">Workflow plan<select id="v2-report-plan" class="min-w-64 rounded bg-surface-container-high px-space-sm py-space-sm text-on-surface" disabled><option value="">Select a mission first</option></select></label></div><div id="v2-report-status" role="status" aria-live="polite" class="mt-space-md font-code-sm text-on-surface-variant">Loading persisted V2 missions…</div><div id="v2-report-summary" class="mt-space-md"></div><div id="v2-report-outcomes" class="mt-space-md space-y-space-sm"></div>';
+  const reportRoot=document.querySelector("main");
+  if(reportRoot)reportRoot.insertBefore(v2Panel,reportRoot.firstChild);
+  const missionSelect=v2Panel.querySelector("#v2-report-mission");
+  const planSelect=v2Panel.querySelector("#v2-report-plan");
+  const v2Status=v2Panel.querySelector("#v2-report-status");
+  const v2Summary=v2Panel.querySelector("#v2-report-summary");
+  const v2Outcomes=v2Panel.querySelector("#v2-report-outcomes");
+  let selectedPlans=[];
+  const setV2Status=(message,kind="status")=>{v2Status.textContent=message;v2Status.setAttribute("role",kind);v2Status.classList.toggle("text-error",kind==="alert");};
+  const option=(value,label)=>{const node=document.createElement("option");node.value=value;node.textContent=label;return node;};
+  async function loadV2Missions(keepSelection=true){
+    const previous=keepSelection?missionSelect.value:"";
+    missionSelect.replaceChildren(option("","Loading missions…"));
+    planSelect.replaceChildren(option("","Select a mission first"));
+    planSelect.disabled=true;v2Summary.replaceChildren();v2Outcomes.replaceChildren();
+    setV2Status("Loading persisted V2 missions…");
+    try{
+      const response=await fetch("/api/v2/missions?limit=100",{headers:{"Accept":"application/json"}});
+      if(!response.ok)throw new Error("HTTP "+response.status);
+      const missions=await response.json();
+      if(!Array.isArray(missions))throw new Error("The V2 missions API returned an invalid response.");
+      missionSelect.replaceChildren(option("","Select a mission"));
+      missions.forEach(m=>{if(m&&typeof m.id==="string")missionSelect.append(option(m.id,m.id+(m.objective?" · "+m.objective:"")));});
+      if(!missions.length){setV2Status("No persisted V2 missions are available.");return;}
+      if(previous&&missions.some(m=>m.id===previous))missionSelect.value=previous;
+      setV2Status("Select a mission and plan to view its persisted workflow report.");
+      if(missionSelect.value)await loadV2Plans();
+    }catch(error){missionSelect.replaceChildren(option("","V2 missions unavailable"));setV2Status("V2 workflow report unavailable: "+(error?.message||"missions could not be loaded")+". No legacy report fallback was used.","alert");}
+  }
+  async function loadV2Plans(){
+    const missionId=missionSelect.value;
+    planSelect.replaceChildren(option("","Loading plans…"));planSelect.disabled=true;
+    v2Summary.replaceChildren();v2Outcomes.replaceChildren();
+    if(!missionId){planSelect.replaceChildren(option("","Select a mission first"));setV2Status("Select a mission to load its persisted plans.");return;}
+    setV2Status("Loading plans for mission "+missionId+"…");
+    try{
+      const response=await fetch("/api/v2/missions/"+encodeURIComponent(missionId)+"/plans",{headers:{"Accept":"application/json"}});
+      if(!response.ok)throw new Error("HTTP "+response.status);
+      const plans=await response.json();
+      if(!Array.isArray(plans))throw new Error("The V2 plans API returned an invalid response.");
+      selectedPlans=plans.filter(p=>p&&typeof p.id==="string");
+      planSelect.replaceChildren(option("","Select a plan"));
+      selectedPlans.forEach(p=>planSelect.append(option(p.id,p.id+" · "+(p.status||"status unavailable")+" · "+(p.digest||"digest unavailable"))));
+      planSelect.disabled=selectedPlans.length===0;
+      if(!selectedPlans.length){setV2Status("No persisted workflow plans are available for this mission.");return;}
+      setV2Status("Select a persisted plan to load its evidence report.");
+    }catch(error){selectedPlans=[];planSelect.replaceChildren(option("","V2 plans unavailable"));setV2Status("V2 plan list unavailable: "+(error?.message||"plans could not be loaded")+". No legacy report fallback was used.","alert");}
+  }
+  const appendCategory=(parent,title,counts)=>{
+    const box=document.createElement("div");box.className="rounded bg-surface-container p-space-sm";
+    const heading=document.createElement("strong");heading.textContent=title;box.append(heading);
+    const line=document.createElement("p");line.className="mt-1 text-body-sm text-on-surface-variant";
+    const entries=Object.entries(counts).filter(([,count])=>Number.isInteger(count)&&count>0);
+    line.textContent=entries.length?entries.map(([name,count])=>name+": "+count).join(" · "):"No recorded categories";
+    box.append(line);parent.append(box);
+  };
+  function renderV2WorkflowReport(report){
+    if(!report||report.schema_version!=="whaxon.workflow-report.v1"||!Array.isArray(report.findings)||!report.summary||typeof report.summary!=="object")throw new Error("The V2 workflow report response was invalid.");
+    v2Summary.replaceChildren();v2Outcomes.replaceChildren();
+    const heading=document.createElement("h3");heading.className="font-headline-sm";heading.textContent="Plan "+report.plan_id+" · report status: "+report.status;v2Summary.append(heading);
+    const meta=document.createElement("p");meta.className="mt-1 text-body-sm text-on-surface-variant";meta.textContent="Mission "+report.mission_id+" · digest "+report.plan_digest+" · "+report.summary.findings+" evidence-linked findings · "+report.summary.task_attempts+" task attempts · "+(report.truncated?"attempt history truncated":"attempt history not marked truncated");v2Summary.append(meta);
+    const categories=document.createElement("div");categories.className="mt-space-sm grid gap-space-sm md:grid-cols-2";
+    appendCategory(categories,"Task outcome categories",report.summary.task_status_counts||{});
+    const outcomeCounts={};
+    for(const finding of report.findings){const status=finding?.verification_outcome?.status||"unknown";outcomeCounts[status]=(outcomeCounts[status]||0)+1;}
+    appendCategory(categories,"Finding verification outcome categories",outcomeCounts);
+    v2Summary.append(categories);
+    if(report.limitations&&Array.isArray(report.limitations)){
+      const limits=document.createElement("p");limits.className="mt-space-sm text-body-sm text-on-surface-variant";limits.textContent=report.limitations.join(" ");v2Summary.append(limits);
+    }
+    if(!report.findings.length){const empty=document.createElement("p");empty.className="mt-space-sm text-body-sm text-on-surface-variant";empty.setAttribute("role","status");empty.textContent="This plan report contains no findings from recorded, integrity-verified attempts. Empty findings do not prove coverage.";v2Outcomes.append(empty);return;}
+    const list=document.createElement("div");list.className="space-y-space-sm";
+    report.findings.forEach((finding,index)=>{
+      const outcome=finding.verification_outcome&&typeof finding.verification_outcome==="object"?finding.verification_outcome:{status:"unknown"};
+      const card=document.createElement("article");card.className="rounded border border-outline-variant/30 bg-surface-container p-space-sm";card.dataset.v2FindingIndex=String(index);
+      const title=document.createElement("h4");title.className="font-code-sm font-semibold";title.textContent=(finding.title||finding.kind||"Finding")+" · "+(finding.severity||"severity unavailable");card.append(title);
+      const identity=document.createElement("p");identity.className="mt-1 text-body-sm text-on-surface-variant";identity.textContent="Source job "+(finding.job_id||"unavailable")+" · finding #"+(Number.isInteger(finding.seq)?finding.seq:"unavailable")+" · task "+(finding.task_key||"unavailable");card.append(identity);
+      const status=document.createElement("p");status.className="mt-1 font-code-sm";status.textContent="Verification outcome: "+(outcome.status||"unknown")+(outcome.verification_status? " · recorded verification status: "+outcome.verification_status:"");card.append(status);
+      if(outcome.task_key||outcome.job_id||Array.isArray(outcome.attempt_statuses)){
+        const detail=document.createElement("p");detail.className="mt-1 text-body-sm text-on-surface-variant";
+        const parts=[];if(outcome.task_key)parts.push("verifier task "+outcome.task_key);if(outcome.job_id)parts.push("verifier job "+outcome.job_id);if(Array.isArray(outcome.attempt_statuses))parts.push("attempts "+outcome.attempt_statuses.join(", "));detail.textContent=parts.join(" · ");card.append(detail);
+      }
+      if(Array.isArray(outcome.requests))outcome.requests.forEach((request,i)=>{const row=document.createElement("p");row.className="mt-1 text-body-sm text-on-surface-variant";row.textContent="Request "+(i+1)+": "+(request.status||"unknown")+(request.verification_status?" · "+request.verification_status:"");card.append(row);});
+      list.append(card);
+    });
+    v2Outcomes.append(list);
+  }
+  async function loadV2Report(){
+    const missionId=missionSelect.value,planId=planSelect.value;
+    v2Summary.replaceChildren();v2Outcomes.replaceChildren();
+    if(!missionId||!planId){setV2Status("Select a persisted mission and plan to view V2 evidence.");return;}
+    setV2Status("Loading persisted evidence for plan "+planId+"…");
+    try{
+      const response=await fetch("/api/v2/workflows/"+encodeURIComponent(planId)+"/report?limit=100",{headers:{"Accept":"application/json"}});
+      if(!response.ok)throw new Error("HTTP "+response.status);
+      const report=await response.json();
+      if(report.mission_id!==missionId)throw new Error("The selected plan report belongs to a different mission.");
+      renderV2WorkflowReport(report);
+      setV2Status("Loaded persisted V2 workflow evidence. No legacy report fallback was used.");
+    }catch(error){v2Summary.replaceChildren();v2Outcomes.replaceChildren();setV2Status("V2 workflow report unavailable: "+(error?.message||"report could not be loaded")+". No legacy report fallback was used.","alert");}
+  }
+  missionSelect.addEventListener("change",loadV2Plans);
+  planSelect.addEventListener("change",loadV2Report);
+  v2Panel.querySelector("#v2-report-refresh").addEventListener("click",()=>loadV2Missions(true));
+  loadV2Missions(false);
+
   load().catch(error=>{
     const root=document.querySelector("main");
     let banner=document.getElementById("whaxon-report-status");
