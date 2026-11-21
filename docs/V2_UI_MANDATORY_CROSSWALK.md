@@ -315,7 +315,7 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 ## Findings page
 | ID | Element | Expected | Actual | Backend | Status |
 |---|---|---|---|---|---|
-| F.01 | Findings list | Load and render validated live report records; show empty, unavailable, malformed-response, and retry states | Implemented | GET /api/report?format=json | TESTS ADDED; BROWSER RUN PENDING |
+| F.01 | Findings list | Load bounded persisted job/finding pages; disclose total and returned coverage; load older pages; show empty, unavailable, malformed-response, and retry states | Implemented | GET /api/ui-v2/findings?limit=&offset= | API TEST ADDED; BROWSER CI PENDING |
 | F.02 | Finding card | Select a finding and inspect only recorded fields | Implemented | none | EXISTING BROWSER TEST |
 | F.03 | Validate selected finding | Open V2 Verification & Retest Studio for a sealed-evidence verification proposal | V2 plan proposal only | `/api/v2/workflow-proposals`; legacy POST remains for older clients | Browser test guards against legacy mutation |
 | F.04 | Retest selected / verified findings | Open V2 Verification & Retest Studio for a sealed-evidence retest proposal | V2 plan proposal only | `/api/v2/workflow-proposals`; legacy POST remains for older clients | Browser test guards against legacy mutation |
@@ -324,6 +324,8 @@ Do not mark the new UI DONE or deployment-ready until the acceptance gaps above 
 | F.07 | Copy Evidence | Copy the selected finding's recorded evidence | Implemented | Clipboard API | WIRED |
 | F.08 | Scope status | Display current scope summary and enforcement state | Implemented | GET /api/scope | EXISTING BROWSER TEST |
 | F.09 | Mark Fixed / Issue Tracker export / approvals | Unsupported controls are hidden; no state is claimed | Hidden at runtime | none | HIDDEN |
+
+The Findings page reads a snapshot-consistent page from `GET /api/ui-v2/findings`, which avoids full report enrichment. It shows total and loaded counts and offers bounded older-job pages; each page is limited to 100 jobs and reports when older jobs remain. The page metadata applies to completed and failed legacy/V2 jobs. This is still partial page wiring and browser acceptance remains required.
 
 The former F.05 “Sort headers” and F.06 “Density toggle” rows described controls absent from this card-list design and are retired. Bulk verify/delete and the AI banner are not controls in the current source; they are not counted as hidden controls. Mark Fixed, Issue Tracker export, and approvals remain source-visible placeholder buttons with inert handlers; current page JavaScript hides them at runtime until real actions exist.
 
@@ -440,7 +442,7 @@ This is a complete **static source-control registry**, not a declaration that ev
 | ui_v2_dashboard.html | 36 | 2 | 0 | 0 | 0 | 21 | 13 |
 | ui_v2_diagnostics.html | 33 | 0 | 0 | 0 | 12 | 17 | 4 |
 | ui_v2_evidence.html | 35 | 0 | 0 | 0 | 0 | 14 | 21 |
-| ui_v2_findings.html | 26 | 1 | 0 | 1 | 4 | 20 | 0 |
+| ui_v2_findings.html | 27 | 2 | 0 | 1 | 4 | 20 | 0 |
 | ui_v2_history.html | 31 | 0 | 3 | 0 | 0 | 16 | 12 |
 | ui_v2_monitoring.html | 45 | 0 | 0 | 0 | 0 | 19 | 26 |
 | ui_v2_ptaas.html | 42 | 5 | 0 | 0 | 11 | 17 | 9 |
@@ -919,12 +921,13 @@ Labels and binding excerpts are generated from the complete tracked templates; l
 | 145:1 | button | sqlmap | script-reference | filter:adapter:sqlmap |
 | 146:1 | button | Nikto | script-reference | filter:adapter:nikto |
 | 151:1 | input | Filter findings by proof pattern, URL, or CVE | script-reference | whaxon-finding-filter |
-| 165:229 | button | Retry | source-hidden | whaxon-findings-retry |
-| 248:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
-| 310:1 | button | play_arrow Open V2 Verification & Retest Studio | script-reference | replay-btn |
-| 314:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
-| 320:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
-| 324:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
+| 158:1 | button | Load older findings | source-hidden | whaxon-findings-more |
+| 169:229 | button | Retry | source-hidden | whaxon-findings-retry |
+| 252:1 | button | content_copy Copy Evidence | script-reference | copy-btn |
+| 314:1 | button | play_arrow Open V2 Verification & Retest Studio | script-reference | replay-btn |
+| 318:1 | button | check Mark Fixed | inline-handler | markFixedAction() |
+| 324:1 | button | file_export Export Proof to Issue Tracker | inline-handler | exportProofAction() |
+| 328:1 | button | how_to_reg Send to Approvals | inline-handler | sendToApprovalsAction() |
 
 ### ui_v2_history.html
 

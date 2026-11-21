@@ -226,6 +226,57 @@ def test_job_findings(tmp_path, monkeypatch):
 
 # ---------------------------------------------------------------- /api/report
 
+def test_ui_v2_findings_endpoint_returns_stable_pages_without_report_enrichment(
+    tmp_path, monkeypatch,
+):
+    app, core = _make_app(tmp_path, monkeypatch)
+    for index in range(3):
+        _seed_job(
+            core, f"page-job-{index}",
+            findings=[_finding(port=8000 + index)],
+        )
+    conn = core.store._conn()
+    try:
+        conn.executemany(
+            "UPDATE jobs SET started_at=? WHERE id=?",
+            [(float(index), f"page-job-{index}") for index in range(3)],
+        )
+    finally:
+        conn.close()
+
+    def report_must_not_run(*_args, **_kwargs):
+        raise AssertionError("findings projection must not build a full report")
+
+    def separate_findings_read_must_not_run(*_args, **_kwargs):
+        raise AssertionError("page findings must come from the history snapshot")
+
+    monkeypatch.setattr("whaxon.core.report._load", report_must_not_run)
+    monkeypatch.setattr(core.store, "get_findings", separate_findings_read_must_not_run)
+    client = app.test_client()
+    first = client.get("/api/ui-v2/findings?limit=2&offset=0")
+    assert first.status_code == 200
+    first_data = first.get_json()
+    assert [entry["job"]["id"] for entry in first_data["jobs"]] == [
+        "page-job-2", "page-job-1",
+    ]
+    assert first_data["page"] == {
+        "limit": 2, "offset": 0, "total_jobs": 3, "returned_jobs": 2,
+        "total_findings": 3, "returned_findings": 2, "has_more": True,
+        "next_offset": 2,
+    }
+
+    second = client.get("/api/ui-v2/findings?limit=2&offset=2")
+    assert second.status_code == 200
+    second_data = second.get_json()
+    assert [entry["job"]["id"] for entry in second_data["jobs"]] == ["page-job-0"]
+    assert second_data["page"]["has_more"] is False
+    assert second_data["page"]["next_offset"] is None
+
+    for query in (
+        "limit=0", "limit=501", "limit=1&limit=2", "offset=-1", "offset=1&offset=2",
+    ):
+        assert client.get("/api/ui-v2/findings?" + query).status_code == 400
+
 def test_report_md(tmp_path, monkeypatch):
     app, core = _make_app(tmp_path, monkeypatch)
     _seed_job(core, "j1", findings=[_finding()])

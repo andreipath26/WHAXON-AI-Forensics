@@ -2904,21 +2904,44 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/ui-v2/findings")
     def api_ui_v2_findings():
-        """Return bounded persisted job/finding records for lightweight UI panels.
+        """Return a stable bounded page of persisted jobs/findings for V2 UI.
 
         Unlike the full report endpoint, this deliberately avoids report
         enrichment and pivot-chain generation so auxiliary pages remain
-        responsive even when optional report enrichment is slow.
+        responsive even when optional report enrichment is slow. Page metadata
+        makes omitted older jobs and findings explicit to clients.
         """
+        raw_limit = request.args.get("limit", "500")
+        raw_offset = request.args.get("offset", "0")
+        if (
+            len(request.args.getlist("limit")) > 1
+            or len(request.args.getlist("offset")) > 1
+            or not raw_limit.isascii() or not raw_limit.isdecimal()
+            or not raw_offset.isascii() or not raw_offset.isdecimal()
+        ):
+            return jsonify({"error": "limit and offset must be decimal integers"}), 400
+        limit = int(raw_limit)
+        offset = int(raw_offset)
+        if not 1 <= limit <= 500 or offset > 2_147_483_647:
+            return jsonify({"error": "limit or offset is outside the supported range"}), 400
         try:
-            jobs = registry.core.store.history(limit=500)
-            entries = []
-            for job in jobs:
-                entries.append({
-                    "job": job,
-                    "findings": registry.core.store.get_findings(job["id"]) or [],
-                })
-            return jsonify({"jobs": entries})
+            entries, total_jobs, total_findings, returned_findings = (
+                registry.core.store.history_page(limit=limit, offset=offset)
+            )
+            has_more = offset + len(entries) < total_jobs
+            return jsonify({
+                "jobs": entries,
+                "page": {
+                    "limit": limit,
+                    "offset": offset,
+                    "total_jobs": total_jobs,
+                    "returned_jobs": len(entries),
+                    "total_findings": total_findings,
+                    "returned_findings": returned_findings,
+                    "has_more": has_more,
+                    "next_offset": offset + len(entries) if has_more else None,
+                },
+            })
         except Exception as exc:
             return jsonify({
                 "error": "Unable to load live findings",

@@ -837,11 +837,12 @@ sealed Engine V2 source evidence and leave approval and submission as separate
 steps. Legacy APIs remain for older clients and legacy-owned records. No plan
 proposal approves or submits work.
 
-The Findings page loads its bounded persisted job/finding projection from
-`GET /api/ui-v2/findings`, which intentionally avoids the full report
-enrichment path. This keeps the findings view tied to the same recorded data
-while preventing report-generation work from blocking its live-count and
-coverage controls. It does not certify all other V2 UI workflows or close G06.
+The Findings page loads its snapshot-consistent persisted job/finding
+projection from `GET /api/ui-v2/findings` in bounded pages of 100 jobs. Page
+metadata includes total and returned job/finding counts and the next offset;
+the UI offers older pages and labels its loaded coverage. This endpoint avoids
+the full report-enrichment path. It does not certify all other V2 UI workflows
+or close G06.
 
 ## V2 UI cancellation ownership — 2026-11-11
 

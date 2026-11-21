@@ -905,10 +905,31 @@ class JobStore:
         finally:
             c.close()
 
-    def history(self, limit=50):
+    def history_page(self, limit=50, offset=0, *, include_findings=True):
+        """Return one snapshot-consistent bounded history/findings page."""
+        if type(limit) is not int or limit < 1:
+            raise ValueError("history limit must be a positive integer")
+        if type(offset) is not int or offset < 0:
+            raise ValueError("history offset must be a nonnegative integer")
         c = self._conn()
         try:
-            rows = c.execute("SELECT id, tool, target, status, exit_code, duration_s, started_at FROM jobs WHERE status IN ('finished','failed') ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
+            c.execute("BEGIN")
+            total = c.execute(
+                "SELECT COUNT(*) FROM jobs WHERE status IN ('finished','failed')",
+            ).fetchone()[0]
+            total_findings = (
+                c.execute(
+                    "SELECT COUNT(*) FROM findings f JOIN jobs j ON j.id=f.job_id "
+                    "WHERE j.status IN ('finished','failed')",
+                ).fetchone()[0]
+                if include_findings else None
+            )
+            rows = c.execute(
+                "SELECT id, tool, target, status, exit_code, duration_s, started_at "
+                "FROM jobs WHERE status IN ('finished','failed') "
+                "ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
             out = []
             for r in rows:
                 line_count = c.execute(
@@ -917,7 +938,7 @@ class JobStore:
                 findings_count = c.execute(
                     "SELECT COUNT(*) AS n FROM findings WHERE job_id=?", (r["id"],)
                 ).fetchone()["n"]
-                out.append({
+                job = {
                     "id": r["id"],
                     "tool": r["tool"],
                     "target": r["target"],
@@ -927,9 +948,54 @@ class JobStore:
                     "started_at": r["started_at"],
                     "line_count": line_count,
                     "findings_count": findings_count,
-                })
-            return out
+                }
+                finding_rows = c.execute(
+                    "SELECT seq, kind, severity, source, data_json, raw_line, "
+                    "enrichment_json, verification_status, verified_by, verification_reason "
+                    "FROM findings WHERE job_id=? ORDER BY seq", (r["id"],),
+                ).fetchall() if include_findings else []
+                findings = []
+                for finding in finding_rows:
+                    enrichment = {}
+                    try:
+                        enrichment = json.loads(finding["enrichment_json"] or "{}")
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    findings.append({
+                        "seq": finding["seq"],
+                        "verification_status": finding["verification_status"],
+                        "verified_by": finding["verified_by"],
+                        "verification_reason": finding["verification_reason"],
+                        "kind": finding["kind"],
+                        "severity": finding["severity"],
+                        "source": finding["source"],
+                        "data": json.loads(finding["data_json"]),
+                        "raw_line": finding["raw_line"],
+                        "remediation": enrichment.get("remediation", ""),
+                        "impact": enrichment.get("impact", ""),
+                        "cvss": enrichment.get("cvss"),
+                        "cwe": enrichment.get("cwe", ""),
+                        "references": enrichment.get("references", []),
+                        "lookup_hint": enrichment.get("lookup_hint", ""),
+                        "proof": enrichment.get("proof", ""),
+                        "request_context": enrichment.get("request_context") or {},
+                    })
+                out.append({"job": job, "findings": findings})
+            c.commit()
+            returned_findings = sum(
+                len(item["findings"]) if include_findings else item["job"]["findings_count"]
+                for item in out
+            )
+            return out, total, total_findings, returned_findings
         finally: c.close()
+
+    def history(self, limit=50, offset=0):
+        return [
+            entry["job"]
+            for entry in self.history_page(
+                limit, offset, include_findings=False,
+            )[0]
+        ]
 
     def findings_by_target(self, limit: int = 50) -> list[dict]:
         """Group findings by target, deduped by (kind, signature)."""
