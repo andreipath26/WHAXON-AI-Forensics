@@ -105,3 +105,47 @@ def test_semantic_provider_recovery_reuses_exact_catalog_tool_identity(tmp_path)
     assert core.store.get_workflow_audit_integrity(
         "semantic-recovery-plan",
     )["consistent"] is True
+
+
+
+def test_semantic_provider_recovery_preserves_nonzero_exit_as_failure(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("semantic-failure", "recover failed provider result")
+    core.save_workflow_plan("semantic-failure-plan", WorkflowPlan("semantic-failure", (
+        WorkflowTask(
+            "scan", "network.services.discover", "192.0.2.10",
+            permissions=("network.scan",), impact="moderate",
+        ),
+    )))
+    claim = core.store.claim_ready_workflow_task(
+        "semantic-failure-plan", "task-worker", max_attempts=1,
+    )
+    assert claim is not None
+    attempt_id = claim["attempt_id"]
+    assert core.store.mark_workflow_dispatch_started(
+        "semantic-failure-plan", attempt_id,
+        provider_execution_id=attempt_id,
+    )
+    core.store.mark_engine_v2_execution_job(attempt_id)
+    core.store.create(attempt_id)
+    assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
+    assert core.store.set_finished(attempt_id, 2, 0.25)
+    core.store.finish_task_attempt(
+        attempt_id, "uncertain", error="worker lost after provider completion",
+    )
+
+    result = core.recover_workflow_attempt_from_provider_job(
+        "semantic-failure-plan", attempt_id,
+    )
+
+    assert result["task_status"] == "failed"
+    assert result["provider_exit_code"] == 2
+    snapshot = core.store.get_workflow_progress("semantic-failure-plan")
+    assert snapshot["counts"] == {"failed": 1}
+    evidence = core.workflow_evidence("semantic-failure-plan")
+    assert evidence["attempts"][0]["evidence_status"] == "recorded"
+    assert evidence["attempts"][0]["provider_exit_code"] == 2
+    assert evidence["attempts"][0]["integrity_status"] == "verified"
+    assert core.store.get_workflow_audit_integrity(
+        "semantic-failure-plan",
+    )["consistent"] is True
