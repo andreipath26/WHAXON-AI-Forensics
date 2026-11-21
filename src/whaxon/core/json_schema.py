@@ -23,6 +23,37 @@ class SchemaContractError(ValueError):
     """A capability schema or value violates its declared JSON contract."""
 
 
+def _ensure_json_data(value: Any, path: str, depth: int = 0,
+                      active: set[int] | None = None) -> None:
+    if depth > 64:
+        raise SchemaContractError(f"{path}: JSON data nesting exceeds 64 levels")
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise SchemaContractError(f"{path}: number must be finite")
+        return
+    if not _is_mapping(value) and not isinstance(value, (list, tuple)):
+        raise SchemaContractError(f"{path}: value is not JSON data")
+    if active is None:
+        active = set()
+    identity = id(value)
+    if identity in active:
+        raise SchemaContractError(f"{path}: circular JSON data")
+    active.add(identity)
+    try:
+        if _is_mapping(value):
+            for key, item in value.items():
+                if not isinstance(key, str):
+                    raise SchemaContractError(f"{path}: object keys must be strings")
+                _ensure_json_data(item, f"{path}.{key}", depth + 1, active)
+        else:
+            for index, item in enumerate(value):
+                _ensure_json_data(item, f"{path}[{index}]", depth + 1, active)
+    finally:
+        active.remove(identity)
+
+
 def _is_mapping(value: Any) -> bool:
     return isinstance(value, Mapping)
 
@@ -33,6 +64,7 @@ def validate_schema(schema: Any, *, path: str = "$", depth: int = 0) -> None:
         raise SchemaContractError(f"{path}: schema nesting exceeds 64 levels")
     if not _is_mapping(schema):
         raise SchemaContractError(f"{path}: schema must be an object")
+    _ensure_json_data(schema, path)
     unknown = set(schema) - _SCHEMA_KEYS
     if unknown:
         raise SchemaContractError(
@@ -43,7 +75,7 @@ def validate_schema(schema: Any, *, path: str = "$", depth: int = 0) -> None:
         if isinstance(types, str):
             types = (types,)
         if (not isinstance(types, (list, tuple)) or not types
-                or any(item not in _TYPES for item in types)
+                or any(not isinstance(item, str) or item not in _TYPES for item in types)
                 or len(set(types)) != len(types)):
             raise SchemaContractError(f"{path}.type: invalid JSON type declaration")
     if "required" in schema:
@@ -170,4 +202,5 @@ def _validate(schema: Mapping[str, Any], value: Any, path: str, depth: int) -> N
 def validate_instance(schema: Mapping[str, Any], value: Any, *, path: str = "$") -> None:
     """Raise when a JSON-compatible value violates its declared schema."""
     validate_schema(schema)
+    _ensure_json_data(value, path)
     _validate(schema, value, path, 0)
