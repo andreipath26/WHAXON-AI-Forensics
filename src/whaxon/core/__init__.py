@@ -598,6 +598,15 @@ class Core:
                             check = omission.get("check")
                             disposition = omission.get("disposition")
                             if (
+                                disposition is None
+                                and omission.get("reason")
+                                == "legacy-only; no admitted V2 provider"
+                            ):
+                                # Preserve the exact legacy planner record
+                                # without treating arbitrary free-form reasons
+                                # as a typed disposition.
+                                disposition = "unsupported"
+                            if (
                                 isinstance(check, str) and check
                                 and len(check) <= 128
                                 and disposition in {

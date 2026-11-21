@@ -218,7 +218,8 @@ def test_workflow_report_projects_plan_bound_unsupported_and_unavailable_checks(
         "omitted_checks": [
             {"check": "cookies", "reason": "legacy only", "disposition": "unsupported"},
             {"check": "dns_full", "reason": "provider not ready", "disposition": "provider_unavailable"},
-            {"check": "secret", "reason": "ignored unsupported metadata"},
+                {"check": "tech", "reason": "legacy-only; no admitted V2 provider"},
+                {"check": "secret", "reason": "untyped provider note"},
         ],
     })
     store.save_workflow_plan("omissions-plan", plan)
@@ -239,10 +240,11 @@ def test_workflow_report_projects_plan_bound_unsupported_and_unavailable_checks(
 
     assert report["coverage"]["unsupported_or_inaccessible_work"] == {
         "status": "recorded",
-        "count": 2,
+        "count": 3,
         "items": [
             {"check": "cookies", "disposition": "unsupported"},
             {"check": "dns_full", "disposition": "provider_unavailable"},
+            {"check": "tech", "disposition": "unsupported"},
         ],
     }
 
