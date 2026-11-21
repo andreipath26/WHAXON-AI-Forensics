@@ -741,8 +741,9 @@ def test_web_validation_refuses_out_of_scope_job_target(tmp_path, monkeypatch):
         "/api/validate/outside/0",
         environ_base={"REMOTE_ADDR": "127.0.0.1"},
     )
-    assert response.status_code == 403
-    assert "out of scope" in response.get_json()["error"].lower()
+    assert response.status_code == 410
+    assert response.get_json()["legacy_validation_enabled"] is False
+    assert response.get_json()["replay_attempted"] is False
 
 
 def test_legacy_validation_api_is_default_denied_before_read_or_replay(tmp_path, monkeypatch):
@@ -766,85 +767,42 @@ def test_legacy_validation_api_is_default_denied_before_read_or_replay(tmp_path,
     assert read_findings("j1")[0]["verification_status"] == "candidate"
 
 
-def test_legacy_validation_api_runs_only_with_explicit_opt_in(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
+def test_stale_legacy_validation_flag_cannot_read_or_replay(tmp_path, monkeypatch):
     from whaxon.core.validator import Validator
 
     monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
     app, core = _make_app(tmp_path, monkeypatch)
     _seed_job(core, findings=[_finding(kind="sqli")])
+    core.store.update_verification("j1", 0, "verified", by="test", reason="seeded proof")
+    calls = []
+    read_findings = core.store.get_findings
     monkeypatch.setattr(
-        core.scope, "check",
-        lambda target: SimpleNamespace(allowed=True, reason="in scope", matched_rule="test"),
+        core.store, "get_findings",
+        lambda *_: calls.append("read") or [],
     )
-    replayed = []
     monkeypatch.setattr(
         Validator, "validate",
-        lambda _self, finding, target_url=None: (
-            replayed.append((finding.kind, target_url)) or ("verified", "synthetic proof")
-        ),
+        lambda *_a, **_k: calls.append("validate"),
+    )
+    monkeypatch.setattr(
+        Validator, "revalidate",
+        lambda *_a, **_k: calls.append("retest"),
     )
 
-    response = app.test_client().post("/api/validate/j1/0")
-
-    assert response.status_code == 200
-    assert response.get_json() == {"status": "verified", "reason": "synthetic proof"}
-    assert replayed == [("sqli", "http://10.0.0.5")]
-    assert core.store.get_findings("j1")[0]["verification_status"] == "verified"
-
-
-def test_legacy_validation_and_retest_recheck_scope_before_each_probe(
-    tmp_path, monkeypatch,
-):
-    from types import SimpleNamespace
-
-    from whaxon.core.validator import Validator
-
-    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    finding = {**_finding(kind="sqli"), "data": {"parameter": "q"}}
-    _seed_job(core, findings=[finding])
     client = app.test_client()
-    attempted = []
+    responses = [
+        client.post("/api/validate/j1/0"),
+        client.post("/api/retest/j1/0"),
+    ]
 
-    def fake_fetch(url, param, value, *, authorize_request=None):
-        allowed = authorize_request(url) if callable(authorize_request) else None
-        attempted.append((url, allowed))
-        if allowed is not True:
-            raise ValueError("scope authorization denied validation request")
-        return "no proof", 0.0
-
-    monkeypatch.setattr(Validator, "_fetch", staticmethod(fake_fetch))
-
-    def assert_scope_revocation(endpoint, expected_status):
-        decisions = iter((True, False))
-        scope_targets = []
-
-        def check_for_execution(target):
-            scope_targets.append(target)
-            return SimpleNamespace(
-                allowed=next(decisions),
-                reason="in scope" if len(scope_targets) == 1 else "revoked",
-                matched_rule="test",
-            )
-
-        monkeypatch.setattr(
-            core.scope, "check_for_execution", check_for_execution,
-        )
-        attempted.clear()
-        response = client.post(endpoint)
-
-        assert response.status_code == 200
-        assert response.get_json()["status"] == expected_status
-        assert scope_targets == ["http://10.0.0.5", "http://10.0.0.5"]
-        assert attempted == [("http://10.0.0.5", False)]
-
-    assert_scope_revocation("/api/validate/j1/0", "candidate")
-    core.store.update_verification(
-        "j1", 0, "verified", by="test", reason="seeded proof",
-    )
-    assert_scope_revocation("/api/retest/j1/0", "inconclusive")
+    assert [response.status_code for response in responses] == [410, 410]
+    for response in responses:
+        body = response.get_json()
+        assert body["legacy_validation_enabled"] is False
+        assert body["approval_granted"] is False
+        assert body["replay_attempted"] is False
+    assert calls == []
+    assert read_findings("j1")[0]["verification_status"] == "verified"
 
 
 def test_legacy_retest_api_is_default_denied_before_read_or_replay(tmp_path, monkeypatch):
@@ -1210,57 +1168,7 @@ def test_dependency_audit_integrity_endpoint_fails_on_corruption(tmp_path, monke
     assert response.get_json()["valid"] is False
 
 
-# ---------------------------------------------------------------- G03 API retest eligibility and conservative outcomes
-
-def test_retest_api_refuses_candidate_without_replay(tmp_path, monkeypatch):
-    from whaxon.core.validator import Validator
-
-    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    _seed_job(core, findings=[_finding()])
-    called = []
-    monkeypatch.setattr(
-        Validator, "revalidate",
-        lambda *args, **kwargs: called.append(True),
-    )
-
-    response = app.test_client().post("/api/retest/j1/0")
-
-    assert response.status_code == 400
-    assert response.get_json()["error"] == "not verified"
-    assert called == []
-    assert core.store.get_findings("j1")[0]["verification_status"] == "candidate"
-
-
-def test_retest_api_persists_inconclusive_instead_of_fixed(tmp_path, monkeypatch):
-    from types import SimpleNamespace
-
-    from whaxon.core.validator import Validator
-
-    monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
-    app, core = _make_app(tmp_path, monkeypatch)
-    _seed_job(core, findings=[_finding()])
-    core.store.update_verification("j1", 0, "verified", by="test", reason="seeded proof")
-    monkeypatch.setattr(
-        core.scope, "check",
-        lambda target: SimpleNamespace(allowed=True, reason="in scope", matched_rule="test"),
-    )
-    monkeypatch.setattr(
-        Validator, "revalidate",
-        lambda *args, **kwargs: ("inconclusive", "replay unavailable; no fix inferred"),
-    )
-
-    response = app.test_client().post("/api/retest/j1/0")
-
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "status": "inconclusive",
-        "reason": "replay unavailable; no fix inferred",
-    }
-    stored = core.store.get_findings("j1")[0]
-    assert stored["verification_status"] == "inconclusive"
-    assert stored["verification_reason"] == "replay unavailable; no fix inferred"
-
+# ---------------------------------------------------------------- G03 API retest remains retired
 
 # ---------------------------------------------------------------- G04 API report coverage
 
