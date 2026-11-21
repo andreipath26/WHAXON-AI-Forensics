@@ -184,7 +184,7 @@ class EvidenceFollowupPlanner:
                     )):
                 blocked.append({"source_task": key, "reason": "source_job_mismatch"})
                 continue
-            findings = self.store.get_findings(job_id)
+            findings = row.get("findings")
             if not isinstance(findings, list):
                 blocked.append({"source_task": key, "reason": "findings_unavailable"})
                 continue
@@ -244,8 +244,14 @@ class EvidenceFollowupPlanner:
                     seen.add(unique)
                     tasks.append(task)
                     provenance.append({
+                        "task_id": task.id,
                         "source_task": key, "source_job": job_id,
+                        "source_attempt": row.get("attempt_id"),
                         "finding_seq": finding.get("seq"), "rule_id": rule.id,
+                        "finding_digest": hashlib.sha256(json.dumps(
+                            finding, sort_keys=True, separators=(",", ":"),
+                            ensure_ascii=False, allow_nan=False,
+                        ).encode("utf-8")).hexdigest(),
                         "provider_fingerprint": manifest.fingerprint,
                     })
         if not tasks:
