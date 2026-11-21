@@ -356,8 +356,36 @@ class MainWindow(QMainWindow):
         from whaxon.core.override_log import log_override
         log_override(self.core.data_dir, tool_id, target)
 
+    def _allow_direct_cancel(self, job_id: str) -> bool:
+        """Legacy jobs may use ToolRunner.cancel; V2 jobs require the durable barrier."""
+        try:
+            is_v2_job = self.core.store.is_engine_v2_execution_job(job_id)
+        except Exception:
+            self.statusBar().showMessage(
+                "cannot cancel: job ownership could not be checked; "
+                "use V2 Workflows to inspect durable requests"
+            )
+            return False
+        if is_v2_job:
+            self.statusBar().showMessage(
+                "Engine V2 work must be cancelled through its durable request "
+                "in V2 Workflows"
+            )
+            return False
+        return True
+
     def _cancel_job(self) -> None:
-        if not self.current_job_id:
+        job_id = self.current_job_id
+        if not job_id:
             self.statusBar().showMessage("nothing to cancel")
             return
-        self._cancel_task = asyncio.create_task(self.core.runner.cancel(self.current_job_id))
+        if not self._allow_direct_cancel(job_id):
+            return
+        self._cancel_task = asyncio.create_task(self._cancel_job_async(job_id))
+
+    async def _cancel_job_async(self, job_id: str) -> None:
+        # Recheck at dispatch time so a stale UI event or ownership change
+        # cannot route a V2 provider job through raw ToolRunner cancellation.
+        if not self._allow_direct_cancel(job_id):
+            return
+        await self.core.runner.cancel(job_id)
