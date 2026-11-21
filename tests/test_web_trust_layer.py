@@ -62,24 +62,20 @@ def test_coverage_route_returns_empty_for_new_job(live_server):
 def test_validate_route_candidate_on_non_replayable(live_server):
     job_id, seq = _seed_sqli_job(live_server)
     status, body = _post(f"{live_server}/api/validate/{job_id}/{seq}")
-    assert status == 200
-    # open_port is observational, not replayable. It must not be promoted
-    # by a validation endpoint that has no observation-probe implementation.
-    assert body["status"] == "candidate"
-    assert "reason" in body
-    assert body["reason"]
+    assert status == 410
+    assert body["legacy_validation_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["replay_attempted"] is False
 
 
 def test_retest_route_requires_verified(live_server):
     job_id, seq = _seed_sqli_job(live_server)
     # Force the finding to candidate (default), then retest.
     status, body = _post(f"{live_server}/api/retest/{job_id}/{seq}")
-    if body.get("error") == "not verified":
-        assert status == 400
-        assert "not verified" in body["error"]
-    else:
-        # If the seed happened to be verified, retest should not error.
-        assert status == 200
+    assert status == 410
+    assert body["legacy_validation_enabled"] is False
+    assert body["approval_granted"] is False
+    assert body["replay_attempted"] is False
 
 
 def test_approval_resolve_route_writes_human(live_server):
