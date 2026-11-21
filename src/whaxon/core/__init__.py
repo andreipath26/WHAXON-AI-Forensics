@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from pathlib import Path
 from typing import Any
 
@@ -1405,13 +1404,11 @@ class Core:
         return result
 
     async def initialize(self, drain: bool = True) -> None:
-        """Called once by any interface. Awaitable inside a splash screen.
+        """Initialize persisted state and reconcile stale durable work.
 
-        drain=True (default): long-lived hosts reconcile stale rows. Legacy
-        JobStore rows are drained only when
-        WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true is explicitly configured.
-        Engine V2 requests are serviced by their dedicated durable worker.
-        drain=False: one-shot CLI commands never drain prior legacy jobs.
+        The drain argument remains accepted for caller compatibility, but
+        neither mode dispatches legacy JobStore rows. Engine V2 requests are
+        serviced by their dedicated durable worker.
         """
         self.bus.bind_loop(asyncio.get_running_loop())
         if self.catalog.path.exists():
@@ -1427,12 +1424,3 @@ class Core:
             # after silently skipping it can strand claims or report false
             # readiness, so fail closed and let the supervisor retry.
             raise RuntimeError("workflow recovery failed; execution is not ready") from exc
-        legacy_drain_enabled = os.environ.get(
-            "WHAXON_LEGACY_QUEUE_DRAIN_ENABLED", "false",
-        ).strip().lower() in {"1", "true", "yes"}
-        if drain and legacy_drain_enabled:
-            try:
-                from .worker import drain_async
-                await drain_async(self.store, self.runner)
-            except Exception:
-                pass
