@@ -103,7 +103,10 @@ class ToolRunner:
                 raise OutOfScopeError(host, match.reason, match.matched_rule)
         return host
 
-    def _authorize_pivot_route(self, target_host: str, route: object):
+    def _authorize_pivot_route(
+        self, target_host: str, route: object,
+        *, expected_target_port: int | None = None,
+    ):
         """Bind a pivot to an open, persisted session and its live peer identity."""
         route_host = self._session_host(getattr(route, "target_host", ""))
         local_port = getattr(route, "local_port", None)
@@ -121,6 +124,8 @@ class ToolRunner:
             or not 1 <= target_port <= 65535
         ):
             raise ValueError("pivot route has an invalid remote target port")
+        if expected_target_port is not None and target_port != expected_target_port:
+            raise ValueError("pivot route target port does not match requested target port")
         if not isinstance(via_session, str) or not via_session or self._session_lookup is None:
             raise RuntimeError("pivot route requires persisted session authorization context")
         stored_session = self._session_lookup(via_session)
@@ -342,10 +347,15 @@ class ToolRunner:
 
             parsed_target = urlsplit(target if "://" in target else "//" + target)
             host_only = parsed_target.hostname or ""
+            expected_target_port = parsed_target.port
+            if expected_target_port is None:
+                expected_target_port = {"http": 80, "https": 443}.get(
+                    parsed_target.scheme.lower()
+                )
             route = self._route_resolver(host_only)
             if route is not None:
                 pivot_binding, effective_target = self._authorize_pivot_route(
-                    host_only, route,
+                    host_only, route, expected_target_port=expected_target_port,
                 )
                 pivot_host = host_only
 
@@ -387,6 +397,7 @@ class ToolRunner:
                     raise ValueError("pivot route changed before process creation")
                 current_binding, _ = self._authorize_pivot_route(
                     pivot_host, current_route,
+                    expected_target_port=expected_target_port,
                 )
                 if current_binding != pivot_binding:
                     raise ValueError("pivot route or session changed before process creation")
