@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import time
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +31,7 @@ from .http_recon_v2 import (
     _send_child_result,
     _valid_target,
 )
+from .provider_execution import provider_execution_job_id
 from .recon_checks import _SECURITY_TXT_FIELDS
 from .scope import ScopeManager
 from .workflow import WorkflowTask
@@ -264,7 +264,7 @@ class SecurityTxtReconProvider:
 
     async def dispatch(self, task: WorkflowTask) -> dict[str, Any]:
         resolution = self.resolve_task(task, require_installed=True)
-        job_id = uuid.uuid4().hex[:12]
+        job_id = provider_execution_job_id(task)
         if self.store.get(job_id) is not None:
             raise RuntimeError("security.txt evidence job id collision")
         self.store.create(job_id)

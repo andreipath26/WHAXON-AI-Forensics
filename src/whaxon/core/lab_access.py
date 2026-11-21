@@ -6,13 +6,13 @@ import ipaddress
 import os
 import re
 import time
-import uuid
 
 from .capabilities import (
     CapabilityManifest,
     CapabilityRequirements,
     CapabilityUnavailable,
 )
+from .provider_execution import provider_execution_job_id
 from .workflow import WorkflowTask
 
 
@@ -219,7 +219,7 @@ class MetasploitableLabAccessProvider:
             raise CapabilityUnavailable(self.CAPABILITY, ("task permission/impact differs from lab contract",))
         # Re-read the scope immediately before the only network dispatch.
         self._authorize_target(task.target)
-        job_id = uuid.uuid4().hex[:12]
+        job_id = provider_execution_job_id(task)
         self.store.create(job_id)
         if not self.store.set_started(job_id, self.CAPABILITY, self.TARGET):
             raise RuntimeError("could not start lab access evidence job")
