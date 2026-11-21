@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 import uuid
 from pathlib import Path
@@ -67,6 +66,14 @@ def main(args: list[str] | None = None) -> int:
         _usage()
         return EXIT_USAGE
 
+    if legacy_selected or engine == "legacy":
+        print(
+            "Legacy direct reconnaissance is retired. Use the default Engine V2 "
+            "proposal and exact-approved workflow run; no legacy job was created.",
+            file=sys.stderr,
+        )
+        return EXIT_V2_WORKFLOW_REQUIRED
+
     target = positional[0]
     core = Core(data_dir)
 
@@ -87,45 +94,6 @@ def main(args: list[str] | None = None) -> int:
             plan_id=plan_id, verbose=verbose,
         )
 
-    legacy_enabled = os.environ.get(
-        "WHAXON_LEGACY_RECON_ENABLED", "false",
-    ).strip().lower() in {"1", "true", "yes"}
-    if not legacy_selected or not legacy_enabled:
-        print(
-            "Legacy direct reconnaissance is disabled. The default creates a "
-            "reviewable Engine V2 plan without dispatch; set "
-            "WHAXON_LEGACY_RECON_ENABLED=true and pass --legacy only for the "
-            "compatibility path.",
-            file=sys.stderr,
-        )
-        return EXIT_V2_WORKFLOW_REQUIRED
-
-    asyncio.run(core.initialize(drain=False))
-    match = core.scope.check(target)
-    if verbose:
-        print(f"[recon] scope: allowed={match.allowed} reason={match.reason} rule={match.matched_rule}", file=sys.stderr)
-    if not match.allowed:
-        print(f"Out of scope: {target} ({match.reason})", file=sys.stderr)
-        return EXIT_OUT_OF_SCOPE
-
-    if verbose:
-        print("[recon] running checks...", file=sys.stderr)
-    job_id = core.recon.run(target, checks=checks)
-    if verbose:
-        print(f"[recon] job_id={job_id}", file=sys.stderr)
-    if job_id is None:
-        print(f"No findings for {target}", file=sys.stderr)
-        return EXIT_OK
-
-    findings = core.store.get_findings(job_id)
-    print(f"recon: {target}  (job {job_id}, {len(findings)} findings)")
-    for f in findings:
-        print(f"  [{f['severity']:8s}] {f['kind']:28s} {f['raw_line'][:90]}")
-        if verbose:
-            print(f"    data: {f.get('data')}", file=sys.stderr)
-            print(f"    remediation: {f.get('remediation', '')[:120]}", file=sys.stderr)
-            print(f"    impact: {f.get('impact', '')[:120]}", file=sys.stderr)
-    return EXIT_OK
 
 
 def _propose_v2(
@@ -275,12 +243,11 @@ def _usage() -> None:
     print(
         "Usage: whaxon recon <target> [--data DIR] [--checks a,b,c] [--mission-id ID] [--plan-id ID]\n"
         "       whaxon recon <target> --engine v2 --plan-id ID [--data DIR]\n"
-        "       whaxon recon <target> --legacy [--checks a,b,c] [--data DIR]\n"
         "\n"
         "  Default: create a persisted, reviewable V2 plan from ready fixed providers; never approve or dispatch it.\n"
         "  --checks may select dns, dns_full, ssl, https, headers, redirects, robots, or security_txt.\n"
         "  Legacy-only tech, cookies, and waf checks are omitted from a default plan and block an explicit V2 selection.\n"
-        "  --legacy preserves the compatibility runner only when WHAXON_LEGACY_RECON_ENABLED=true.\n"
+        "  --legacy is retired and returns an error without dispatch.\n"
         "  V2 execution requires a persisted plan with exact approval.\n"
         "\n"
         "  V2 proposal checks:\n"
