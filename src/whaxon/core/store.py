@@ -1979,17 +1979,30 @@ class JobStore:
         finally:
             c.close()
 
-    def list_workflow_mission_plans(self, mission_id):
-        """List immutable plans and durable status for one existing mission."""
+    def list_workflow_mission_plans(self, mission_id, *, limit=None):
+        """List immutable plans and durable status for one existing mission.
+
+        Callers that need a bounded reconciliation view may supply a positive
+        limit. Existing list callers retain the complete result by default.
+        """
+        if limit is not None and (
+            isinstance(limit, bool) or not isinstance(limit, int)
+            or not 1 <= limit <= 1000
+        ):
+            raise ValueError("mission plan limit must be between 1 and 1000")
         c = self._conn()
         try:
             if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
                 raise ValueError(f"unknown mission: {mission_id}")
-            rows = c.execute(
+            query = (
                 "SELECT id, digest, schema_version, status, created_at "
-                "FROM workflow_plans WHERE mission_id=? ORDER BY created_at, id",
-                (mission_id,),
-            ).fetchall()
+                "FROM workflow_plans WHERE mission_id=? ORDER BY created_at, id"
+            )
+            parameters = (mission_id,)
+            if limit is not None:
+                query += " LIMIT ?"
+                parameters = (mission_id, limit)
+            rows = c.execute(query, parameters).fetchall()
             return [dict(row) for row in rows]
         finally:
             c.close()
