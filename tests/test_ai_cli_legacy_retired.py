@@ -26,4 +26,4 @@ def test_legacy_ai_dispatch_and_resume_are_retired_before_state_access(
 
     assert exc.value.code == 2
     assert "legacy autonomous AI execution and resume are retired" in capsys.readouterr().err
-    assert not tmp_path.exists()
+    assert list(tmp_path.iterdir()) == []
