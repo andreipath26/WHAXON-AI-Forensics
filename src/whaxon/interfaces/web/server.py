@@ -2597,6 +2597,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/msf/sessions/<session_id>/portfwd")
     def pf_list(session_id: str):
+        if not _legacy_msf_execution_enabled():
+            return {
+                "error": "Legacy Metasploit session inspection is disabled.",
+                "legacy_execution_enabled": False,
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
         from whaxon.core import portfwd as _pf
         session_error = _msf_session_scope_error(session_id)
         if session_error:
@@ -2676,6 +2683,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.delete("/api/msf/sessions/<session_id>/portfwd")
     def pf_del(session_id: str):
+        if not _legacy_msf_execution_enabled():
+            return {
+                "error": "Legacy Metasploit port-forward cleanup is disabled.",
+                "legacy_execution_enabled": False,
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
         from whaxon.core import portfwd as _pf
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
@@ -2962,6 +2976,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def api_pivot_candidates():
         """Ask each live session for its routing table; return subnets it can
         reach that the host probably cannot."""
+        if not _legacy_msf_execution_enabled():
+            return {
+                "error": "Legacy Metasploit session inspection is disabled.",
+                "legacy_execution_enabled": False,
+                "approval_granted": False,
+                "execution_submitted": False,
+            }, 410
         from whaxon.core import autopivot as _ap
         results = []
         try:
@@ -2969,6 +2990,14 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         except Exception:
             sessions = {}
         for sid in sessions:
+            session_error = _msf_session_scope_error(str(sid))
+            if session_error:
+                results.append({
+                    "session_id": str(sid),
+                    "candidates": [],
+                    "error": "session authorization failed; no command was sent",
+                })
+                continue
             try:
                 cands = _ap.detect(registry.core.msf, sid)
             except Exception as e:
