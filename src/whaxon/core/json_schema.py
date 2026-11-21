@@ -138,6 +138,30 @@ def _matches_type(value: Any, declared: str) -> bool:
     return value is None
 
 
+def _equal_json(left: Any, right: Any) -> bool:
+    """Compare JSON values without Python's bool-as-integer equivalence."""
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is bool and type(right) is bool and left is right
+    if (
+        isinstance(left, (int, float)) and isinstance(right, (int, float))
+        and not isinstance(left, bool) and not isinstance(right, bool)
+    ):
+        return left == right
+    if _is_mapping(left) or _is_mapping(right):
+        return (
+            _is_mapping(left) and _is_mapping(right)
+            and set(left) == set(right)
+            and all(_equal_json(left[key], right[key]) for key in left)
+        )
+    if isinstance(left, (list, tuple)) or isinstance(right, (list, tuple)):
+        return (
+            isinstance(left, (list, tuple)) and isinstance(right, (list, tuple))
+            and len(left) == len(right)
+            and all(_equal_json(a, b) for a, b in zip(left, right, strict=True))
+        )
+    return type(left) is type(right) and left == right
+
+
 def _validate(schema: Mapping[str, Any], value: Any, path: str, depth: int) -> None:
     if depth > 64:
         raise SchemaContractError(f"{path}: value nesting exceeds 64 levels")
@@ -146,9 +170,9 @@ def _validate(schema: Mapping[str, Any], value: Any, path: str, depth: int) -> N
         types = (declared,) if isinstance(declared, str) else declared
         if not any(_matches_type(value, item) for item in types):
             raise SchemaContractError(f"{path}: value has the wrong type")
-    if "const" in schema and value != schema["const"]:
+    if "const" in schema and not _equal_json(value, schema["const"]):
         raise SchemaContractError(f"{path}: value does not match const")
-    if "enum" in schema and value not in schema["enum"]:
+    if "enum" in schema and not any(_equal_json(value, item) for item in schema["enum"]):
         raise SchemaContractError(f"{path}: value is outside enum")
     if isinstance(value, str):
         if len(value) < schema.get("minLength", 0):
@@ -170,6 +194,8 @@ def _validate(schema: Mapping[str, Any], value: Any, path: str, depth: int) -> N
         if len(value) > schema.get("maxItems", math.inf):
             raise SchemaContractError(f"{path}: array exceeds maxItems")
         child = schema.get("items")
+        if child is False and value:
+            raise SchemaContractError(f"{path}: items are not allowed")
         if isinstance(child, Mapping):
             for index, item in enumerate(value):
                 _validate(child, item, f"{path}[{index}]", depth + 1)
