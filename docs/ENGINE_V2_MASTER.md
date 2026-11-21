@@ -976,3 +976,14 @@ a request updated by a concurrent cancellation from being paired with progress
 read after that cancellation. Response schema and lease-token redaction remain
 unchanged; worker liveness stays explicitly unverified. Regression:
 `tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`.
+
+### 2026-11-21 local Engine V2 acceptance evidence runner
+
+`scripts/engine_v2_acceptance.py` and `make engine-v2-acceptance` provide one
+local command for the repeatable checks, packaging validation, and a clean
+wheel smoke, with timestamped logs and a machine-readable evidence bundle.
+The runner requires no Git invocation and can bind evidence to a caller-supplied
+source SHA. It always records `deployment_decision: HOLD`; exact-head CI,
+authorized provider lab, independent evidence anchoring, manual UI review,
+production-like recovery, and independent engineering acceptance remain
+separate gates. See [ENGINE_V2_ACCEPTANCE_RUNNER.md](ENGINE_V2_ACCEPTANCE_RUNNER.md).

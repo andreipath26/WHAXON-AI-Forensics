@@ -1,4 +1,4 @@
-.PHONY: init up down reset test lint
+.PHONY: init up down reset test lint engine-v2-acceptance
 
 init:
 	whaxon init
@@ -19,3 +19,6 @@ test:
 
 lint:
 	ruff check src/
+
+engine-v2-acceptance:
+	python scripts/engine_v2_acceptance.py
