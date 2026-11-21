@@ -5,7 +5,6 @@ import asyncio
 import os
 import queue
 import re
-import subprocess
 import threading
 from pathlib import Path
 from typing import Any
