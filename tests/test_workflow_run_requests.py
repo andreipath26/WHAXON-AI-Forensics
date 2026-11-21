@@ -225,6 +225,32 @@ def test_cancel_closes_queued_run_request_without_executing(tmp_path):
 
 
 
+def test_terminal_run_request_cannot_cancel_later_active_request_for_same_plan(tmp_path):
+    core = _core(tmp_path)
+
+    request_a = core.enqueue_workflow_run("p")
+    claim_a = core.workflow_requests.claim("worker-a")
+    assert claim_a["id"] == request_a["id"]
+    assert core.workflow_requests.finish(
+        request_a["id"], claim_a["lease_token"], status="incomplete",
+    )
+
+    request_b = core.enqueue_workflow_run("p")
+    claim_b = core.workflow_requests.claim("worker-b")
+    assert claim_b["id"] == request_b["id"]
+
+    stale_cancel = core.cancel_workflow_run_request(request_a["id"])
+
+    assert stale_cancel["cancellation_requested"] is False
+    assert stale_cancel["tasks_cancelled"] == 0
+    assert stale_cancel["request"]["status"] == "incomplete"
+    assert core.workflow_run_request(request_b["id"])["status"] == "running"
+    assert core.workflow_requests.finish(
+        request_b["id"], claim_b["lease_token"], status="completed",
+    )
+    assert core.workflow_run_request(request_b["id"])["status"] == "completed"
+
+
 def test_e4_blocked_execution_never_enters_followup_planner(tmp_path, monkeypatch):
     """Review-only E4 planning must not poison E3 request completion."""
     core = _core(tmp_path)
