@@ -3561,6 +3561,7 @@ class JobStore:
 
     def mark_workflow_dispatch_started(
         self, plan_id, attempt_id, *, provider_execution_id=None,
+        approval_required=False,
     ):
         """Atomically record dispatch intent or reject a cancelled/stale attempt.
 
