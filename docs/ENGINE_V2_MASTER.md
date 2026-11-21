@@ -959,9 +959,9 @@ requires exact-head CI.
 Default recon proposals now persist explicit `unsupported` and
 `provider_unavailable` dispositions for checks omitted because no admitted V2
 provider exists or a provider cannot produce a ready plan. The workflow report
-projects only the check and typed disposition from digest-matched persisted
-plan metadata; it does not expose free-form provider reasons. General workflow
-reports continue to expose task states, recorded skip reasons, attempt-page
-truncation, and per-finding verification requests. This is a bounded P1-07
-slice: unsupported/inaccessible accounting outside recon proposals and
-requirement-level acceptance remain open.
+projects requested checks, included checks, and typed dispositions from
+digest-matched persisted plan metadata; it does not expose free-form provider
+reasons. General workflow reports continue to expose task states, recorded skip
+reasons, attempt-page truncation, and per-finding verification requests. This
+is a bounded P1-07 slice: unsupported/inaccessible accounting outside recon
+proposals and requirement-level acceptance remain open.

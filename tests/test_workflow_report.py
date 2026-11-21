@@ -215,6 +215,8 @@ def test_workflow_report_projects_plan_bound_unsupported_and_unavailable_checks(
     plan = WorkflowPlan("omissions-mission", (
         WorkflowTask("scan", "tool.nmap", "192.0.2.12"),
     ), metadata={
+        "requested_checks": ["dns", "cookies", "tech"],
+        "included_checks": ["dns"],
         "omitted_checks": [
             {"check": "cookies", "reason": "legacy only", "disposition": "unsupported"},
             {"check": "dns_full", "reason": "provider not ready", "disposition": "provider_unavailable"},
@@ -247,6 +249,8 @@ def test_workflow_report_projects_plan_bound_unsupported_and_unavailable_checks(
             {"check": "tech", "disposition": "unsupported"},
         ],
     }
+    assert report["coverage"]["requested_checks"] == ["dns", "cookies", "tech"]
+    assert report["coverage"]["included_checks"] == ["dns"]
 
     # The report must not trust a changed omission list that no longer matches
     # the immutable plan digest stored with the workflow evidence.

@@ -582,6 +582,8 @@ class Core:
             else progress.get("total_tasks")
         )
         omitted_dispositions: list[dict[str, str]] = []
+        requested_checks: list[str] | None = None
+        included_checks: list[str] | None = None
         plan_details_reader = getattr(self, "workflow_plan_details", None)
         if callable(plan_details_reader):
             try:
@@ -590,6 +592,22 @@ class Core:
 
                 persisted_plan = WorkflowPlan.from_dict(plan_details["plan"])
                 if persisted_plan.digest == evidence.get("plan_digest"):
+                    for field_name in ("requested_checks", "included_checks"):
+                        raw_checks = persisted_plan.metadata.get(field_name)
+                        if (
+                            isinstance(raw_checks, (list, tuple))
+                            and len(raw_checks) <= 128
+                            and all(
+                                isinstance(item, str) and item
+                                and item == item.strip()
+                                and len(item) <= 128 for item in raw_checks
+                            )
+                            and len(set(raw_checks)) == len(raw_checks)
+                        ):
+                            if field_name == "requested_checks":
+                                requested_checks = list(raw_checks)
+                            else:
+                                included_checks = list(raw_checks)
                     raw_omissions = persisted_plan.metadata.get("omitted_checks", [])
                     if isinstance(raw_omissions, (list, tuple)):
                         for omission in raw_omissions:
@@ -626,6 +644,8 @@ class Core:
             "persisted_attempts": persisted_attempt_count,
             "returned_attempts": len(attempts),
             "attempt_history_truncated": truncated,
+            "requested_checks": requested_checks,
+            "included_checks": included_checks,
             "recorded_skips": skip_counts,
             "finding_verification_outcomes": verification_outcome_counts,
             "unrequested_verification_findings": verification_outcome_counts.get(
