@@ -228,6 +228,33 @@ def test_cancel_after_real_http_effect_is_uncertain_and_never_replayed(tmp_path)
         assert receiver.server.received == [b"effect-before-cancel"]
 
 
+def test_mission_runtime_exhaustion_stops_active_async_provider(tmp_path):
+    store = JobStore(tmp_path / "runtime-stop.db")
+    _plan(store)
+    store.set_mission_runtime_limit("mission", max_runtime_s=0.5)
+    cancellation_observed = asyncio.Event()
+
+    async def dispatch(_task):
+        try:
+            await asyncio.sleep(10)
+        except asyncio.CancelledError:
+            cancellation_observed.set()
+            raise
+
+    result = asyncio.run(WorkflowScheduler(
+        store, authorize=lambda task: True, dispatch=dispatch,
+    ).run("plan", max_tasks=1, max_attempts=2))
+
+    assert cancellation_observed.is_set()
+    assert result["tasks"] == [{"id": "task", "status": "uncertain"}]
+    assert store.get_mission_runtime_limit("mission")["runtime_budget_exhausted"] is True
+    assert "mission runtime budget exhausted" in store.list_workflow_attempts("plan")[0]["error"]
+    retry = asyncio.run(WorkflowScheduler(
+        JobStore(store.path), authorize=lambda task: True, dispatch=dispatch,
+    ).run("plan", max_tasks=1, max_attempts=2))
+    assert retry["attempts"] == 0
+
+
 @pytest.mark.parametrize("stop_kind", ["shutdown", "plan"])
 def test_scheduler_cancellation_kills_runner_and_keeps_attempt_uncertain(tmp_path, stop_kind):
     """Durable plan stop and worker shutdown cannot orphan a child tool."""
