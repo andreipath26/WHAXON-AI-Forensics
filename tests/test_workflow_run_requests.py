@@ -82,8 +82,12 @@ def test_stale_run_is_uncertain_not_automatically_replayed(tmp_path):
         )
 
 
-def test_drain_queued_work_after_restart_without_unsafe_reexecution(tmp_path):
+def test_v2_drain_runs_with_legacy_opt_in_without_draining_legacy_jobs(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setenv("WHAXON_LEGACY_QUEUE_DRAIN_ENABLED", "true")
     first = _core(tmp_path)
+    first.store.create_pending("legacy-job", "nmap", "192.0.2.99")
     request = first.enqueue_workflow_run("p")
     second = Core(tmp_path)
     # The fixture capability cannot execute: policy must block it, rather
@@ -95,6 +99,9 @@ def test_drain_queued_work_after_restart_without_unsafe_reexecution(tmp_path):
     row = first.workflow_run_request(request["id"])
     assert row["status"] == "completed"
     assert first.workflow_progress("p")["counts"]["blocked"] == 1
+    assert first.store.list_pending() == [
+        {"id": "legacy-job", "tool": "nmap", "target": "192.0.2.99"}
+    ]
     with ThreadPoolExecutor(max_workers=1) as executor:
         assert executor.submit(
             lambda: asyncio.run(second.drain_workflow_run_requests()),
