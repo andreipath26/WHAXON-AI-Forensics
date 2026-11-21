@@ -57,3 +57,9 @@
 - Remaining E3 acceptance requires an actual independently supervised publisher process/transport, authenticated downstream sink, external receipt evidence, fault/restart tests and external protected audit anchor.
 
 - The current synchronous outbox contract refuses an awaitable/coroutine return (with no acknowledgement); otherwise accidentally passing an async callback could checkpoint an event before the coroutine ever executes. An asynchronous transport needs a separately awaited publisher boundary and its own acceptance tests.
+
+## Fail-closed provider-result recovery validation
+
+- Before an uncertain attempt can be recovered from a terminal V2-owned provider job, persisted finding rows are checked for nonnegative sequence identities, string-valued finding fields and JSON-object `data`/`enrichment` payloads. Malformed rows leave the attempt uncertain and unsealed; recovery never repairs or rewrites provider output.
+- `tests/test_engine_v2_e3_provider_job_recovery.py` corrupts both finding payload forms in SQLite and verifies the recovery path refuses them while preserving the uncertain attempt.
+- This validates the shape of persisted finding rows, not provider-specific semantic completeness, binary-artifact integrity, production scanner behavior or an independent audit anchor. Those E3 boundaries remain open.

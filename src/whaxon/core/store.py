@@ -228,6 +228,32 @@ def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _recovery_findings_are_well_formed(conn, job_id: str) -> bool:
+    """Reject corrupt persisted finding rows before recovery seals them."""
+    rows = conn.execute(
+        "SELECT seq, kind, severity, source, data_json, raw_line, enrichment_json, "
+        "verification_status, verified_by, verification_reason "
+        "FROM findings WHERE job_id=? ORDER BY seq", (job_id,),
+    ).fetchall()
+    for row in rows:
+        if (
+            type(row["seq"]) is not int or row["seq"] < 0
+            or any(not isinstance(row[key], str) for key in (
+                "kind", "severity", "source", "raw_line", "verification_status",
+                "verified_by", "verification_reason",
+            ))
+        ):
+            return False
+        try:
+            data = json.loads(row["data_json"] or "{}")
+            enrichment = json.loads(row["enrichment_json"] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return False
+        if not isinstance(data, dict) or not isinstance(enrichment, dict):
+            return False
+    return True
+
+
 def _signature_for(kind: str, data: dict) -> str:
     """Build a stable per-finding signature for dedup."""
     if kind == "open_port":
@@ -2202,6 +2228,8 @@ class JobStore:
                     or isinstance(job["exit_code"], bool)
                 ):
                     raise ValueError("no matching successful durable provider job is available")
+                if not _recovery_findings_are_well_formed(c, attempt_id):
+                    raise ValueError("durable provider findings are malformed")
                 findings = [dict(item) for item in c.execute(
                     "SELECT seq, kind, severity, source, data_json, raw_line, "
                     "enrichment_json, verification_status, verified_by, verification_reason "

@@ -98,8 +98,10 @@ def test_recovery_refuses_incomplete_provider_results(
     assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
 
 
-@pytest.mark.parametrize("tamper", ["tool", "target", "ownership"])
-def test_recovery_fails_closed_on_provider_identity_mismatch(tmp_path, tamper):
+@pytest.mark.parametrize(
+    "tamper", ["tool", "target", "ownership", "finding_data", "finding_enrichment"],
+)
+def test_recovery_fails_closed_on_provider_identity_or_evidence_mismatch(tmp_path, tamper):
     core, _, attempt_id = _uncertain_catalog_attempt(tmp_path)
     conn = core.store._conn()
     try:
@@ -108,12 +110,29 @@ def test_recovery_fails_closed_on_provider_identity_mismatch(tmp_path, tamper):
         elif tamper == "target":
             conn.execute("UPDATE jobs SET target='198.51.100.8' WHERE id=?", (attempt_id,))
         else:
-            conn.execute(
-                "DELETE FROM engine_v2_execution_jobs WHERE job_id=?", (attempt_id,),
-            )
+            if tamper == "ownership":
+                conn.execute(
+                    "DELETE FROM engine_v2_execution_jobs WHERE job_id=?", (attempt_id,),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO findings (job_id, seq, kind, severity, source, data_json, "
+                    "raw_line, enrichment_json) VALUES (?, 0, 'open_port', 'info', 'nmap', ?, ?, ?)",
+                    (
+                        attempt_id,
+                        "[]" if tamper == "finding_data" else '{"port":80}',
+                        "80/tcp open http",
+                        "[]" if tamper == "finding_enrichment" else "{}",
+                    ),
+                )
     finally:
         conn.close()
-    with pytest.raises(ValueError, match="no matching successful durable"):
+    expected = (
+        "durable provider findings are malformed"
+        if tamper.startswith("finding_")
+        else "no matching successful durable"
+    )
+    with pytest.raises(ValueError, match=expected):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
 

@@ -391,6 +391,17 @@ During provider dispatch, the scheduler polls the durable plan stop and cumulati
 
 The read-only portfolio audit now joins each trusted capability manifest to its current readiness snapshot, including capabilities supplied outside the catalog-backed adapter bridge. The report exposes contract fingerprint, declared/live readiness, availability, and explicit authorization requirements; it never registers providers or enables execution. This advances the P2-06 inventory/report slice, while import-only/session completeness and onboarding lifecycle acceptance remain open.
 
+### 2026-11-21 local Engine V2 acceptance evidence runner
+
+`scripts/engine_v2_acceptance.py` and `make engine-v2-acceptance` provide one
+local command for the repeatable checks, packaging validation, and a clean
+wheel smoke, with timestamped logs and a machine-readable evidence bundle.
+The runner requires no Git invocation and can bind evidence to a caller-supplied
+source SHA. It always records `deployment_decision: HOLD`; exact-head CI,
+authorized provider lab, independent evidence anchoring, manual UI review,
+production-like recovery, and independent engineering acceptance remain
+separate gates. See [ENGINE_V2_ACCEPTANCE_RUNNER.md](ENGINE_V2_ACCEPTANCE_RUNNER.md).
+
 The AI-to-V2 planning handoff now attaches `whaxon.ai-proposal.v1` provenance to the immutable plan digest: producer, bounded rationale, a hash of request context, and model-reported confidence labeled as a heuristic. It records no observations or source citations when none were supplied, and explicitly states the remaining uncertainty. A frozen-manifest schema comparison was corrected so an empty `required` array is recognized after contract freezing; the focused bridge regression proves an eligible proposal is emitted while still unapproved and unsubmitted. This is one P2-05 trust-boundary slice; legacy Automator migration and evidence-cited follow-up acceptance remain open. For evidence-derived follow-ups, the plan now binds each generated node to the exact source attempt, finding sequence, finding digest, rule and provider fingerprint. Core re-reads the sealed source evidence at authorization time and blocks the child if the source plan, attempt, finding or seal has changed. This closes the stale-citation window for that path; fixed Automator parity and rejection auditing remain open. Evidence reads now report the total attempt count, returned count and whether a page was truncated; `all_evidence_recorded` and `all_evidence_integrity_verified` are false for partial pages, even when every returned record is sealed. This prevents report and follow-up consumers from treating the first 1000 rows as a complete mission history.
 
 Generic V2 network providers now use `check_for_unpinned_execution`: with scope enabled, hostname and hostname-URL targets are refused before DNS lookup unless the provider declares the narrower pinned-network or DNS-query scope mode. Literal IP targets still pass the ordinary scope rules; explicitly disabling scope remains an operator choice. This prevents an explicit hostname allowlist from being treated as pinning for a later external-tool connection. It does not control scanner subprocesses' secondary connections or prove network-level egress isolation. `tests/test_engine_v2_e1_boundary.py::test_v2_hostname_dispatch_requires_pinned_or_query_scope_mode` covers the mode distinction and no-lookup denial. P1-02 remains open for broader redirect, DNS, follow-up, session, ownership and egress acceptance.
@@ -826,6 +837,12 @@ sealed Engine V2 source evidence and leave approval and submission as separate
 steps. Legacy APIs remain for older clients and legacy-owned records. No plan
 proposal approves or submits work.
 
+The Findings page loads its bounded persisted job/finding projection from
+`GET /api/ui-v2/findings`, which intentionally avoids the full report
+enrichment path. This keeps the findings view tied to the same recorded data
+while preventing report-generation work from blocking its live-count and
+coverage controls. It does not certify all other V2 UI workflows or close G06.
+
 ## V2 UI cancellation ownership — 2026-11-11
 
 The 14 remaining V2 Emergency Halt Scan handlers now discover active legacy
@@ -897,12 +914,10 @@ dispatches tasks. An explicit `--checks` selection is all-or-nothing: an
 unsupported or unavailable requested provider blocks the proposal. The default
 proposal lists omitted unavailable checks so partial coverage is visible. The
 fixed `web.recon.passive` HTTPS profile performs one GET and emits header,
-technology, cookie, and WAF observations together, so explicit `headers`,
-`tech`, `cookies`, and `waf` selections bind to that single task. The plan records
+technology, cookie, and WAF observations together, so explicit `tech`,
+`cookies`, and `waf` selections now bind to that single task. The plan records
 the provider output kinds and avoids duplicate requests when several bundled
-checks are selected. Digest-matched reports also list the standard passive-recon checks
-left unrequested, so a limited profile cannot be mistaken for full recon coverage.
-The legacy
+checks are selected. The legacy
 runner requires both `--legacy` and
 `WHAXON_LEGACY_RECON_ENABLED=true`. An approved saved plan can still be run via
 `--engine v2 --plan-id`, which accepts only fixed recon capabilities against
@@ -976,20 +991,9 @@ proposals and requirement-level acceptance remain open.
 
 ## Atomic V2 run reconnect snapshots — 2026-11-21
 
-`GET /api/v2/workflow-runs/<id>/snapshot` now reads the durable run-request
-row and workflow task progress from one SQLite read transaction. This prevents
-a request updated by a concurrent cancellation from being paired with progress
-read after that cancellation. Response schema and lease-token redaction remain
-unchanged; worker liveness stays explicitly unverified. Regression:
+`GET /api/v2/workflow-runs/<id>/snapshot` now reads the durable run-request row
+and workflow task progress from one SQLite read transaction. This prevents a
+request updated by a concurrent cancellation from being paired with progress
+read after that cancellation. The response schema and lease-token redaction
+are unchanged; worker liveness remains explicitly unverified. Regression:
 `tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`.
-
-### 2026-11-21 local Engine V2 acceptance evidence runner
-
-`scripts/engine_v2_acceptance.py` and `make engine-v2-acceptance` provide one
-local command for the repeatable checks, packaging validation, and a clean
-wheel smoke, with timestamped logs and a machine-readable evidence bundle.
-The runner requires no Git invocation and can bind evidence to a caller-supplied
-source SHA. It always records `deployment_decision: HOLD`; exact-head CI,
-authorized provider lab, independent evidence anchoring, manual UI review,
-production-like recovery, and independent engineering acceptance remain
-separate gates. See [ENGINE_V2_ACCEPTANCE_RUNNER.md](ENGINE_V2_ACCEPTANCE_RUNNER.md).
