@@ -7,7 +7,7 @@ models preserve selected existing serialized shapes.
 """
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -46,6 +46,20 @@ class WorkflowFindingProposalRequest(BaseModel):
     source_job_id: str
     finding_seq: int = Field(ge=0)
     mode: str
+    save: bool = False
+
+
+class AIWorkflowProposalRequest(BaseModel):
+    """Typed planning input accepted by the existing AI proposal route."""
+
+    model_config = ConfigDict(strict=True, extra="ignore")
+
+    mission_id: str
+    id: str
+    goal: str
+    target: str
+    history: list[dict[str, Any]] = Field(default_factory=list)
+    step: int = Field(default=1, ge=1)
     save: bool = False
 
 
