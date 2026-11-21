@@ -110,3 +110,41 @@ def test_plan_report_cli_prints_json_and_returns_failure_for_partial(monkeypatch
     result = workflow_cmd.main(["--data-dir", ".", "plan", "report", "--id", "plan-1", "--limit", "20"])
     assert result == 1
     assert json.loads(capsys.readouterr().out)["status"] == "partial"
+
+
+
+def test_workflow_report_projects_failed_attempt_without_raw_error(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-report.db")
+    store.create_mission("report-mission", "report failure safely")
+    store.save_workflow_plan(
+        "report-plan",
+        WorkflowPlan("report-mission", (
+            WorkflowTask("scan", "tool.nmap", "192.0.2.10"),
+        )),
+    )
+    claim = store.claim_ready_workflow_task("report-plan", "report-test-worker")
+    assert claim is not None
+    secret = "credential=do-not-report-this"
+    store.finish_task_attempt(
+        claim["attempt_id"], "failed",
+        error=f"RuntimeError: provider response contained {secret}",
+    )
+
+    core = Core.__new__(Core)
+    core.workflow_evidence = lambda plan_id, limit=100: store.get_workflow_evidence(
+        plan_id, limit=limit,
+    )
+    core.workflow_readiness = store.get_workflow_readiness
+    core.workflow_progress = store.get_workflow_progress
+
+    report = Core.workflow_report(core, "report-plan")
+    attempt = report["evidence"]["attempts"][0]
+    assert report["status"] == "partial"
+    assert attempt["attempt_status"] == "failed"
+    assert attempt["attempt_error_category"] == "task_failed"
+    rendered = json.dumps(report)
+    assert secret not in rendered
+    assert "provider response contained" not in rendered
