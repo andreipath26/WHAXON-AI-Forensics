@@ -1198,6 +1198,10 @@ class Core:
                 task.impact in ("moderate", "high", "critical")
                 or network_effect
             )
+            # Carry the consent requirement to the atomic dispatch marker.
+            # The scheduler checks approval once more there, inside the same
+            # write transaction that serializes dispatch against revocation.
+            object.__setattr__(task, "_workflow_approval_required", approval_required)
             if approval_required:
                 return self.store.has_valid_workflow_approval(plan_id, task.id) is True
             return True
