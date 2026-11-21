@@ -847,6 +847,24 @@ class ToolRunner:
             self._procs.pop(job_id, None)
             self._lines_by_job.pop(job_id, None)
             return job_id
+        except asyncio.CancelledError:
+            # Scheduler/worker shutdown must not orphan a scanner process.
+            # Killing the process cannot undo requests already sent, so the
+            # workflow layer still records the dispatched attempt as uncertain.
+            await self._kill_process_tree(proc)
+            from .events import CoverageSkipped
+            self._bus.publish(CoverageSkipped(
+                job_id=job_id, tool_id=tool_id, target=target,
+                kind="cancelled", detail="runner task was cancelled",
+                phase=phase,
+            ))
+            self._bus.publish(JobFailed(
+                job_id=job_id, error="cancelled", lease_token=lease_token,
+            ))
+            self._procs.pop(job_id, None)
+            self._lines_by_job.pop(job_id, None)
+            await asyncio.sleep(0)
+            raise
 
         self._procs.pop(job_id, None)
         self._bus.publish(JobFinished(
