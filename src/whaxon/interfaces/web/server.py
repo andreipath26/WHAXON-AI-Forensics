@@ -35,6 +35,10 @@ from whaxon.interfaces.web.api_contracts import (
     WorkflowEventAcknowledgement,
     WorkflowEventAcknowledgementResult,
     WorkflowFindingProposalRequest,
+    WorkflowFollowupsRequest,
+    WorkflowAuditVerifyRequest,
+    WorkflowMissionCreateRequest,
+    WorkflowPlanCreateRequest,
     WorkflowPlanReconciliationRequest,
     WorkflowProviderResultRecoveryRequest,
     WorkflowRunAccepted,
@@ -762,14 +766,23 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         payload = request.get_json(silent=True)
         if payload is None:
             payload = {}
-        if not isinstance(payload, dict) or set(payload) - {"max_tasks", "save"}:
-            return jsonify({"error": "max_tasks and save are the only supported fields"}), 400
-        max_tasks = payload.get("max_tasks", 16)
-        save = payload.get("save", False)
-        if type(max_tasks) is not int or not 1 <= max_tasks <= 100:
-            return jsonify({"error": "max_tasks must be an integer in 1..100"}), 400
-        if type(save) is not bool:
+        if not isinstance(payload, dict):
+            return jsonify({
+                "error": "max_tasks and save are the only supported fields",
+            }), 400
+        try:
+            followup_request = WorkflowFollowupsRequest.model_validate(payload)
+        except ValidationError as exc:
+            if any(error["type"] == "extra_forbidden" for error in exc.errors()):
+                return jsonify({
+                    "error": "max_tasks and save are the only supported fields",
+                }), 400
+            fields = {error["loc"][0] for error in exc.errors() if error.get("loc")}
+            if "max_tasks" in fields:
+                return jsonify({"error": "max_tasks must be an integer in 1..100"}), 400
             return jsonify({"error": "save must be a boolean"}), 400
+        max_tasks = followup_request.max_tasks
+        save = followup_request.save
         try:
             proposal = core.propose_workflow_followups(plan_id, max_tasks=max_tasks)
             created = False
@@ -788,13 +801,17 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def workflow_v2_missions():
         if request.method == "POST":
             payload = request.get_json(silent=True)
-            if not isinstance(payload, dict) or not isinstance(payload.get("id"), str) or (
-                not isinstance(payload.get("objective"), str)
-            ):
+            try:
+                mission_request = WorkflowMissionCreateRequest.model_validate(payload)
+            except ValidationError:
                 return jsonify({"error": "id and objective strings required"}), 400
             try:
-                created = core.create_mission(payload["id"], payload["objective"])
-                return jsonify({"mission_id": payload["id"], "created": bool(created)}), 201
+                created = core.create_mission(
+                    mission_request.id, mission_request.objective,
+                )
+                return jsonify({
+                    "mission_id": mission_request.id, "created": bool(created),
+                }), 201
             except (ValueError, TypeError) as exc:
                 return jsonify({"error": str(exc)}), 400
         try:
@@ -908,15 +925,15 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         from whaxon.core.workflow import WorkflowPlan
 
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or not isinstance(payload.get("id"), str) or (
-            not isinstance(payload.get("plan"), dict)
-        ):
+        try:
+            plan_request = WorkflowPlanCreateRequest.model_validate(payload)
+        except ValidationError:
             return jsonify({"error": "id string and plan object required"}), 400
         try:
-            plan = WorkflowPlan.from_dict(payload["plan"])
-            created = core.save_workflow_plan(payload["id"], plan)
+            plan = WorkflowPlan.from_dict(plan_request.plan)
+            created = core.save_workflow_plan(plan_request.id, plan)
             return jsonify({
-                "plan_id": payload["id"], "mission_id": plan.mission_id,
+                "plan_id": plan_request.id, "mission_id": plan.mission_id,
                 "digest": plan.digest, "created": bool(created),
             }), 201
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
@@ -1373,11 +1390,13 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def workflow_v2_audit_verify(plan_id):
         """Compare against a caller-held digest; never claim third-party anchoring."""
         payload = request.get_json(silent=True)
-        if not isinstance(payload, dict) or set(payload) != {"expected_digest"}:
+        try:
+            audit_request = WorkflowAuditVerifyRequest.model_validate(payload)
+        except ValidationError:
             return jsonify({"error": "expected_digest is required"}), 400
         try:
             matched = core.verify_workflow_audit_snapshot(
-                plan_id, payload["expected_digest"],
+                plan_id, audit_request.expected_digest,
             )
             return jsonify({
                 "plan_id": plan_id,
