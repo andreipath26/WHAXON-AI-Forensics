@@ -84,6 +84,15 @@ class WorkflowScheduler:
         # plan approval at any in-flight follow-up request boundary.
         object.__setattr__(task, "_plan_id", row["plan_id"])
         attempt_id = row["attempt_id"]
+        # Catalog providers persist their execution under this identity. If a
+        # worker dies after the external process starts but before recording a
+        # result, the attempt can still be correlated with the durable job.
+        # This is a correlation key only; it never authorizes replay.
+        # Attempt IDs are already collision-resistant 32-character job IDs,
+        # which also preserves the verifier's existing source-ID contract.
+        provider_execution_id = attempt_id
+        object.__setattr__(task, "_attempt_id", attempt_id)
+        object.__setattr__(task, "_provider_execution_id", provider_execution_id)
         lease_lost = asyncio.Event()
         heartbeat_interval = min(10.0, max(0.1, task.timeout_s / 3.0))
         heartbeat = asyncio.create_task(
@@ -134,7 +143,10 @@ class WorkflowScheduler:
                 return {"task_id": task.id, "status": "blocked"}
             if lease_lost.is_set() or not self.store.workflow_attempt_owned(attempt_id):
                 return {"task_id": task.id, "status": "uncertain"}
-            if not self.store.mark_workflow_dispatch_started(row["plan_id"], attempt_id):
+            if not self.store.mark_workflow_dispatch_started(
+                row["plan_id"], attempt_id,
+                provider_execution_id=provider_execution_id,
+            ):
                 # This gate may close for cancellation, deadline, resource or
                 # mission budget reasons. A budget refusal is NOT cancellation.
                 cancelled = self.store.workflow_cancellation_requested(row["plan_id"])

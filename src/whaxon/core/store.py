@@ -2181,21 +2181,63 @@ class JobStore:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
             rows = c.execute(
-                "SELECT a.id AS attempt_id, t.task_key, a.status, "
+                "SELECT a.id AS attempt_id, t.task_key, t.capability_id, t.target, a.status, "
                 "EXISTS(SELECT 1 FROM workflow_events e "
                 "WHERE e.plan_id=t.plan_id AND e.attempt_id=a.id "
                 "AND e.event_type='dispatch_started') AS dispatch_recorded, "
+                "(SELECT e.detail_json FROM workflow_events e "
+                "WHERE e.plan_id=t.plan_id AND e.attempt_id=a.id "
+                "AND e.event_type='dispatch_started' LIMIT 1) AS dispatch_detail, "
                 "r.disposition, r.actor, r.evidence_ref, r.note, r.recorded_at "
                 "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                 "LEFT JOIN workflow_attempt_reconciliations r ON r.attempt_id=a.id "
                 "WHERE t.plan_id=? AND a.status IN ('running', 'uncertain') "
                 "ORDER BY a.started_at, a.id", (plan_id,),
             ).fetchall()
-            return [
-                {
+            results = []
+            for row in rows:
+                try:
+                    dispatch_detail = json.loads(row["dispatch_detail"] or "{}")
+                except (TypeError, ValueError):
+                    dispatch_detail = {}
+                provider_execution_id = (
+                    dispatch_detail.get("provider_execution_id")
+                    if isinstance(dispatch_detail, dict) else None
+                )
+                provider_job = None
+                if isinstance(provider_execution_id, str):
+                    job = c.execute(
+                        "SELECT j.id AS job_id, j.tool, j.target, j.status, j.exit_code, "
+                        "j.duration_s, (SELECT COUNT(*) FROM findings f "
+                        "WHERE f.job_id=j.id) AS finding_count "
+                        "FROM jobs j JOIN engine_v2_execution_jobs v2 "
+                        "ON v2.job_id=j.id WHERE j.id=?",
+                        (provider_execution_id,),
+                    ).fetchone()
+                    if (
+                        job is not None
+                        and job["target"] == row["target"]
+                        and (
+                            not row["capability_id"].startswith("tool.")
+                            or job["tool"] == row["capability_id"][5:]
+                        )
+                    ):
+                        provider_job = dict(job)
+                results.append({
                     "attempt_id": row["attempt_id"],
                     "task_key": row["task_key"], "status": row["status"],
                     "external_effect_possible": bool(row["dispatch_recorded"]),
+                    "provider_execution_id": provider_execution_id,
+                    "provider_job": provider_job,
+                    "provider_job_identity_mismatch": bool(
+                        provider_job is None
+                        and isinstance(provider_execution_id, str)
+                        and c.execute(
+                            "SELECT 1 FROM jobs j JOIN engine_v2_execution_jobs v2 "
+                            "ON v2.job_id=j.id WHERE j.id=?",
+                            (provider_execution_id,),
+                        ).fetchone() is not None
+                    ),
                     "operator_resolution": (
                         {
                             "disposition": row["disposition"],
@@ -2215,9 +2257,8 @@ class JobStore:
                             and row["disposition"] in (None, "unresolved")
                         )
                     ),
-                }
-                for row in rows
-            ]
+                })
+            return results
         finally:
             c.close()
 
@@ -2392,6 +2433,7 @@ class JobStore:
             claims = {}
             terminal = {}
             dispatch = {}
+            mismatched_dispatch_identities = set()
             reconciliation_events = {}
             mismatched = set()
             mismatched_reconciliations = set()
@@ -2407,6 +2449,15 @@ class JobStore:
                     claims[attempt_id] = claims.get(attempt_id, 0) + 1
                 if kind == "dispatch_started":
                     dispatch[attempt_id] = dispatch.get(attempt_id, 0) + 1
+                    try:
+                        detail = json.loads(event["detail_json"] or "{}")
+                    except (TypeError, ValueError):
+                        detail = None
+                    if detail not in (
+                        {},
+                        {"provider_execution_id": attempt_id},
+                    ):
+                        mismatched_dispatch_identities.add(attempt_id)
                 if kind == "workflow_attempt_reconciled":
                     reconciliation_events[attempt_id] = (
                         reconciliation_events.get(attempt_id, 0) + 1
@@ -2459,6 +2510,8 @@ class JobStore:
                 "missing_or_duplicate_terminal_events": missing_terminal,
                 "mismatched_terminal_events": sorted(mismatched),
                 "duplicate_dispatch_events": duplicate_dispatch,
+                "mismatched_dispatch_identities":
+                    sorted(mismatched_dispatch_identities),
                 "unknown_attempt_events": sorted(unknown),
                 "missing_or_duplicate_reconciliation_events":
                     missing_or_duplicate_reconciliations,
@@ -2477,6 +2530,7 @@ class JobStore:
                 "consistent": not (
                     missing_claims or missing_terminal or mismatched
                     or duplicate_dispatch or unknown
+                    or mismatched_dispatch_identities
                     or missing_or_duplicate_reconciliations
                     or mismatched_reconciliations
                     or unknown_reconciliations
@@ -3162,7 +3216,9 @@ class JobStore:
         finally:
             c.close()
 
-    def mark_workflow_dispatch_started(self, plan_id, attempt_id):
+    def mark_workflow_dispatch_started(
+        self, plan_id, attempt_id, *, provider_execution_id=None,
+    ):
         """Atomically record dispatch intent or reject a cancelled/stale attempt.
 
         The recorded event makes crash recovery distinguish pre-dispatch claims
@@ -3206,11 +3262,20 @@ class JobStore:
                 ).fetchone()
                 if previous is not None:
                     raise ValueError("workflow dispatch already recorded")
+                detail = {}
+                if provider_execution_id is not None:
+                    if (
+                        not isinstance(provider_execution_id, str)
+                        or provider_execution_id != attempt_id
+                    ):
+                        raise ValueError("provider execution identity must match the attempt")
+                    detail["provider_execution_id"] = provider_execution_id
                 c.execute(
                     "INSERT INTO workflow_events "
-                    "(plan_id, task_ref, attempt_id, event_type, at) "
-                    "VALUES (?, ?, ?, 'dispatch_started', ?)",
-                    (plan_id, row["task_id"], attempt_id, now),
+                    "(plan_id, task_ref, attempt_id, event_type, detail_json, at) "
+                    "VALUES (?, ?, ?, 'dispatch_started', ?, ?)",
+                    (plan_id, row["task_id"], attempt_id,
+                     json.dumps(detail, sort_keys=True), now),
                 )
                 c.execute("COMMIT")
                 return True

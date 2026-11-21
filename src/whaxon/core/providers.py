@@ -419,7 +419,22 @@ class CatalogAdapterProvider:
             raise CapabilityUnavailable(task.capability_id, (
                 "task permission/impact differs from the bound provider contract",))
         tool_id = self._tool_by_provider[expected.provider_id]
-        job_id = uuid.uuid4().hex[:12]
+        # V2 attempts use a stable persisted job identity so a worker restart
+        # can correlate a possibly-started external effect without replaying it.
+        # Legacy/direct provider invocations retain their random job IDs.
+        attempt_id = getattr(task, "_attempt_id", None)
+        if attempt_id is None:
+            job_id = uuid.uuid4().hex[:12]
+        else:
+            expected_job_id = attempt_id
+            if (
+                not isinstance(attempt_id, str)
+                or len(attempt_id) != 32
+                or any(char not in "0123456789abcdef" for char in attempt_id)
+                or getattr(task, "_provider_execution_id", None) != expected_job_id
+            ):
+                raise ValueError("invalid durable V2 provider execution identity")
+            job_id = expected_job_id
         # Fail closed if the old Automator cannot be fenced. The fence must
         # happen before ToolRunner may publish any findings.
         if self._suppress_legacy_followup is not None:
