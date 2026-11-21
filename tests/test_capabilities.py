@@ -308,3 +308,10 @@ def test_capability_schema_validation_supports_provider_one_of_contracts():
         validate_instance(schema, {"data": {"port": 443, "header": "x"}})
     with pytest.raises(SchemaContractError):
         validate_instance({"type": "integer", "enum": [1, 2]}, True)
+    with pytest.raises(SchemaContractError, match="outside enum"):
+        validate_instance({"enum": [1]}, True)
+    with pytest.raises(SchemaContractError, match="does not match const"):
+        validate_instance({"const": 1}, True)
+    with pytest.raises(SchemaContractError, match="items are not allowed"):
+        validate_instance({"type": "array", "items": False}, [1])
+    validate_instance({"type": "array", "items": False}, [])
