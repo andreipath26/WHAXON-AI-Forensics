@@ -1920,8 +1920,19 @@ class JobStore:
                     "SELECT last_event_id FROM workflow_event_cursors "
                     "WHERE plan_id=? AND consumer_id=?", (plan_id, consumer_id),
                 ).fetchone()
-                if old is not None and event_id < old["last_event_id"]:
+                last_event_id = old["last_event_id"] if old is not None else 0
+                if event_id < last_event_id:
                     raise ValueError("workflow event cursor cannot move backwards")
+                if event_id > last_event_id:
+                    next_event = c.execute(
+                        "SELECT id FROM workflow_events WHERE plan_id=? AND id>? "
+                        "ORDER BY id LIMIT 1",
+                        (plan_id, last_event_id),
+                    ).fetchone()
+                    if next_event is None or event_id != next_event["id"]:
+                        raise ValueError(
+                            "workflow event cursor cannot skip unacknowledged events"
+                        )
                 c.execute(
                     "INSERT INTO workflow_event_cursors "
                     "(plan_id, consumer_id, last_event_id, updated_at) VALUES (?, ?, ?, ?) "
