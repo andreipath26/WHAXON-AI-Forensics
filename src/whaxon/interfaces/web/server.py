@@ -1570,7 +1570,7 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     def ai_run_answer(run_id: str):
         return {
             "error": (
-                "Legacy AI run answers are retired and cannot approve or resume "
+                "Legacy AI execution is disabled and retired; answers cannot approve or resume "
                 "pending runs. Use the V2 proposal, exact-task approval, and durable "
                 "run flow."
             ),
