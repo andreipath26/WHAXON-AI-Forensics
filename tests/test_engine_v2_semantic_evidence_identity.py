@@ -143,6 +143,8 @@ def test_semantic_provider_recovery_preserves_nonzero_exit_as_failure(tmp_path):
     snapshot = core.store.get_workflow_progress("semantic-failure-plan")
     assert snapshot["counts"] == {"failed": 1}
     evidence = core.workflow_evidence("semantic-failure-plan")
+    assert evidence["attempts"][0]["evidence_status"] == "recorded"
+    assert evidence["attempts"][0]["provider_exit_code"] == 2
     assert evidence["attempts"][0]["integrity_status"] == "verified"
     assert core.store.get_workflow_audit_integrity(
         "semantic-failure-plan",
