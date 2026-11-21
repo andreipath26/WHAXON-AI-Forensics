@@ -3578,7 +3578,7 @@ class JobStore:
             try:
                 c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
-                    "SELECT a.task_id, a.status AS attempt_status, "
+                    "SELECT a.task_id, t.task_key, a.status AS attempt_status, "
                     "t.status AS task_status, t.active_attempt_id, p.status AS plan_status "
                     "FROM task_attempts a "
                     "JOIN workflow_tasks t ON t.id=a.task_id "
