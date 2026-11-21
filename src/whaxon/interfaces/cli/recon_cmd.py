@@ -94,6 +94,9 @@ def main(args: list[str] | None = None) -> int:
             plan_id=plan_id, verbose=verbose,
         )
 
+    _usage()
+    return EXIT_USAGE
+
 
 
 def _propose_v2(
