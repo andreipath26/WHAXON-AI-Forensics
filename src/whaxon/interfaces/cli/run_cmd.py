@@ -6,13 +6,7 @@ Usage:
 Options:
     --mission-id ID        mission for the V2 plan (generated if omitted)
     --plan-id ID            immutable V2 plan ID (generated if omitted)
-    --extra "..."          extra arguments passed to the tool
     --data DIR             data directory (default: ./data)
-    --timeout SEC          hard timeout in seconds (default: 300)
-    --allow-out-of-scope   bypass the scope check for this run
-    --quiet                suppress live output (just findings at the end)
-    --verbose              print internal state, argv, and full untruncated findings
-    --json                 emit findings as JSON to stdout at the end
 """
 from __future__ import annotations
 
@@ -150,8 +144,7 @@ def main(args: list[str] | None = None) -> None:
 
     if extra_args or allow_out_of_scope or timeout_explicit or verbose or quiet or as_json:
         print(
-            "error: direct-dispatch options require --legacy; default `whaxon run` "
-            "creates a reviewable V2 plan",
+            "error: direct-dispatch options are retired; use an approved Engine V2 plan",
             file=sys.stderr,
         )
         sys.exit(EXIT_USAGE)
