@@ -106,8 +106,10 @@ def test_echo_run_creates_job_in_store(tmp_path):
     assert latest["target"] == "127.0.0.1"
 
 def test_run_automatically_drains_jobs_queued_by_automator(tmp_path, monkeypatch, capsys):
-    """A single CLI run executes durable follow-ups queued by its findings."""
+    """A single CLI run drains follow-ups only with legacy compatibility enabled."""
     import asyncio
+
+    monkeypatch.setenv("WHAXON_AUTOCHAIN", "true")
 
     from whaxon.core.automation import Automator
     from whaxon.core.events import EventBus, JobFindings, JobFinished, JobStarted
