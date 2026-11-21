@@ -78,7 +78,6 @@ def main(args: list[str] | None = None) -> None:
     data_dir = Path("data")
     mission_id = None
     plan_id = None
-    timeout_s = 300.0
     allow_out_of_scope = False
     quiet = False
     as_json = False
@@ -94,13 +93,7 @@ def main(args: list[str] | None = None) -> None:
         elif a == "--data" and i + 1 < len(args):
             data_dir = Path(args[i + 1]); i += 2
         elif a == "--timeout" and i + 1 < len(args):
-            try:
-                timeout_s = float(args[i + 1])
-                timeout_explicit = True
-            except ValueError:
-                print(f"error: --timeout expects a number, got {args[i+1]!r}", file=sys.stderr)
-                sys.exit(EXIT_USAGE)
-            i += 2
+            timeout_explicit = True; i += 2
         elif a == "--allow-out-of-scope":
             allow_out_of_scope = True; i += 1
         elif a == "--quiet":
