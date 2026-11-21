@@ -208,11 +208,12 @@ def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_se
         )
 
     def create_mission(route):
-        submitted["mission"].append(route.request.post_data_json)
+        payload = route.request.post_data_json
+        submitted["mission"].append(payload)
         route.fulfill(
             status=201,
             content_type="application/json",
-            body='{"mission_id":"mission-ui-submit-test","created":true}',
+            body='{"mission_id":"' + payload["id"] + '","created":true}',
         )
 
     def propose(route):
@@ -317,14 +318,25 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
         "**/api/scope/check",
         lambda route: route.fulfill(status=200, content_type="application/json", body='{"allowed":true,"reason":"matched test scope"}'),
     )
-    page.route(
-        "**/api/v2/missions",
-        lambda route: route.fulfill(status=201, content_type="application/json", body='{"mission_id":"scope-refresh-test","created":true}'),
-    )
-    page.route(
-        "**/api/v2/ai/proposals",
-        lambda route: route.fulfill(status=200, content_type="application/json", body='{"status":"proposed","created":true,"plan_id":"scope-refresh-plan","digest":"scope-refresh-digest","approval_granted":false,"execution_submitted":false}'),
-    )
+    def create_mission(route):
+        payload = route.request.post_data_json
+        route.fulfill(
+            status=201,
+            content_type="application/json",
+            body='{"mission_id":"' + payload["id"] + '","created":true}',
+        )
+
+    def propose(route):
+        payload = route.request.post_data_json
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"status":"proposed","created":true,"plan_id":"' + payload["id"] +
+            '","digest":"scope-refresh-digest","approval_granted":false,"execution_submitted":false}',
+        )
+
+    page.route("**/api/v2/missions", create_mission)
+    page.route("**/api/v2/ai/proposals", propose)
 
     page.add_init_script("const _setInterval = window.setInterval.bind(window); window.setInterval = (fn, delay, ...args) => _setInterval(fn, Math.max(delay, 60000), ...args);")
     page.goto(f"{live_server}/ui-v2/ai")
