@@ -628,11 +628,23 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         try:
             ai_request = AIWorkflowProposalRequest.model_validate(payload)
         except ValidationError as exc:
-            invalid_fields = {
-                error["loc"][0] for error in exc.errors()
-                if error.get("loc")
-            }
-            if "step" in invalid_fields:
+            errors = exc.errors()
+            bounded_history = any(
+                error.get("loc") == ("history",)
+                and error.get("type") in {"too_long", "value_error"}
+                for error in errors
+            )
+            if bounded_history:
+                message = "AI proposal history exceeds allowed limits"
+            elif any(
+                error.get("loc") == ("step",)
+                and error.get("type") == "less_than_equal"
+                for error in errors
+            ):
+                message = "AI proposal step must follow the supplied history"
+            elif any(
+                error.get("loc") == ("step",) for error in errors
+            ):
                 message = "step must be a positive integer"
             else:
                 message = "AI proposal history must be an array of objects"

@@ -7,9 +7,10 @@ models preserve selected existing serialized shapes.
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class WorkflowRunRequest(BaseModel):
@@ -54,13 +55,27 @@ class AIWorkflowProposalRequest(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="ignore")
 
-    mission_id: str
-    id: str
-    goal: str
-    target: str
-    history: list[dict[str, Any]] = Field(default_factory=list)
-    step: int = Field(default=1, ge=1)
+    mission_id: str = Field(min_length=1)
+    id: str = Field(min_length=1)
+    goal: str = Field(min_length=1, max_length=10_000)
+    target: str = Field(min_length=1, max_length=2_048)
+    history: list[dict[str, Any]] = Field(default_factory=list, max_length=32)
+    step: int = Field(default=1, ge=1, le=33)
     save: bool = False
+
+    @field_validator("history")
+    @classmethod
+    def bound_history_item_size(cls, history: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Reject oversized serialized history items before provider invocation."""
+        for item in history:
+            try:
+                encoded = json.dumps(item, ensure_ascii=False, allow_nan=False)
+            except (TypeError, ValueError):
+                # Preserve Core's existing error handling for non-JSON values.
+                continue
+            if len(encoded) > 4_096:
+                raise ValueError("AI proposal history exceeds allowed limits")
+        return history
 
 
 class ExecutionLimitsRequest(BaseModel):
