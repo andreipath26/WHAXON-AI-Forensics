@@ -49,6 +49,16 @@ def test_dashboard_links_to_ai_strategy_gate(page, live_server):
     assert link.get_attribute("href") == "/ui-v2/ai"
 
 def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofed(page, live_server):
+    submitted = {"mission": None, "proposal": None}
+    api_calls = []
+    def record_request(request):
+        api_calls.append((request.method, request.url))
+        if request.method == "POST" and request.url.endswith("/api/v2/missions"):
+            submitted["mission"] = request.post_data_json
+        if request.method == "POST" and request.url.endswith("/api/v2/ai/proposals"):
+            submitted["proposal"] = request.post_data_json
+
+    page.on("request", record_request)
     page.route(
         "**/api/scope/check",
         lambda route: route.fulfill(
@@ -74,6 +84,30 @@ def test_ai_strategy_gate_submits_to_server_even_if_client_scope_check_is_spoofe
     page.wait_for_function(
         "() => document.querySelector('#ai-run-status')?.textContent.toLowerCase().includes('outside current scope')",
         timeout=8000,
+    )
+    status = page.locator("#ai-run-status").inner_text()
+    assert submitted["mission"] and submitted["proposal"]
+    mission_id = submitted["mission"]["id"]
+    assert submitted["proposal"]["mission_id"] == mission_id
+    assert f"Mission {mission_id} was created" in status
+    assert "no V2 plan was saved" in status
+    assert "no approval or execution was submitted" in status.lower()
+    missions = page.evaluate(
+        "async () => (await (await fetch('/api/v2/missions?limit=100')).json())"
+    )
+    assert any(item["id"] == mission_id for item in missions)
+    plan_id = submitted["proposal"]["id"]
+    plan_lookup = page.evaluate(
+        """async id => {
+          const response = await fetch('/api/v2/workflows/' + encodeURIComponent(id));
+          return {status: response.status, body: await response.json()};
+        }""",
+        plan_id,
+    )
+    assert plan_lookup["status"] == 404
+    assert not any(
+        method == "POST" and (url.endswith("/approvals") or url.endswith("/run"))
+        for method, url in api_calls
     )
 
 
@@ -174,11 +208,12 @@ def test_ai_strategy_gate_keeps_successful_submission_confirmation(page, live_se
         )
 
     def create_mission(route):
-        submitted["mission"].append(route.request.post_data_json)
+        payload = route.request.post_data_json
+        submitted["mission"].append(payload)
         route.fulfill(
             status=201,
             content_type="application/json",
-            body='{"mission_id":"mission-ui-submit-test","created":true}',
+            body='{"mission_id":"' + payload["id"] + '","created":true}',
         )
 
     def propose(route):
@@ -283,14 +318,25 @@ def test_ai_strategy_gate_refreshes_engagement_label_after_live_scope_changes(pa
         "**/api/scope/check",
         lambda route: route.fulfill(status=200, content_type="application/json", body='{"allowed":true,"reason":"matched test scope"}'),
     )
-    page.route(
-        "**/api/v2/missions",
-        lambda route: route.fulfill(status=201, content_type="application/json", body='{"mission_id":"scope-refresh-test","created":true}'),
-    )
-    page.route(
-        "**/api/v2/ai/proposals",
-        lambda route: route.fulfill(status=200, content_type="application/json", body='{"status":"proposed","created":true,"plan_id":"scope-refresh-plan","digest":"scope-refresh-digest","approval_granted":false,"execution_submitted":false}'),
-    )
+    def create_mission(route):
+        payload = route.request.post_data_json
+        route.fulfill(
+            status=201,
+            content_type="application/json",
+            body='{"mission_id":"' + payload["id"] + '","created":true}',
+        )
+
+    def propose(route):
+        payload = route.request.post_data_json
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"status":"proposed","created":true,"plan_id":"' + payload["id"] +
+            '","digest":"scope-refresh-digest","approval_granted":false,"execution_submitted":false}',
+        )
+
+    page.route("**/api/v2/missions", create_mission)
+    page.route("**/api/v2/ai/proposals", propose)
 
     page.add_init_script("const _setInterval = window.setInterval.bind(window); window.setInterval = (fn, delay, ...args) => _setInterval(fn, Math.max(delay, 60000), ...args);")
     page.goto(f"{live_server}/ui-v2/ai")
@@ -347,3 +393,61 @@ def test_ai_pending_target_is_not_labelled_scope_checked_before_server_verdict(p
     assert "(SCOPE CHECKED)" not in header
     assert "SCOPE RULE CONFIGURED" in header
     assert "SERVER-SIDE SCOPE CHECK ENABLED" not in header
+
+
+def test_ai_strategy_gate_reports_uncertain_mission_write_without_proposing(page, live_server):
+    """A lost mission response is treated as uncertain and does not start a proposal."""
+    submitted_missions = []
+    mission_responses = []
+    proposal_calls = []
+
+    def scope_check(route):
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body='{"allowed":true,"reason":"client scope preview allowed"}',
+        )
+
+    def create_mission_and_drop_response(route):
+        if route.request.method != "POST":
+            route.continue_()
+            return
+        submitted_missions.append(route.request.post_data_json)
+        response = route.fetch()
+        mission_responses.append((response.status, response.json()))
+        route.abort("failed")
+
+    def proposal(route):
+        proposal_calls.append(route.request.post_data_json)
+        route.fulfill(status=500, content_type="application/json", body='{"error":"unexpected proposal"}')
+
+    page.route("**/api/scope/check", scope_check)
+    page.route("**/api/v2/missions", create_mission_and_drop_response)
+    page.route("**/api/v2/ai/proposals", proposal)
+    page.goto(f"{live_server}/ui-v2/ai")
+    page.wait_for_function(
+        "() => document.documentElement.dataset.aiGateReady === 'true'",
+        timeout=8000,
+    )
+    page.locator("#ai-target").fill("127.0.0.1")
+    page.locator("#ai-goal").fill("Verify a lost mission acknowledgment")
+    page.locator("#ai-run-form button[type=submit]").click()
+    page.wait_for_function(
+        "() => document.querySelector('#ai-run-status')?.textContent.includes('creation was not confirmed')",
+        timeout=8000,
+    )
+
+    assert submitted_missions and mission_responses
+    mission_id = submitted_missions[0]["id"]
+    assert mission_responses[0][0] == 201
+    assert mission_responses[0][1]["mission_id"] == mission_id
+    assert mission_responses[0][1]["created"] is True
+    status = page.locator("#ai-run-status").inner_text()
+    assert f"Mission {mission_id} creation was not confirmed" in status
+    assert "may have persisted" in status
+    assert "No V2 proposal request, approval or execution was submitted." in status
+    assert proposal_calls == []
+    missions = page.evaluate(
+        "async () => await (await fetch('/api/v2/missions?limit=100')).json()"
+    )
+    assert any(item["id"] == mission_id for item in missions)
