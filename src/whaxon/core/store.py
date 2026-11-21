@@ -4048,10 +4048,19 @@ class JobStore:
                         "JOIN workflow_plans p ON p.id=t.plan_id WHERE t.id=?",
                         (row["task_id"],),
                     ).fetchone()
+                    provider_job = (
+                        c.execute(
+                            "SELECT exit_code FROM jobs WHERE id=?", (job_id,),
+                        ).fetchone()
+                        if isinstance(job_id, str) and bool(job_id) else None
+                    )
+                    result_exit_code = result.get("exit_code", 0)
                     if (
-                        isinstance(job_id, str) and bool(job_id)
+                        provider_job is not None and provider_job["exit_code"] == 0
+                        and isinstance(result_exit_code, int)
+                        and not isinstance(result_exit_code, bool)
+                        and result_exit_code == 0
                         and result.get("target") == task["target"]
-                        and result.get("exit_code") == 0
                         and result.get("tool_id") == provider_tool_id_for_capability(
                             task["capability_id"],
                         )
