@@ -592,7 +592,7 @@
    e.preventDefault();
    const target=targetInput.value.trim(),goal=goalInput.value.trim(),submit=form.querySelector("button[type=submit]");
    status.textContent="Checking target against current scope…";submit.disabled=true;v2PlanResult.replaceChildren();
-   let missionId=null,missionCreated=false,proposalRequestStarted=false;
+   let missionId=null,missionRequestStarted=false,missionCreated=false,proposalRequestStarted=false;
    try{
      const check=await fetch("/api/scope/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target})});
      const verdict=await check.json();
@@ -600,6 +600,7 @@
      const id=()=>globalThis.crypto?.randomUUID?globalThis.crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
      missionId="ai-mission-"+id();
      const planId="ai-plan-"+id();
+     missionRequestStarted=true;
      const missionResponse=await fetch("/api/v2/missions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:missionId,objective:goal})});
      const missionData=await missionResponse.json();
      if(!missionResponse.ok)throw new Error(missionData.error||("mission HTTP "+missionResponse.status));
@@ -627,7 +628,11 @@
      status.textContent=missionCreated&&proposalRequestStarted
        ? "Mission "+missionId+" was created, but the V2 proposal request failed: "+error.message+
          ". The plan outcome may need checking; no approval or execution was submitted."
-       : "V2 AI plan not saved: "+error.message;
+       : missionRequestStarted
+         ? "Mission "+missionId+" creation was not confirmed; the mission may have persisted. "+
+           "No V2 proposal request, approval or execution was submitted. Check mission state before retrying. "+
+           error.message
+         : "V2 AI plan not saved: "+error.message;
    }
    finally{submit.disabled=false;}
  });
