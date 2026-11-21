@@ -816,14 +816,7 @@ def test_legacy_validation_and_retest_recheck_scope_before_each_probe(
 
     monkeypatch.setattr(Validator, "_fetch", staticmethod(fake_fetch))
 
-    for endpoint, expected_status in (
-        ("/api/validate/j1/0", "candidate"),
-        ("/api/retest/j1/0", "inconclusive"),
-    ):
-        if endpoint.startswith("/api/retest"):
-            core.store.update_verification(
-                "j1", 0, "verified", by="test", reason="seeded proof",
-            )
+    def assert_scope_revocation(endpoint, expected_status):
         decisions = iter((True, False))
         scope_targets = []
 
@@ -845,6 +838,13 @@ def test_legacy_validation_and_retest_recheck_scope_before_each_probe(
         assert response.get_json()["status"] == expected_status
         assert scope_targets == ["http://10.0.0.5", "http://10.0.0.5"]
         assert attempted == [("http://10.0.0.5", False)]
+
+    assert_scope_revocation("/api/validate/j1/0", "candidate")
+    core.store.update_verification(
+        "j1", 0, "verified", by="test", reason="seeded proof",
+    )
+    assert_scope_revocation("/api/retest/j1/0", "inconclusive")
+
 
 def test_legacy_retest_api_is_default_denied_before_read_or_replay(tmp_path, monkeypatch):
     from whaxon.core.validator import Validator
