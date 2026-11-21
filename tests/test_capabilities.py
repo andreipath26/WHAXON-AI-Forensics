@@ -276,8 +276,10 @@ def test_capability_schema_rejects_unknown_or_non_json_contracts():
 
     with pytest.raises(ValueError, match="unsupported schema keyword"):
         _manifest("provider.unknown_key", input_schema={"type": "object", "magic": True})
-    with pytest.raises(ValueError, match="finite number"):
+    with pytest.raises(ValueError, match="finite"):
         _manifest("provider.nonfinite", output_schema={"type": "number", "minimum": math.inf})
+    with pytest.raises(ValueError, match="object keys must be strings"):
+        _manifest("provider.nonstring_key", input_schema={"const": {1: "bad"}})
 
 
 def test_capability_schema_validation_supports_provider_one_of_contracts():
