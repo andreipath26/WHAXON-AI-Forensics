@@ -83,12 +83,12 @@ def test_catalog_provider_uses_durable_v2_execution_identity(monkeypatch):
         permissions=("network.scan",), impact="moderate",
     )
     object.__setattr__(task, "_attempt_id", "a" * 32)
-    object.__setattr__(task, "_provider_execution_id", f"v2-{'a' * 32}")
+    object.__setattr__(task, "_provider_execution_id", "a" * 32)
 
     import asyncio
     asyncio.run(provider.dispatch(task))
 
-    assert runner.calls[0]["job_id"] == f"v2-{'a' * 32}"
+    assert runner.calls[0]["job_id"] == "a" * 32
 
 
 def test_catalog_provider_rejects_mismatched_durable_execution_identity(monkeypatch):

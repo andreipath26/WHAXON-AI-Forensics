@@ -426,7 +426,7 @@ class CatalogAdapterProvider:
         if attempt_id is None:
             job_id = uuid.uuid4().hex[:12]
         else:
-            expected_job_id = f"v2-{attempt_id}"
+            expected_job_id = attempt_id
             if (
                 not isinstance(attempt_id, str)
                 or len(attempt_id) != 32

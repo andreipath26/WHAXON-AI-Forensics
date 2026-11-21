@@ -906,7 +906,7 @@ def test_reconciliation_report_identifies_dispatch_uncertainty(tmp_path):
     before = store.get_workflow_dispatch_reconciliation("p")
     assert before[0]["external_effect_possible"] is False
     assert before[0]["manual_reconciliation_required"] is False
-    provider_execution_id = f"v2-{claim['attempt_id']}"
+    provider_execution_id = claim["attempt_id"]
     store.mark_workflow_dispatch_started(
         "p", claim["attempt_id"],
         provider_execution_id=provider_execution_id,

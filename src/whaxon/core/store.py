@@ -2455,7 +2455,7 @@ class JobStore:
                         detail = None
                     if detail not in (
                         {},
-                        {"provider_execution_id": f"v2-{attempt_id}"},
+                        {"provider_execution_id": attempt_id},
                     ):
                         mismatched_dispatch_identities.add(attempt_id)
                 if kind == "workflow_attempt_reconciled":
@@ -3266,7 +3266,7 @@ class JobStore:
                 if provider_execution_id is not None:
                     if (
                         not isinstance(provider_execution_id, str)
-                        or provider_execution_id != f"v2-{attempt_id}"
+                        or provider_execution_id != attempt_id
                     ):
                         raise ValueError("provider execution identity must match the attempt")
                     detail["provider_execution_id"] = provider_execution_id

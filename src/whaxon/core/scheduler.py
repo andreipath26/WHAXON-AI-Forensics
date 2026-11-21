@@ -88,7 +88,9 @@ class WorkflowScheduler:
         # worker dies after the external process starts but before recording a
         # result, the attempt can still be correlated with the durable job.
         # This is a correlation key only; it never authorizes replay.
-        provider_execution_id = f"v2-{attempt_id}"
+        # Attempt IDs are already collision-resistant 32-character job IDs,
+        # which also preserves the verifier's existing source-ID contract.
+        provider_execution_id = attempt_id
         object.__setattr__(task, "_attempt_id", attempt_id)
         object.__setattr__(task, "_provider_execution_id", provider_execution_id)
         lease_lost = asyncio.Event()
