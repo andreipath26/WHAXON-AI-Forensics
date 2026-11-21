@@ -2954,8 +2954,9 @@ class JobStore:
                             report_findings = []
                             for finding in findings:
                                 item = dict(finding)
+                                raw_data_json = item.pop("data_json", None)
                                 try:
-                                    finding_data = json.loads(finding["data_json"] or "{}")
+                                    finding_data = json.loads(raw_data_json or "{}")
                                 except (TypeError, json.JSONDecodeError):
                                     finding_data = None
                                 if isinstance(finding_data, dict):
