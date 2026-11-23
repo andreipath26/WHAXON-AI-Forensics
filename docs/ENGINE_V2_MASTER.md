@@ -8,8 +8,10 @@ Warning: truncated output (original token count: 60794)
 Total output lines: 2154
 
 # WHAXON — ENGINE V2 MASTER DOCUMENT
+> **Current implementation status — 2026-11-23; exact source baseline `27faf26ecb20f5b22dad33fab031c240fbfcf47e` on PR #268.** PR #268 remains open and unmerged. Exact-head CI [45171571410](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/45171571410) passed all 20 jobs; README freeze [45171571405](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/45171571405), Dashboard [45171571440](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/45171571440), Findings [45171571442](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/45171571442), and Scope [45171571399](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/45171571399) passed. Web validation/retest APIs are permanent HTTP 410 responses; the legacy human-resolution route returns 409 before changing a V2 finding. A fake-`dig` crash/recovery regression exercises the real catalog provider path, confirms restart uncertainty and explicit recovery from the sealed result, and proves that a later scheduler run dispatches nothing. This is a bounded local provider regression, not a general exactly-once guarantee. Versioned digest-bound coverage reporting and proposal-only CLI validation/retest aliases are also present. The full E0–E6 scope, remaining legacy CLI/Metasploit/session work, provider-effect recovery and qualification, complete UI wiring, integrated acceptance, external qualification, and release approval remain open. G10 remains **HOLD — NOT READY TO DEPLOY**.
 
-> **Current implementation status — 2026-11-21; main `f32ce0913d460f046f6d984ec54a1f7f5d775409`.** PR #226 merged after exact head `65cae35059934a6032cb250bca3752152c88d918` passed CI [44833852913](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852913) (20/20), README freeze [44833852900](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852900), and dashboard acceptance [44833853031](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833853031). The squash merge tree matches the tested PR tree; no separate merge-SHA check run is recorded yet. PR #226 records execution-path dispositions and adds safety regressions for legacy scope denial and cancellation after a real provider effect. Provider-specific effect reconciliation, remaining client lifecycle parity, complete UI wiring, integrated acceptance, and external qualification remain open. G10 remains **HOLD — NOT READY TO DEPLOY**.
+
+> **Historical implementation status — 2026-11-21; main `f32ce0913d460f046f6d984ec54a1f7f5d775409`.** PR #226 merged after exact head `65cae35059934a6032cb250bca3752152c88d918` passed CI [44833852913](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852913) (20/20), README freeze [44833852900](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833852900), and dashboard acceptance [44833853031](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/44833853031). The squash merge tree matches the tested PR tree; no separate merge-SHA check run is recorded yet. PR #226 records execution-path dispositions and adds safety regressions for legacy scope denial and cancellation after a real provider effect. Provider-specific effect reconciliation, remaining client lifecycle parity, complete UI wiring, integrated acceptance, and external qualification remain open. G10 remains **HOLD — NOT READY TO DEPLOY**.
 
 **Consolidation date:** 2026-11-06. **Historical consolidation baseline:** `6a41f626536be917e12acd175ffffad716132823`; current status is reconciled to the exact `main` SHA in the audit banner above.
 
@@ -383,7 +385,28 @@ The first provider-backed task uses a capability such as `tool.nmap`, with `perm
 
 ### 2026-11-02 scheduler deadline correction
 
-A task's declared timeout now covers both deterministic authorization and provider dispatch. Synchronous callbacks execute in worker threads rather than blocking the event loop, preserving lease heartbeats and independent task progress. Authorization timeout fails closed as `blocked` and never dispatches; provider timeout remains `uncertain` because cancelling an await or timing out a worker thread cannot prove that an external effect stopped. Regression tests cover synchronous and asynchronous authorization timeouts. This closes a scheduler correctness gap, not the remaining mission-wide budget, cancellation, audit/outbox or recovery acceptance gates.
+A task's declared timeout now covers both deterministic authorization and provider dispatch. Synchronous callbacks execute in worker threads rather than blocking the event loop, preserving lease heartbeats and independent task progress. Authorization timeout fails closed as `blocked` and never dispatches; provider timeout remains `uncertain` because cancelling an await or timing out a worker thread cannot prove that an external effect stopped. Regression tests cover synchronous and asynchronous authorization timeouts. This closes a scheduler correctness gap; whole-phase cancellation, audit/outbox and recovery acceptance remain open.
+
+### 2026-11-21 Engine V2 subprocess cancellation
+
+During provider dispatch, the scheduler polls the durable plan stop and cumulative runtime-budget barriers, then cancels the async provider coroutine when either closes. When a dispatched scheduler task is cancelled during worker shutdown, plan stop, or runtime exhaustion, `ToolRunner` kills the isolated child process group, persists a cancelled provider-job event, and cleans its process/output bookkeeping before propagating cancellation. The workflow attempt remains `uncertain` after the dispatch marker because killing the scanner cannot reverse requests already sent. `tests/test_engine_v2_e3_external_effect_crash.py::test_scheduler_cancellation_kills_runner_and_keeps_attempt_uncertain` and `test_mission_runtime_exhaustion_stops_active_async_provider` exercise these boundaries. A synchronous provider thread may continue after coroutine cancellation; its outcome remains uncertain and is never replayed. These local regressions do not close external-effect, multi-worker, or deployment recovery acceptance.
+
+The read-only portfolio audit now joins each trusted capability manifest to its current readiness snapshot, including capabilities supplied outside the catalog-backed adapter bridge. The report exposes contract fingerprint, declared/live readiness, availability, and explicit authorization requirements; it never registers providers or enables execution. This advances the P2-06 inventory/report slice, while import-only/session completeness and onboarding lifecycle acceptance remain open.
+
+### 2026-11-21 local Engine V2 acceptance evidence runner
+
+`scripts/engine_v2_acceptance.py` and `make engine-v2-acceptance` provide one
+local command for the repeatable checks, packaging validation, and a clean
+wheel smoke, with timestamped logs and a machine-readable evidence bundle.
+The runner requires no Git invocation and can bind evidence to a caller-supplied
+source SHA. It always records `deployment_decision: HOLD`; exact-head CI,
+authorized provider lab, independent evidence anchoring, manual UI review,
+production-like recovery, and independent engineering acceptance remain
+separate gates. See [ENGINE_V2_ACCEPTANCE_RUNNER.md](ENGINE_V2_ACCEPTANCE_RUNNER.md).
+
+The AI-to-V2 planning handoff now attaches `whaxon.ai-proposal.v1` provenance to the immutable plan digest: producer, bounded rationale, a hash of request context, and model-reported confidence labeled as a heuristic. It records no observations or source citations when none were supplied, and explicitly states the remaining uncertainty. A frozen-manifest schema comparison was corrected so an empty `required` array is recognized after contract freezing; the focused bridge regression proves an eligible proposal is emitted while still unapproved and unsubmitted. This is one P2-05 trust-boundary slice; legacy Automator migration and evidence-cited follow-up acceptance remain open. For evidence-derived follow-ups, the plan now binds each generated node to the exact source attempt, finding sequence, finding digest, rule and provider fingerprint. Core re-reads the sealed source evidence at authorization time and blocks the child if the source plan, attempt, finding or seal has changed. This closes the stale-citation window for that path; fixed Automator parity and rejection auditing remain open. Evidence reads now report the total attempt count, returned count and whether a page was truncated; `all_evidence_recorded` and `all_evidence_integrity_verified` are false for partial pages, even when every returned record is sealed. This prevents report and follow-up consumers from treating the first 1000 rows as a complete mission history.
+
+Generic V2 network providers now use `check_for_unpinned_execution`: with scope enabled, hostname and hostname-URL targets are refused before DNS lookup unless the provider declares the narrower pinned-network or DNS-query scope mode. Literal IP targets still pass the ordinary scope rules; explicitly disabling scope remains an operator choice. This prevents an explicit hostname allowlist from being treated as pinning for a later external-tool connection. It does not control scanner subprocesses' secondary connections or prove network-level egress isolation. `tests/test_engine_v2_e1_boundary.py::test_v2_hostname_dispatch_requires_pinned_or_query_scope_mode` covers the mode distinction and no-lookup denial. P1-02 remains open for broader redirect, DNS, follow-up, session, ownership and egress acceptance.
 ---
 
 ## Source 2: [ENGINE_V2_BASELINE_INVENTORY.md](ENGINE_V2_BASELINE_INVENTORY.md)
@@ -421,7 +444,7 @@ Symbols: **S** source/artifact and related test found; **G** gate incomplete or 
 | E0 inventory | **2/5 (40.0%)** | S: dated architecture/baseline inventory exists; S: 75-entry requirement mapping/evidence index exists | G: fully current all-surface call graph; G: exhaustive tool/transport/UI control acceptance; G: reviewed migration/rollback/trust-anchor decision matrix |
 | E1 security | **4/5 (80.0%)** | S: one-shot drain contract and regression; S: fail-closed IP/DNS scope tests; S: exact plan-bound approval tests; S: worker ownership/lease recovery tests | G: complete adversarial redirect/pivot/external DNS, audit-failure and exact candidate acceptance lab |
 | E2 contracts | **4/5 (80.0%)** | S: versioned immutable DAG/task contracts; S: immutable manifest registry with deterministic resolution; S: durable scoped/revocable approval bindings; S: plan digest/integrity and compatibility tests | G: full canonical versioned domain contract set and backward-migration acceptance |
-| E3 durability | **5/6 (83.3%)** | S: persisted mission/plan/task/attempt graph; S: atomic claims/leases/retries; S: mission budget/deadline/cost/rate limits; S: stop intent and uncertain outcome fencing; S: durable events and consumer cursors | G: real external-effect process-kill, multi-worker recovery, audit-store failure and outbox/independent integrity trust-anchor acceptance |
+| E3 durability | **5/6 (83.3%)** | S: persisted mission/plan/task/attempt graph; S: atomic claims/leases/retries; S: mission attempt/concurrency/deadline/cost/rate/runtime limits; S: stop intent and uncertain outcome fencing; S: durable events and consumer cursors | G: real external-effect process-kill, multi-worker recovery, audit-store failure and outbox/independent integrity trust-anchor acceptance |
 | E4 providers | **5/7 (71.4%)** | S: local catalog-adapter bridge; S: bound trusted provider router with provider selection; S: semantic operation aliases; S: read-only catalog/adapter portfolio audit; S: separately proposed evidence-driven follow-ups | G: exhaustive transport/catalog/CLI/UI parity and provider substitution acceptance; G: retirement of bypassable legacy autochains only after proven migration |
 | E5 services | **3/6 (50.0%)** | S: durable acknowledged run-request queue; S: continuous headless request worker with stop controls; S: CLI/API/Core shared workflow surfaces | G: controlled real crash/restart with running external effect; G: daemon/systemd/container, backup/restore and supported platform acceptance; G: all service-client lifecycle and reconnect parity |
 | E6 UI/release | **2/6 (33.3%)** | S: 22 UI-v2 routes/templates in the product; S: regenerated static source-control inventory with 808 controls | G: per-control real-service acceptance; G: desktop visual/accessibility/offline parity; G: authorized seeded end-to-end solo lab; G: §38 G01–G10 release sign-off |
@@ -816,6 +839,13 @@ sealed Engine V2 source evidence and leave approval and submission as separate
 steps. Legacy APIs remain for older clients and legacy-owned records. No plan
 proposal approves or submits work.
 
+The Findings page loads its snapshot-consistent persisted job/finding
+projection from `GET /api/ui-v2/findings` in bounded pages of 100 jobs. Page
+metadata includes total and returned job/finding counts and the next offset;
+the UI offers older pages and labels its loaded coverage. This endpoint avoids
+the full report-enrichment path. It does not certify all other V2 UI workflows
+or close G06.
+
 ## V2 UI cancellation ownership — 2026-11-11
 
 The 14 remaining V2 Emergency Halt Scan handlers now discover active legacy
@@ -885,8 +915,12 @@ port-forward deletion remains available for cleanup.
 available fixed V2 recon providers. The plan proposal itself never approves or
 dispatches tasks. An explicit `--checks` selection is all-or-nothing: an
 unsupported or unavailable requested provider blocks the proposal. The default
-proposal lists omitted legacy-only or unavailable checks so partial coverage is
-visible; `tech`, `cookies`, and `waf` are not claimed as migrated. The legacy
+proposal lists omitted unavailable checks so partial coverage is visible. The
+fixed `web.recon.passive` HTTPS profile performs one GET and emits header,
+technology, cookie, and WAF observations together, so explicit `tech`,
+`cookies`, and `waf` selections now bind to that single task. The plan records
+the provider output kinds and avoids duplicate requests when several bundled
+checks are selected. The legacy
 runner requires both `--legacy` and
 `WHAXON_LEGACY_RECON_ENABLED=true`. An approved saved plan can still be run via
 `--engine v2 --plan-id`, which accepts only fixed recon capabilities against
@@ -945,3 +979,41 @@ the older import-compatible Qt module remained in the wheel with direct
 execution-path inventory identifies this compatibility path, and focused gate,
 callsite-inventory, and GUI-entrypoint tests pass; the current change still
 requires exact-head CI.
+
+## Persisted plan coverage dispositions — 2026-11-21
+
+Default recon proposals now persist explicit `unsupported` and
+`provider_unavailable` dispositions for checks omitted because no admitted V2
+provider exists or a provider cannot produce a ready plan. The workflow report
+projects requested checks, included checks, and typed dispositions from
+digest-matched persisted plan metadata; it does not expose free-form provider
+reasons. General workflow reports continue to expose task states, recorded skip
+reasons, attempt-page truncation, and per-finding verification requests. This
+is a bounded P1-07 slice: unsupported/inaccessible accounting outside recon
+proposals and requirement-level acceptance remain open.
+
+## Atomic V2 run reconnect snapshots — 2026-11-21
+
+`GET /api/v2/workflow-runs/<id>/snapshot` now reads the durable run-request row
+and workflow task progress from one SQLite read transaction. This prevents a
+request updated by a concurrent cancellation from being paired with progress
+read after that cancellation. The response schema and lease-token redaction
+are unchanged; worker liveness remains explicitly unverified. Regression:
+`tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`.
+
+## Conservative workflow report completion — 2026-11-21
+
+The plan report now reads persisted evidence, readiness, task progress, plan
+metadata and task rows from one SQLite read snapshot. It also requires that
+snapshot to show every task succeeded, no cancellation, and an untruncated
+evidence page before returning `complete`. This prevents a concurrently
+cancelled or otherwise inconsistent workflow from appearing successful, and
+keeps plan-bound verification and coverage projections aligned with the same
+stored tasks. This closes the report-read consistency race; G04's broader
+reproducibility, redaction, external trust-anchor and fault-recovery gates
+remain open. Regressions:
+`tests/test_workflow_report.py::test_core_workflow_report_refuses_stale_readiness_after_cancellation`,
+`test_core_workflow_report_refuses_inconsistent_terminal_counts`, and
+`test_core_workflow_report_honors_evidence_snapshot_truncation_flag`,
+`test_workflow_report_inputs_share_one_sqlite_snapshot`, and
+`test_core_report_uses_store_report_snapshot_when_available`.

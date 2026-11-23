@@ -75,6 +75,19 @@ def test_partial_delivery_ack_survives_restart_without_skipping(tmp_path):
     assert followup[0] > first["last_event_id"]
 
 
+def test_consumer_checkpoint_cannot_skip_an_unacknowledged_event(tmp_path):
+    core = _ready(tmp_path)
+    first, second = core.store.list_workflow_events("plan", limit=2)
+
+    with pytest.raises(ValueError, match="cannot skip"):
+        core.store.acknowledge_workflow_events("plan", "reporter", second["id"])
+    assert core.store.get_workflow_event_cursor("plan", "reporter") == 0
+
+    core.store.acknowledge_workflow_events("plan", "reporter", first["id"])
+    core.store.acknowledge_workflow_events("plan", "reporter", second["id"])
+    assert core.store.get_workflow_event_cursor("plan", "reporter") == second["id"]
+
+
 def test_inconsistent_lifecycle_audit_blocks_outbox_delivery(tmp_path):
     core = _ready(tmp_path)
     conn = core.store._conn()

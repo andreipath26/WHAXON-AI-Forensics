@@ -23,7 +23,7 @@ class _Core:
         )
         self.manifest = SimpleNamespace(
             capability_id="network.services.discover", provider_id="whaxon.local.nmap",
-            fingerprint="manifest-sha256", impact="moderate",
+            provider_version="1.0.0", fingerprint="manifest-sha256", impact="moderate",
             input_schema={"properties": {}, "required": [], "additionalProperties": False},
             permissions=("network.scan",), timeout_s=90,
         )
@@ -60,6 +60,7 @@ def test_tool_proposal_is_fixed_argument_and_provider_pinned():
     assert task.inputs == {}
     assert proposal["plan"]["metadata"]["provider_bindings"]["task-1"] == {
         "provider_id": "whaxon.local.nmap",
+        "provider_version": "1.0.0",
         "manifest_fingerprint": "manifest-sha256",
     }
     assert len(core.resolved) == 1
@@ -183,7 +184,7 @@ def test_finding_verification_proposal_binds_exact_source_and_kind():
     source_job_id = "0123456789ab"
     resolved = []
     manifest = SimpleNamespace(
-        capability_id="tool.verify_xss", provider_id="whaxon.verifier.http",
+        capability_id="tool.verify_xss", provider_id="whaxon.verifier.http", provider_version="1.0.0",
         fingerprint="verifier-manifest", impact="moderate",
         permissions=("network.verify",), timeout_s=75,
     )
@@ -218,7 +219,7 @@ def test_http_observation_proposal_uses_bounded_v2_verifier():
     resolved = []
     manifest = SimpleNamespace(
         capability_id="tool.verify_http_observation",
-        provider_id="whaxon.verifier.http", fingerprint="observation-manifest",
+        provider_id="whaxon.verifier.http", provider_version="1.0.0", fingerprint="observation-manifest",
         impact="moderate", permissions=("network.verify",), timeout_s=75,
     )
     core = SimpleNamespace(

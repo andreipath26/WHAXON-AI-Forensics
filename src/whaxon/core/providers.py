@@ -20,6 +20,7 @@ from .capabilities import (
     CapabilityResolution,
     CapabilityUnavailable,
 )
+from .json_schema import SchemaContractError, validate_instance
 from .provider_execution import (
     SEMANTIC_OPERATION_TO_TOOL,
 )
@@ -406,7 +407,7 @@ class CatalogAdapterProvider:
             raise RuntimeError(f"required tool is not installed: {tool.id}")
         return resolution
 
-    async def dispatch(self, task: WorkflowTask) -> dict:
+    async def dispatch(self, task: WorkflowTask, *, binding_manifest=None) -> dict:
         resolution = self.resolve_task(task, require_installed=True)
         expected = resolution.manifest
         if set(task.permissions) != set(expected.permissions) or task.impact != expected.impact:
@@ -421,6 +422,9 @@ class CatalogAdapterProvider:
         # happen before ToolRunner may publish any findings.
         if self._suppress_legacy_followup is not None:
             self._suppress_legacy_followup(job_id)
+        self.store.mark_engine_v2_execution_job(
+            job_id, binding_manifest or expected,
+        )
         timeout_s = min(float(task.timeout_s), expected.timeout_s)
         returned_id = await self.runner.run_tool(
             tool_id=tool_id,
@@ -451,6 +455,8 @@ class CatalogAdapterProvider:
         findings = self.store.get_findings(job_id)
         if not isinstance(findings, list):
             raise RuntimeError("provider findings could not be verified in durable store")
+        if not self.store.seal_engine_v2_provider_result(job_id):
+            raise RuntimeError("could not seal complete provider output")
         return {
             "job_id": job_id,
             "tool_id": tool_id,
@@ -532,7 +538,12 @@ class SemanticOperationProvider:
     async def dispatch(self, task: WorkflowTask) -> dict:
         resolved = self.resolve_task(task, require_installed=True)
         original, expected = self._legacy_task(task)
-        result = await self.bridge.dispatch(original)
+        # dataclasses.replace() does not copy scheduler-only execution context;
+        # retain the attempt fence before the catalog bridge derives a job ID.
+        for attribute in ("_attempt_id", "_provider_execution_id", "_plan_id"):
+            if hasattr(task, attribute):
+                object.__setattr__(original, attribute, getattr(task, attribute))
+        result = await self.bridge.dispatch(original, binding_manifest=expected)
         legacy = self._operations[task.capability_id][1]
         if (
             result.get("provider_id") != legacy.provider_id
@@ -810,7 +821,7 @@ class FindingVerificationProvider:
             evidence_job_id, task.capability_id.removeprefix("tool."), task.target,
         ):
             raise RuntimeError("could not start verification evidence job")
-        self.store.mark_engine_v2_execution_job(evidence_job_id)
+        self.store.mark_engine_v2_execution_job(evidence_job_id, expected)
         started = time.monotonic()
 
         def run_validation():
@@ -861,6 +872,8 @@ class FindingVerificationProvider:
                 evidence_job_id, 0, time.monotonic() - started,
             ):
                 raise RuntimeError("could not finish verification evidence job")
+            if not self.store.seal_engine_v2_provider_result(evidence_job_id):
+                raise RuntimeError("could not seal complete verification output")
         except asyncio.CancelledError:
             # Cancellation cannot abort an in-flight urllib request. Stop any
             # follow-up probes, then drain the current bounded request before
@@ -1070,6 +1083,7 @@ class BoundProviderRouter:
             return False
         return (
             expected.get("provider_id") == manifest.provider_id
+            and expected.get("provider_version") == manifest.provider_version
             and expected.get("manifest_fingerprint") == manifest.fingerprint
         )
 
@@ -1077,6 +1091,13 @@ class BoundProviderRouter:
         if not isinstance(task, WorkflowTask):
             raise TypeError("provider task must be a WorkflowTask")
         manifest = self.manifest_for(task.capability_id)
+        try:
+            validate_instance(manifest.input_schema, task.inputs, path="task.inputs")
+        except SchemaContractError as exc:
+            raise CapabilityUnavailable(
+                task.capability_id,
+                (f"task inputs violate the selected provider contract: {exc}",),
+            ) from exc
         provider = self._routes[task.capability_id]
         resolution = provider.resolve_task(task, require_installed=require_installed)
         if resolution.manifest.fingerprint != manifest.fingerprint:
@@ -1095,6 +1116,37 @@ class BoundProviderRouter:
             or result.get("manifest_fingerprint") != resolution.manifest.fingerprint
         ):
             raise RuntimeError("provider result identity does not match resolved manifest")
+        # Evidence stores add observation sequence, enrichment and
+        # verification fields after the provider has produced each finding.
+        # Those WHAXON-owned fields are not provider output, so validate a
+        # detached provider-contract view while preserving the persisted
+        # result unchanged for reports and callers.
+        evidence_metadata = {
+            "seq", "enrichment", "verification_status", "verified_by",
+            "verification_reason", "proof",
+        }
+        contract_result = dict(result)
+        findings = contract_result.get("findings")
+        if isinstance(findings, list):
+            contract_result["findings"] = [
+                {
+                    key: value for key, value in finding.items()
+                    if key not in evidence_metadata
+                }
+                if isinstance(finding, dict) else finding
+                for finding in findings
+            ]
+        try:
+            validate_instance(
+                resolution.manifest.output_schema, contract_result,
+                path="provider.result",
+            )
+        except SchemaContractError as exc:
+            # Dispatch has crossed the effect boundary. The scheduler records
+            # this provider failure as uncertain and requires reconciliation.
+            raise RuntimeError(
+                f"provider result violates its declared output contract: {exc}",
+            ) from exc
         return result
 
     def operation_reconciliation(self) -> list[dict]:
@@ -1166,17 +1218,68 @@ class BoundProviderRouter:
             optional_audit = getattr(provider, "portfolio_audit", None)
             if callable(optional_audit):
                 audits.append(optional_audit())
+        capability_providers = self._capability_provider_report()
         if len(audits) == 1:
             return {
                 **audits[0],
                 "operation_bindings": self.operation_reconciliation(),
+                "capability_providers": capability_providers,
+                "execution_enabled_by_audit": False,
             }
         return {
             "schema_version": "whaxon.portfolio-audit.v1",
             "provider_audits": audits,
             **({"operation_bindings": self.operation_reconciliation()} if audits else {}),
+            "capability_providers": capability_providers,
             "execution_enabled_by_audit": False,
         }
+
+    def _capability_provider_report(self) -> list[dict]:
+        """Join immutable provider contracts to current readiness, read-only."""
+        rows: list[dict] = []
+        for provider in self._providers:
+            live_rows = provider.inventory()
+            live_by_identity = {
+                (
+                    item.get("capability_id"), item.get("provider_id"),
+                    item.get("provider_version"),
+                ): item
+                for item in live_rows
+                if isinstance(item, dict)
+            }
+            for manifest in provider.bindings():
+                live = live_by_identity.get((
+                    manifest.capability_id, manifest.provider_id,
+                    manifest.provider_version,
+                ), {})
+                if live.get("executable") is True:
+                    state = "executable"
+                elif live.get("registered") is False:
+                    state = "binding_mismatch"
+                elif live.get("installed") is False:
+                    state = "registered_not_installed"
+                else:
+                    state = "registered"
+                rows.append({
+                    "capability_id": manifest.capability_id,
+                    "provider_id": manifest.provider_id,
+                    "provider_version": manifest.provider_version,
+                    "manifest_fingerprint": manifest.fingerprint,
+                    "manifest": manifest.to_dict(),
+                    "declared_readiness": manifest.readiness,
+                    "live_readiness": live.get("readiness", "unknown"),
+                    "state": state,
+                    "reason": live.get("reason", "live_readiness_unreported"),
+                    "installed": live.get("installed") is True,
+                    "executable": live.get("executable") is True,
+                    "authorization_required": True,
+                    "execution_enabled_by_audit": False,
+                })
+        return sorted(
+            rows, key=lambda row: (
+                row["capability_id"], row["provider_id"], row["provider_version"],
+            ),
+        )
 
     def inventory(self) -> list[dict]:
         """Report deployable routing, not just independently installed providers.

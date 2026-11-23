@@ -396,6 +396,9 @@ def start_install_batch_operation(
                 progress_callback=progress,
                 cancel_requested=cancel_path.exists,
             )
+            # Terminal state means another approved operation may now claim these dependencies.
+            for lock_path in lock_paths:
+                lock_path.unlink(missing_ok=True)
             current = get_install_operation(data_dir, operation_id) or state
             current.update({
                 "status": result["status"],

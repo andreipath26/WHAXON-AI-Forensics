@@ -50,6 +50,7 @@ def test_workflow_cli_proposes_and_saves_fixed_security_txt_plan(monkeypatch, ca
     assert plan.tasks[0].capability_id == CAPABILITY_ID and plan.tasks[0].inputs == {}
     assert plan.metadata["provider_bindings"]["security-txt-1"] == {
         "provider_id": _MANIFEST.provider_id,
+        "provider_version": _MANIFEST.provider_version,
         "manifest_fingerprint": _MANIFEST.fingerprint,
     }
 

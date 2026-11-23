@@ -373,6 +373,8 @@ class RobotsReconProvider:
         duration_s = time.monotonic() - started
         if not self.store.set_finished(job_id, 0, duration_s):
             raise RuntimeError("could not finish robots evidence job")
+        if not self.store.seal_engine_v2_provider_result(job_id):
+            raise RuntimeError("could not seal complete provider output")
         return duration_s, persisted
 
     def resolve_task(
@@ -420,7 +422,7 @@ class RobotsReconProvider:
         self.store.create(job_id)
         if not self.store.set_started(job_id, CAPABILITY_ID, task.target):
             raise RuntimeError("could not start robots evidence job")
-        self.store.mark_engine_v2_execution_job(job_id)
+        self.store.mark_engine_v2_execution_job(job_id, resolution.manifest)
         started = time.monotonic()
         child = _BoundedHttpsWorker(
             task.target,

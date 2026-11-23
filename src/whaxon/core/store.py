@@ -6,9 +6,11 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
+from typing import Literal
 
 from .provider_execution import (
     provider_capability_identity_is_known,
+    provider_supports_result_only_recovery,
     provider_tool_id_for_capability,
 )
 
@@ -52,7 +54,15 @@ SCHEMA = """
 -- Registered V2 jobs must never be dispatched by legacy follow-up rules.
 CREATE TABLE IF NOT EXISTS engine_v2_execution_jobs (
     job_id TEXT PRIMARY KEY,
-    marked_at REAL NOT NULL
+    marked_at REAL NOT NULL,
+    capability_id TEXT,
+    provider_id TEXT,
+    provider_version TEXT,
+    manifest_fingerprint TEXT
+);
+CREATE TABLE IF NOT EXISTS engine_v2_provider_result_seals (
+    attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, digest TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1, sealed_at REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, tool TEXT DEFAULT '', target TEXT DEFAULT '', status TEXT DEFAULT 'starting', exit_code INTEGER, error TEXT, started_at REAL, finished_at REAL, duration_s REAL, lease_owner TEXT, lease_token TEXT, heartbeat_at REAL);
 CREATE TABLE IF NOT EXISTS lines (job_id TEXT, seq INTEGER, stream TEXT, text TEXT, PRIMARY KEY (job_id, seq));
@@ -139,6 +149,10 @@ CREATE TABLE IF NOT EXISTS mission_execution_limits (
     max_total_attempts INTEGER NOT NULL,
     max_concurrency INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mission_runtime_limits (
+    mission_id TEXT PRIMARY KEY,
+    max_runtime_s REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS workflow_limits (
     plan_id TEXT PRIMARY KEY,
     max_total_attempts INTEGER NOT NULL,
@@ -224,6 +238,32 @@ def _workflow_evidence_digest(conn, *, attempt_id, job_id, target, capability_id
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _recovery_findings_are_well_formed(conn, job_id: str) -> bool:
+    """Reject corrupt persisted finding rows before recovery seals them."""
+    rows = conn.execute(
+        "SELECT seq, kind, severity, source, data_json, raw_line, enrichment_json, "
+        "verification_status, verified_by, verification_reason "
+        "FROM findings WHERE job_id=? ORDER BY seq", (job_id,),
+    ).fetchall()
+    for row in rows:
+        if (
+            type(row["seq"]) is not int or row["seq"] < 0
+            or any(not isinstance(row[key], str) for key in (
+                "kind", "severity", "source", "raw_line", "verification_status",
+                "verified_by", "verification_reason",
+            ))
+        ):
+            return False
+        try:
+            data = json.loads(row["data_json"] or "{}")
+            enrichment = json.loads(row["enrichment_json"] or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return False
+        if not isinstance(data, dict) or not isinstance(enrichment, dict):
+            return False
+    return True
+
+
 def _signature_for(kind: str, data: dict) -> str:
     """Build a stable per-finding signature for dedup."""
     if kind == "open_port":
@@ -299,6 +339,16 @@ class JobStore:
         c = self._conn()
         try:
             c.executescript(SCHEMA)
+            for column in (
+                "capability_id TEXT", "provider_id TEXT", "provider_version TEXT",
+                "manifest_fingerprint TEXT",
+            ):
+                try:
+                    c.execute(
+                        f"ALTER TABLE engine_v2_execution_jobs ADD COLUMN {column}"
+                    )
+                except sqlite3.OperationalError:
+                    pass
             # Durable worker leases. Existing databases are upgraded in place.
             try:
                 c.execute("ALTER TABLE task_attempts ADD COLUMN heartbeat_at REAL")
@@ -385,18 +435,72 @@ class JobStore:
         c.execute("PRAGMA synchronous=NORMAL")
         c.row_factory = sqlite3.Row
         return c
-    def mark_engine_v2_execution_job(self, job_id: str) -> None:
-        """Persist V2 job ownership before any external process starts."""
+    def mark_engine_v2_execution_job(self, job_id: str, manifest=None) -> None:
+        """Persist V2 ownership and the resolved manifest before provider effects."""
         if not isinstance(job_id, str) or not job_id:
             raise ValueError("valid V2 job identity required")
+        binding = None
+        if manifest is not None:
+            document = manifest.to_dict() if callable(getattr(manifest, "to_dict", None)) else manifest
+            if not isinstance(document, dict):
+                raise TypeError("provider manifest binding must be an object")
+            required = ("capability_id", "provider_id", "provider_version")
+            if any(not isinstance(document.get(key), str) or not document[key] for key in required):
+                raise ValueError("provider manifest binding is incomplete")
+            encoded = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            fingerprint = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+            declared = getattr(manifest, "fingerprint", fingerprint)
+            if declared != fingerprint:
+                raise ValueError("provider manifest fingerprint is inconsistent")
+            binding = (
+                document["capability_id"], document["provider_id"],
+                document["provider_version"], fingerprint, encoded,
+            )
         with self._lock:
             conn = self._conn()
             try:
+                conn.execute("BEGIN IMMEDIATE")
                 conn.execute(
                     "INSERT OR IGNORE INTO engine_v2_execution_jobs "
                     "(job_id, marked_at) VALUES (?, ?)",
                     (job_id, time.time()),
                 )
+                if binding is not None:
+                    cap, provider, version, fingerprint, encoded = binding
+                    registered = conn.execute(
+                        "SELECT fingerprint, manifest_json FROM capability_manifests "
+                        "WHERE capability_id=? AND provider_id=? AND provider_version=?",
+                        (cap, provider, version),
+                    ).fetchone()
+                    if (
+                        registered is None
+                        or registered["fingerprint"] != fingerprint
+                        or registered["manifest_json"] != encoded
+                    ):
+                        raise ValueError("provider manifest is not the registered immutable binding")
+                    existing = conn.execute(
+                        "SELECT capability_id, provider_id, provider_version, manifest_fingerprint "
+                        "FROM engine_v2_execution_jobs WHERE job_id=?", (job_id,),
+                    ).fetchone()
+                    current = tuple(existing[key] for key in (
+                        "capability_id", "provider_id", "provider_version",
+                        "manifest_fingerprint",
+                    ))
+                    expected = (cap, provider, version, fingerprint)
+                    if current == (None, None, None, None):
+                        conn.execute(
+                            "UPDATE engine_v2_execution_jobs SET capability_id=?, provider_id=?, "
+                            "provider_version=?, manifest_fingerprint=? WHERE job_id=? "
+                            "AND capability_id IS NULL AND provider_id IS NULL "
+                            "AND provider_version IS NULL AND manifest_fingerprint IS NULL",
+                            (*expected, job_id),
+                        )
+                    elif current != expected:
+                        raise ValueError("V2 provider manifest binding is immutable")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
             finally:
                 conn.close()
 
@@ -584,6 +688,45 @@ class JobStore:
                 )
             finally: c.close()
 
+    def update_legacy_verification_if_unowned(
+        self, job_id, seq, status, by="engine", reason="",
+    ) -> Literal["updated", "v2_owned", "not_found"]:
+        """Atomically update a legacy finding only while V2 does not own its job."""
+        if status not in ("verified", "refuted"):
+            raise ValueError("legacy verification status must be verified or refuted")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute(
+                    "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
+                    (job_id,),
+                ).fetchone() is not None:
+                    c.commit()
+                    return "v2_owned"
+                if c.execute(
+                    "SELECT 1 FROM findings WHERE job_id=? AND seq=?",
+                    (job_id, seq),
+                ).fetchone() is None:
+                    c.commit()
+                    return "not_found"
+                updated = c.execute(
+                    "UPDATE findings SET verification_status=?, verified_by=?, "
+                    "verification_reason=? WHERE job_id=? AND seq=?",
+                    (status, by, reason, job_id, seq),
+                )
+                if updated.rowcount != 1:
+                    c.commit()
+                    return "not_found"
+                c.commit()
+                return "updated"
+            except Exception:
+                if c.in_transaction:
+                    c.rollback()
+                raise
+            finally:
+                c.close()
+
     def update_verification(self, job_id, seq, status, by="engine", reason=""):
         with self._lock:
             c = self._conn()
@@ -639,18 +782,151 @@ class JobStore:
         with self._lock:
             c = self._conn()
             try:
+                c.execute("BEGIN IMMEDIATE")
+                finished_at = time.time()
                 if lease_token:
                     cur = c.execute(
                         "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? "
                         "WHERE id=? AND status='running' AND lease_token=?",
-                        (exit_code, duration_s, time.time(), job_id, lease_token),
+                        (exit_code, duration_s, finished_at, job_id, lease_token),
                     )
                 else:
                     cur = c.execute(
                         "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? WHERE id=?",
-                        (exit_code, duration_s, time.time(), job_id),
+                        (exit_code, duration_s, finished_at, job_id),
                     )
-                return cur.rowcount == 1
+                if cur.rowcount != 1:
+                    c.commit()
+                    return False
+
+                # Provider output sealing is a separate post-parse step.
+                # ToolRunner emits JobFinished before its findings events.
+                c.commit()
+                return True
+            except Exception:
+                c.rollback()
+                raise
+            finally:
+                c.close()
+
+    def seal_engine_v2_provider_result(self, job_id: str) -> bool:
+        """Seal the complete parsed provider result after its output is persisted."""
+        if not isinstance(job_id, str) or not job_id:
+            raise ValueError("valid V2 job identity required")
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute(
+                    "SELECT 1 FROM task_attempts WHERE id=?", (job_id,),
+                ).fetchone() is None:
+                    # Direct provider calls have no workflow attempt to recover.
+                    # Ownership still fences legacy follow-up, but no workflow
+                    # completion snapshot is needed.
+                    c.commit()
+                    return True
+                binding = c.execute(
+                    "SELECT j.status, t.target, t.capability_id, t.task_key, t.impact, "
+                    "t.permissions_json, p.digest AS plan_digest, p.plan_json, "
+                    "v.capability_id AS bound_capability_id, v.provider_id, "
+                    "v.provider_version, v.manifest_fingerprint, m.fingerprint, "
+                    "m.manifest_json FROM jobs j "
+                    "JOIN engine_v2_execution_jobs v ON v.job_id=j.id "
+                    "JOIN task_attempts a ON a.id=j.id "
+                    "JOIN workflow_tasks t ON t.id=a.task_id "
+                    "JOIN workflow_plans p ON p.id=t.plan_id "
+                    "LEFT JOIN capability_manifests m ON "
+                    "m.capability_id=v.capability_id AND m.provider_id=v.provider_id "
+                    "AND m.provider_version=v.provider_version WHERE j.id=?",
+                    (job_id,),
+                ).fetchone()
+                if (
+                    binding is None or binding["status"] != "finished"
+                    or binding["bound_capability_id"] != binding["capability_id"]
+                    or binding["fingerprint"] is None
+                    or binding["fingerprint"] != binding["manifest_fingerprint"]
+                ):
+                    c.commit()
+                    return False
+                try:
+                    manifest = json.loads(binding["manifest_json"])
+                    plan_document = json.loads(binding["plan_json"])
+                    if (
+                        not isinstance(manifest, dict)
+                        or not isinstance(manifest.get("permissions"), list)
+                        or any(not isinstance(item, str) for item in manifest["permissions"])
+                    ):
+                        manifest = None
+                    manifest_fingerprint = hashlib.sha256(
+                        json.dumps(
+                            manifest, sort_keys=True, separators=(",", ":"),
+                            ensure_ascii=False,
+                        ).encode("utf-8"),
+                    ).hexdigest()
+                    provider_bindings = plan_document.get("metadata", {}).get(
+                        "provider_bindings", {},
+                    )
+                    planned_binding = provider_bindings.get(binding["task_key"])
+                    planned_binding_matches = (
+                        not provider_bindings or (
+                            isinstance(planned_binding, dict)
+                            and planned_binding.get("provider_id") == binding["provider_id"]
+                            and planned_binding.get("provider_version")
+                            == binding["provider_version"]
+                            and planned_binding.get("manifest_fingerprint")
+                            == binding["manifest_fingerprint"]
+                        )
+                    )
+                    task_permissions = json.loads(binding["permissions_json"])
+                except (TypeError, ValueError, AttributeError):
+                    manifest = None
+                    manifest_fingerprint = None
+                    planned_binding_matches = False
+                    task_permissions = None
+                if (
+                    manifest is None or not planned_binding_matches
+                    or manifest_fingerprint != binding["manifest_fingerprint"]
+                    or manifest.get("impact") != binding["impact"]
+                    or not isinstance(task_permissions, list)
+                    or any(not isinstance(item, str) for item in task_permissions)
+                    or sorted(manifest["permissions"]) != sorted(task_permissions)
+                ):
+                    c.commit()
+                    return False
+                digest = _workflow_evidence_digest(
+                    c, attempt_id=job_id, job_id=job_id,
+                    target=binding["target"],
+                    capability_id=binding["capability_id"],
+                    plan_digest=binding["plan_digest"],
+                )
+                if digest is None:
+                    c.commit()
+                    return False
+                existing = c.execute(
+                    "SELECT job_id, digest, version FROM engine_v2_provider_result_seals "
+                    "WHERE attempt_id=?", (job_id,),
+                ).fetchone()
+                if existing is not None:
+                    if (
+                        existing["job_id"] != job_id
+                        or existing["version"] != 1
+                        or not hmac.compare_digest(existing["digest"], digest)
+                    ):
+                        raise ValueError("provider output changed after its completion seal")
+                    c.commit()
+                    return True
+                c.execute(
+                    "INSERT INTO engine_v2_provider_result_seals "
+                    "(attempt_id, job_id, digest, version, sealed_at) "
+                    "VALUES (?, ?, ?, 1, ?)",
+                    (job_id, job_id, digest, time.time()),
+                )
+                c.commit()
+                return True
+            except Exception:
+                if c.in_transaction:
+                    c.rollback()
+                raise
             finally:
                 c.close()
 
@@ -875,10 +1151,31 @@ class JobStore:
         finally:
             c.close()
 
-    def history(self, limit=50):
+    def history_page(self, limit=50, offset=0, *, include_findings=True):
+        """Return one snapshot-consistent bounded history/findings page."""
+        if type(limit) is not int or limit < 1:
+            raise ValueError("history limit must be a positive integer")
+        if type(offset) is not int or offset < 0:
+            raise ValueError("history offset must be a nonnegative integer")
         c = self._conn()
         try:
-            rows = c.execute("SELECT id, tool, target, status, exit_code, duration_s, started_at FROM jobs WHERE status IN ('finished','failed') ORDER BY started_at DESC LIMIT ?", (limit,)).fetchall()
+            c.execute("BEGIN")
+            total = c.execute(
+                "SELECT COUNT(*) FROM jobs WHERE status IN ('finished','failed')",
+            ).fetchone()[0]
+            total_findings = (
+                c.execute(
+                    "SELECT COUNT(*) FROM findings f JOIN jobs j ON j.id=f.job_id "
+                    "WHERE j.status IN ('finished','failed')",
+                ).fetchone()[0]
+                if include_findings else None
+            )
+            rows = c.execute(
+                "SELECT id, tool, target, status, exit_code, duration_s, started_at "
+                "FROM jobs WHERE status IN ('finished','failed') "
+                "ORDER BY started_at DESC, id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
             out = []
             for r in rows:
                 line_count = c.execute(
@@ -887,7 +1184,7 @@ class JobStore:
                 findings_count = c.execute(
                     "SELECT COUNT(*) AS n FROM findings WHERE job_id=?", (r["id"],)
                 ).fetchone()["n"]
-                out.append({
+                job = {
                     "id": r["id"],
                     "tool": r["tool"],
                     "target": r["target"],
@@ -897,9 +1194,54 @@ class JobStore:
                     "started_at": r["started_at"],
                     "line_count": line_count,
                     "findings_count": findings_count,
-                })
-            return out
+                }
+                finding_rows = c.execute(
+                    "SELECT seq, kind, severity, source, data_json, raw_line, "
+                    "enrichment_json, verification_status, verified_by, verification_reason "
+                    "FROM findings WHERE job_id=? ORDER BY seq", (r["id"],),
+                ).fetchall() if include_findings else []
+                findings = []
+                for finding in finding_rows:
+                    enrichment = {}
+                    try:
+                        enrichment = json.loads(finding["enrichment_json"] or "{}")
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    findings.append({
+                        "seq": finding["seq"],
+                        "verification_status": finding["verification_status"],
+                        "verified_by": finding["verified_by"],
+                        "verification_reason": finding["verification_reason"],
+                        "kind": finding["kind"],
+                        "severity": finding["severity"],
+                        "source": finding["source"],
+                        "data": json.loads(finding["data_json"]),
+                        "raw_line": finding["raw_line"],
+                        "remediation": enrichment.get("remediation", ""),
+                        "impact": enrichment.get("impact", ""),
+                        "cvss": enrichment.get("cvss"),
+                        "cwe": enrichment.get("cwe", ""),
+                        "references": enrichment.get("references", []),
+                        "lookup_hint": enrichment.get("lookup_hint", ""),
+                        "proof": enrichment.get("proof", ""),
+                        "request_context": enrichment.get("request_context") or {},
+                    })
+                out.append({"job": job, "findings": findings})
+            c.commit()
+            returned_findings = sum(
+                len(item["findings"]) if include_findings else item["job"]["findings_count"]
+                for item in out
+            )
+            return out, total, total_findings, returned_findings
         finally: c.close()
+
+    def history(self, limit=50, offset=0):
+        return [
+            entry["job"]
+            for entry in self.history_page(
+                limit, offset, include_findings=False,
+            )[0]
+        ]
 
     def findings_by_target(self, limit: int = 50) -> list[dict]:
         """Group findings by target, deduped by (kind, signature)."""
@@ -1001,19 +1343,35 @@ class JobStore:
 
     def save_capability_manifest(self, manifest):
         import hashlib
-        encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+        encoded = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         key = (manifest["capability_id"], manifest["provider_id"], manifest["provider_version"])
         fingerprint = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
         with self._lock:
             c = self._conn()
             try:
                 row = c.execute(
-                    "SELECT fingerprint FROM capability_manifests WHERE capability_id=? AND provider_id=? AND provider_version=?",
+                    "SELECT fingerprint, manifest_json FROM capability_manifests "
+                    "WHERE capability_id=? AND provider_id=? AND provider_version=?",
                     key,
                 ).fetchone()
                 if row is not None:
-                    if row["fingerprint"] != fingerprint:
+                    try:
+                        existing_manifest = json.loads(row["manifest_json"])
+                    except (TypeError, ValueError, json.JSONDecodeError):
+                        existing_manifest = None
+                    if existing_manifest != manifest:
                         raise ValueError("provider manifest version is immutable")
+                    if (
+                        row["fingerprint"] != fingerprint
+                        or row["manifest_json"] != encoded
+                    ):
+                        # Normalize rows created before provider fingerprints used
+                        # the same UTF-8 canonical form as CapabilityManifest.
+                        c.execute(
+                            "UPDATE capability_manifests SET fingerprint=?, manifest_json=? "
+                            "WHERE capability_id=? AND provider_id=? AND provider_version=?",
+                            (fingerprint, encoded, *key),
+                        )
                     return False
                 c.execute(
                     "INSERT INTO capability_manifests (capability_id, provider_id, provider_version, fingerprint, manifest_json, registered_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1598,8 +1956,9 @@ class JobStore:
             finally:
                 c.close()
 
-    def get_workflow_deadline(self, plan_id):
-        c = self._conn()
+    def get_workflow_deadline(self, plan_id, *, _connection=None):
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
@@ -1608,7 +1967,8 @@ class JobStore:
             ).fetchone()
             return row["deadline_at"] if row else None
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def set_workflow_limits(self, plan_id, *, max_total_attempts, max_concurrency):
         """Set conservative backend-enforced limits; never relax active limits."""
@@ -1662,8 +2022,9 @@ class JobStore:
             finally:
                 c.close()
 
-    def get_workflow_plan(self, plan_id):
-        c = self._conn()
+    def get_workflow_plan(self, plan_id, *, _connection=None):
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             row = c.execute("SELECT * FROM workflow_plans WHERE id=?", (plan_id,)).fetchone()
             if row is None:
@@ -1672,7 +2033,8 @@ class JobStore:
             value["plan"] = json.loads(value.pop("plan_json"))
             return value
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def verify_workflow_plan_integrity(self, plan_id):
         """Verify the immutable DAG snapshot against persisted executable rows.
@@ -1741,8 +2103,9 @@ class JobStore:
         return {"plan_id": plan_id, "valid": True, "digest": row["digest"],
                 "task_count": len(plan.tasks)}
 
-    def list_workflow_tasks(self, plan_id):
-        c = self._conn()
+    def list_workflow_tasks(self, plan_id, *, _connection=None):
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             rows = c.execute(
                 "SELECT id AS task_ref, task_key AS id, plan_id, capability_id, target, "
@@ -1771,7 +2134,8 @@ class JobStore:
                 result.append(value)
             return result
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def workflow_attempt_owned(self, attempt_id):
         """Read ownership fencing state before invoking any provider."""
@@ -1804,8 +2168,15 @@ class JobStore:
             finally:
                 c.close()
 
-    def reconcile_workflow_attempts(self, stale_after_s=None):
-        """Mark orphaned attempts uncertain; optionally preserve fresh worker leases."""
+    def reconcile_workflow_attempts(self, stale_after_s=None, *, limit=128):
+        """Mark one bounded page of orphaned attempts uncertain.
+
+        Callers that need a complete startup sweep must repeat until this
+        returns zero. Each page uses its own short write transaction so a
+        large stale backlog does not monopolize SQLite for one transaction.
+        """
+        if type(limit) is not int or not 1 <= limit <= 1024:
+            raise ValueError("limit must be an integer in [1, 1024]")
         now = time.time()
         if stale_after_s is not None:
             if isinstance(stale_after_s, bool):
@@ -1824,15 +2195,16 @@ class JobStore:
                 if stale_after_s is None:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
-                        "WHERE status='running' ORDER BY started_at, id"
+                        "WHERE status='running' ORDER BY started_at, id LIMIT ?",
+                        (limit,),
                     ).fetchall()
                 else:
                     rows = c.execute(
                         "SELECT id, task_id FROM task_attempts "
                         "WHERE status='running' "
                         "AND COALESCE(heartbeat_at, started_at) < ? "
-                        "ORDER BY started_at, id",
-                        (stale_before,),
+                        "ORDER BY started_at, id LIMIT ?",
+                        (stale_before, limit),
                     ).fetchall()
                 for row in rows:
                     error = "worker stopped before recording an outcome; reconcile before retry"
@@ -1908,8 +2280,19 @@ class JobStore:
                     "SELECT last_event_id FROM workflow_event_cursors "
                     "WHERE plan_id=? AND consumer_id=?", (plan_id, consumer_id),
                 ).fetchone()
-                if old is not None and event_id < old["last_event_id"]:
+                last_event_id = old["last_event_id"] if old is not None else 0
+                if event_id < last_event_id:
                     raise ValueError("workflow event cursor cannot move backwards")
+                if event_id > last_event_id:
+                    next_event = c.execute(
+                        "SELECT id FROM workflow_events WHERE plan_id=? AND id>? "
+                        "ORDER BY id LIMIT 1",
+                        (plan_id, last_event_id),
+                    ).fetchone()
+                    if next_event is None or event_id != next_event["id"]:
+                        raise ValueError(
+                            "workflow event cursor cannot skip unacknowledged events"
+                        )
                 c.execute(
                     "INSERT INTO workflow_event_cursors "
                     "(plan_id, consumer_id, last_event_id, updated_at) VALUES (?, ?, ?, ?) "
@@ -2119,7 +2502,8 @@ class JobStore:
                 row = c.execute(
                     "SELECT a.id, a.status AS attempt_status, t.id AS task_ref, "
                     "t.task_key, t.status AS task_status, t.active_attempt_id, "
-                    "t.target, t.capability_id, p.digest AS plan_digest, "
+                    "t.target, t.capability_id, t.impact, "
+                    "t.permissions_json, p.digest AS plan_digest, p.plan_json, "
                     "p.status AS plan_status FROM task_attempts a "
                     "JOIN workflow_tasks t ON t.id=a.task_id "
                     "JOIN workflow_plans p ON p.id=t.plan_id "
@@ -2143,6 +2527,10 @@ class JobStore:
                 if not identity_is_known:
                     raise ValueError(
                         "provider capability identity is unknown; manual reconciliation required",
+                    )
+                if not provider_supports_result_only_recovery(capability_id):
+                    raise ValueError(
+                        "provider effects require manual reconciliation",
                     )
                 tool_id = provider_tool_id_for_capability(capability_id)
                 dispatch_events = c.execute(
@@ -2179,6 +2567,86 @@ class JobStore:
                     or isinstance(job["exit_code"], bool)
                 ):
                     raise ValueError("no matching successful durable provider job is available")
+                provider_binding = c.execute(
+                    "SELECT v.capability_id, v.provider_id, v.provider_version, "
+                    "v.manifest_fingerprint, m.fingerprint, m.manifest_json "
+                    "FROM engine_v2_execution_jobs v LEFT JOIN capability_manifests m "
+                    "ON m.capability_id=v.capability_id AND m.provider_id=v.provider_id "
+                    "AND m.provider_version=v.provider_version WHERE v.job_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if (
+                    provider_binding is None
+                    or provider_binding["capability_id"] != capability_id
+                    or not provider_binding["provider_id"]
+                    or not provider_binding["provider_version"]
+                    or provider_binding["fingerprint"] is None
+                    or provider_binding["fingerprint"]
+                    != provider_binding["manifest_fingerprint"]
+                ):
+                    raise ValueError("provider manifest binding is missing or changed")
+                try:
+                    manifest = json.loads(provider_binding["manifest_json"])
+                    if not isinstance(manifest, dict):
+                        raise ValueError("provider manifest is not an object")
+                    plan_document = json.loads(row["plan_json"])
+                    task_permissions = json.loads(row["permissions_json"])
+                    manifest_fingerprint = hashlib.sha256(
+                        json.dumps(
+                            manifest, sort_keys=True, separators=(",", ":"),
+                            ensure_ascii=False,
+                        ).encode("utf-8"),
+                    ).hexdigest()
+                    provider_bindings = plan_document.get("metadata", {}).get(
+                        "provider_bindings", {},
+                    )
+                    planned_binding = provider_bindings.get(row["task_key"])
+                    planned_binding_matches = (
+                        isinstance(provider_bindings, dict)
+                        and isinstance(planned_binding, dict)
+                        and planned_binding.get("provider_id")
+                        == provider_binding["provider_id"]
+                        and planned_binding.get("provider_version")
+                        == provider_binding["provider_version"]
+                        and planned_binding.get("manifest_fingerprint")
+                        == provider_binding["manifest_fingerprint"]
+                    )
+                except (TypeError, ValueError, AttributeError):
+                    manifest = None
+                    task_permissions = None
+                    manifest_fingerprint = None
+                    planned_binding_matches = False
+                allowed_side_effects = {
+                    "dns_queries", "resolver_logs", "https_requests",
+                    "network_traffic", "target_service_logs",
+                    "tls_connection", "certificate_metadata",
+                }
+                if (
+                    not planned_binding_matches or manifest is None
+                    or manifest.get("capability_id") != capability_id
+                    or manifest.get("provider_id") != provider_binding["provider_id"]
+                    or manifest.get("provider_version") != provider_binding["provider_version"]
+                    or manifest_fingerprint != provider_binding["manifest_fingerprint"]
+                    or manifest.get("impact") != row["impact"]
+                    or manifest.get("impact") != "moderate"
+                    or not isinstance(task_permissions, list)
+                    or any(not isinstance(item, str) for item in task_permissions)
+                    or not isinstance(manifest.get("permissions"), list)
+                    or any(not isinstance(item, str) for item in manifest["permissions"])
+                    or sorted(manifest["permissions"]) != sorted(task_permissions)
+                    or not isinstance(manifest.get("side_effects"), list)
+                    or any(not isinstance(item, str) for item in manifest["side_effects"])
+                    or not set(manifest["side_effects"]).issubset(allowed_side_effects)
+                    or not manifest["side_effects"]
+                ):
+                    raise ValueError("provider manifest effects require manual reconciliation")
+                if c.execute(
+                    "SELECT 1 FROM evidence WHERE job_id=? AND path IS NOT NULL AND path<>''",
+                    (attempt_id,),
+                ).fetchone() is not None:
+                    raise ValueError("file-backed provider evidence requires manual reconciliation")
+                if not _recovery_findings_are_well_formed(c, attempt_id):
+                    raise ValueError("durable provider findings are malformed")
                 findings = [dict(item) for item in c.execute(
                     "SELECT seq, kind, severity, source, data_json, raw_line, "
                     "enrichment_json, verification_status, verified_by, verification_reason "
@@ -2192,6 +2660,20 @@ class JobStore:
                 )
                 if evidence_digest is None:
                     raise ValueError("durable provider evidence failed identity validation")
+                provider_seal = c.execute(
+                    "SELECT job_id, digest, version FROM engine_v2_provider_result_seals "
+                    "WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if (
+                    provider_seal is None
+                    or provider_seal["job_id"] != attempt_id
+                    or provider_seal["version"] != 1
+                    or not hmac.compare_digest(provider_seal["digest"], evidence_digest)
+                ):
+                    raise ValueError(
+                        "durable provider result changed after completion or has no completion seal",
+                    )
                 if c.execute(
                     "SELECT 1 FROM workflow_evidence_seals WHERE attempt_id=?",
                     (attempt_id,),
@@ -2206,6 +2688,9 @@ class JobStore:
                     "job_id": attempt_id, "tool_id": tool_id,
                     "target": row["target"], "exit_code": job["exit_code"],
                     "duration_s": job["duration_s"], "findings": findings,
+                    "provider_id": provider_binding["provider_id"],
+                    "provider_version": provider_binding["provider_version"],
+                    "manifest_fingerprint": provider_binding["manifest_fingerprint"],
                     "recovered_from_durable_provider_job": True,
                     "provider_effect_state": (
                         "completed" if recovered_status == "succeeded"
@@ -2391,9 +2876,10 @@ class JobStore:
             finally:
                 c.close()
 
-    def get_workflow_dispatch_reconciliation(self, plan_id):
+    def get_workflow_dispatch_reconciliation(self, plan_id, *, _connection=None):
         """Separate uncertain attempts and expose any operator resolution record."""
-        c = self._conn()
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
@@ -2487,7 +2973,8 @@ class JobStore:
                 })
             return results
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def get_workflow_audit_snapshot(self, plan_id):
         """Digest a consistent lifecycle snapshot for *external* anchoring.
@@ -2566,12 +3053,13 @@ class JobStore:
         actual = self.get_workflow_audit_snapshot(plan_id)["digest"]
         return hmac.compare_digest(actual, expected_digest)
 
-    def get_workflow_audit_integrity(self, plan_id):
+    def get_workflow_audit_integrity(self, plan_id, *, _connection=None):
         """Check that every persisted attempt has exactly one claim event.
 
         This is an internal consistency check, not a cryptographic trust anchor.
         """
-        c = self._conn()
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
             if c.execute("SELECT 1 FROM workflow_plans WHERE id=?", (plan_id,)).fetchone() is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
@@ -2895,14 +3383,30 @@ class JobStore:
                 ),
             }
         finally:
-            c.close()
+            if owns_connection:
+                c.close()
 
     def get_workflow_readiness(self, plan_id):
         """Fail-safe operational summary of outstanding reconciliation and controls."""
-        snapshot = self.get_workflow_progress(plan_id)
-        reconciliation = self.get_workflow_dispatch_reconciliation(plan_id)
-        audit = self.get_workflow_audit_integrity(plan_id)
-        deadline = self.get_workflow_deadline(plan_id)
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            return self._get_workflow_readiness_tx(c, plan_id)
+        finally:
+            c.close()
+
+    def _get_workflow_readiness_tx(self, c, plan_id, *, progress=None):
+        """Project readiness from the caller's SQLite read snapshot."""
+        snapshot = progress or self._get_workflow_progress_tx(c, plan_id)
+        reconciliation = self.get_workflow_dispatch_reconciliation(
+            plan_id, _connection=c,
+        )
+        audit = self.get_workflow_audit_integrity(plan_id, _connection=c)
+        deadline_row = c.execute(
+            "SELECT deadline_at FROM workflow_deadlines WHERE plan_id=?",
+            (plan_id,),
+        ).fetchone()
+        deadline = deadline_row["deadline_at"] if deadline_row else None
         blockers = []
         if not audit["consistent"]:
             blockers.append("workflow_audit_inconsistent")
@@ -2931,7 +3435,7 @@ class JobStore:
             and snapshot["total_tasks"] == snapshot["counts"].get("succeeded", 0),
         }
 
-    def get_workflow_evidence(self, plan_id, *, limit=100):
+    def get_workflow_evidence(self, plan_id, *, limit=100, _connection=None):
         """Link successful workflow attempts to their real persisted tool evidence.
 
         This is a read-only reporting boundary. Missing, contradictory or
@@ -2939,14 +3443,21 @@ class JobStore:
         """
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
             raise ValueError("limit must be between 1 and 1000")
-        c = self._conn()
+        owns_connection = _connection is None
+        c = _connection if _connection is not None else self._conn()
         try:
-            c.execute("BEGIN")
+            if owns_connection:
+                c.execute("BEGIN")
             plan = c.execute(
                 "SELECT mission_id, digest FROM workflow_plans WHERE id=?", (plan_id,),
             ).fetchone()
             if plan is None:
                 raise ValueError(f"unknown workflow plan: {plan_id}")
+            attempt_count = c.execute(
+                "SELECT COUNT(*) AS n FROM task_attempts a "
+                "JOIN workflow_tasks t ON t.id=a.task_id WHERE t.plan_id=?",
+                (plan_id,),
+            ).fetchone()["n"]
             rows = c.execute(
                 "SELECT t.task_key, t.target, t.capability_id, a.id AS attempt_id, "
                 "a.attempt_no, a.status, a.result_json, a.error, "
@@ -2957,6 +3468,7 @@ class JobStore:
                 "WHERE t.plan_id=? ORDER BY a.started_at, a.id LIMIT ?",
                 (plan_id, limit),
             ).fetchall()
+            truncated = attempt_count > len(rows)
             evidence = []
             for row in rows:
                 entry = {
@@ -3096,13 +3608,45 @@ class JobStore:
             return {
                 "plan_id": plan_id, "mission_id": plan["mission_id"],
                 "plan_digest": plan["digest"],
+                "attempt_count": attempt_count,
+                "returned_attempt_count": len(evidence),
+                "truncated": truncated,
                 "attempts": evidence,
-                "all_evidence_recorded": bool(evidence) and all(
+                "all_evidence_recorded": bool(evidence) and not truncated
+                and len(evidence) == attempt_count and all(
                     item["evidence_status"] == "recorded" for item in evidence
                 ),
-                "all_evidence_integrity_verified": bool(evidence) and all(
+                "all_evidence_integrity_verified": bool(evidence) and not truncated
+                and len(evidence) == attempt_count and all(
                     item["integrity_status"] == "verified" for item in evidence
                 ),
+            }
+        finally:
+            if owns_connection:
+                c.close()
+
+    def get_workflow_report_snapshot(self, plan_id, *, limit=100):
+        """Read every plan-report projection from one SQLite read snapshot."""
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            evidence = self.get_workflow_evidence(
+                plan_id, limit=limit, _connection=c,
+            )
+            progress = self._get_workflow_progress_tx(c, plan_id)
+            readiness = self._get_workflow_readiness_tx(
+                c, plan_id, progress=progress,
+            )
+            tasks = self.list_workflow_tasks(plan_id, _connection=c)
+            plan = self.get_workflow_plan(plan_id, _connection=c)
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            return {
+                "evidence": evidence,
+                "progress": progress,
+                "readiness": readiness,
+                "tasks": tasks,
+                "plan": plan["plan"],
             }
         finally:
             c.close()
@@ -3190,57 +3734,62 @@ class JobStore:
         c = self._conn()
         try:
             c.execute("BEGIN")
-            plan = c.execute(
-                "SELECT mission_id, status FROM workflow_plans WHERE id=?", (plan_id,)
-            ).fetchone()
-            if plan is None:
-                raise ValueError(f"unknown workflow plan: {plan_id}")
-            rows = c.execute(
-                "SELECT status, COUNT(*) AS n FROM workflow_tasks "
-                "WHERE plan_id=? GROUP BY status", (plan_id,),
-            ).fetchall()
-            attempts = c.execute(
-                "SELECT COUNT(*) AS n FROM task_attempts a "
-                "JOIN workflow_tasks t ON t.id=a.task_id "
-                "WHERE t.plan_id=?", (plan_id,),
-            ).fetchone()["n"]
-            usage = c.execute(
-                "SELECT COUNT(*) AS total, "
-                "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
-                "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
-                "WHERE t.plan_id=?", (plan_id,),
-            ).fetchone()
-            limits = c.execute(
-                "SELECT max_total_attempts, max_concurrency FROM workflow_limits WHERE plan_id=?",
-                (plan_id,),
-            ).fetchone()
-            budget = limits["max_total_attempts"] if limits else 100
-            concurrency = limits["max_concurrency"] if limits else 4
-            counts = {row["status"]: row["n"] for row in rows}
-            total = sum(counts.values())
-            # A failed task may still be retryable; without the caller's retry
-            # policy persisted here it must never count as verified complete.
-            terminal = sum(counts.get(status, 0) for status in (
-                "succeeded", "blocked", "cancelled", "uncertain",
-            ))
-            return {
-                "plan_id": plan_id,
-                "mission_id": plan["mission_id"],
-                "status": plan["status"],
-                "cancellation_requested": plan["status"] == "cancel_requested",
-                "total_tasks": total,
-                "terminal_tasks": terminal,
-                "attempts": attempts,
-                "active_attempts": usage["active"],
-                "remaining_attempt_budget": max(0, budget - usage["total"]),
-                "max_total_attempts": budget,
-                "max_concurrency": concurrency,
-                "attempt_budget_exhausted": usage["total"] >= budget,
-                "counts": counts,
-                "complete": terminal == total,
-            }
+            return self._get_workflow_progress_tx(c, plan_id)
         finally:
             c.close()
+
+    @staticmethod
+    def _get_workflow_progress_tx(c, plan_id):
+        """Read workflow progress using a caller-owned SQLite transaction."""
+        plan = c.execute(
+            "SELECT mission_id, status FROM workflow_plans WHERE id=?", (plan_id,)
+        ).fetchone()
+        if plan is None:
+            raise ValueError(f"unknown workflow plan: {plan_id}")
+        rows = c.execute(
+            "SELECT status, COUNT(*) AS n FROM workflow_tasks "
+            "WHERE plan_id=? GROUP BY status", (plan_id,),
+        ).fetchall()
+        attempts = c.execute(
+            "SELECT COUNT(*) AS n FROM task_attempts a "
+            "JOIN workflow_tasks t ON t.id=a.task_id "
+            "WHERE t.plan_id=?", (plan_id,),
+        ).fetchone()["n"]
+        usage = c.execute(
+            "SELECT COUNT(*) AS total, "
+            "COALESCE(SUM(CASE WHEN a.status='running' THEN 1 ELSE 0 END), 0) AS active "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "WHERE t.plan_id=?", (plan_id,),
+        ).fetchone()
+        limits = c.execute(
+            "SELECT max_total_attempts, max_concurrency FROM workflow_limits WHERE plan_id=?",
+            (plan_id,),
+        ).fetchone()
+        budget = limits["max_total_attempts"] if limits else 100
+        concurrency = limits["max_concurrency"] if limits else 4
+        counts = {row["status"]: row["n"] for row in rows}
+        total = sum(counts.values())
+        # A failed task may still be retryable; without the caller's retry
+        # policy persisted here it must never count as verified complete.
+        terminal = sum(counts.get(status, 0) for status in (
+            "succeeded", "blocked", "cancelled", "uncertain",
+        ))
+        return {
+            "plan_id": plan_id,
+            "mission_id": plan["mission_id"],
+            "status": plan["status"],
+            "cancellation_requested": plan["status"] == "cancel_requested",
+            "total_tasks": total,
+            "terminal_tasks": terminal,
+            "attempts": attempts,
+            "active_attempts": usage["active"],
+            "remaining_attempt_budget": max(0, budget - usage["total"]),
+            "max_total_attempts": budget,
+            "max_concurrency": concurrency,
+            "attempt_budget_exhausted": usage["total"] >= budget,
+            "counts": counts,
+            "complete": terminal == total,
+        }
 
     def reconcile_workflow_plan(self, plan_id, *, stale_after_s=60.0):
         """Conservatively reconcile only expired attempts belonging to a plan.
@@ -3585,17 +4134,103 @@ class JobStore:
             deadline = c.execute(
                 "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?", (mission_id,),
             ).fetchone()
+            runtime = self._mission_runtime_usage(c, mission_id, now=time.time())
             return {
                 "mission_id": mission_id,
                 "deadline_at": deadline["deadline_at"] if deadline else None,
                 "deadline_exceeded": bool(deadline and time.time() >= deadline["deadline_at"]),
                 "max_total_attempts": limits["max_total_attempts"] if limits else None,
                 "max_concurrency": limits["max_concurrency"] if limits else None,
+                "max_runtime_s": runtime["max_runtime_s"],
+                "runtime_s": runtime["runtime_s"],
+                "runtime_budget_exhausted": runtime["runtime_budget_exhausted"],
                 "attempts": usage["attempts"], "active_attempts": usage["active"],
-                "enforced": limits is not None,
+                "enforced": limits is not None or runtime["max_runtime_s"] is not None,
             }
         finally:
             c.close()
+
+    @staticmethod
+    def _mission_runtime_usage(c, mission_id, *, now=None):
+        """Measure elapsed attempt wall time across every plan in a mission."""
+        now = time.time() if now is None else now
+        row = c.execute(
+            "SELECT COALESCE(SUM(CASE "
+            "WHEN a.finished_at IS NOT NULL THEN MAX(0, a.finished_at-a.started_at) "
+            "WHEN a.status='running' THEN MAX(0, ?-a.started_at) ELSE 0 END), 0) AS runtime_s "
+            "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+            "JOIN workflow_plans p ON p.id=t.plan_id WHERE p.mission_id=?",
+            (now, mission_id),
+        ).fetchone()
+        limit = c.execute(
+            "SELECT max_runtime_s FROM mission_runtime_limits WHERE mission_id=?",
+            (mission_id,),
+        ).fetchone()
+        runtime_s = float(row["runtime_s"] or 0.0)
+        max_runtime_s = float(limit["max_runtime_s"]) if limit else None
+        return {
+            "runtime_s": runtime_s,
+            "max_runtime_s": max_runtime_s,
+            "runtime_budget_exhausted": max_runtime_s is not None and runtime_s >= max_runtime_s,
+        }
+
+    def set_mission_runtime_limit(self, mission_id, *, max_runtime_s):
+        """Set a durable cumulative wall-time cap; later changes may only tighten it."""
+        import math
+
+        if (isinstance(max_runtime_s, bool) or not isinstance(max_runtime_s, (int, float))
+                or not math.isfinite(max_runtime_s) or max_runtime_s <= 0):
+            raise ValueError("mission max_runtime_s must be finite and positive")
+        max_runtime_s = float(max_runtime_s)
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                    raise ValueError(f"unknown mission: {mission_id}")
+                old = c.execute(
+                    "SELECT max_runtime_s FROM mission_runtime_limits WHERE mission_id=?",
+                    (mission_id,),
+                ).fetchone()
+                if old is not None and max_runtime_s > old["max_runtime_s"]:
+                    raise ValueError("mission runtime limit cannot be relaxed")
+                if old is None or max_runtime_s != old["max_runtime_s"]:
+                    c.execute(
+                        "INSERT INTO mission_runtime_limits (mission_id,max_runtime_s) "
+                        "VALUES (?,?) ON CONFLICT(mission_id) DO UPDATE SET "
+                        "max_runtime_s=excluded.max_runtime_s",
+                        (mission_id, max_runtime_s),
+                    )
+                    self._audit_mission_execution_change(
+                        c, mission_id, "mission_runtime_limit_set",
+                        {"max_runtime_s": max_runtime_s},
+                    )
+                c.execute("COMMIT")
+            except Exception:
+                if c.in_transaction:
+                    c.execute("ROLLBACK")
+                raise
+            finally:
+                c.close()
+
+    def get_mission_runtime_limit(self, mission_id):
+        """Return the cap and live measured usage for the mission."""
+        c = self._conn()
+        try:
+            if c.execute("SELECT 1 FROM missions WHERE id=?", (mission_id,)).fetchone() is None:
+                raise ValueError(f"unknown mission: {mission_id}")
+            return {"mission_id": mission_id, **self._mission_runtime_usage(c, mission_id)}
+        finally:
+            c.close()
+
+    def _mission_runtime_allows_claim(self, c, plan_id, *, now=None):
+        mission = c.execute(
+            "SELECT mission_id FROM workflow_plans WHERE id=?", (plan_id,),
+        ).fetchone()
+        if mission is None:
+            return False
+        usage = self._mission_runtime_usage(c, mission["mission_id"], now=now)
+        return not usage["runtime_budget_exhausted"]
 
     def _mission_budget_available(self, c, plan_id):
         """Call inside BEGIN IMMEDIATE; serializes claims from different workers."""
@@ -3658,6 +4293,8 @@ class JobStore:
                 or mission_usage["active"] > mission_limits["max_concurrency"]
             ):
                 return False
+        if not self._mission_runtime_allows_claim(c, plan_id):
+            return False
         return self._mission_cost_allows_claim(c, plan_id)
 
     def get_workflow_limits(self, plan_id):
@@ -3770,6 +4407,31 @@ class JobStore:
         finally:
             c.close()
 
+    def workflow_execution_stop_reason(self, plan_id):
+        """Return the durable plan/runtime reason that should stop dispatch."""
+        c = self._conn()
+        try:
+            c.execute("BEGIN")
+            plan = c.execute(
+                "SELECT mission_id, status FROM workflow_plans WHERE id=?", (plan_id,),
+            ).fetchone()
+            if plan is None:
+                raise ValueError(f"unknown workflow plan: {plan_id}")
+            if plan["status"] == "cancel_requested":
+                c.execute("COMMIT")
+                return "plan_cancelled"
+            runtime = self._mission_runtime_usage(c, plan["mission_id"], now=time.time())
+            c.execute("COMMIT")
+            if runtime["runtime_budget_exhausted"]:
+                return "mission_runtime_budget_exhausted"
+            return None
+        except Exception:
+            if c.in_transaction:
+                c.execute("ROLLBACK")
+            raise
+        finally:
+            c.close()
+
     def request_workflow_cancellation(self, plan_id):
         """Persist stop intent and cancel unclaimed work atomically.
 
@@ -3869,6 +4531,7 @@ class JobStore:
                     usage["attempts"] >= max_total
                     or usage["active"] >= max_parallel
                     or not self._mission_budget_available(c, plan_id)
+                    or not self._mission_runtime_allows_claim(c, plan_id)
                     or not self._mission_cost_allows_claim(c, plan_id)
                 ):
                     c.execute("COMMIT")
@@ -4055,6 +4718,8 @@ class JobStore:
                     raise ValueError("workflow concurrency budget exhausted")
                 if not self._mission_budget_available(c, effective_plan):
                     raise ValueError("mission execution budget exhausted")
+                if not self._mission_runtime_allows_claim(c, effective_plan, now=now):
+                    raise ValueError("mission runtime budget exhausted")
                 if not self._mission_cost_allows_claim(c, effective_plan):
                     raise ValueError("mission cost budget blocked or reporting incomplete")
                 task = c.execute(
@@ -4195,6 +4860,121 @@ class JobStore:
                     status = "uncertain"
                     result = None
                     error = "provider outcome after cancellation requires reconciliation"
+                if status == "succeeded" and c.execute(
+                    "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
+                    (attempt_id,),
+                ).fetchone() is not None:
+                    seal_is_current = False
+                    task_binding = c.execute(
+                        "SELECT t.target, t.capability_id, t.task_key, t.impact, "
+                        "t.permissions_json, p.digest AS plan_digest, p.plan_json "
+                        "FROM workflow_tasks t JOIN workflow_plans p ON p.id=t.plan_id "
+                        "WHERE t.id=?", (row["task_id"],),
+                    ).fetchone()
+                    if isinstance(result, dict) and task_binding is not None:
+                        job_id = result.get("job_id")
+                        provider = c.execute(
+                            "SELECT v.capability_id, v.provider_id, v.provider_version, "
+                            "v.manifest_fingerprint, m.fingerprint, m.manifest_json "
+                            "FROM engine_v2_execution_jobs v LEFT JOIN capability_manifests m "
+                            "ON m.capability_id=v.capability_id AND m.provider_id=v.provider_id "
+                            "AND m.provider_version=v.provider_version WHERE v.job_id=?",
+                            (attempt_id,),
+                        ).fetchone()
+                        completion = c.execute(
+                            "SELECT job_id, digest, version FROM engine_v2_provider_result_seals "
+                            "WHERE attempt_id=?", (attempt_id,),
+                        ).fetchone()
+                        durable_job = c.execute(
+                            "SELECT tool, target, status, exit_code FROM jobs WHERE id=?",
+                            (attempt_id,),
+                        ).fetchone()
+                        expected_tool_id = provider_tool_id_for_capability(
+                            task_binding["capability_id"],
+                        )
+                        result_exit_code = result.get("exit_code")
+                        digest_now = (
+                            _workflow_evidence_digest(
+                                c, attempt_id=attempt_id, job_id=attempt_id,
+                                target=task_binding["target"],
+                                capability_id=task_binding["capability_id"],
+                                plan_digest=task_binding["plan_digest"],
+                            )
+                            if job_id == attempt_id else None
+                        )
+                        try:
+                            manifest = json.loads(provider["manifest_json"]) if (
+                                provider is not None and provider["manifest_json"]
+                            ) else None
+                            if not isinstance(manifest, dict):
+                                manifest = None
+                            plan_document = json.loads(task_binding["plan_json"])
+                            task_permissions = json.loads(task_binding["permissions_json"])
+                            manifest_fingerprint = hashlib.sha256(
+                                json.dumps(
+                                    manifest, sort_keys=True, separators=(",", ":"),
+                                    ensure_ascii=False,
+                                ).encode("utf-8"),
+                            ).hexdigest()
+                            provider_bindings = plan_document.get("metadata", {}).get(
+                                "provider_bindings", {},
+                            )
+                            planned_binding = provider_bindings.get(task_binding["task_key"])
+                            planned_binding_matches = (
+                                not provider_bindings or (
+                                    isinstance(planned_binding, dict)
+                                    and planned_binding.get("provider_id") == provider["provider_id"]
+                                    and planned_binding.get("provider_version")
+                                    == provider["provider_version"]
+                                    and planned_binding.get("manifest_fingerprint")
+                                    == provider["manifest_fingerprint"]
+                                )
+                            )
+                        except (TypeError, ValueError, AttributeError):
+                            manifest = None
+                            task_permissions = None
+                            manifest_fingerprint = None
+                            planned_binding_matches = False
+                        seal_is_current = bool(
+                            provider is not None
+                            and provider["capability_id"] == task_binding["capability_id"]
+                            and provider["fingerprint"] == provider["manifest_fingerprint"]
+                            and manifest is not None
+                            and manifest_fingerprint == provider["manifest_fingerprint"]
+                            and isinstance(task_permissions, list)
+                            and all(isinstance(item, str) for item in task_permissions)
+                            and isinstance(manifest.get("permissions"), list)
+                            and all(isinstance(item, str) for item in manifest["permissions"])
+                            and manifest.get("impact") == task_binding["impact"]
+                            and sorted(manifest["permissions"]) == sorted(task_permissions)
+                            and planned_binding_matches
+                            and result.get("provider_id") == provider["provider_id"]
+                            and result.get("provider_version") == provider["provider_version"]
+                            and result.get("manifest_fingerprint")
+                            == provider["manifest_fingerprint"]
+                            and durable_job is not None
+                            and durable_job["status"] == "finished"
+                            and durable_job["exit_code"] == 0
+                            and durable_job["tool"] == expected_tool_id
+                            and durable_job["target"] == task_binding["target"]
+                            and isinstance(result_exit_code, int)
+                            and not isinstance(result_exit_code, bool)
+                            and result_exit_code == 0
+                            and result.get("tool_id") == expected_tool_id
+                            and result.get("target") == task_binding["target"]
+                            and completion is not None
+                            and completion["job_id"] == attempt_id
+                            and completion["version"] == 1
+                            and digest_now is not None
+                            and hmac.compare_digest(completion["digest"], digest_now)
+                        )
+                    if not seal_is_current:
+                        status = "uncertain"
+                        result = None
+                        error = (
+                            "provider completion snapshot or manifest binding changed; "
+                            "reconcile external effects"
+                        )
                 encoded = json.dumps(result, sort_keys=True) if result is not None else None
                 c.execute(
                     "UPDATE task_attempts SET status=?, finished_at=?, result_json=?, error=? WHERE id=?",

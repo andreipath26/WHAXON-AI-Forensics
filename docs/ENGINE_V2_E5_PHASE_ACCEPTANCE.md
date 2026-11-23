@@ -47,14 +47,17 @@ request and its durable workflow progress with explicit
 `worker_liveness_verified=false` and `automatic_uncertain_replay=false`.
 The web route `GET /api/v2/workflow-runs/<request_id>/snapshot` and
 `whaxon plan run-snapshot --id <request_id>` consume this same Core
-contract. A request is not proof of execution, and the read models are
-individually persisted views, not an atomic cross-table snapshot.
+contract. The request row and progress are read inside one SQLite transaction,
+so cancellation or claim updates cannot create a mixed cross-table response.
+A request is not proof of execution, and worker liveness remains unverified.
 
 Adversarial tests cover restart/reconnect, duplicate-submission fencing,
 lease-token secrecy, bounded stale recovery, and durable-health fail-closed
-behavior. **All test results and E5 gates remain unverified until exact-head
-CI and applicable integration evidence are recorded.** No production or
-deployment acceptance is claimed.
+behavior. `tests/test_workflow_run_requests.py::test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot`
+injects a real cancellation between the two database projections and verifies
+both values still come from one snapshot. **All test results and E5 gates
+remain unverified until exact-head CI and applicable integration evidence are
+recorded.** No production or deployment acceptance is claimed.
 
 
 ### Accepted-intent reconnect discovery

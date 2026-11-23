@@ -9,15 +9,28 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 def _uncertain_catalog_attempt(
     tmp_path, *, job_status="finished", exit_code=0,
-    capability_id="tool.nmap",
+    capability_id="tool.nmap", file_evidence=False, pin_provider=True,
 ):
     core = Core(tmp_path)
     core.create_mission("m", "recover lost provider acknowledgement")
-    task_args = {"permissions": ("network.scan",), "impact": "moderate"} \
-        if capability_id.startswith("tool.") else {}
+    try:
+        manifest = core.providers.manifest_for(capability_id)
+    except (LookupError, ValueError):
+        manifest = None
+    task_args = (
+        {"permissions": manifest.permissions, "impact": manifest.impact}
+        if manifest is not None else
+        ({"permissions": ("network.scan",), "impact": "moderate"}
+         if capability_id.startswith("tool.") else {})
+    )
+    metadata = {"provider_bindings": {"scan": {
+        "provider_id": manifest.provider_id,
+        "provider_version": manifest.provider_version,
+        "manifest_fingerprint": manifest.fingerprint,
+    }}} if manifest is not None and pin_provider else {}
     core.save_workflow_plan("p", WorkflowPlan("m", (
         WorkflowTask("scan", capability_id, "192.0.2.10", **task_args),
-    )))
+    ), metadata=metadata))
     request = core.enqueue_workflow_run("p")
     run_claim = core.workflow_requests.claim("run-worker")
     assert run_claim and run_claim["id"] == request["id"]
@@ -27,12 +40,20 @@ def _uncertain_catalog_attempt(
     assert core.store.mark_workflow_dispatch_started(
         "p", attempt_id, provider_execution_id=attempt_id,
     )
-    core.store.mark_engine_v2_execution_job(attempt_id)
+    core.store.mark_engine_v2_execution_job(attempt_id, manifest)
     core.store.create(attempt_id)
-    tool_id = capability_id.removeprefix("tool.")
+    tool_id = (
+        capability_id.removeprefix("tool.")
+        if capability_id.startswith("tool.") else capability_id
+    )
     assert core.store.set_started(attempt_id, tool_id, "192.0.2.10")
+    if file_evidence:
+        core.store.add_evidence(
+            attempt_id, "provider_output", "scan.json", path="/tmp/provider-output.json",
+        )
     if job_status == "finished":
         assert core.store.set_finished(attempt_id, exit_code, 0.25)
+        core.store.seal_engine_v2_provider_result(attempt_id)
     else:
         core.store.set_failed(attempt_id, "provider failure")
     core.store.finish_task_attempt(
@@ -69,8 +90,30 @@ def test_recovery_seals_successful_job_and_never_replays(tmp_path):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
 
 
+@pytest.mark.parametrize("capability_id", [
+    "tool.sqlmap",
+    "tool.unclassified",
+    "web.sql_injection.assess",
+    "lab.initial_access.samba_usermap",
+    "tool.verify_sqli",
+    "tool.retest_xss",
+    "recon.http",
+])
+def test_recovery_requires_manual_reconciliation_for_effectful_capabilities(
+    tmp_path, capability_id,
+):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, capability_id=capability_id,
+    )
+
+    with pytest.raises(ValueError, match="provider effects require manual reconciliation"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
 def test_recovery_supports_first_party_provider_capabilities(tmp_path):
-    capability_id = "recon.http"
+    capability_id = "dns.recon.passive"
     core, _, attempt_id = _uncertain_catalog_attempt(
         tmp_path, capability_id=capability_id,
     )
@@ -98,8 +141,77 @@ def test_recovery_refuses_incomplete_provider_results(
     assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
 
 
-@pytest.mark.parametrize("tamper", ["tool", "target", "ownership"])
-def test_recovery_fails_closed_on_provider_identity_mismatch(tmp_path, tamper):
+def test_recovery_refuses_unpinned_provider_identity(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, pin_provider=False,
+    )
+
+    with pytest.raises(ValueError, match="provider manifest effects require manual reconciliation"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+
+
+def test_recovery_refuses_alternate_registered_provider_identity(tmp_path):
+    from dataclasses import replace
+
+    core, _, attempt_id = _uncertain_catalog_attempt(tmp_path)
+    original = core.providers.manifest_for("tool.nmap")
+    alternate = replace(
+        original, provider_id="whaxon.adapter.nmap.alternate",
+        provider_version="catalog-v2.alternate",
+    )
+    core.store.save_capability_manifest(alternate.to_dict())
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE engine_v2_execution_jobs SET provider_id=?, provider_version=?, "
+            "manifest_fingerprint=? WHERE job_id=?",
+            (
+                alternate.provider_id, alternate.provider_version,
+                alternate.fingerprint, attempt_id,
+            ),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="provider manifest effects require manual reconciliation"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+
+
+def test_recovery_refuses_file_backed_provider_evidence(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, file_evidence=True,
+    )
+
+    with pytest.raises(ValueError, match="file-backed provider evidence"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
+def test_recovery_refuses_provider_evidence_added_after_job_completion(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(tmp_path)
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, data_json, "
+            "raw_line, enrichment_json) VALUES (?, 0, 'open_port', 'info', 'nmap', ?, ?, ?)",
+            (attempt_id, '{"port":80,"protocol":"tcp"}', "80/tcp open http", "{}"),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="changed after completion"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
+@pytest.mark.parametrize(
+    "tamper", ["tool", "target", "ownership", "finding_data", "finding_enrichment"],
+)
+def test_recovery_fails_closed_on_provider_identity_or_evidence_mismatch(tmp_path, tamper):
     core, _, attempt_id = _uncertain_catalog_attempt(tmp_path)
     conn = core.store._conn()
     try:
@@ -108,12 +220,29 @@ def test_recovery_fails_closed_on_provider_identity_mismatch(tmp_path, tamper):
         elif tamper == "target":
             conn.execute("UPDATE jobs SET target='198.51.100.8' WHERE id=?", (attempt_id,))
         else:
-            conn.execute(
-                "DELETE FROM engine_v2_execution_jobs WHERE job_id=?", (attempt_id,),
-            )
+            if tamper == "ownership":
+                conn.execute(
+                    "DELETE FROM engine_v2_execution_jobs WHERE job_id=?", (attempt_id,),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO findings (job_id, seq, kind, severity, source, data_json, "
+                    "raw_line, enrichment_json) VALUES (?, 0, 'open_port', 'info', 'nmap', ?, ?, ?)",
+                    (
+                        attempt_id,
+                        "[]" if tamper == "finding_data" else '{"port":80}',
+                        "80/tcp open http",
+                        "[]" if tamper == "finding_enrichment" else "{}",
+                    ),
+                )
     finally:
         conn.close()
-    with pytest.raises(ValueError, match="no matching successful durable"):
+    expected = (
+        "durable provider findings are malformed"
+        if tamper.startswith("finding_")
+        else "no matching successful durable"
+    )
+    with pytest.raises(ValueError, match=expected):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
 
@@ -183,6 +312,6 @@ def test_reconciliation_requires_exact_tool_for_first_party_provider(tmp_path):
     assert mismatched["provider_job_identity_verified"] is False
     assert mismatched["provider_job_identity_mismatch"] is True
     assert mismatched["manual_reconciliation_required"] is True
-    with pytest.raises(ValueError, match="no matching successful durable"):
+    with pytest.raises(ValueError, match="provider effects require manual reconciliation"):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"

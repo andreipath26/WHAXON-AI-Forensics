@@ -46,14 +46,14 @@ class _LocalProvider:
         return []
 
 
-def _setup(tmp_path, *, selected: str):
+def _setup(tmp_path, *, selected: str, include_version: bool = True):
     first = _LocalProvider("trusted.alpha")
     second = _LocalProvider("trusted.beta")
     core = Core.__new__(Core)
     core.store = JobStore(tmp_path / "e4-provider-substitution.db")
     core.store.create_mission("mission", "synthetic provider-substitution lab")
     core.scope = SimpleNamespace(
-        check_for_execution=lambda _target: SimpleNamespace(allowed=True),
+        check_for_unpinned_execution=lambda _target: SimpleNamespace(allowed=True),
     )
     core.providers = BoundProviderRouter(
         (first, second), preferred_providers={_CAPABILITY: selected},
@@ -66,6 +66,7 @@ def _setup(tmp_path, *, selected: str):
     metadata = {"provider_bindings": {
         task.id: {
             "provider_id": chosen.provider_id,
+            **({"provider_version": chosen.provider_version} if include_version else {}),
             "manifest_fingerprint": chosen.fingerprint,
         },
     }}
@@ -129,6 +130,18 @@ def test_e4_missing_preferred_provider_cannot_fallback_during_scheduler_run(tmp_
     )
     assert core.authorize_workflow_task_for_plan("plan", task) is False
     _run(core)
+    assert first.calls == []
+    assert second.calls == []
+    assert core.store.get_workflow_progress("plan")["counts"]["blocked"] == 1
+
+
+def test_e4_plan_binding_without_provider_version_is_denied_before_dispatch(tmp_path):
+    core, first, second, task = _setup(
+        tmp_path, selected="trusted.alpha", include_version=False,
+    )
+    assert core.authorize_workflow_task_for_plan("plan", task) is False
+    result = _run(core)
+    assert result["complete"] is True
     assert first.calls == []
     assert second.calls == []
     assert core.store.get_workflow_progress("plan")["counts"]["blocked"] == 1

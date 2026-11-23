@@ -1,3 +1,11 @@
+# Engine V2 current execution-path reconciliation — 2026-11-23
+
+This status supersedes older route-gate descriptions where they conflict with current PR #268 source at exact source snapshot 27faf26ecb20f5b22dad33fab031c240fbfcf47e. The web compatibility endpoints `POST /api/run`, `POST /api/ai/run`, `POST /api/ai/runs/<run_id>/answer`, `POST /api/validate/<job_id>/<seq>`, and `POST /api/retest/<job_id>/<seq>` return HTTP 410 without dispatch, approval, replay, resume, or finding mutation. V2 proposal creation still requires separate review, exact-task approval, and durable run submission. The legacy human-resolution endpoint continues to serve legacy jobs but returns HTTP 409 before changing Engine V2 findings.
+
+These retired endpoints are not the remaining legacy execution surface. Explicit legacy CLI modes, blocked bare CLI validation/retest invocations, Metasploit module/session/port-forward operations, and the older GUI compatibility module remain separately scoped migration or qualification work under their existing gates. This note records current source behavior; it does not close G01–G10 or change the release HOLD.
+
+---
+
 # Engine V2 legacy execution inventory
 
 This inventory records Python callsites that invoke `run_tool` or
@@ -22,7 +30,7 @@ ready; those readiness states remain separate.
 | --- | --- | --- |
 | V2 catalog tools | The 12 admitted catalog IDs in the table below are the bounded local-process catalog surface. | Fixed catalog arguments/provider binding only; installed/readiness checks and exact plan approval still apply. |
 | V2 verification | `tool.verify_sqli`, `tool.retest_sqli`, `tool.verify_xss`, `tool.retest_xss`, `tool.verify_http_observation`, and `tool.retest_http_observation` are the bounded HTTP verification operations. | V2-sealed source evidence and separate plan approval required. Provider smoke/lab/end-to-end acceptance flags remain false in the provider inventory. |
-| V2 recon | Only the fixed, explicitly listed V2 recon proposals/providers are in scope. | No full legacy parity; `tech`, `cookies`, and `waf` remain legacy-only. Redirect handling is first-hop only. |
+| V2 recon | Only the fixed, explicitly listed V2 recon proposals/providers are in scope. | No full legacy parity. Aggregated `headers`, `tech`, `cookies`, and `waf` checks bind to the same fixed HTTPS profile task, which emits those observations in one request. Redirect handling is first-hop only. |
 | V2 clients | CLI workflow commands, TUI workflow screen, V2 API, and `/ui-v2` are clients of shared Core services. | UI route presence does not close per-control wiring or full client-parity acceptance. |
 | Legacy direct execution | Compatibility only; excluded from the V2 task/attempt guarantee unless and until migrated and accepted. | Web execution endpoints are default-denied behind their named `WHAXON_LEGACY_*_ENABLED` gates; legacy CLI execution requires explicit legacy selection where documented. Do not present these as V2 workflows. |
 | Session transports | Metasploit session, SMB, SSH, and WMI execution are not admitted V2 transports. | Keep them inaccessible as V2 actions; any legacy compatibility use remains separately scoped and does not create V2 task evidence. |
@@ -35,8 +43,8 @@ documentation alone.
 
 | Source | Caller | Classification | Notes |
 | --- | --- | --- | --- |
-| `interfaces/web/server.py` | `_run_job_blocking` | Legacy | `/api/run`; scope checked, but no persisted V2 request or task lease. |
-| `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy | Used only by legacy `/api/ai/run` and explicit `whaxon ai --legacy` execution/resume; approvals remain in legacy `ai_runs`. The separate `propose_v2_workflow_plan` path creates reviewable plan tasks and does not dispatch. |
+| `interfaces/web/server.py` | `run_tool` compatibility handler | Retired; HTTP 410 | `/api/run` validates the request and scope, then returns 410 without calling `_run_job_blocking`, ToolRunner, or creating a job. |
+| `core/ai_bridge.py` | `_run_tool`, `build_executor._run_in_session` | Legacy CLI compatibility only | The web `/api/ai/run` handler is retired with HTTP 410 and no dispatch. Explicit `whaxon ai --legacy` remains a separate compatibility path; `propose_v2_workflow_plan` creates reviewable plan tasks and does not dispatch. |
 | `ai/executor.py`, `ai/providers/*` | Executor/provider actions | Legacy | Indirect callbacks still dispatch through `ToolRunner`. |
 | `interfaces/cli/run_cmd.py` | default proposal path / `main._go` | Mixed; default V2 plan-only | `whaxon run <tool> <target>` saves a provider-pinned review plan after scope/readiness checks; it does not approve or execute. `--v2-plan` submits a durable run request for a previously persisted plan; the supervised worker owns dispatch. Direct ToolRunner and session transports require explicit `--legacy`; there is no V2-to-legacy fallback. |
 | `core/worker.py` | `drain_async` | Legacy compatibility path | One-shot `run --legacy` drains only follow-ups caused by that invocation; long-lived `Core.initialize(drain=True)` leaves legacy rows pending unless `WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true`. Legacy auto-chain work remains outside workflow-plan authorization. |
@@ -82,10 +90,13 @@ Location display and never follows that Location. This is not redirect-chain
 parity. Proposal creation never dispatches network work.
 
 Additional execution actions need their own semantic inventory. CLI passive
-recon and legacy-job CLI/API validate/retest callers still use dedicated legacy
-services rather than `ToolRunner`. A separate V2 provider now covers
-only sealed-finding SQLi verification/retest under a plan-bound contract; this
-does not migrate those legacy callers or cover the other validator kinds.
+recon still uses its dedicated service rather than `ToolRunner`. The
+`validate` and `retest` commands now accept explicit `--mission-id` and
+`--plan-id` context for sealed V2 findings and delegate to the shared
+`propose_finding_verification_plan` service. They print an inert proposal;
+`--save` persists it without granting approval or submitting execution. Bare
+legacy invocations remain blocked. The verifier remains bounded to supported
+finding kinds and provider contracts. The legacy validation/retest web routes are retired with HTTP 410; these CLI aliases only create V2 proposals, with review, approval and run submission remaining separate.
 
 ## Dedicated network-service entry points
 
@@ -95,16 +106,16 @@ runner inventory.
 
 | Source | Caller | Service path | Scope/consent boundary | Persistence and V2 status |
 | --- | --- | --- | --- | --- |
-| `interfaces/cli/recon_cmd.py` | default proposal / `--engine v2 --plan-id` / explicit `--legacy` | Default creates one fixed multi-provider plan and never dispatches; approved saved V2 plans use Core workflow services; legacy `core.recon.run` is behind `--legacy` plus `WHAXON_LEGACY_RECON_ENABLED=true` | Each included task is preflighted by its provider proposal and remains unapproved until the operator grants exact task consent. Explicit selections block if any requested provider is unsupported or unavailable. | V2 task attempts and evidence use the shared workflow store. `tech`, `cookies`, and `waf` remain legacy-only; a default plan lists them as omitted and does not claim full recon parity. |
-| `interfaces/cli/validate_cmd.py` | `main` | `Validator.validate` | V2-owned evidence is refused before target replay; legacy jobs still require target and active scope. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
-| `interfaces/cli/retest_cmd.py` | `main` | `Validator.revalidate` → `Validator.validate` | V2-owned evidence is refused before replay; legacy findings still require prior verification and current scope. | Legacy job updates remain in `JobStore`; V2 retest uses the plan-bound provider path. |
-| `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy jobs still pass `_validation_scope_error` before the probe. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
-| `interfaces/web/server.py` | `create_app.api_retest` | `Validator.revalidate` → `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy findings still require prior verification and current scope. | Legacy job updates remain in `JobStore`; V2 retest uses the plan-bound provider path. |
+| `interfaces/cli/recon_cmd.py` | default proposal / `--engine v2 --plan-id` / explicit `--legacy` | Default creates one fixed multi-provider plan and never dispatches; approved saved V2 plans use Core workflow services; legacy `core.recon.run` is behind `--legacy` plus `WHAXON_LEGACY_RECON_ENABLED=true` | Each included task is preflighted by its provider proposal and remains unapproved until the operator grants exact task consent. Explicit selections block if any requested provider is unsupported or unavailable. | V2 task attempts and evidence use the shared workflow store. Aggregated `headers`, `tech`, `cookies`, and `waf` checks select the one fixed `web.recon.passive` HTTPS task; it emits all bundled observation kinds and avoids duplicate requests. This remains bounded recon coverage, not full legacy parity. |
+| `interfaces/cli/validate_cmd.py` | `main` with explicit `--mission-id` and `--plan-id` | `propose_finding_verification_plan(mode="verify")` | Requires persisted V2 source evidence, current scope, supported finding kind and a ready verifier; without explicit V2 context it refuses without replay. | Prints an unapproved proposal; only `--save` persists the immutable plan. Approval and run submission remain separate. |
+| `interfaces/cli/retest_cmd.py` | `main` with explicit `--mission-id` and `--plan-id` | `propose_finding_verification_plan(mode="retest")` | Requires sealed V2 provenance and an exact matching prior V2 verification; the provider rechecks current scope and source eligibility. Without explicit context it refuses without replay. | Prints an unapproved proposal; only `--save` persists the immutable plan. Approval and run submission remain separate. |
+| `interfaces/web/server.py` | `create_app.api_validate` | Retired static HTTP 410 response | Always refuses with `legacy_validation_enabled=false`, `approval_granted=false`, and `replay_attempted=false`; points clients to `/api/v2/workflow-proposals`. | No Validator call or JobStore finding mutation; V2 plan review, approval and durable submission remain separate. |
+| `interfaces/web/server.py` | `create_app.api_retest` | Retired static HTTP 410 response | Always refuses with `legacy_validation_enabled=false`, `approval_granted=false`, and `replay_attempted=false`; points clients to `/api/v2/workflow-proposals`. | No Validator call or JobStore finding mutation; V2 plan review, approval and durable submission remain separate. |
 | `interfaces/web/server.py`, `adapters/msf.py` | `create_app.msf_run._do_run` → `MSFAdapter.run_module` | `MSFClient.execute` (module and optional auto-chain post modules) | The MSF route validates module/target inputs and checks target scope before enqueueing its worker. This direct adapter path is not a `ToolRunner` dispatch. The optional post-module auto-chain is not plan-bound V2 dispatch. | Persists job output/findings through `JobStore`; no V2 workflow task, lease, attempt or cancellation record. Keep separate from catalog tools routed through `ToolRunner`. |
 | `interfaces/web/server.py` | `create_app.msf_session_exec` | `MSFClient.session_exec` | `_msf_session_scope_error` resolves the session host and checks current scope before sending the supplied session command. | Returns output directly; no V2 task/attempt record or durable workflow evidence link. |
 | `core/runner.py` | `run_in_session` → `_run_msf_session` | `MSFClient.session_exec` | Runner requires a persisted open session, authorizes its stored host, re-reads the live RPC session and authorizes its host, rejects host identity drift, and enforces a required session type when available before dispatch. | Emits legacy job events and stores capped output; this session-scoped execution path is not scheduler-owned V2 workflow dispatch. |
 
-The legacy CLI/API validator paths remain separate from the bounded V2 provider.
+The legacy validation/retest web routes are retired (HTTP 410); the CLI aliases call the shared V2 proposal service for sealed V2 evidence. The following validator limitations describe remaining legacy CLI/service behavior only.
 For SQLi, the current replay uses three baseline and three injected samples
 and verifies only when a specific SQL parser error appears consistently after
 the quote probe. Missing proof, network failure and timing-only signals remain
@@ -267,8 +278,8 @@ execution evidence; deployment-host readiness remains unverified.
 
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
-| CLI workflow | `whaxon run`, default `whaxon ai`, default `whaxon recon`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `recon --engine v2 --plan-id` submits a durable request for an approved fixed recon plan | `whaxon run --legacy`, `whaxon ai --legacy`, `recon --legacy`, `validate`, and `retest` retain compatibility paths; `whaxon msf` only inspects status/sessions/modules | Default recon saves one reviewable plan from ready fixed providers, reports omitted checks, and never approves or dispatches. Explicit check selections fail as a unit if any check is unsupported or unavailable. Legacy recon requires both `--legacy` and `WHAXON_LEGACY_RECON_ENABLED=true`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_recon_v2_cli.py`, `test_engine_v2_recon_plan_proposal.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
-| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `/api/run`, `/api/ai/run`, `/api/ai/runs/<id>/answer`, `/api/msf/run`, `/api/msf/sessions/<id>/exec`, `POST /api/msf/sessions/<id>/portfwd`, `/api/validate`, `/api/retest` remain separate legacy paths for older clients; gates are route-specific | `/api/run` and legacy AI execution/answer routes are default-denied unless respectively `WHAXON_LEGACY_TOOL_EXECUTION_ENABLED=true` and `WHAXON_LEGACY_AI_EXECUTION_ENABLED=true`. MSF module launch, session commands, and port-forward creation require `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; port-forward DELETE remains available for cleanup. Validate/retest are gated by `WHAXON_LEGACY_VALIDATION_ENABLED=true` for legacy evidence and still reject V2-owned evidence before replay. V2 clients do not call legacy executor, answer, validation or retest mutations; proposals and approvals remain separate from submission. |
+| CLI workflow | `whaxon run`, default `whaxon ai`, default `whaxon recon`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `recon --engine v2 --plan-id` submits a durable request for an approved fixed recon plan | `whaxon run --legacy`, `whaxon ai --legacy`,  `recon --legacy`, bare `validate` and `retest` remain guarded compatibility commands; explicit mission/plan flags create V2 proposals; `whaxon msf` only inspects status/sessions/modules | Default recon saves one reviewable plan from ready fixed providers, reports omitted checks, and never approves or dispatches. Explicit check selections fail as a unit if any check is unsupported or unavailable. Legacy recon requires both `--legacy` and `WHAXON_LEGACY_RECON_ENABLED=true`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_recon_v2_cli.py`, `test_engine_v2_recon_plan_proposal.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
+| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `POST /api/run`, `POST /api/ai/run`, `POST /api/ai/runs/<id>/answer`, `POST /api/validate/<job_id>/<seq>`, and `POST /api/retest/<job_id>/<seq>` are retired compatibility endpoints (HTTP 410); `/api/msf/run`, session commands, port-forward creation, and legacy human resolution remain separately scoped | The retired tool/AI/validation/retest endpoints return 410 and do not dispatch or mutate findings. The human-resolution route preserves legacy behavior but rejects V2-owned findings with HTTP 409 before mutation. MSF module launch, session commands, and port-forward creation require `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; port-forward DELETE remains available for cleanup. V2 clients use shared workflow services; proposal creation, exact approval, and durable submission remain separate steps. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate and do not auto-drain by default | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. Legacy queue drain requires `WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true`. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls behind `WHAXON_LEGACY_GUI_EXECUTION_ENABLED=true`; no TUI catalog legacy action remains | The legacy gate has explicit default-deny coverage. Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
 
@@ -325,12 +336,12 @@ test family remain authoritative for side effects and access-control limits.
 | Method | Exact path | Handler | Owning state/service |
 | --- | --- | --- | --- |
 | `GET` | `/api/ai/pending` | `ai_pending_list` | Legacy AI run state/executor |
-| `POST` | `/api/ai/run` | `ai_run` | Legacy AI run state/executor |
+| `POST` | `/api/ai/run` | `ai_run` | Retired no-dispatch compatibility response (HTTP 410) |
 | `GET` | `/api/ai/runs` | `ai_runs_list` | Legacy AI run state/executor |
 | `GET` | `/api/ai/runs/<run_id>` | `ai_run_get` | Legacy AI run state/executor |
-| `POST` | `/api/ai/runs/<run_id>/answer` | `ai_run_answer` | Legacy AI run state/executor |
+| `POST` | `/api/ai/runs/<run_id>/answer` | `ai_run_answer` | Retired no-dispatch compatibility response (HTTP 410) |
 | `GET` | `/api/ai/runs/<run_id>/stream` | `ai_run_stream` | Legacy AI run state/executor |
-| `POST` | `/api/approvals/<job_id>/<int:seq>/resolve` | `api_approval_resolve` | Legacy finding review state |
+| `POST` | `/api/approvals/<job_id>/<int:seq>/resolve` | `api_approval_resolve` | Legacy finding review state; HTTP 409 before mutation for Engine V2 jobs |
 | `POST` | `/api/bounty/import` | `import_bounty_program` | Bounty import/review draft |
 | `GET` | `/api/coverage/<job_id>` | `api_coverage` | Legacy coverage records |
 | `GET` | `/api/dependencies` | `api_dependencies_get` | Local dependency/readiness or installer service |
@@ -375,8 +386,8 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/pivot/graph` | `api_pivot_graph` | Legacy pivot/session graph |
 | `GET` | `/api/pivot/sessions/<session_id>/chain` | `api_pivot_chain` | Legacy pivot/session graph |
 | `GET` | `/api/report` | `api_report` | Legacy report, finding or loot view |
-| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
-| `POST` | `/api/run` | `run_tool` | Legacy ToolRunner and JobStore |
+| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Retired static HTTP 410; no replay, approval, Validator call, or finding mutation; points to `/api/v2/workflow-proposals` |
+| `POST` | `/api/run` | `run_tool` | Retired no-dispatch compatibility response (HTTP 410) |
 | `GET` | `/api/scope` | `get_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope/check` | `check_scope` | Scope policy service/configuration |
@@ -402,6 +413,8 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/missions/<mission_id>/report` | `workflow_v2_mission_report` | Ordered mission-level, evidence-bound report; partial status is preserved |
 | `GET` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/missions/<mission_id>/rate-limit` | `workflow_v2_mission_rate_limit` | Core workflow registry, stores and lifecycle services |
+| `GET` | `/api/v2/missions/<mission_id>/runtime-budget` | `workflow_v2_mission_runtime_budget` | Durable cumulative runtime budget across all plans in the mission |
+| `POST` | `/api/v2/missions/<mission_id>/runtime-budget` | `workflow_v2_mission_runtime_budget` | Tightening-only durable runtime cap; dispatch and active async work recheck the barrier |
 | `GET` | `/api/v2/providers` | `workflow_v2_providers` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/providers/portfolio-audit` | `workflow_v2_portfolio_audit` | Core workflow registry, stores and lifecycle services |
 | `GET` | `/api/v2/workflow-runs/<request_id>` | `workflow_v2_run_request_status` | Core workflow registry, stores and lifecycle services |
@@ -436,15 +449,15 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Retired static HTTP 410; no replay, approval, Validator call, or finding mutation; points to `/api/v2/workflow-proposals` |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
 | V2 capability and lifecycle | `GET /api/v2/capabilities`, `/providers`, `/providers/portfolio-audit`; `POST /api/v2/workflows`; `POST /api/v2/workflows/<plan_id>/run`; `POST /api/v2/workflow-runs/<request_id>/cancel` | Core capability registry, workflow contracts, approvals and durable request queue. A run submission is persisted work, not a success result. | Shared Core path; see `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, and `test_workflow.py`. |
-| Legacy tool and AI dispatch | `POST /api/run` → `_run_job_blocking`; `POST /api/ai/run` → legacy AI executor/bridge; `POST /api/ai/runs/<run_id>/answer` → legacy resume | `/api/run` is default-denied unless `WHAXON_LEGACY_TOOL_EXECUTION_ENABLED=true`; request-field, extra-argument, scope, and catalog checks precede this gate and remain prerequisites when enabled. `/api/ai/run` validates goal/target and scope before its `WHAXON_LEGACY_AI_EXECUTION_ENABLED=true` gate; the answer/resume route applies that gate before parsing the answer or looking up the run. None creates V2 plan-bound task attempts. | Legacy path; see `test_server.py`, `test_server_ai.py`, runner and AI bridge tests. |
+| Retired web tool and AI compatibility routes | `POST /api/run`, `POST /api/ai/run`, `POST /api/ai/runs/<run_id>/answer` | Each returns HTTP 410 without dispatch, approval, answer persistence, or resume; request-shape and relevant scope checks remain fail-closed before retirement responses. | No separate web execution authority remains on these routes. V2 proposal, approval, and durable submission are separate; see `test_server.py`, `test_server_ai.py`, and V2 workflow tests. |
 | Legacy Metasploit | `POST /api/msf/run`; `POST /api/msf/sessions/<session_id>/exec` | Both are default-denied unless `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; module path validates inputs and scope before worker dispatch. Session command checks live session scope before RPC. | Legacy job/session paths; no V2 task/attempt lifecycle. |
 | Metasploit pivot forwarding | `GET`, `POST`, and `DELETE /api/msf/sessions/<session_id>/portfwd` | GET inspects; POST creation is gated by `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true` and checks session plus destination scope; DELETE cleanup remains available and checks the session host. | Network/pivot side effects remain outside V2 task ownership. See `test_server_portfwd.py` and scope-denial cases in `test_server.py`. |
-| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest default-deny before finding reads, replay or mutation unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; with opt-in, they recheck current target scope and retest requires existing verified status. V2-owned evidence remains rejected before replay. The separate resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
+| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validation/retest endpoints always return static HTTP 410 without replay or mutation. Human resolution remains available for legacy jobs but returns 409 before mutating an Engine V2-owned finding; it is not a plan-bound V2 approval. | V2 proposal/workflow paths remain scheduler-owned. Route evidence includes `test_legacy_validation_routes_are_permanently_no_replay`, `test_retired_validation_api_handlers_have_no_execution_authority`, `test_legacy_human_resolution_route_refuses_engine_v2_jobs`, and `test_web_trust_layer.py`. |
 | V2 authoring scope preview | `POST /api/v2/scope/check` | Uses the selected capability's target policy for authoring feedback; passive DNS requires a hostname and DNS-query scope. This preview does not authorize or dispatch a task. | Core scheduler and the supervised DNS child recheck current scope before execution. |
 | Scope policy | `GET`, `POST /api/scope`; `POST /api/scope/check`; `POST /api/scope/override` | Scope POST persists rules and requires explicit confirmation to disable enforcement. Scope check evaluates a target. Override only writes a legacy audit-style record; it does not authorize dispatch. | Scope configuration feeds shared Core checks, but the legacy override record is not a V2 approval. See `test_web_scope.py`, `test_scope_failclosed.py`, and `test_server.py`. |
 | Legacy job cancellation | `POST /api/jobs/<job_id>/cancel` | Calls `_cancel_job_blocking` for a legacy job process/event state. | Separate from durable V2 run-request and plan cancellation endpoints. Route-level lifecycle parity remains open under G05. |
@@ -457,13 +470,13 @@ does not prove smoke, lab, end-to-end or authorization acceptance.
 ### Read, status and export API semantics
 
 The remaining HTTP GET surfaces are mapped by handler class below. Exact route
-and handler names are pinned by the 104-binding AST guard; this table records
+and handler names are pinned by the 106-binding AST guard; this table records
 which state each family reads and what it cannot establish.
 
 | API family | Handlers/routes | Data owner and truth limit | Existing evidence |
 | --- | --- | --- | --- |
 | V2 capabilities and providers | `/api/v2/capabilities`, `/providers`, `/portfolio-audit` | Core registries and inventory; registered, bound, installed and executable are distinct from smoke/lab/end-to-end acceptance. | `test_server_workflow_v2.py`, `test_providers.py` |
-| V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit` | Core mission, plan, budget and rate-limit records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
+| V2 mission state | `/api/v2/missions`, `/missions/<id>/budget`, `/cost`, `/plans`, `/rate-limit`, `/runtime-budget` | Core mission, plan, budget, rate-limit and cumulative runtime records. Configuration/readiness is not execution. | `test_server_workflow_v2.py`, `test_workflow.py` |
 | V2 run and plan state | `/api/v2/workflow-runs/summary`, `/workflow-runs/<id>`, `/snapshot`, `/workflows/<id>` | Durable run request, queue and workflow store. Queued, active, terminal and successful remain distinct; snapshots are not atomic cross-table reads. | `test_workflow_run_requests.py`, `test_server_workflow_v2.py` |
 | V2 approval, attempts and proof | `/api/v2/workflows/<id>/approvals`, `/attempts`, `/audit`, `/event-inbox`, `/events`, `/evidence`, `/limits`, `/progress`, `/readiness`, `/reconciliation`, `/resources` | Core store and workflow integrity/readiness services; only persisted attempts/evidence count, unavailable cost/worker signals are not inferred. | `test_server_workflow_v2.py`, `test_workflow.py`, `test_engine_v2_e3_audit_semantic_integrity.py` |
 | Health and advertised tools | `/api/health`, `/api/health/simple`, `/api/status`, `/api/tools` | Health checks database/data-dir writability and optional MSF status. When `WHAXON_V2_EXTERNAL_WORKER=1`, health also requires a fresh V2 worker heartbeat. Catalog rows and health do not prove V2 admission or assessment success. | `test_server.py`, `test_server_workflow_v2.py`, `test_engine_v2_e5_core_readiness.py` |
@@ -483,7 +496,7 @@ V2-owned evidence.
 | Mutation group | Paths and persisted state | Authority/truth limitation | Evidence |
 | --- | --- | --- | --- |
 | V2 mission and plan controls | Mission create, budget/cost/rate/deadline writes; plan approval grant/revoke, cancellation, reconciliation, event acknowledgement, attempt cost and plan limit/deadline/rate writes all delegate to Core workflow services and durable stores. | Approval/revocation/reconciliation actors are derived by `_request_actor()` from loopback or the authenticated request; a body-supplied `actor` is ignored. Attempt-cost `source` remains caller-supplied metadata and is not provider-origin proof. Reconciliation fences stale attempts as uncertain; it does not prove external work stopped or recovered. | `test_server_workflow_v2.py`, `test_workflow_run_requests.py`, `test_workflow.py` |
-| Legacy AI answer | `POST /api/ai/runs/<run_id>/answer` writes the operator response to legacy AI-run state and may resume the legacy executor. | Not a V2 plan/task approval. The route ignores a client-supplied user identity and records its local actor behavior. | `test_server_ai.py::test_ai_run_answer_records_operator_response` |
+| Retired legacy AI answer | `POST /api/ai/runs/<run_id>/answer` returns HTTP 410 and does not write an answer or resume a run. | Not a V2 plan/task approval; V2 exact-task approval and run submission use separate workflow endpoints. | `test_server_ai.py` retirement/no-resume cases |
 | Legacy evidence mutation | `POST`/`DELETE /api/jobs/<job_id>/evidence[/<seq>]` writes/removes files and JobStore evidence rows. | Legacy job evidence, not V2 attempt-sealed evidence. | `test_server.py`, `test_server_ai.py` evidence note/delete cases |
 | Bounty program import | `POST /api/bounty/import` fetches or parses source and returns a disabled review-required draft. | Ingestion only; draft is not persisted as authorization and does not activate testing. | `test_web_bounty_ingest.py`, `test_bounty_ingest.py` |
 | Burp report import | `POST /api/import/burp` parses uploaded XML, creates a legacy job and persists imported findings. | User-supplied evidence import; no target dispatch and no V2 attempt/evidence seal. | `test_server.py::test_burp_import_route_persists_imported_findings`, plus invalid-upload cases |
@@ -630,8 +643,8 @@ The AI Gate page now uses the V2 proposal endpoint and hands saved plans to the
 Run page. Default `whaxon ai "<goal>"` now creates and saves a scope-checked V2
 proposal, then prints separate review, approval and submission commands. It
 does not grant approval or submit a run. The old autonomous executor and
-`--resume` path require explicit `--legacy`; `/api/ai/run` remains a legacy API
-for existing clients. V2 AI action generation is still bounded to one
+`--resume` path require explicit `--legacy`; `/api/ai/run` is a retired HTTP 410
+compatibility endpoint for existing clients. V2 AI action generation is still bounded to one
 moderate-impact catalog action with an exact target and no dynamic arguments;
 multi-step autonomous planning remains outside this migration slice.
 
@@ -639,16 +652,16 @@ The V2 Approvals page now reads `GET /api/v2/approval-queue` and grants
 plan/task-bound, expiring consent through
 `POST /api/v2/workflows/<plan_id>/approvals`. It never resumes a legacy AI
 run: `/api/ai/pending` is displayed read-only, and
-`POST /api/ai/runs/<id>/answer` remains available only for older clients.
+`POST /api/ai/runs/<id>/answer` is retired with HTTP 410 for older clients.
 Granting consent does not submit the separate V2 run request; blocked tasks
 remain blocked and must be replanned.
 
-The V2 Findings, BAS and Retest pages no longer call the legacy validation or
+The V2 Findings, BAS and Retest pages no longer call the retired validation or
 retest mutation routes. They hand off candidate findings for V2 verification
 plans and verified findings for V2 retest plans. The server requires sealed V2
-evidence and current scope before saving either plan. Legacy validation and
-retest APIs remain available for compatibility clients; saved plans still
-require review, approval, and separate run submission.
+evidence and current scope before saving either plan. Legacy validation/retest
+web APIs return HTTP 410; CLI aliases only create inert V2 proposals. Saved
+plans still require review, approval, and separate run submission.
 
 ## Cancellation ownership boundary — 2026-11-11
 
@@ -678,13 +691,13 @@ legacy event writes outside scheduler attempt ownership.
 | --- | --- | --- | --- |
 | `dns` | Queries A, AAAA, MX, NS, TXT and SOA through dnspython; emits `dns_record` findings and per-query errors. | `dns.records.query` (`dig`) and `dns.records.enumerate` (`dnsrecon`) are admitted fixed-argv catalog providers. Dedicated `dns.recon.passive` provider implemented with fixed inputs and a supervised child process. | Catalog tools remain partial. The dedicated provider preserves the query/finding contract in source, but is not yet test-qualified or wired into the legacy CLI; no recon parity is claimed. |
 | `ssl` | Connects to port 443, checks certificate validity, SANs and expiry; emits certificate/error findings. | `tls.certificate.inspect` (`whaxon.recon.tls_cert`) uses a supervised child, scope-pinned numeric socket addresses, fixed port 443, and certificate verification before any bounded invalid-certificate detail retry. Focused provider tests cover scope denial, socket pinning, findings, output bounds, and registration. | The V2 provider covers bounded certificate inspection and is runtime-tested at the provider boundary; exact legacy finding/output parity and full recon release qualification remain open. |
-| `headers` | Fetches the target (HTTPS first, HTTP fallback) and reports configured security headers missing from the response. | Dedicated `web.recon.headers` provider makes one root-path HTTPS GET, checks pinned scope inside a supervised child, reads only bounded response headers, and persists attempt-linked evidence. | Bounded HTTPS header observations are implemented and covered by focused tests; HTTP fallback and complete legacy parity/release qualification remain open. |
-| `tech` | Detects server/framework markers from HTTP headers and emits technology/port findings. | `web.server.audit` may expose server banners among broader findings. | Not equivalent; no fixed technology-detection contract. |
+| `headers` | Fetches the target (HTTPS first, HTTP fallback) and reports configured security headers missing from the response. | Aggregated plans bind `headers` to `web.recon.passive`, which emits the same bounded missing-header observations alongside technology, cookie, and WAF observations from one root GET. The separately registered `web.recon.headers` provider remains fixed to header observations only. | Bounded HTTPS header observations are implemented and covered by focused tests; HTTP fallback and complete legacy parity/release qualification remain open. |
+| `tech` | Detects server/framework markers from HTTP headers and emits technology/port findings. | Fixed `web.recon.passive` HTTPS profile emits `tech_detected` and `open_port` observations in one root GET. | Implemented as a bundled check alias; findings are tied to the same fixed HTTPS task and request. |
 | `robots` | Fetches at most 64 KiB from `robots.txt` and `sitemap.xml` without following redirects; emits disallowed paths, sitemap references and up to 100 sitemap URLs. | Dedicated `web.recon.robots` V2 provider makes only two fixed HTTPS GETs, checks pinned scope inside a supervised child, bounds parsing/output, and persists attempt-linked evidence. | Bounded provider is implemented and covered by source/tests; full legacy parity/release qualification remains open. |
 | `security_txt` | Fetches `/.well-known/security.txt`, parses recognized RFC 9116 fields, and emits field observations or an informational missing/no-recognized-fields finding; it does not validate `Expires`. | Dedicated `web.recon.security_txt` V2 provider makes one fixed HTTPS GET, checks pinned scope inside a supervised child, bounds headers/body/output, and persists attempt-linked evidence. | Bounded provider is implemented and covered by focused tests; full legacy parity/release qualification remains open. |
-| `cookies` | Fetches the target and audits `Set-Cookie` flags (`Secure`, `HttpOnly`, `SameSite`). | `web.server.audit` may report some cookie issues. | Not equivalent; no stable cookie-only output contract. |
+| `cookies` | Fetches the target and audits `Set-Cookie` flags (`Secure`, `HttpOnly`, `SameSite`). | Fixed `web.recon.passive` HTTPS profile emits `cookie_insecure` observations from its root GET. | Implemented as a bundled check alias; no separate cookie-only request or contract. |
 | `redirects` | Manually follows at most 10 hops, records HTTPS-to-HTTP and cross-origin hops, and stops before contacting a new cross-origin destination. | Dedicated `web.recon.redirect_observe` provider makes exactly one scope-pinned HTTPS GET to `/`, records status and a credential/query/fragment-redacted Location display, classifies HTTP(S) downgrade/cross-origin, and never follows Location. Other schemes are displayed as unsupported destinations, not classified as web origins. Hostname scope resolution may also produce a DNS query and resolver log. | Bounded first-hop observation only; not redirect-chain parity. |
-| `waf` | Fingerprints known WAF/CDN signatures from response headers and cookies. | No equivalent fixed V2 provider. | Absent. |
+| `waf` | Fingerprints known WAF/CDN signatures from response headers and cookies. | Fixed `web.recon.passive` HTTPS profile emits `waf_detected` observations from its root GET. | Implemented as a bundled check alias; fingerprint coverage remains limited to the provider's fixed signature set. |
 | `dns_full` | Checks CAA, DMARC and SPF posture and emits dedicated policy findings. | Dedicated `dns.recon.full` V2 provider makes only fixed CAA(host), TXT(_dmarc.host), and TXT(host) queries with DNS-query scope checks and bounded child execution. | Bounded provider is implemented and covered by focused tests; complete legacy parity/release qualification remains open. |
 
 The legacy HTTP helpers use short per-request socket timeouts, and the DNS

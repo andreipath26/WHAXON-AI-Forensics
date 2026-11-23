@@ -122,3 +122,6 @@ def test_findings_filter_controls_have_explicit_script_bindings():
     assert {control["binding"] for control in filters} >= {
         "filter:severity:all", "filter:status:review_needed", "filter:adapter:nikto",
     }
+    older = next(control for control in controls if control["binding"] == "whaxon-findings-more")
+    assert older["label"] == "Load older findings"
+    assert older["state"] == "source-hidden"

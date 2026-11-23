@@ -13,6 +13,8 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
+from .json_schema import SchemaContractError, validate_schema
+
 CAPABILITY_SCHEMA_VERSION = "whaxon.capability.v1"
 _READINESS = {
     "registered": 0,
@@ -151,6 +153,11 @@ class CapabilityManifest:
             object.__setattr__(self, name, values)
         if not isinstance(self.input_schema, dict) or not isinstance(self.output_schema, dict):
             raise TypeError("input_schema and output_schema must be objects")
+        try:
+            validate_schema(self.input_schema, path="input_schema")
+            validate_schema(self.output_schema, path="output_schema")
+        except SchemaContractError as exc:
+            raise ValueError(f"invalid capability schema: {exc}") from exc
         object.__setattr__(self, "input_schema", _freeze(self.input_schema))
         object.__setattr__(self, "output_schema", _freeze(self.output_schema))
 

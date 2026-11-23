@@ -353,6 +353,14 @@ class Core:
     def mission_execution_limits(self, mission_id: str):
         return self.store.get_mission_execution_limits(mission_id)
 
+    def configure_mission_runtime_limit(self, mission_id: str, *, max_runtime_s: float):
+        return self.store.set_mission_runtime_limit(
+            mission_id, max_runtime_s=max_runtime_s,
+        )
+
+    def mission_runtime_limit(self, mission_id: str):
+        return self.store.get_mission_runtime_limit(mission_id)
+
     def configure_mission_execution_limits(
         self, mission_id: str, *, max_total_attempts: int, max_concurrency: int,
     ):
@@ -383,13 +391,46 @@ class Core:
         Partial, failed, missing, or unsealed attempts remain visible but can
         never receive a complete/success status.
         """
-        evidence = self.workflow_evidence(plan_id, limit=limit)
-        readiness = self.workflow_readiness(plan_id)
-        progress = self.workflow_progress(plan_id)
+        store = getattr(self, "store", None)
+        snapshot_reader = getattr(store, "get_workflow_report_snapshot", None)
+        report_snapshot = (
+            snapshot_reader(plan_id, limit=limit)
+            if callable(snapshot_reader) else None
+        )
+        if isinstance(report_snapshot, dict):
+            evidence = report_snapshot["evidence"]
+            readiness = report_snapshot["readiness"]
+            progress = report_snapshot["progress"]
+        else:
+            evidence = self.workflow_evidence(plan_id, limit=limit)
+            readiness = self.workflow_readiness(plan_id)
+            progress = self.workflow_progress(plan_id)
         attempts = evidence["attempts"]
-        truncated = len(attempts) < progress["attempts"]
+        # Keep conservative checks even for snapshot-backed sources. They
+        # protect compatibility stores and malformed injected test doubles.
+        progress_attempts = progress.get("attempts")
+        truncated = evidence.get("truncated") is True or (
+            type(progress_attempts) is int
+            and progress_attempts >= 0
+            and len(attempts) < progress_attempts
+        )
+        progress_counts = progress.get("counts")
+        progress_total = progress.get("total_tasks")
+        progress_all_succeeded = (
+            isinstance(progress_counts, dict)
+            and type(progress_total) is int
+            and progress_total >= 0
+            and progress_counts.get("succeeded") == progress_total
+            and all(
+                isinstance(status, str) and type(count) is int and count >= 0
+                for status, count in progress_counts.items()
+            )
+        )
         complete = bool(
             readiness["ready_to_report_success"]
+            and progress.get("complete") is True
+            and progress.get("cancellation_requested") is not True
+            and progress_all_succeeded
             and evidence["all_evidence_recorded"]
             and evidence["all_evidence_integrity_verified"]
             and attempts
@@ -403,8 +444,12 @@ class Core:
             and attempt["integrity_status"] == "verified"
             for finding in attempt["findings"]
         ]
-        task_reader = getattr(getattr(self, "store", None), "list_workflow_tasks", None)
-        if callable(task_reader):
+        persisted_tasks = (
+            report_snapshot.get("tasks")
+            if isinstance(report_snapshot, dict) else None
+        )
+        task_reader = getattr(store, "list_workflow_tasks", None)
+        if persisted_tasks is None and callable(task_reader):
             try:
                 persisted_tasks = task_reader(plan_id)
             except (AttributeError, TypeError, ValueError, RuntimeError):
@@ -546,6 +591,177 @@ class Core:
             status: count for status, count in task_status_counts.items()
             if isinstance(status, str) and type(count) is int and count >= 0
         }
+        verification_outcome_counts: dict[str, int] = {}
+        for finding in findings:
+            verification_outcome = finding.get("verification_outcome")
+            outcome_status = (
+                verification_outcome.get("status")
+                if isinstance(verification_outcome, dict) else None
+            )
+            if isinstance(outcome_status, str):
+                verification_outcome_counts[outcome_status] = (
+                    verification_outcome_counts.get(outcome_status, 0) + 1
+                )
+        skip_counts: dict[str, int] = {}
+        for attempt in attempts:
+            for outcome in attempt.get("coverage_outcomes", []):
+                if not isinstance(outcome, dict) or outcome.get("status") != "skipped":
+                    continue
+                kind = outcome.get("kind")
+                kind = kind if isinstance(kind, str) else "unknown"
+                skip_counts[kind] = skip_counts.get(kind, 0) + 1
+        persisted_attempt_count = evidence.get("attempt_count")
+        if type(persisted_attempt_count) is not int or persisted_attempt_count < 0:
+            persisted_attempt_count = progress.get("attempts")
+        planned_task_count = (
+            len(persisted_tasks) if isinstance(persisted_tasks, list)
+            else progress.get("total_tasks")
+        )
+        omitted_dispositions: list[dict[str, str]] = []
+        declared_coverage = _project_declared_coverage()
+        coverage_contract_present = False
+        plan_metadata: dict[str, Any] | None = None
+        requested_checks: list[str] | None = None
+        included_checks: list[str] | None = None
+        unrequested_checks: list[str] | None = None
+        persisted_plan = (
+            report_snapshot.get("plan")
+            if isinstance(report_snapshot, dict) else None
+        )
+        plan_details_reader = getattr(self, "workflow_plan_details", None)
+        if persisted_plan is None and callable(plan_details_reader):
+            try:
+                plan_details = plan_details_reader(plan_id)
+                persisted_plan = plan_details["plan"]
+            except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
+                persisted_plan = None
+        if persisted_plan is not None:
+            try:
+                from .workflow import WorkflowPlan
+
+                parsed_plan = WorkflowPlan.from_dict(persisted_plan)
+                if parsed_plan.digest == evidence.get("plan_digest"):
+                    plan_metadata = parsed_plan.metadata
+                    coverage_contract_present = (
+                        "coverage_contract" in plan_metadata
+                    )
+                    declared_coverage = _project_declared_coverage(
+                        plan_metadata.get(
+                            "coverage_contract", _COVERAGE_CONTRACT_ABSENT,
+                        ),
+                    )
+                    for field_name in ("requested_checks", "included_checks"):
+                        raw_checks = plan_metadata.get(field_name)
+                        if (
+                            isinstance(raw_checks, (list, tuple))
+                            and len(raw_checks) <= 128
+                            and all(
+                                isinstance(item, str) and item
+                                and item == item.strip()
+                                and len(item) <= 128 for item in raw_checks
+                            )
+                            and len(set(raw_checks)) == len(raw_checks)
+                        ):
+                            if field_name == "requested_checks":
+                                requested_checks = list(raw_checks)
+                            else:
+                                included_checks = list(raw_checks)
+                    if (
+                        plan_metadata.get("proposal_type") == "passive_recon"
+                        and requested_checks is not None
+                    ):
+                        from .workflow_proposals import PASSIVE_RECON_CHECKS
+
+                        unrequested_checks = [
+                            check for check in PASSIVE_RECON_CHECKS
+                            if check not in requested_checks
+                        ]
+                    raw_omissions = plan_metadata.get("omitted_checks", [])
+                    if isinstance(raw_omissions, (list, tuple)):
+                        for omission in raw_omissions:
+                            if not isinstance(omission, dict):
+                                continue
+                            check = omission.get("check")
+                            disposition = omission.get("disposition")
+                            if (
+                                disposition is None
+                                and omission.get("reason")
+                                == "legacy-only; no admitted V2 provider"
+                            ):
+                                # Preserve the exact legacy planner record
+                                # without treating arbitrary free-form reasons
+                                # as a typed disposition.
+                                disposition = "unsupported"
+                            if (
+                                isinstance(check, str) and check
+                                and len(check) <= 128
+                                and disposition in {
+                                    "unsupported", "provider_unavailable", "inaccessible",
+                                }
+                            ):
+                                omitted_dispositions.append({
+                                    "check": check,
+                                    "disposition": disposition,
+                                })
+            except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
+                omitted_dispositions = []
+                declared_coverage = _project_declared_coverage({})
+        if coverage_contract_present and plan_metadata is not None:
+            if declared_coverage["status"] != "recorded":
+                requested_checks = None
+                included_checks = None
+                unrequested_checks = None
+                omitted_dispositions = []
+            elif plan_metadata.get("proposal_type") == "passive_recon":
+                contract_omissions = sorted(
+                    (item["check_id"], item["disposition"])
+                    for item in declared_coverage["omissions"]
+                )
+                legacy_omissions = sorted(
+                    (item["check"], item["disposition"])
+                    for item in omitted_dispositions
+                )
+                if (
+                    requested_checks != declared_coverage["requested"]
+                    or included_checks != declared_coverage["included"]
+                    or unrequested_checks != declared_coverage["unrequested"]
+                    or legacy_omissions != contract_omissions
+                ):
+                    declared_coverage = _project_declared_coverage({})
+                    requested_checks = None
+                    included_checks = None
+                    unrequested_checks = None
+                    omitted_dispositions = []
+            else:
+                # Generic contracts are authoritative outside the passive
+                # recon compatibility projection.
+                requested_checks = None
+                included_checks = None
+                unrequested_checks = None
+                omitted_dispositions = []
+        coverage = {
+            "basis": "persisted workflow plan, task, attempt, and evidence records",
+            "planned_tasks": planned_task_count,
+            "task_status_counts": task_status_counts,
+            "persisted_attempts": persisted_attempt_count,
+            "returned_attempts": len(attempts),
+            "attempt_history_truncated": truncated,
+            "declared_coverage": declared_coverage,
+            "requested_checks": requested_checks,
+            "included_checks": included_checks,
+            "unrequested_checks": unrequested_checks,
+            "recorded_skips": skip_counts,
+            "finding_verification_outcomes": verification_outcome_counts,
+            "unrequested_verification_findings": verification_outcome_counts.get(
+                "not_requested", 0,
+            ),
+            "unsupported_or_inaccessible_work": {
+                "status": "recorded" if omitted_dispositions else "not_recorded",
+                "count": len(omitted_dispositions) if omitted_dispositions else None,
+                "items": omitted_dispositions,
+            },
+            "completeness_claim": False,
+        }
         return {
             "schema_version": "whaxon.workflow-report.v1",
             "plan_id": evidence["plan_id"],
@@ -554,6 +770,7 @@ class Core:
             "status": "complete" if complete else "partial",
             "readiness": readiness,
             "truncated": truncated,
+            "coverage": coverage,
             "evidence": evidence,
             "summary": {
                 "planned_tasks": progress.get("total_tasks"),
@@ -572,6 +789,9 @@ class Core:
             "limitations": [
                 "This report contains only evidence linked to the named workflow plan.",
                 "A partial report is not a successful completion or a release acceptance record.",
+                "Unrequested verification is counted only for persisted findings; work omitted from the plan is unknown.",
+                "Unsupported or inaccessible work is not classified unless a persisted record explicitly identifies it.",
+                "Coverage totals are not heuristic recall, endpoint completeness, or proof that all relevant checks ran.",
             ],
         }
 
@@ -979,21 +1199,8 @@ class Core:
         }
 
     def workflow_run_snapshot(self, request_id: str):
-        """Reconnect-safe persisted run and task progress, without lease secrets.
-
-        The request and task views are individually persisted snapshots, not
-        a claim that external effects completed or that a worker is alive.
-        """
-        row = self.workflow_run_request(request_id)
-        if row is None:
-            return None
-        return {
-            "schema_version": "whaxon.workflow-run-snapshot.v1",
-            "request": row,
-            "progress": self.workflow_progress(row["plan_id"]),
-            "worker_liveness_verified": False,
-            "automatic_uncertain_replay": False,
-        }
+        """Reconnect-safe request and task progress from one SQLite snapshot."""
+        return self.workflow_requests.snapshot(request_id)
 
     async def drain_workflow_run_requests(self, *, max_runs: int = 20,
                                           initialized: bool = False,
@@ -1220,9 +1427,10 @@ class Core:
                 and task.target == "172.28.0.10"
             ):
                 return False
-        # Network execution uses the stricter DNS-rebinding gate. The one
-        # passive DNS-query operation has a narrower scope path because it
-        # does not connect to the hostname's resolved address.
+        # Provider scope mode selects the actual network authorization
+        # boundary: unpinned providers may connect only to literal IPs while
+        # scope is enabled; pinned providers resolve and authorize inside the
+        # supervised transport; DNS-query providers authorize the query name.
         try:
             # Scope may be revoked by another CLI/server process. Refresh the
             # persisted policy at each decision; malformed updates fail closed.
@@ -1242,12 +1450,99 @@ class Core:
                 return pinned_check(task.target).allowed is True
             if scope_mode != "network":
                 return False
-            execution_check = getattr(self.scope, "check_for_execution", None)
-            if not callable(execution_check):
-                execution_check = self.scope.check
-            return execution_check(task.target).allowed is True
+            unpinned_check = getattr(
+                self.scope, "check_for_unpinned_execution", None,
+            )
+            if not callable(unpinned_check):
+                return False
+            return unpinned_check(task.target).allowed is True
         except Exception:
             return False
+
+    def _workflow_followup_provenance_valid(self, plan, task) -> bool:
+        """Revalidate the exact sealed finding behind an E4 follow-up node."""
+        import hashlib
+        import json
+
+        if plan.metadata.get("followup_schema") != "whaxon.followup.v1":
+            return True
+        refs = plan.metadata.get("provenance")
+        source_plan_id = plan.metadata.get("source_plan")
+        source_digest = plan.metadata.get("source_digest")
+        if not isinstance(refs, (list, tuple)) or not isinstance(source_plan_id, str):
+            return False
+        matching = [
+            ref for ref in refs
+            if isinstance(ref, dict) and ref.get("task_id") == task.id
+        ]
+        if len(matching) != 1:
+            return False
+        ref = matching[0]
+        source_task = ref.get("source_task")
+        source_job = ref.get("source_job")
+        source_attempt = ref.get("source_attempt")
+        finding_seq = ref.get("finding_seq")
+        finding_digest = ref.get("finding_digest")
+        if (
+            not isinstance(source_task, str) or not source_task
+            or not isinstance(source_job, str) or not source_job
+            or not isinstance(source_attempt, str) or not source_attempt
+            or not isinstance(source_digest, str) or not source_digest
+            or not isinstance(finding_digest, str)
+            or type(finding_seq) is not int or finding_seq < 0
+            or len(finding_digest) != 64
+            or any(char not in "0123456789abcdef" for char in finding_digest)
+        ):
+            return False
+        bindings = plan.metadata.get("provider_bindings")
+        binding = bindings.get(task.id) if isinstance(bindings, dict) else None
+        if (
+            not isinstance(binding, dict)
+            or binding.get("manifest_fingerprint") != ref.get("provider_fingerprint")
+        ):
+            return False
+        try:
+            evidence = self.store.get_workflow_evidence(source_plan_id, limit=1000)
+        except (ValueError, TypeError, RuntimeError):
+            return False
+        if (
+            not isinstance(evidence, dict)
+            or evidence.get("plan_id") != source_plan_id
+            or evidence.get("mission_id") != plan.mission_id
+            or evidence.get("plan_digest") != source_digest
+            or evidence.get("all_evidence_recorded") is not True
+            or evidence.get("all_evidence_integrity_verified") is not True
+        ):
+            return False
+        attempts = evidence.get("attempts")
+        if not isinstance(attempts, list):
+            return False
+        source_rows = [
+            row for row in attempts
+            if isinstance(row, dict)
+            and row.get("task_key") == source_task
+            and row.get("job_id") == source_job
+            and row.get("attempt_id") == source_attempt
+            and row.get("attempt_status") == "succeeded"
+            and row.get("evidence_status") == "recorded"
+            and row.get("integrity_status") == "verified"
+        ]
+        if len(source_rows) != 1:
+            return False
+        findings = source_rows[0].get("findings")
+        if not isinstance(findings, list):
+            return False
+        source_findings = [
+            finding for finding in findings
+            if isinstance(finding, dict) and finding.get("seq") == finding_seq
+        ]
+        if len(source_findings) != 1:
+            return False
+        actual = hashlib.sha256(json.dumps(
+            source_findings[0], sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+        return actual == finding_digest
 
     def authorize_workflow_task_for_plan(self, plan_id: str, task) -> bool:
         """Require exact consent for moderate-impact or network-effect tasks.
@@ -1300,6 +1595,8 @@ class Core:
                 else:
                     return False
             if not any(candidate == task for candidate in plan.tasks):
+                return False
+            if not self._workflow_followup_provenance_valid(plan, task):
                 return False
             self.store.verify_workflow_plan_integrity(plan_id)
             provider = getattr(self, "providers", None)
@@ -1418,9 +1715,121 @@ class Core:
             self.store.reconcile_stale()
             # Do not steal a live worker's attempt when another CLI/daemon
             # process starts. Workflow workers renew this lease while executing.
-            self.store.reconcile_workflow_attempts(stale_after_s=60.0)
+            # Reconcile every stale page before readiness. Each transaction
+            # is bounded by JobStore; repeating until empty avoids stranding
+            # older attempts behind a fixed startup batch size.
+            while self.store.reconcile_workflow_attempts(stale_after_s=60.0):
+                pass
         except Exception as exc:
             # Recovery is part of the durable execution boundary. Starting
             # after silently skipping it can strand claims or report false
             # readiness, so fail closed and let the supervisor retry.
             raise RuntimeError("workflow recovery failed; execution is not ready") from exc
+
+
+_COVERAGE_CONTRACT_ABSENT = object()
+_DECLARED_COVERAGE_DISPOSITIONS = frozenset({
+    "unsupported", "provider_unavailable", "inaccessible",
+})
+
+
+def _project_declared_coverage(
+    contract: Any = _COVERAGE_CONTRACT_ABSENT,
+) -> dict[str, Any]:
+    """Project a strict, plan-digest-bound declaration of planning coverage.
+
+    This describes only what a plan declared at planning time. Runtime skipped
+    and failed outcomes come from persisted task, attempt, and skip records.
+    """
+    result: dict[str, Any] = {
+        "status": "not_recorded",
+        "schema_version": None,
+        "checklist": [],
+        "requested": [],
+        "included": [],
+        "unrequested": [],
+        "omissions": [],
+    }
+    if contract is _COVERAGE_CONTRACT_ABSENT:
+        return result
+
+    result["status"] = "invalid"
+    required = {
+        "schema_version", "checklist", "requested", "included", "dispositions",
+    }
+    if (
+        not isinstance(contract, dict)
+        or set(contract) != required
+        or type(contract.get("schema_version")) is not int
+        or contract.get("schema_version") != 1
+    ):
+        return result
+
+    def normalized_ids(value: Any) -> list[str] | None:
+        if not isinstance(value, list) or len(value) > 256:
+            return None
+        if any(
+            not isinstance(item, str) or not item or item != item.strip()
+            or len(item) > 128
+            or any(ord(char) < 32 for char in item)
+            for item in value
+        ):
+            return None
+        if len(set(value)) != len(value):
+            return None
+        return list(value)
+
+    checklist = normalized_ids(contract.get("checklist"))
+    requested = normalized_ids(contract.get("requested"))
+    included = normalized_ids(contract.get("included"))
+    dispositions = contract.get("dispositions")
+    if (
+        checklist is None or requested is None or included is None
+        or not isinstance(dispositions, list) or len(dispositions) > 256
+    ):
+        return result
+
+    omission_items: list[dict[str, str]] = []
+    omission_ids: set[str] = set()
+    for item in dispositions:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"check_id", "disposition"}
+            or not isinstance(item.get("check_id"), str)
+            or not item["check_id"] or item["check_id"] != item["check_id"].strip()
+            or len(item["check_id"]) > 128
+            or any(ord(char) < 32 for char in item["check_id"])
+            or item.get("disposition") not in _DECLARED_COVERAGE_DISPOSITIONS
+            or item["check_id"] in omission_ids
+        ):
+            return result
+        omission_ids.add(item["check_id"])
+        omission_items.append({
+            "check_id": item["check_id"],
+            "disposition": item["disposition"],
+        })
+
+    checklist_set = set(checklist)
+    requested_set = set(requested)
+    included_set = set(included)
+    omitted_requested = requested_set - included_set
+    if (
+        not requested_set.issubset(checklist_set)
+        or not included_set.issubset(requested_set)
+        or not omission_ids.issubset(omitted_requested)
+        or omission_ids != omitted_requested
+    ):
+        return result
+
+    result.update({
+        "status": "recorded",
+        "schema_version": 1,
+        "checklist": checklist,
+        "requested": requested,
+        "included": included,
+        "unrequested": [
+            check_id for check_id in checklist if check_id not in requested_set
+        ],
+        "omissions": omission_items,
+    })
+    return result

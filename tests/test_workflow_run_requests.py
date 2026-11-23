@@ -552,6 +552,32 @@ def test_e5_run_snapshot_reconnect_and_lease_secrecy(tmp_path, monkeypatch):
     assert claimed["lease_token"] not in str(running)
 
 
+def test_e5_run_snapshot_pins_request_and_progress_to_one_db_snapshot(
+    tmp_path, monkeypatch,
+):
+    core = _core(tmp_path)
+    request = core.enqueue_workflow_run("p")
+    original_progress = core.store._get_workflow_progress_tx
+    cancellation_committed = False
+
+    def cancel_between_snapshot_reads(conn, plan_id):
+        nonlocal cancellation_committed
+        core.workflow_requests.cancel_active(request["id"])
+        cancellation_committed = True
+        return original_progress(conn, plan_id)
+
+    monkeypatch.setattr(
+        core.store, "_get_workflow_progress_tx", cancel_between_snapshot_reads,
+    )
+    snapshot = core.workflow_run_snapshot(request["id"])
+
+    assert cancellation_committed is True
+    assert snapshot["request"]["status"] == "queued"
+    assert snapshot["progress"]["cancellation_requested"] is False
+    assert core.workflow_run_request(request["id"])["status"] == "cancelled"
+    assert core.workflow_progress("p")["cancellation_requested"] is True
+
+
 def test_e5_submission_advertises_reconnect_snapshot_without_execution_claim(
     tmp_path, monkeypatch,
 ):

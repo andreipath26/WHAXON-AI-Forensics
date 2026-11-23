@@ -27,6 +27,7 @@ from whaxon.interfaces.web.api_contracts import (
     DeadlineRequest,
     ExecutionLimitsRequest,
     MissionCostLimitRequest,
+    MissionRuntimeLimitRequest,
     RateLimitRequest,
     WorkflowApprovalGrantRequest,
     WorkflowAttemptReconciliationRequest,
@@ -66,11 +67,6 @@ def _request_actor() -> str:
 
 def _legacy_msf_execution_enabled() -> bool:
     """Legacy Metasploit command dispatch is retired in every configuration."""
-    return False
-
-
-def _legacy_validation_enabled() -> bool:
-    """Direct legacy validation/retest probes are retired in every configuration."""
     return False
 
 
@@ -955,6 +951,30 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                     max_concurrency=limits.max_concurrency,
                 )
             return jsonify(core.mission_execution_limits(mission_id))
+        except (ValueError, TypeError) as exc:
+            status = 404 if "unknown mission" in str(exc) else 400
+            return jsonify({"error": str(exc)}), status
+
+    @app.route("/api/v2/missions/<mission_id>/runtime-budget", methods=["GET", "POST"])
+    def workflow_v2_mission_runtime_budget(mission_id):
+        try:
+            if request.method == "POST":
+                payload = request.get_json(silent=True)
+                if not isinstance(payload, dict):
+                    return jsonify({"error": "max_runtime_s required"}), 400
+                try:
+                    limit = MissionRuntimeLimitRequest.model_validate(payload)
+                except ValidationError as exc:
+                    missing = any(error["type"] == "missing" for error in exc.errors())
+                    message = (
+                        "max_runtime_s required" if missing
+                        else "max_runtime_s must be finite and positive"
+                    )
+                    return jsonify({"error": message}), 400
+                core.configure_mission_runtime_limit(
+                    mission_id, max_runtime_s=limit.max_runtime_s,
+                )
+            return jsonify(core.mission_runtime_limit(mission_id))
         except (ValueError, TypeError) as exc:
             status = 404 if "unknown mission" in str(exc) else 400
             return jsonify({"error": str(exc)}), status
@@ -2159,147 +2179,31 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         log_override(registry.core.data_dir, tool, target)
         return {"logged": True}
 
-    def _validation_scope_error(target_url: str | None):
-        """Re-check current scope before any validator network replay."""
-        if not target_url:
-            return {"error": "finding has no target URL; replay was not attempted"}, 400
-        try:
-            match = _check_execution_scope(registry.core.scope, target_url)
-        except Exception:
-            app.logger.exception("Scope evaluation failed before validation replay")
-            return {"error": "scope evaluation failed; replay was not attempted"}, 503
-        if match is None or not getattr(match, "allowed", False):
-            reason = getattr(match, "reason", "target could not be confirmed in scope")
-            return {
-                "error": f"target out of scope: {reason}; replay was not attempted",
-                "matched_rule": getattr(match, "matched_rule", None),
-            }, 403
-        return None
-
-    def _validation_authorize_request(target_url: str) -> bool:
-        """Recheck current scope immediately before each validator network request."""
-        try:
-            match = _check_execution_scope(registry.core.scope, target_url)
-        except Exception:
-            app.logger.exception("Scope evaluation failed before validation request")
-            return False
-        return match is not None and getattr(match, "allowed", False) is True
-
-    def _legacy_validation_v2_error(job_id: str):
-        """Keep legacy validators from mutating sealed V2 evidence."""
-        checker = getattr(registry.core.store, "is_engine_v2_execution_job", None)
-        if not callable(checker):
-            return {"error": "could not confirm evidence ownership; replay was not attempted"}, 503
-        try:
-            is_v2_job = checker(job_id)
-        except Exception:
-            app.logger.exception("Could not confirm evidence ownership before validation replay")
-            return {"error": "could not confirm evidence ownership; replay was not attempted"}, 503
-        if is_v2_job:
-            return {
-                "error": "Engine V2 evidence requires a plan-bound verification or retest workflow",
-                "workflow": "whaxon workflow plan propose-verification",
-            }, 409
-        return None
-
     @app.post("/api/validate/<job_id>/<int:seq>")
     def api_validate(job_id: str, seq: int):
-        if not _legacy_validation_enabled():
-            return {
-                "error": (
-                    "Legacy finding validation is disabled. Use the Engine V2 "
-                    "plan-bound verification workflow for V2 evidence."
-                ),
-                "legacy_validation_enabled": False,
-                "approval_granted": False,
-                "replay_attempted": False,
-            }, 410
-        from whaxon.core.findings import Finding
-        from whaxon.core.validator import Validator
-        findings = registry.core.store.get_findings(job_id) or []
-        target_f = next((f for f in findings if f["seq"] == seq), None)
-        if not target_f:
-            return {"error": "finding not found"}, 404
-        evidence_error = _legacy_validation_v2_error(job_id)
-        if evidence_error:
-            return evidence_error
-        job = registry.core.store.get(job_id) or {}
-        raw_target = job.get("target", "")
-        if raw_target.startswith(("http://", "https://")):
-            target_url = raw_target
-        elif raw_target:
-            target_url = f"http://{raw_target}"
-        else:
-            target_url = None
-        scope_error = _validation_scope_error(target_url)
-        if scope_error:
-            return scope_error
-        f_obj = Finding(
-            kind=target_f["kind"], severity=target_f["severity"],
-            source=target_f["source"], data=target_f["data"],
-            raw_line=target_f["raw_line"],
-            request_context=target_f.get("request_context") or {},
-        )
-        pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
-        v = Validator(
-            pkg_payloads,
-            authorize_request=_validation_authorize_request,
-        )
-        status, reason = v.validate(f_obj, target_url=target_url)
-        registry.core.store.update_verification(job_id, seq, status, by="engine", reason=reason)
-        return {"status": status, "reason": reason}
+        return {
+            "error": (
+                "Legacy finding validation is disabled. Use the Engine V2 "
+                "plan-bound verification workflow for V2 evidence."
+            ),
+            "legacy_validation_enabled": False,
+            "approval_granted": False,
+            "replay_attempted": False,
+            "workflow": "/api/v2/workflow-proposals",
+        }, 410
 
     @app.post("/api/retest/<job_id>/<int:seq>")
     def api_retest(job_id: str, seq: int):
-        if not _legacy_validation_enabled():
-            return {
-                "error": (
-                    "Legacy finding retest is disabled. Use the Engine V2 "
-                    "plan-bound retest workflow for V2 evidence."
-                ),
-                "legacy_validation_enabled": False,
-                "approval_granted": False,
-                "replay_attempted": False,
-            }, 410
-        from whaxon.core.findings import Finding
-        from whaxon.core.validator import Validator
-        findings = registry.core.store.get_findings(job_id) or []
-        target_f = next((f for f in findings if f["seq"] == seq), None)
-        if not target_f:
-            return {"error": "finding not found"}, 404
-        evidence_error = _legacy_validation_v2_error(job_id)
-        if evidence_error:
-            return evidence_error
-        if target_f.get("verification_status") != "verified":
-            return {
-                "error": "not verified",
-                "verification_status": target_f.get("verification_status"),
-            }, 400
-        job = registry.core.store.get(job_id) or {}
-        raw_target = job.get("target", "")
-        if raw_target.startswith(("http://", "https://")):
-            target_url = raw_target
-        elif raw_target:
-            target_url = f"http://{raw_target}"
-        else:
-            target_url = None
-        scope_error = _validation_scope_error(target_url)
-        if scope_error:
-            return scope_error
-        f_obj = Finding(
-            kind=target_f["kind"], severity=target_f["severity"],
-            source=target_f["source"], data=target_f["data"],
-            raw_line=target_f["raw_line"],
-            request_context=target_f.get("request_context") or {},
-        )
-        pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
-        v = Validator(
-            pkg_payloads,
-            authorize_request=_validation_authorize_request,
-        )
-        status, reason = v.revalidate(f_obj, target_url=target_url)
-        registry.core.store.update_verification(job_id, seq, status, by="engine", reason=reason)
-        return {"status": status, "reason": reason}
+        return {
+            "error": (
+                "Legacy finding retest is disabled. Use the Engine V2 "
+                "plan-bound retest workflow for V2 evidence."
+            ),
+            "legacy_validation_enabled": False,
+            "approval_granted": False,
+            "replay_attempted": False,
+            "workflow": "/api/v2/workflow-proposals",
+        }, 410
 
     @app.get("/api/coverage/<job_id>")
     def api_coverage(job_id: str):
@@ -2312,12 +2216,23 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         status = data.get("status", "").strip().lower()
         if status not in ("verified", "refuted"):
             return {"error": "status must be verified or refuted"}, 400
-        findings = registry.core.store.get_findings(job_id) or []
-        target_f = next((f for f in findings if f["seq"] == seq), None)
-        if not target_f:
-            return {"error": "finding not found"}, 404
         user = data.get("user") or "human"
-        registry.core.store.update_verification(job_id, seq, status, by=f"human:{user}", reason=f"human review by {user}")
+        result = registry.core.store.update_legacy_verification_if_unowned(
+            job_id, seq, status,
+            by=f"human:{user}", reason=f"human review by {user}",
+        )
+        if result == "v2_owned":
+            return {
+                "error": (
+                    "Engine V2 finding state must come from its plan-bound "
+                    "verification workflow"
+                ),
+                "approval_granted": False,
+                "verification_updated": False,
+                "workflow": "/api/v2/workflow-proposals",
+            }, 409
+        if result == "not_found":
+            return {"error": "finding not found"}, 404
         return {"ok": True, "status": status, "by": f"human:{user}"}
 
     @app.post("/api/import/burp")
@@ -2879,21 +2794,45 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.get("/api/ui-v2/findings")
     def api_ui_v2_findings():
-        """Return bounded persisted job/finding records for lightweight UI panels.
+        """Return a stable bounded page of persisted jobs/findings for V2 UI.
 
         Unlike the full report endpoint, this deliberately avoids report
         enrichment and pivot-chain generation so auxiliary pages remain
-        responsive even when optional report enrichment is slow.
+        responsive even when optional report enrichment is slow. Page metadata
+        makes omitted older jobs and findings explicit to clients.
         """
+        raw_limit = request.args.get("limit", "500")
+        raw_offset = request.args.get("offset", "0")
+        if (
+            len(request.args.getlist("limit")) > 1
+            or len(request.args.getlist("offset")) > 1
+            or len(raw_limit) > 3 or len(raw_offset) > 10
+            or not raw_limit.isascii() or not raw_limit.isdecimal()
+            or not raw_offset.isascii() or not raw_offset.isdecimal()
+        ):
+            return jsonify({"error": "limit and offset must be decimal integers"}), 400
+        limit = int(raw_limit)
+        offset = int(raw_offset)
+        if not 1 <= limit <= 500 or offset > 2_147_483_647:
+            return jsonify({"error": "limit or offset is outside the supported range"}), 400
         try:
-            jobs = registry.core.store.history(limit=500)
-            entries = []
-            for job in jobs:
-                entries.append({
-                    "job": job,
-                    "findings": registry.core.store.get_findings(job["id"]) or [],
-                })
-            return jsonify({"jobs": entries})
+            entries, total_jobs, total_findings, returned_findings = (
+                registry.core.store.history_page(limit=limit, offset=offset)
+            )
+            has_more = offset + len(entries) < total_jobs
+            return jsonify({
+                "jobs": entries,
+                "page": {
+                    "limit": limit,
+                    "offset": offset,
+                    "total_jobs": total_jobs,
+                    "returned_jobs": len(entries),
+                    "total_findings": total_findings,
+                    "returned_findings": returned_findings,
+                    "has_more": has_more,
+                    "next_offset": offset + len(entries) if has_more else None,
+                },
+            })
         except Exception as exc:
             return jsonify({
                 "error": "Unable to load live findings",

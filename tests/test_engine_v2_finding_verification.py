@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import threading
 import time
@@ -79,6 +78,7 @@ def _bound_plan(core, *, plan_id, capability_id, target, inputs):
         mission_id=plan_id, tasks=(task,),
         metadata={"provider_bindings": {task.id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
     )
@@ -102,17 +102,28 @@ async def _seed_sealed_source(
         else "nmap" if kind in {"http_header_missing", "cookie_insecure"}
         else "sqlmap"
     )
+    capability_id = f"tool.{tool_id}"
+    manifest = core.providers.manifest_for(capability_id)
     task = WorkflowTask(
-        id="scan", capability_id=f"tool.{tool_id}", target=target,
-        permissions=("network.scan",), impact="moderate",
+        id="scan", capability_id=capability_id, target=target,
+        permissions=manifest.permissions, impact=manifest.impact,
     )
-    core.save_workflow_plan(plan_id, WorkflowPlan(mission_id=plan_id, tasks=(task,)))
-    source_job = hashlib.sha256(plan_id.encode("utf-8")).hexdigest()[:12]
+    core.save_workflow_plan(plan_id, WorkflowPlan(
+        mission_id=plan_id, tasks=(task,),
+        metadata={"provider_bindings": {task.id: {
+            "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
+            "manifest_fingerprint": manifest.fingerprint,
+        }}},
+    ))
+    source_job = None
 
     async def fake_scan(_task):
+        nonlocal source_job
+        source_job = _task._attempt_id
         core.store.create(source_job)
         core.store.set_started(source_job, tool_id, target)
-        core.store.mark_engine_v2_execution_job(source_job)
+        core.store.mark_engine_v2_execution_job(source_job, manifest)
         data = finding_data or (
             {"header": "Content-Security-Policy", "url": target}
             if kind == "http_header_missing"
@@ -128,9 +139,13 @@ async def _seed_sealed_source(
             }),
         ), 0)
         core.store.set_finished(source_job, 0, 0.01)
+        core.store.seal_engine_v2_provider_result(source_job)
         return {
             "job_id": source_job, "tool_id": tool_id, "target": target,
             "exit_code": 0,
+            "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
+            "manifest_fingerprint": manifest.fingerprint,
         }
 
     scheduler = core.workflow_scheduler(

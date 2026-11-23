@@ -2,6 +2,7 @@
 """Download sqlmap source archive into third_party/ for review/build staging."""
 import urllib.request
 from pathlib import Path
+
 ROOT=Path(__file__).resolve().parents[1]
 DEST=ROOT/"third_party"/"sqlmap-master.zip"
 DEST.parent.mkdir(parents=True, exist_ok=True)

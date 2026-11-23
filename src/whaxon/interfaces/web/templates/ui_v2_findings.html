@@ -153,6 +153,10 @@
 </div>
 <span id="whaxon-findings-count" class="font-label-sm text-label-sm text-primary uppercase bg-primary/10 px-space-sm py-1.5 rounded">Live findings: Loading…</span>
 </div>
+<div class="flex items-center justify-between gap-space-sm px-space-xs">
+<p id="whaxon-findings-coverage" class="font-body-sm text-body-sm text-on-surface-variant" role="status" aria-live="polite" hidden></p>
+<button id="whaxon-findings-more" class="rounded bg-surface-container-high px-space-sm py-1.5 text-label-sm text-primary" type="button" hidden>Load older findings</button>
+</div>
 </div>
 <!-- Main Operational Split View (Findings Matrix + Selected Finding Detail Inspector) -->
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter items-start">
@@ -364,8 +368,8 @@
 <script>
 (function(){
 "use strict";
-const findingsCount=document.getElementById("whaxon-findings-count");const list=document.getElementById("whaxon-findings-list"),detail=document.getElementById("whaxon-detail"),filter=document.getElementById("whaxon-finding-filter"),proof=document.getElementById("curl-proof-payload"),findingsState=document.getElementById("whaxon-findings-state"),findingsStateMessage=document.getElementById("whaxon-findings-state-message"),findingsRetry=document.getElementById("whaxon-findings-retry");
-let findings=[],selected=null,hasLoadedReport=false,filters={severity:"",status:"",adapter:""};
+const findingsCount=document.getElementById("whaxon-findings-count");const findingsCoverage=document.getElementById("whaxon-findings-coverage"),findingsMore=document.getElementById("whaxon-findings-more");const list=document.getElementById("whaxon-findings-list"),detail=document.getElementById("whaxon-detail"),filter=document.getElementById("whaxon-finding-filter"),proof=document.getElementById("curl-proof-payload"),findingsState=document.getElementById("whaxon-findings-state"),findingsStateMessage=document.getElementById("whaxon-findings-state-message"),findingsRetry=document.getElementById("whaxon-findings-retry");
+let findings=[],selected=null,hasLoadedReport=false,nextFindingsOffset=0,totalFindingCount=null,totalFindingJobs=null,loadedFindingJobs=0,filters={severity:"",status:"",adapter:""};
 const template=document.getElementById("finding-card-template");
 list.querySelectorAll('[id^="finding-card-"]').forEach(n=>{if(n.id!=="finding-card-template")n.remove();});
 detail.style.visibility="hidden";
@@ -436,11 +440,59 @@ function wireFilters(){
 }
 function setFindingsState(kind,message,retry){findingsState.hidden=false;findingsState.dataset.state=kind;findingsStateMessage.textContent=message;findingsRetry.hidden=!retry;list.setAttribute("aria-busy",kind==="loading"?"true":"false");}
 function openV2RetestStudio(){window.location.href="/ui-v2/retest";}
-async function load(reset){setFindingsState("loading",hasLoadedReport?"Refreshing live findings…":"Loading live findings…",false);try{const r=await fetch("/api/report?format=json",{headers:{"Accept":"application/json"}});if(!r.ok){const error=new Error(r.status===401||r.status===403?"Findings are unavailable: access denied (HTTP "+r.status+").":"Findings could not be loaded (HTTP "+r.status+").");error.state=r.status===401||r.status===403?"unavailable":"error";throw error;}let d;try{d=await r.json();}catch(_){const error=new Error("The findings service returned an invalid JSON response.");error.state="error";throw error;}if(!validReport(d)){const error=new Error("The findings service returned an invalid report response.");error.state="error";throw error;}findings=flatten(d);hasLoadedReport=true;setKpis();if(reset!==false)selected=null;renderList();findingsState.hidden=true;list.setAttribute("aria-busy","false");}catch(error){const reason=error?.message||"Unknown error";const stale=hasLoadedReport;const state=error?.state||"unavailable";setFindingsState(state,stale?"Could not refresh live findings; previously loaded results remain visible. "+reason:reason,true);}}
+async function load(reset){
+  const append=reset===false&&hasLoadedReport;
+  const offset=append?nextFindingsOffset:0;
+  if(append&&offset===null)return;
+  setFindingsState("loading",append?"Loading older findings…":hasLoadedReport?"Refreshing live findings…":"Loading live findings…",false);
+  findingsMore.disabled=true;
+  try{
+    const r=await fetch("/api/ui-v2/findings?limit=100&offset="+offset,{headers:{"Accept":"application/json"}});
+    if(!r.ok){const error=new Error(r.status===401||r.status===403?"Findings are unavailable: access denied (HTTP "+r.status+").":"Findings could not be loaded (HTTP "+r.status+").");error.state=r.status===401||r.status===403?"unavailable":"error";throw error;}
+    let d;
+    try{d=await r.json();}catch(_){const error=new Error("The findings service returned an invalid JSON response.");error.state="error";throw error;}
+    if(!validReport(d)){const error=new Error("The findings service returned an invalid findings response.");error.state="error";throw error;}
+    const incoming=flatten(d),page=d.page;
+    if(page&&(
+      !Number.isInteger(page.limit)||page.limit!==100
+      ||!Number.isInteger(page.offset)||page.offset!==offset
+      ||!Number.isInteger(page.total_jobs)||page.total_jobs<0
+      ||!Number.isInteger(page.returned_jobs)||page.returned_jobs!==d.jobs.length
+      ||!Number.isInteger(page.total_findings)||page.total_findings<0
+      ||!Number.isInteger(page.returned_findings)||page.returned_findings!==incoming.length
+      ||typeof page.has_more!=="boolean"
+      ||(page.has_more&&(page.next_offset!==offset+page.returned_jobs||page.next_offset>=page.total_jobs))
+      ||(!page.has_more&&page.next_offset!==null)
+    ))throw new Error("The findings service returned invalid page metadata.");
+    findings=append?findings.concat(incoming):incoming;
+    hasLoadedReport=true;
+    totalFindingCount=Number.isInteger(page?.total_findings)?page.total_findings:null;
+    totalFindingJobs=Number.isInteger(page?.total_jobs)?page.total_jobs:null;
+    loadedFindingJobs=page?Math.min(page.offset+page.returned_jobs,page.total_jobs):findings.length?1:0;
+    nextFindingsOffset=page?.has_more?page.next_offset:null;
+    findingsMore.hidden=nextFindingsOffset===null;
+    findingsMore.disabled=false;
+    findingsCoverage.hidden=false;
+    findingsCoverage.textContent=totalFindingCount===null
+      ?findings.length+" persisted finding(s) loaded."
+      :"Showing "+findings.length+" of "+totalFindingCount+" findings across "+loadedFindingJobs+" of "+totalFindingJobs+" completed jobs.";
+    setKpis();
+    if(!append)selected=null;
+    renderList();
+    findingsState.hidden=true;
+    list.setAttribute("aria-busy","false");
+  }catch(error){
+    findingsMore.disabled=false;
+    const reason=error?.message||"Unknown error";
+    const stale=hasLoadedReport;
+    const state=error?.state||"unavailable";
+    setFindingsState(state,stale?"Could not refresh live findings; previously loaded results remain visible. "+reason:reason,true);
+  }
+}
 window.selectFinding=selectFinding;window.openV2RetestStudio=openV2RetestStudio;
 document.getElementById("copy-btn")?.addEventListener("click",async e=>{e.preventDefault();try{await navigator.clipboard.writeText(proof.textContent||"");}catch(_){alert("Clipboard access was denied by the browser.");}});
 document.getElementById("replay-btn")?.addEventListener("click",e=>{e.preventDefault();if(selected&&["verified","candidate","pending","unverified"].includes(selected.status))window.location.href="/ui-v2/retest";});
-findingsRetry?.addEventListener("click",()=>load(false));
+findingsRetry?.addEventListener("click",()=>load(hasLoadedReport?false:true));findingsMore?.addEventListener("click",()=>load(false));
 ["fixed-btn"].forEach(id=>{const b=document.getElementById(id);if(b)b.style.display="none";});
 document.querySelectorAll('button[onclick="exportProofAction()"],button[onclick="sendToApprovalsAction()"]').forEach(b=>b.style.display="none");
 

@@ -66,6 +66,7 @@ def test_workflow_cli_proposes_one_unapproved_redirect_observation(
     assert task.inputs == {} and task.target == "api.example.test"
     assert plan.metadata["provider_bindings"]["redirect-1"] == {
         "provider_id": _MANIFEST.provider_id,
+        "provider_version": _MANIFEST.provider_version,
         "manifest_fingerprint": _MANIFEST.fingerprint,
     }
 

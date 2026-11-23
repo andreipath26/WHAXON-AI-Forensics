@@ -92,3 +92,42 @@ def test_explicit_hostname_only_scope_is_distinct_from_cidr_scope(tmp_path, monk
     monkeypatch.setattr("whaxon.core.scope.socket.getaddrinfo", forbidden_dns)
     assert scope.check_for_execution("target.example").allowed is True
     assert scope.check_for_execution("other.example").allowed is False
+
+
+@pytest.mark.parametrize(
+    ("scope_mode", "expected"),
+    [("network", False), ("pinned_network", True), ("dns_query", True)],
+)
+def test_v2_hostname_dispatch_requires_pinned_or_query_scope_mode(
+    tmp_path, monkeypatch, scope_mode, expected,
+):
+    from whaxon.core import Core
+    from whaxon.core.capabilities import CapabilityManifest, CapabilityRegistry
+    from whaxon.core.workflow import WorkflowTask
+
+    scope = _scope(tmp_path, allow=("target.example",))
+    monkeypatch.setattr(
+        "whaxon.core.scope.socket.getaddrinfo",
+        lambda *_args, **_kwargs: pytest.fail(
+            "authorization must not resolve an unpinned hostname"
+        ),
+    )
+    core = Core.__new__(Core)
+    core.capabilities = CapabilityRegistry()
+    core.capabilities.register(CapabilityManifest(
+        capability_id="fixture.scope_mode",
+        provider_id="fixture.scope_mode",
+        provider_version="1.0.0",
+        transports=("local_process",),
+        target_types=("hostname",),
+        permissions=("network.scan",),
+        impact="moderate",
+        scope_mode=scope_mode,
+    ))
+    core.scope = scope
+    task = WorkflowTask(
+        "scope-mode-task", "fixture.scope_mode", "target.example",
+        permissions=("network.scan",), impact="moderate",
+    )
+
+    assert core.authorize_workflow_task(task) is expected

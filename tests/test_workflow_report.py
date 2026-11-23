@@ -33,6 +33,8 @@ def _core_with(evidence, *, ready=True, persisted_attempts=None):
         "attempts": persisted_attempts if persisted_attempts is not None
         else len(evidence["attempts"]),
         "total_tasks": 1,
+        "complete": True,
+        "cancellation_requested": False,
         "counts": {"succeeded": 1} if ready else {"failed": 1},
     }
     return core
@@ -47,6 +49,11 @@ def test_core_workflow_report_uses_only_sealed_plan_evidence():
         "pending_tasks": 0,
         "task_attempts": 1, "recorded_attempts": 1,
         "verified_seals": 1, "findings": 1,
+    }
+    assert report["coverage"]["completeness_claim"] is False
+    assert report["coverage"]["persisted_attempts"] == 1
+    assert report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "not_recorded", "count": None, "items": [],
     }
     assert report["findings"][0]["job_id"] == "123456789abc"
     assert report["findings"][0]["target"].startswith("http://127.0.0.1")
@@ -90,6 +97,45 @@ def test_core_workflow_report_flags_truncated_attempt_history():
     )
     assert report["status"] == "partial"
     assert report["truncated"] is True
+
+
+def test_core_workflow_report_refuses_stale_readiness_after_cancellation():
+    core = _core_with(_evidence(), ready=True)
+    core.workflow_progress = lambda _plan_id: {
+        "plan_id": "plan-1", "attempts": 1, "total_tasks": 1,
+        "complete": True, "cancellation_requested": True,
+        "counts": {"succeeded": 1},
+    }
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["status"] == "partial"
+    assert report["readiness"]["ready_to_report_success"] is True
+
+
+def test_core_workflow_report_refuses_inconsistent_terminal_counts():
+    core = _core_with(_evidence(), ready=True)
+    core.workflow_progress = lambda _plan_id: {
+        "plan_id": "plan-1", "attempts": 1, "total_tasks": 1,
+        "complete": True, "cancellation_requested": False,
+        "counts": {"succeeded": 0, "failed": 1},
+    }
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["status"] == "partial"
+
+
+def test_core_workflow_report_honors_evidence_snapshot_truncation_flag():
+    evidence = _evidence()
+    evidence["truncated"] = True
+    core = _core_with(evidence, ready=True, persisted_attempts=1)
+
+    report = Core.workflow_report(core, "plan-1")
+
+    assert report["truncated"] is True
+    assert report["coverage"]["attempt_history_truncated"] is True
+    assert report["status"] == "partial"
 
 
 def test_plan_report_cli_prints_json_and_returns_failure_for_partial(monkeypatch, capsys):
@@ -150,6 +196,55 @@ def test_workflow_report_projects_failed_attempt_without_raw_error(tmp_path):
     assert "provider response contained" not in rendered
 
 
+def test_workflow_report_inputs_share_one_sqlite_snapshot(tmp_path, monkeypatch):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-report-snapshot.db")
+    store.create_mission("snapshot-mission", "pin report reads")
+    store.save_workflow_plan("snapshot-plan", WorkflowPlan("snapshot-mission", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    original_progress = store._get_workflow_progress_tx
+    cancellation_committed = False
+
+    def cancel_after_evidence_snapshot(conn, plan_id):
+        nonlocal cancellation_committed
+        store.request_workflow_cancellation(plan_id)
+        cancellation_committed = True
+        return original_progress(conn, plan_id)
+
+    monkeypatch.setattr(
+        store, "_get_workflow_progress_tx", cancel_after_evidence_snapshot,
+    )
+    snapshot = store.get_workflow_report_snapshot("snapshot-plan")
+
+    assert cancellation_committed is True
+    assert snapshot["progress"]["cancellation_requested"] is False
+    assert snapshot["readiness"]["blockers"] == []
+    assert snapshot["tasks"][0]["status"] == "pending"
+    assert store.get_workflow_progress("snapshot-plan")["cancellation_requested"] is True
+
+
+def test_core_report_uses_store_report_snapshot_when_available(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-report-core-snapshot.db")
+    store.create_mission("snapshot-mission", "core report snapshot")
+    store.save_workflow_plan("snapshot-plan", WorkflowPlan("snapshot-mission", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    core = Core.__new__(Core)
+    core.store = store
+
+    report = Core.workflow_report(core, "snapshot-plan")
+
+    assert report["status"] == "partial"
+    assert report["summary"]["planned_tasks"] == 1
+    assert report["summary"]["task_status_counts"] == {"pending": 1}
+
+
 
 def test_workflow_report_projects_scope_skip_without_raw_coverage_details(tmp_path):
     from whaxon.core.store import JobStore
@@ -197,6 +292,80 @@ def test_workflow_report_projects_scope_skip_without_raw_coverage_details(tmp_pa
     assert secret_detail not in rendered
     assert "private context" not in rendered
     assert "target" not in attempt["coverage_outcomes"][0]
+    assert report["coverage"]["recorded_skips"] == {"scope_blocked": 1}
+    assert report["coverage"]["attempt_history_truncated"] is False
+
+
+def test_workflow_report_projects_plan_bound_unsupported_and_unavailable_checks(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "workflow-report-omissions.db")
+    store.create_mission("omissions-mission", "report omitted checks")
+    plan = WorkflowPlan("omissions-mission", (
+        WorkflowTask("scan", "tool.nmap", "192.0.2.12"),
+    ), metadata={
+        "proposal_type": "passive_recon",
+        "requested_checks": ["dns", "cookies", "tech"],
+        "included_checks": ["dns"],
+        "omitted_checks": [
+            {"check": "cookies", "reason": "legacy only", "disposition": "unsupported"},
+            {"check": "dns_full", "reason": "provider not ready", "disposition": "provider_unavailable"},
+                {"check": "tech", "reason": "legacy-only; no admitted V2 provider"},
+                {"check": "secret", "reason": "untyped provider note"},
+        ],
+    })
+    store.save_workflow_plan("omissions-plan", plan)
+
+    core = Core.__new__(Core)
+    core.store = store
+    core.workflow_evidence = lambda plan_id, limit=100: store.get_workflow_evidence(
+        plan_id, limit=limit,
+    )
+    core.workflow_plan_details = lambda plan_id: {
+        "plan": store.get_workflow_plan(plan_id)["plan"],
+        "tasks": store.list_workflow_tasks(plan_id),
+    }
+    core.workflow_readiness = store.get_workflow_readiness
+    core.workflow_progress = store.get_workflow_progress
+
+    report = Core.workflow_report(core, "omissions-plan")
+
+    assert report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "recorded",
+        "count": 3,
+        "items": [
+            {"check": "cookies", "disposition": "unsupported"},
+            {"check": "dns_full", "disposition": "provider_unavailable"},
+            {"check": "tech", "disposition": "unsupported"},
+        ],
+    }
+    assert report["coverage"]["requested_checks"] == ["dns", "cookies", "tech"]
+    assert report["coverage"]["included_checks"] == ["dns"]
+    assert report["coverage"]["unrequested_checks"] == [
+        "dns_full", "ssl", "https", "headers", "redirects", "robots",
+        "security_txt", "waf",
+    ]
+
+    # The report must not trust a changed omission list that no longer matches
+    # the immutable plan digest stored with the workflow evidence.
+    with store._conn() as connection:
+        raw_plan = connection.execute(
+            "SELECT plan_json FROM workflow_plans WHERE id=?", ("omissions-plan",),
+        ).fetchone()["plan_json"]
+        changed_plan = json.loads(raw_plan)
+        changed_plan["metadata"]["omitted_checks"].append({
+            "check": "forged", "disposition": "unsupported",
+        })
+        connection.execute(
+            "UPDATE workflow_plans SET plan_json=? WHERE id=?",
+            (json.dumps(changed_plan), "omissions-plan"),
+        )
+    changed_report = Core.workflow_report(core, "omissions-plan")
+    assert changed_report["coverage"]["unrequested_checks"] is None
+    assert changed_report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "not_recorded", "count": None, "items": [],
+    }
 
 
 
@@ -263,6 +432,10 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
     assert not_requested["findings"][0]["verification_outcome"] == {
         "status": "not_requested",
     }
+    assert not_requested["coverage"]["unrequested_verification_findings"] == 1
+    assert not_requested["coverage"]["finding_verification_outcomes"] == {
+        "not_requested": 1,
+    }
 
     pending = make_report([scan_task, {**verify_task, "status": "pending"}])
     assert pending["findings"][0]["verification_outcome"] == {
@@ -309,3 +482,163 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
     }
     assert "source_job_id" not in json.dumps(recorded)
     assert "source_finding_seq" not in json.dumps(recorded)
+
+
+def _declared_coverage_report(
+    tmp_path, contract, *, stale_digest=False, extra_metadata=None,
+):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    store = JobStore(tmp_path / "declared-coverage.db")
+    store.create_mission("mission-1", "declared coverage test")
+    metadata = {"coverage_contract": contract}
+    metadata.update(extra_metadata or {})
+    plan = WorkflowPlan(
+        "mission-1",
+        (WorkflowTask("scan", "tool.nmap", "192.0.2.10"),),
+        metadata=metadata,
+    )
+    store.save_workflow_plan("declared-plan", plan)
+    evidence = _evidence()
+    evidence["plan_id"] = "declared-plan"
+    evidence["mission_id"] = "mission-1"
+    evidence["plan_digest"] = "stale-digest" if stale_digest else plan.digest
+    core = _core_with(evidence)
+    core.workflow_plan_details = lambda _plan_id: {
+        "plan": store.get_workflow_plan("declared-plan")["plan"],
+    }
+    return Core.workflow_report(core, "declared-plan")
+
+
+def test_workflow_report_projects_digest_bound_generic_declared_coverage(tmp_path):
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "http", "tls", "headers"],
+        "requested": ["dns", "http", "tls"],
+        "included": ["dns"],
+        "dispositions": [
+            {"check_id": "http", "disposition": "provider_unavailable"},
+            {"check_id": "tls", "disposition": "inaccessible"},
+        ],
+    }
+
+    report = _declared_coverage_report(tmp_path, contract)
+
+    assert report["coverage"]["declared_coverage"] == {
+        "status": "recorded",
+        "schema_version": 1,
+        "checklist": ["dns", "http", "tls", "headers"],
+        "requested": ["dns", "http", "tls"],
+        "included": ["dns"],
+        "unrequested": ["headers"],
+        "omissions": [
+            {"check_id": "http", "disposition": "provider_unavailable"},
+            {"check_id": "tls", "disposition": "inaccessible"},
+        ],
+    }
+    assert report["coverage"]["completeness_claim"] is False
+    assert report["status"] == "complete"
+
+
+def test_workflow_report_fails_closed_on_invalid_declared_coverage(tmp_path):
+    from copy import deepcopy
+
+    valid = {
+        "schema_version": 1,
+        "checklist": ["dns", "http"],
+        "requested": ["dns", "http"],
+        "included": ["dns"],
+        "dispositions": [{"check_id": "http", "disposition": "unsupported"}],
+    }
+    invalid_contracts = []
+    duplicate = deepcopy(valid)
+    duplicate["checklist"].append("dns")
+    invalid_contracts.append(duplicate)
+    outside_requested = deepcopy(valid)
+    outside_requested["included"] = ["dns", "elsewhere"]
+    invalid_contracts.append(outside_requested)
+    missing_omission = deepcopy(valid)
+    missing_omission["dispositions"] = []
+    invalid_contracts.append(missing_omission)
+    unknown_disposition = deepcopy(valid)
+    unknown_disposition["dispositions"][0]["disposition"] = "timeout"
+    invalid_contracts.append(unknown_disposition)
+    unknown_field = deepcopy(valid)
+    unknown_field["dispositions"][0]["reason"] = "private provider detail"
+    invalid_contracts.append(unknown_field)
+    invalid_contracts.append({
+        "schema_version": 1,
+        "checklist": ["x"] * 257,
+        "requested": ["x"],
+        "included": [],
+        "dispositions": [{"check_id": "x", "disposition": "unsupported"}],
+    })
+
+    for index, contract in enumerate(invalid_contracts):
+        report = _declared_coverage_report(tmp_path / str(index), contract)
+        declared = report["coverage"]["declared_coverage"]
+        assert declared["status"] == "invalid"
+        assert declared["checklist"] == []
+        assert declared["requested"] == []
+        assert declared["included"] == []
+        assert declared["unrequested"] == []
+        assert declared["omissions"] == []
+        assert report["coverage"]["completeness_claim"] is False
+
+
+def test_workflow_report_suppresses_declared_coverage_on_digest_mismatch(tmp_path):
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "http"],
+        "requested": ["dns"],
+        "included": ["dns"],
+        "dispositions": [],
+    }
+
+    report = _declared_coverage_report(tmp_path, contract, stale_digest=True)
+
+    assert report["coverage"]["declared_coverage"]["status"] == "not_recorded"
+    assert report["coverage"]["declared_coverage"]["checklist"] == []
+    assert report["coverage"]["unrequested_checks"] is None
+
+
+def test_workflow_report_has_no_declared_projection_without_checklist(tmp_path):
+    report = Core.workflow_report(
+        _core_with(_evidence()), "plan-1",
+    )
+
+    assert report["coverage"]["declared_coverage"]["status"] == "not_recorded"
+
+
+def test_workflow_report_fails_closed_on_conflicting_recon_projections(tmp_path):
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "tls"],
+        "requested": ["dns", "tls"],
+        "included": ["dns"],
+        "dispositions": [{"check_id": "tls", "disposition": "provider_unavailable"}],
+    }
+    legacy_metadata = {
+        "proposal_type": "passive_recon",
+        "requested_checks": ["dns"],
+        "included_checks": ["dns"],
+        "omitted_checks": [
+            {"check": "tls", "reason": "provider unavailable",
+             "disposition": "provider_unavailable"},
+        ],
+    }
+
+    report = _declared_coverage_report(
+        tmp_path, contract, extra_metadata=legacy_metadata,
+    )
+
+    assert report["coverage"]["declared_coverage"]["status"] == "invalid"
+    assert report["coverage"]["declared_coverage"]["omissions"] == []
+    assert report["coverage"]["requested_checks"] is None
+    assert report["coverage"]["included_checks"] is None
+    assert report["coverage"]["unrequested_checks"] is None
+    assert report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "not_recorded", "count": None, "items": [],
+    }

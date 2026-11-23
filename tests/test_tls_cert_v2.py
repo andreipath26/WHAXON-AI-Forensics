@@ -375,6 +375,7 @@ def test_tls_plan_proposal_is_fixed_and_requires_exact_approval_before_socket(
     plan = WorkflowPlan.from_dict(proposal["plan"])
     assert plan.metadata["provider_bindings"]["task-1"] == {
         "provider_id": provider.bindings()[0].provider_id,
+        "provider_version": provider.bindings()[0].provider_version,
         "manifest_fingerprint": provider.bindings()[0].fingerprint,
     }
     task = plan.tasks[0]

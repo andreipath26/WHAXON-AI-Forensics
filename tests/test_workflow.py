@@ -358,7 +358,15 @@ def test_workflow_contract_nested_mappings_are_immutable():
         task.inputs["new"] = "value"
     with pytest.raises(TypeError, match="immutable"):
         task.inputs["options"]["new"] = "value"
-    assert task.inputs["options"]["ports"] == (80, 443)
+    ports = task.inputs["options"]["ports"]
+    assert isinstance(ports, list)
+    assert ports == [80, 443]
+    with pytest.raises(TypeError, match="immutable"):
+        ports.append(8080)
+    labels = plan.metadata["labels"]
+    assert isinstance(labels, list)
+    with pytest.raises(TypeError, match="immutable"):
+        labels.append("changed")
 
 
 def test_workflow_task_rejects_non_finite_timeout():
@@ -1338,6 +1346,71 @@ def test_mission_budget_rejects_direct_attempt_bypass(tmp_path):
     store.finish_task_attempt(claim["attempt_id"], "succeeded")
     with pytest.raises(ValueError, match="mission execution budget"):
         store.start_task_attempt("manual", "b", 1, plan_id="p")
+
+
+def test_mission_runtime_budget_is_durable_and_checked_across_plans(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    path = tmp_path / "mission-runtime-budget.db"
+    store = JobStore(path)
+    store.create_mission("m", "controlled")
+    for plan_id, target in (("p1", "192.0.2.10"), ("p2", "192.0.2.11")):
+        store.save_workflow_plan(plan_id, WorkflowPlan("m", (
+            WorkflowTask("scan", "fixture", target),
+        )))
+    first = store.claim_ready_workflow_task("p1", "worker")
+    store.finish_task_attempt(first["attempt_id"], "succeeded")
+
+    # Seed elapsed time as a deterministic clock-independent fixture.
+    with store._lock:
+        conn = store._conn()
+        try:
+            conn.execute(
+                "UPDATE task_attempts SET started_at=?, finished_at=? WHERE id=?",
+                (time.time() - 12, time.time(), first["attempt_id"]),
+            )
+        finally:
+            conn.close()
+
+    store.set_mission_runtime_limit("m", max_runtime_s=10)
+    restarted = JobStore(path)
+    usage = restarted.get_mission_runtime_limit("m")
+    assert usage["max_runtime_s"] == 10
+    assert usage["runtime_budget_exhausted"] is True
+    assert usage["runtime_s"] >= 10
+    assert restarted.claim_ready_workflow_task("p2", "other-worker") is None
+    with pytest.raises(ValueError, match="cannot be relaxed"):
+        store.set_mission_runtime_limit("m", max_runtime_s=11)
+
+
+def test_mission_runtime_limit_is_rechecked_at_dispatch(tmp_path):
+    import time
+
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "mission-runtime-dispatch.db")
+    store.create_mission("m", "controlled")
+    store.save_workflow_plan("p", WorkflowPlan("m", (
+        WorkflowTask("scan", "fixture", "192.0.2.10"),
+    )))
+    claim = store.claim_ready_workflow_task("p", "worker")
+    with store._lock:
+        conn = store._conn()
+        try:
+            conn.execute(
+                "UPDATE task_attempts SET started_at=? WHERE id=?",
+                (time.time() - 5, claim["attempt_id"]),
+            )
+        finally:
+            conn.close()
+    store.set_mission_runtime_limit("m", max_runtime_s=2)
+    assert store.mark_workflow_dispatch_started("p", claim["attempt_id"]) is False
+    assert not [event for event in store.list_workflow_events("p")
+                if event["event_type"] == "dispatch_started"]
 
 
 def test_mission_deadline_stops_all_plans_and_is_durable(tmp_path):

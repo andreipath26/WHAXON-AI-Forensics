@@ -230,11 +230,20 @@ def test_v2_report_and_audit_digest_api_match_shared_core(tmp_path, monkeypatch)
     core.create_mission("m-audit", "controlled")
     core.save_workflow_plan("p-audit", WorkflowPlan("m-audit", (
         WorkflowTask("scan", "fixture", "192.0.2.10"),
-    )))
+    ), metadata={
+        "omitted_checks": [{
+            "check": "cookies", "reason": "legacy-only",
+            "disposition": "unsupported",
+        }],
+    }))
     report = client.get("/api/v2/workflows/p-audit/report?limit=10")
     assert report.status_code == 200
     assert report.get_json() == core.workflow_report("p-audit", limit=10)
     assert report.get_json()["status"] != "complete"
+    assert report.get_json()["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "recorded", "count": 1,
+        "items": [{"check": "cookies", "disposition": "unsupported"}],
+    }
 
     snapshot = client.get("/api/v2/workflows/p-audit/audit-snapshot")
     assert snapshot.status_code == 200
@@ -416,6 +425,24 @@ def test_workflow_v2_mission_budget_is_shared_with_store(tmp_path, monkeypatch):
     assert response.status_code == 400
     assert response.get_json() == {"error": "mission limits must be positive integers"}
     assert client.get("/api/v2/missions/missing/budget").status_code == 404
+
+
+def test_workflow_v2_mission_runtime_budget_is_shared_with_store(tmp_path, monkeypatch):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m", "controlled")
+    response = client.post(
+        "/api/v2/missions/m/runtime-budget", json={"max_runtime_s": 30.5},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["max_runtime_s"] == 30.5
+    assert core.store.get_mission_runtime_limit("m")["max_runtime_s"] == 30.5
+    assert client.get("/api/v2/missions/m/runtime-budget").get_json()[
+        "runtime_budget_exhausted"
+    ] is False
+    assert client.post(
+        "/api/v2/missions/m/runtime-budget", json={"max_runtime_s": float("inf")},
+    ).status_code == 400
+    assert client.get("/api/v2/missions/missing/runtime-budget").status_code == 404
 
 
 def test_mission_deadline_api_blocks_later_claims(tmp_path, monkeypatch):
@@ -700,6 +727,54 @@ def test_v2_evidence_api_links_actual_job_and_never_fabricates_findings(tmp_path
     assert mismatch["all_evidence_recorded"] is False
     assert mismatch["attempts"][0]["evidence_status"] == "job_not_verified"
     assert mismatch["attempts"][0]["findings"] == []
+
+
+def test_v2_evidence_page_never_claims_completeness_for_a_truncated_lifecycle(
+    tmp_path, monkeypatch,
+):
+    client, core = _client(tmp_path, monkeypatch)
+    core.create_mission("m-pages", "authorized lab")
+    core.save_workflow_plan("p-pages", WorkflowPlan("m-pages", (
+        WorkflowTask("scan-a", "tool.nmap", "192.0.2.10"),
+        WorkflowTask("scan-b", "tool.nmap", "192.0.2.11"),
+    )))
+    first = core.store.claim_ready_workflow_task("p-pages", "worker")
+    second = core.store.claim_ready_workflow_task("p-pages", "worker")
+    assert first is not None and second is not None
+
+    with core.store._conn() as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, tool, target, status, exit_code) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("page-job", "nmap", first["target"], "finished", 0),
+        )
+        connection.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, "
+            "data_json, raw_line, verification_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("page-job", 0, "open_port", "info", "nmap", '{"port":80}',
+             "80/tcp open http", "candidate"),
+        )
+    core.store.finish_task_attempt(first["attempt_id"], "succeeded", result={
+        "job_id": "page-job", "tool_id": "nmap", "target": first["target"],
+    })
+    core.store.finish_task_attempt(second["attempt_id"], "succeeded", result={
+        "job_id": "missing-page-job", "tool_id": "nmap", "target": second["target"],
+    })
+    with core.store._conn() as connection:
+        connection.execute(
+            "UPDATE task_attempts SET started_at=1 WHERE id=?", (first["attempt_id"],),
+        )
+        connection.execute(
+            "UPDATE task_attempts SET started_at=2 WHERE id=?", (second["attempt_id"],),
+        )
+
+    bounded = client.get("/api/v2/workflows/p-pages/evidence?limit=1").get_json()
+    assert bounded["attempt_count"] == 2
+    assert bounded["returned_attempt_count"] == 1
+    assert bounded["truncated"] is True
+    assert bounded["attempts"][0]["evidence_status"] == "recorded"
+    assert bounded["all_evidence_recorded"] is False
+    assert bounded["all_evidence_integrity_verified"] is False
 
 
 def test_v2_evidence_api_rejects_bad_bounds_and_unknown_plans(tmp_path, monkeypatch):
@@ -1028,29 +1103,102 @@ def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monk
     assert core.store.get_workflow_plan("p-ai") is None
 
 
-def test_legacy_validation_routes_refuse_engine_v2_evidence(tmp_path, monkeypatch):
+def test_legacy_validation_routes_are_permanently_no_replay(tmp_path, monkeypatch):
     from whaxon.core.findings import Finding
+    from whaxon.core.validator import Validator
 
     monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
+
+    def refuse_probe(*_args, **_kwargs):
+        raise AssertionError("retired validation API attempted a probe")
+
+    monkeypatch.setattr(Validator, "validate", refuse_probe)
+    monkeypatch.setattr(Validator, "revalidate", refuse_probe)
     client, core = _client(tmp_path, monkeypatch)
-    job_id = "0123456789ab"
-    core.store.create(job_id)
-    core.store.set_started(job_id, "verify_sqli", "http://192.0.2.10/search?id=1")
-    core.store.append_finding(job_id, Finding(
-        kind="sqli", severity="high", source="engine-v2-verifier",
-        data={"parameter": "id"}, raw_line="verified finding",
-    ), 0)
-    core.store.update_verification(job_id, 0, "verified", by="engine-v2", reason="sealed result")
-    core.store.mark_engine_v2_execution_job(job_id)
 
-    before = core.store.get_findings(job_id)
-    validate = client.post(f"/api/validate/{job_id}/0")
-    retest = client.post(f"/api/retest/{job_id}/0")
+    for job_id, is_v2 in (("legacy-job", False), ("0123456789ab", True)):
+        core.store.create(job_id)
+        core.store.set_started(
+            job_id, "verify_sqli", "http://192.0.2.10/search?id=1",
+        )
+        core.store.append_finding(job_id, Finding(
+            kind="sqli",
+            severity="high",
+            source="engine-v2-verifier" if is_v2 else "test",
+            data={"parameter": "id"},
+            raw_line="finding",
+        ), 0)
+        if is_v2:
+            core.store.update_verification(
+                job_id, 0, "verified", by="engine-v2", reason="sealed result",
+            )
+            core.store.mark_engine_v2_execution_job(job_id)
 
-    assert validate.status_code == 410
-    assert retest.status_code == 410
-    assert validate.get_json()["legacy_validation_enabled"] is False
-    assert retest.get_json()["legacy_validation_enabled"] is False
-    assert validate.get_json()["replay_attempted"] is False
-    assert retest.get_json()["replay_attempted"] is False
-    assert core.store.get_findings(job_id) == before
+        before = core.store.get_findings(job_id)
+        validate = client.post(f"/api/validate/{job_id}/0")
+        retest = client.post(f"/api/retest/{job_id}/0")
+
+        for response in (validate, retest):
+            assert response.status_code == 410
+            body = response.get_json()
+            assert body["legacy_validation_enabled"] is False
+            assert body["approval_granted"] is False
+            assert body["replay_attempted"] is False
+            assert body["workflow"] == "/api/v2/workflow-proposals"
+        assert core.store.get_findings(job_id) == before
+
+
+def test_human_resolution_route_preserves_legacy_and_blocks_v2_jobs(
+    tmp_path, monkeypatch,
+):
+    from whaxon.core.findings import Finding
+
+    client, core = _client(tmp_path, monkeypatch)
+    v2_job_id = "v2-human-resolution"
+    legacy_job_id = "legacy-human-resolution"
+    for job_id, source in (
+        (v2_job_id, "engine-v2-verifier"),
+        (legacy_job_id, "test"),
+    ):
+        core.store.create(job_id)
+        core.store.append_finding(job_id, Finding(
+            kind="sqli",
+            severity="high",
+            source=source,
+            data={"parameter": "id"},
+            raw_line="candidate finding",
+        ), 0)
+    core.store.mark_engine_v2_execution_job(v2_job_id)
+    before = core.store.get_findings(v2_job_id)
+
+    for status in ("verified", "refuted"):
+        response = client.post(
+            f"/api/approvals/{v2_job_id}/0/resolve",
+            json={"status": status, "user": "reviewer"},
+        )
+        assert response.status_code == 409
+        body = response.get_json()
+        assert body["approval_granted"] is False
+        assert body["verification_updated"] is False
+        assert body["workflow"] == "/api/v2/workflow-proposals"
+        assert core.store.get_findings(v2_job_id) == before
+
+        response = client.post(
+            f"/api/approvals/{legacy_job_id}/0/resolve",
+            json={"status": status, "user": "reviewer"},
+        )
+        assert response.status_code == 200
+        assert response.get_json() == {
+            "ok": True, "status": status, "by": "human:reviewer",
+        }
+        legacy_finding = core.store.get_findings(legacy_job_id)[0]
+        assert legacy_finding["verification_status"] == status
+        assert legacy_finding["verified_by"] == "human:reviewer"
+        assert legacy_finding["verification_reason"] == "human review by reviewer"
+
+    missing = client.post(
+        "/api/approvals/missing-job/0/resolve",
+        json={"status": "verified", "user": "reviewer"},
+    )
+    assert missing.status_code == 404
+    assert missing.get_json()["error"] == "finding not found"

@@ -148,7 +148,7 @@ def test_approval_queue_includes_low_impact_network_candidates_only(tmp_path):
 @pytest.mark.parametrize(
     ("scope_mode", "expected_method"),
     [
-        ("network", "check_for_execution"),
+        ("network", "check_for_unpinned_execution"),
         ("dns_query", "check_for_dns_query"),
         ("pinned_network", "check_for_pinned_execution"),
         ("unknown", None),
@@ -166,8 +166,8 @@ def test_core_scope_preflight_uses_manifest_scope_mode(
         def load(self):
             return None
 
-        def check_for_execution(self, target):
-            calls.append(("check_for_execution", target))
+        def check_for_unpinned_execution(self, target):
+            calls.append(("check_for_unpinned_execution", target))
             return SimpleNamespace(allowed=True)
 
         def check_for_dns_query(self, target):

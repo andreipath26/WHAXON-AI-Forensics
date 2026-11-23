@@ -87,6 +87,14 @@ class ExecutionLimitsRequest(BaseModel):
     max_concurrency: int = Field(ge=1)
 
 
+class MissionRuntimeLimitRequest(BaseModel):
+    """Finite positive cumulative mission attempt wall-time cap."""
+
+    model_config = ConfigDict(strict=True, extra="ignore")
+
+    max_runtime_s: float = Field(gt=0, allow_inf_nan=False)
+
+
 class RateLimitRequest(BaseModel):
     """Positive finite dispatch spacing accepted by existing rate-limit routes."""
 

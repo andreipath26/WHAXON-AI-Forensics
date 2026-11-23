@@ -72,6 +72,59 @@ class WorkflowScheduler:
                 lost.set()
                 return
 
+    async def _wait_for_execution_stop(self, plan_id: str) -> str | None:
+        """Observe durable cancellation/runtime barriers during provider work."""
+        stop_reason = getattr(self.store, "workflow_execution_stop_reason", None)
+        if callable(stop_reason):
+            async def read_stop_reason():
+                return await asyncio.to_thread(stop_reason, plan_id)
+        else:
+            # Compatibility for small injected test stores predating the
+            # runtime-budget stop-reason service.
+            async def read_stop_reason():
+                cancelled = await asyncio.to_thread(
+                    self.store.workflow_cancellation_requested, plan_id,
+                )
+                return "plan_cancelled" if cancelled else None
+        while True:
+            reason = await read_stop_reason()
+            if reason:
+                return reason
+            await asyncio.sleep(0.25)
+
+    async def _dispatch_with_cancellation_watch(
+        self, plan_id: str, task: WorkflowTask, deadline: float,
+    ) -> tuple[str | None, Any]:
+        """Cancel the provider coroutine after durable plan stop intent.
+
+        Async providers such as ToolRunner can stop their child process. A
+        synchronous provider running in a thread may continue after coroutine
+        cancellation; its caller still records uncertainty and never replays.
+        """
+        dispatch = asyncio.create_task(self._invoke(self.dispatch, task, deadline))
+        cancellation = asyncio.create_task(self._wait_for_execution_stop(plan_id))
+        try:
+            done, _pending = await asyncio.wait(
+                (dispatch, cancellation), return_when=asyncio.FIRST_COMPLETED,
+            )
+            if cancellation in done:
+                # Surface storage/read failures as dispatch uncertainty rather
+                # than silently allowing execution with an unknown stop state.
+                stop_reason = cancellation.result()
+                dispatch.cancel()
+                await asyncio.gather(dispatch, return_exceptions=True)
+                return stop_reason, None
+            return None, dispatch.result()
+        except BaseException:
+            if not dispatch.done():
+                dispatch.cancel()
+            await asyncio.gather(dispatch, return_exceptions=True)
+            raise
+        finally:
+            if not cancellation.done():
+                cancellation.cancel()
+            await asyncio.gather(cancellation, return_exceptions=True)
+
     async def _execute(self, row: dict[str, Any]) -> dict[str, str]:
         task = WorkflowTask(
             id=row["id"], capability_id=row["capability_id"], target=row["target"],
@@ -164,7 +217,20 @@ class WorkflowScheduler:
                     "status": self.store.get_workflow_attempt_status(attempt_id),
                 }
             dispatch_started = True
-            result = await self._invoke(self.dispatch, task, deadline)
+            stop_reason, result = await self._dispatch_with_cancellation_watch(
+                row["plan_id"], task, deadline,
+            )
+            if stop_reason:
+                reason = (
+                    "cancellation requested while provider was executing"
+                    if stop_reason == "plan_cancelled"
+                    else "mission runtime budget exhausted while provider was executing"
+                )
+                self.store.finish_task_attempt(
+                    attempt_id, "uncertain",
+                    error=f"{reason}; outcome requires reconciliation",
+                )
+                return {"task_id": task.id, "status": "uncertain"}
             if lease_lost.is_set():
                 return {"task_id": task.id, "status": "uncertain"}
             # A stop request during external dispatch cannot prove that side

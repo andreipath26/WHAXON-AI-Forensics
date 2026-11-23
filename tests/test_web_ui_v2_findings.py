@@ -40,7 +40,7 @@ def _serve_stable_report(route):
 
 
 def test_canonical_findings_page_renders_report_api_data(page, live_server):
-    page.route("**/api/report?format=json", _serve_stable_report)
+    page.route("**/api/ui-v2/findings**", _serve_stable_report)
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-findings-count')?.textContent === 'Live findings: 3'",
@@ -49,7 +49,7 @@ def test_canonical_findings_page_renders_report_api_data(page, live_server):
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 3
     assert "SQLi: Time-based Blind" not in page.locator("#whaxon-findings-list").inner_text()
 def test_canonical_findings_page_inspects_report_finding(page, live_server):
-    page.route("**/api/report?format=json", _serve_stable_report)
+    page.route("**/api/ui-v2/findings**", _serve_stable_report)
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
@@ -62,7 +62,7 @@ def test_canonical_findings_page_inspects_report_finding(page, live_server):
     assert detail.locator("#selected-finding-target").text_content().strip() == "127.0.0.1"
     assert "staging-api.corp.net" not in detail.locator("#curl-proof-payload").text_content()
 def test_wired_navigation_is_visible_and_unfinished_navigation_is_hidden(page, live_server):
-    page.route("**/api/report?format=json", _serve_stable_report)
+    page.route("**/api/ui-v2/findings**", _serve_stable_report)
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
         "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
@@ -89,7 +89,7 @@ def test_findings_page_has_no_hardcoded_demo_evidence(page, live_server):
 def test_verified_finding_action_routes_to_v2_retest_studio(page, live_server):
     legacy_calls = []
     page.route(
-        "**/api/report?format=json",
+        "**/api/ui-v2/findings**",
         lambda route: route.fulfill(
             status=200, content_type="application/json",
             body='{"jobs":[{"job":{"id":"sealed-candidate"},"job_id":"sealed-candidate",'
@@ -124,7 +124,7 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
         }],
     }
     page.route(
-        "**/api/report?format=json",
+        "**/api/ui-v2/findings**",
         lambda route: route.fulfill(
             status=200, content_type="application/json", body=json.dumps(payload),
         ),
@@ -171,9 +171,34 @@ def test_finding_filter_chips_toggle_off_and_heading_tracks_visible_count(page, 
     assert page.locator("#whaxon-findings-list #whaxon-findings-empty").count() == 0
 
 def test_findings_search_includes_structured_data_and_evidence_falls_back_to_raw_line(page, live_server):
+    payload = {
+        "jobs": [{
+            "job": {"id": "search-findings", "target": "127.0.0.1", "tool": "nmap"},
+            "findings": [
+                {"seq": 0, "title": "22/tcp open ssh", "severity": "low",
+                 "source": "nmap", "verification_status": "candidate",
+                 "raw_line": "22/tcp open ssh OpenSSH 9.6",
+                 "data": {"port": 22, "protocol": "tcp", "service": "ssh"}},
+                {"seq": 1, "title": "443/tcp open https", "severity": "medium",
+                 "source": "nmap", "verification_status": "candidate",
+                 "raw_line": "443/tcp open https",
+                 "data": {"port": 443, "protocol": "tcp", "service": "https"}},
+                {"seq": 2, "title": "53/udp open domain", "severity": "info",
+                 "source": "nmap", "verification_status": "candidate",
+                 "raw_line": "53/udp open domain",
+                 "data": {"port": 53, "service": "domain"}},
+            ],
+        }],
+    }
+    page.route(
+        "**/api/ui-v2/findings**",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(payload),
+        ),
+    )
     page.goto(f"{live_server}/ui-v2/findings")
     page.wait_for_function(
-        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length > 0",
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 3",
         timeout=15000,
     )
 
@@ -238,6 +263,54 @@ def test_findings_kpi_bars_match_live_report_counts(page, live_server):
     assert abs(candidate_width - expected_candidate) < 0.1
     assert page.locator("#whaxon-kpi-fixed-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
     assert page.locator("#whaxon-kpi-vulnerable-bar").evaluate("(el) => parseFloat(el.style.width)") >= 0
+
+
+def test_findings_page_loads_older_bounded_pages(page, live_server):
+    def page_response(offset):
+        first = offset == 0
+        jobs = [
+            {
+                "job": {"id": f"page-job-{offset + index}", "target": "192.0.2.10", "tool": "nmap"},
+                "findings": [{
+                    "seq": 0, "kind": "open_port", "severity": "low",
+                    "source": "nmap", "title": f"Finding {offset + index}",
+                    "verification_status": "candidate", "data": {"port": 8000 + offset + index},
+                }],
+            }
+            for index in range(100 if first else 1)
+        ]
+        return {
+            "jobs": jobs,
+            "page": {
+                "limit": 100, "offset": offset, "total_jobs": 101,
+                "returned_jobs": len(jobs), "total_findings": 101,
+                "returned_findings": len(jobs), "has_more": first,
+                "next_offset": 100 if first else None,
+            },
+        }
+
+    page.route(
+        "**/api/ui-v2/findings**",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json",
+            body=json.dumps(page_response(int(route.request.url.split("offset=")[-1]))),
+        ),
+    )
+    page.goto(f"{live_server}/ui-v2/findings")
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 100",
+        timeout=8000,
+    )
+    assert page.locator("#whaxon-findings-more").is_visible()
+    assert "100 of 101 findings" in page.locator("#whaxon-findings-coverage").inner_text()
+
+    page.locator("#whaxon-findings-more").click()
+    page.wait_for_function(
+        "() => document.querySelectorAll('#whaxon-findings-list [data-finding-index]').length === 101",
+        timeout=8000,
+    )
+    assert page.locator("#whaxon-findings-more").is_hidden()
+    assert "101 of 101 findings" in page.locator("#whaxon-findings-coverage").inner_text()
 
 
 def test_findings_list_uses_only_records_from_live_report(page, live_server):
@@ -307,14 +380,14 @@ def test_findings_reject_malformed_report_and_retry(page, live_server):
                 body=json.dumps(_stable_report_payload()),
             )
 
-    page.route("**/api/report**", malformed_once)
+    page.route("**/api/ui-v2/findings**", malformed_once)
     page.goto(f"{live_server}/ui-v2/findings")
     state = page.locator("#whaxon-findings-state")
     page.wait_for_function(
         "() => document.querySelector('#whaxon-findings-state')?.dataset.state === 'error'",
         timeout=5000,
     )
-    assert "invalid report response" in state.inner_text().lower()
+    assert "invalid findings response" in state.inner_text().lower()
     assert page.locator("#whaxon-findings-list [data-finding-index]").count() == 0
     page.get_by_role("button", name="Retry").click()
     page.wait_for_function(
@@ -326,7 +399,7 @@ def test_findings_reject_malformed_report_and_retry(page, live_server):
 
 def test_findings_empty_report_is_distinct_from_unavailable(page, live_server):
     page.route(
-        "**/api/report**",
+        "**/api/ui-v2/findings**",
         lambda route: route.fulfill(
             status=200,
             content_type="application/json",
@@ -360,7 +433,7 @@ def test_findings_403_and_network_error_are_unavailable_and_retryable(page, live
         else:
             route.abort()
 
-    page.route("**/api/report**", unavailable_then_network)
+    page.route("**/api/ui-v2/findings**", unavailable_then_network)
     page.goto(f"{live_server}/ui-v2/findings")
     state = page.locator("#whaxon-findings-state")
     page.wait_for_function(
@@ -395,7 +468,7 @@ def test_verified_batch_action_opens_v2_retest_studio_without_legacy_posts(page,
     calls = []
 
     page.route(
-        "**/api/report**",
+        "**/api/ui-v2/findings**",
         lambda route: route.fulfill(status=200, content_type="application/json", body=json.dumps(payload)),
     )
 

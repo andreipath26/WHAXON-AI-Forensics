@@ -57,6 +57,7 @@ async def _run_stage(core: Core, stage: str, tasks: tuple[WorkflowTask, ...]):
         manifest = core.providers.manifest_for(task.capability_id)
         bindings[task.id] = {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }
     plan = WorkflowPlan(

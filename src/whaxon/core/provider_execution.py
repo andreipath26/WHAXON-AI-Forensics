@@ -45,6 +45,32 @@ def provider_capability_identity_is_known(capability_id: str) -> bool:
     )
 
 
+# Positive recovery policy: additions require an explicit reviewed contract.
+# Verification probes, SQL injection checks, the Samba lab provider and
+# unknown tool aliases intentionally remain manual-reconciliation-only.
+RESULT_ONLY_RECOVERY_CAPABILITY_IDS = frozenset({
+    "tool.nmap", "tool.nikto", "tool.gobuster", "tool.ffuf", "tool.nuclei",
+    "tool.wpscan", "tool.whois", "tool.dig", "tool.theharvester",
+    "tool.dnsrecon", "tool.arjun",
+    "network.services.discover", "web.server.audit", "web.directories.enumerate",
+    "web.paths.fuzz", "web.templates.assess", "web.wordpress.audit",
+    "domain.registration.lookup", "dns.records.query",
+    "osint.domain.contacts.search", "dns.records.enumerate",
+    "web.parameters.discover",
+    "dns.recon.passive", "dns.recon.full", "web.recon.passive",
+    "web.recon.headers", "web.recon.robots", "web.recon.security_txt",
+    "web.recon.redirect_observe", "tls.certificate.inspect",
+})
+
+
+def provider_supports_result_only_recovery(capability_id: str) -> bool:
+    """Whether this exact capability has an approved observational recovery contract."""
+    return (
+        isinstance(capability_id, str)
+        and capability_id in RESULT_ONLY_RECOVERY_CAPABILITY_IDS
+    )
+
+
 def provider_tool_id_for_capability(capability_id: str) -> str:
     """Resolve the persisted provider tool identity for a workflow capability."""
     if not isinstance(capability_id, str) or not capability_id:

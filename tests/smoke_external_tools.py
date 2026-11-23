@@ -172,6 +172,7 @@ def main() -> None:
                         "provider_bindings": {
                             task.id: {
                                 "provider_id": manifest.provider_id,
+                                "provider_version": manifest.provider_version,
                                 "manifest_fingerprint": manifest.fingerprint,
                             },
                         },

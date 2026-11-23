@@ -87,8 +87,6 @@ EXPECTED_RUNNER_CALLS = Counter(
 # their public execution entry points visible separately from runner calls.
 EXPECTED_SERVICE_CALLS = Counter(
     {
-        ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
-        ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.msf_run._do_run", "adapter.run_module"): 1,
         ("interfaces/web/server.py", "create_app.msf_session_exec", "client.session_exec"): 1,
         ("core/runner.py", "_run_msf_session", "client.session_exec"): 1,
@@ -221,6 +219,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('GET', '/api/v2/missions/<mission_id>/plans'): 'workflow_v2_mission_plans',
     ('GET', '/api/v2/missions/<mission_id>/report'): 'workflow_v2_mission_report',
     ('GET', '/api/v2/missions/<mission_id>/rate-limit'): 'workflow_v2_mission_rate_limit',
+    ('GET', '/api/v2/missions/<mission_id>/runtime-budget'): 'workflow_v2_mission_runtime_budget',
     ('GET', '/api/v2/providers'): 'workflow_v2_providers',
     ('GET', '/api/v2/providers/portfolio-audit'): 'workflow_v2_portfolio_audit',
     ('GET', '/api/v2/workflow-runs/<request_id>'): 'workflow_v2_run_request_status',
@@ -268,6 +267,7 @@ EXPECTED_API_ROUTE_HANDLERS = {
     ('POST', '/api/v2/missions/<mission_id>/cost'): 'workflow_v2_mission_cost',
     ('POST', '/api/v2/missions/<mission_id>/deadline'): 'workflow_v2_mission_deadline',
     ('POST', '/api/v2/missions/<mission_id>/rate-limit'): 'workflow_v2_mission_rate_limit',
+    ('POST', '/api/v2/missions/<mission_id>/runtime-budget'): 'workflow_v2_mission_runtime_budget',
     ('POST', '/api/v2/scope/check'): 'check_v2_authoring_scope',
     ('POST', '/api/v2/workflow-runs/<request_id>/cancel'): 'workflow_v2_cancel_run_request',
     ('POST', '/api/v2/workflows'): 'workflow_v2_save_plan',
@@ -413,6 +413,51 @@ def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
         f"Unexpected: {actual - EXPECTED_SERVICE_CALLS}; "
         f"missing: {EXPECTED_SERVICE_CALLS - actual}"
     )
+
+
+def test_retired_validation_api_handlers_have_no_execution_authority() -> None:
+    server = SOURCE_ROOT / "interfaces" / "web" / "server.py"
+    tree = ast.parse(server.read_text(encoding="utf-8"), filename=str(server))
+    handlers = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in {"api_validate", "api_retest"}
+    }
+    assert set(handlers) == {"api_validate", "api_retest"}
+
+    for name, handler in handlers.items():
+        returns = [
+            node for node in ast.walk(handler) if isinstance(node, ast.Return)
+        ]
+        assert len(returns) == 1, name
+        response = returns[0].value
+        assert isinstance(response, ast.Tuple) and len(response.elts) == 2, name
+        assert isinstance(response.elts[1], ast.Constant)
+        assert response.elts[1].value == 410
+        payload = response.elts[0]
+        assert isinstance(payload, ast.Dict)
+        fields = {
+            key.value: value
+            for key, value in zip(payload.keys, payload.values, strict=True)
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        }
+        for field in ("legacy_validation_enabled", "approval_granted", "replay_attempted"):
+            assert isinstance(fields.get(field), ast.Constant)
+            assert fields[field].value is False
+        calls = [
+            _dotted_name(node.func)
+            for node in ast.walk(handler)
+            if isinstance(node, ast.Call)
+        ]
+        assert not any(
+            call and (
+                call.endswith(".validate")
+                or call.endswith(".revalidate")
+                or call.endswith(".update_verification")
+            )
+            for call in calls
+        ), name
 
 
 def test_direct_external_effect_sinks_are_classified() -> None:
