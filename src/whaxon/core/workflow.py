@@ -37,11 +37,37 @@ class _FrozenDict(dict):
         return self
 
 
+class _FrozenList(list):
+    """JSON-serializable array that rejects mutation after construction."""
+
+    def __init__(self, value=()):
+        list.__init__(self, (_freeze(item) for item in value))
+
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("workflow contract arrays are immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    append = _immutable
+    clear = _immutable
+    extend = _immutable
+    insert = _immutable
+    pop = _immutable
+    remove = _immutable
+    reverse = _immutable
+    sort = _immutable
+    __iadd__ = _immutable
+    __imul__ = _immutable
+
+    def __deepcopy__(self, memo):
+        return self
+
+
 def _freeze(value: Any) -> Any:
     if isinstance(value, dict):
         return _FrozenDict(value)
     if isinstance(value, list):
-        return tuple(_freeze(item) for item in value)
+        return _FrozenList(value)
     if isinstance(value, tuple):
         return tuple(_freeze(item) for item in value)
     return value
