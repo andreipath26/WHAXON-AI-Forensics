@@ -1166,11 +1166,25 @@ def propose_passive_recon_plan(
             "execution_submitted": False,
             "approval_granted": False,
         }
+    coverage_contract = {
+        "schema_version": 1,
+        "checklist": list(PASSIVE_RECON_CHECKS),
+        "requested": list(requested),
+        "included": list(included),
+        "dispositions": [
+            {"check_id": item["check"], "disposition": item["disposition"]}
+            for item in omitted
+            if item.get("disposition") in {
+                "unsupported", "provider_unavailable", "inaccessible",
+            }
+        ],
+    }
     plan = WorkflowPlan(
         mission_id=mission_id,
         tasks=tuple(tasks),
         metadata={
             "proposal_type": "passive_recon",
+            "coverage_contract": coverage_contract,
             "provider_bindings": provider_bindings,
             "requested_checks": list(requested),
             "included_checks": included,
