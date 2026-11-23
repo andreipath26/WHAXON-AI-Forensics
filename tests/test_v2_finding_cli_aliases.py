@@ -1,7 +1,5 @@
 """Tests for proposal-only V2 validate/retest CLI aliases."""
-import asyncio
 import json
-from types import SimpleNamespace
 
 import pytest
 
