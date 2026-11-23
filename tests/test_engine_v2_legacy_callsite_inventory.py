@@ -87,8 +87,6 @@ EXPECTED_RUNNER_CALLS = Counter(
 # their public execution entry points visible separately from runner calls.
 EXPECTED_SERVICE_CALLS = Counter(
     {
-        ("interfaces/web/server.py", "create_app.api_validate", "v.validate"): 1,
-        ("interfaces/web/server.py", "create_app.api_retest", "v.revalidate"): 1,
         ("interfaces/web/server.py", "create_app.msf_run._do_run", "adapter.run_module"): 1,
         ("interfaces/web/server.py", "create_app.msf_session_exec", "client.session_exec"): 1,
         ("core/runner.py", "_run_msf_session", "client.session_exec"): 1,
@@ -415,6 +413,51 @@ def test_recon_validation_and_retest_service_callsites_are_explicit() -> None:
         f"Unexpected: {actual - EXPECTED_SERVICE_CALLS}; "
         f"missing: {EXPECTED_SERVICE_CALLS - actual}"
     )
+
+
+def test_retired_validation_api_handlers_have_no_execution_authority() -> None:
+    server = SOURCE_ROOT / "interfaces" / "web" / "server.py"
+    tree = ast.parse(server.read_text(encoding="utf-8"), filename=str(server))
+    handlers = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name in {"api_validate", "api_retest"}
+    }
+    assert set(handlers) == {"api_validate", "api_retest"}
+
+    for name, handler in handlers.items():
+        returns = [
+            node for node in ast.walk(handler) if isinstance(node, ast.Return)
+        ]
+        assert len(returns) == 1, name
+        response = returns[0].value
+        assert isinstance(response, ast.Tuple) and len(response.elts) == 2, name
+        assert isinstance(response.elts[1], ast.Constant)
+        assert response.elts[1].value == 410
+        payload = response.elts[0]
+        assert isinstance(payload, ast.Dict)
+        fields = {
+            key.value: value
+            for key, value in zip(payload.keys, payload.values, strict=True)
+            if isinstance(key, ast.Constant) and isinstance(key.value, str)
+        }
+        for field in ("legacy_validation_enabled", "approval_granted", "replay_attempted"):
+            assert isinstance(fields.get(field), ast.Constant)
+            assert fields[field].value is False
+        calls = [
+            _dotted_name(node.func)
+            for node in ast.walk(handler)
+            if isinstance(node, ast.Call)
+        ]
+        assert not any(
+            call and (
+                call.endswith(".validate")
+                or call.endswith(".revalidate")
+                or call.endswith(".update_verification")
+            )
+            for call in calls
+        ), name
 
 
 def test_direct_external_effect_sinks_are_classified() -> None:
