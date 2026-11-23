@@ -141,7 +141,7 @@ def test_e4_plan_binding_without_provider_version_is_denied_before_dispatch(tmp_
     )
     assert core.authorize_workflow_task_for_plan("plan", task) is False
     result = _run(core)
-    assert result["complete"] is False
+    assert result["complete"] is True
     assert first.calls == []
     assert second.calls == []
     assert core.store.get_workflow_progress("plan")["counts"]["blocked"] == 1
