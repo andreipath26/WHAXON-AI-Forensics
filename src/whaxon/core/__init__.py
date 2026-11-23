@@ -727,6 +727,7 @@ class Core:
         )
         omitted_dispositions: list[dict[str, str]] = []
         declared_coverage = _project_declared_coverage()
+        coverage_contract_present = False
         requested_checks: list[str] | None = None
         included_checks: list[str] | None = None
         unrequested_checks: list[str] | None = None
@@ -747,6 +748,9 @@ class Core:
 
                 persisted_plan = WorkflowPlan.from_dict(persisted_plan)
                 if persisted_plan.digest == evidence.get("plan_digest"):
+                    coverage_contract_present = (
+                        "coverage_contract" in persisted_plan.metadata
+                    )
                     declared_coverage = _project_declared_coverage(
                         persisted_plan.metadata.get(
                             "coverage_contract", _COVERAGE_CONTRACT_ABSENT,
@@ -808,6 +812,39 @@ class Core:
             except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
                 omitted_dispositions = []
                 declared_coverage = _project_declared_coverage({})
+        if coverage_contract_present:
+            if declared_coverage["status"] != "recorded":
+                requested_checks = None
+                included_checks = None
+                unrequested_checks = None
+                omitted_dispositions = []
+            elif persisted_plan.metadata.get("proposal_type") == "passive_recon":
+                contract_omissions = sorted(
+                    (item["check_id"], item["disposition"])
+                    for item in declared_coverage["omissions"]
+                )
+                legacy_omissions = sorted(
+                    (item["check"], item["disposition"])
+                    for item in omitted_dispositions
+                )
+                if (
+                    requested_checks != declared_coverage["requested"]
+                    or included_checks != declared_coverage["included"]
+                    or unrequested_checks != declared_coverage["unrequested"]
+                    or legacy_omissions != contract_omissions
+                ):
+                    declared_coverage = _project_declared_coverage({})
+                    requested_checks = None
+                    included_checks = None
+                    unrequested_checks = None
+                    omitted_dispositions = []
+            else:
+                # Generic contracts are authoritative outside the passive
+                # recon compatibility projection.
+                requested_checks = None
+                included_checks = None
+                unrequested_checks = None
+                omitted_dispositions = []
         coverage = {
             "basis": "persisted workflow plan, task, attempt, and evidence records",
             "planned_tasks": planned_task_count,
