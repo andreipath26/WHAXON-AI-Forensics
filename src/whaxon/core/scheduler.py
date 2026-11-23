@@ -244,7 +244,9 @@ class WorkflowScheduler:
                     error=f"{reason}; outcome requires reconciliation",
                 )
                 return {"task_id": task.id, "status": "uncertain"}
-            if lease_lost.is_set():
+            if lease_lost.is_set() or not self.store.workflow_attempt_owned(attempt_id):
+                # A worker may lose the persisted attempt before its next
+                # heartbeat notices. Never terminalize someone else's attempt.
                 return {"task_id": task.id, "status": "uncertain"}
             # A stop request during external dispatch cannot prove that side
             # effects were cancelled. Do not report a clean post-stop success.
