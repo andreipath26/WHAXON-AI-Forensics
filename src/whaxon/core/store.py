@@ -4420,7 +4420,15 @@ class JobStore:
             if plan["status"] == "cancel_requested":
                 c.execute("COMMIT")
                 return "plan_cancelled"
-            runtime = self._mission_runtime_usage(c, plan["mission_id"], now=time.time())
+            now = time.time()
+            mission_deadline = c.execute(
+                "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?",
+                (plan["mission_id"],),
+            ).fetchone()
+            if mission_deadline is not None and now >= mission_deadline["deadline_at"]:
+                c.execute("COMMIT")
+                return "mission_deadline_exceeded"
+            runtime = self._mission_runtime_usage(c, plan["mission_id"], now=now)
             c.execute("COMMIT")
             if runtime["runtime_budget_exhausted"]:
                 return "mission_runtime_budget_exhausted"
@@ -4860,6 +4868,21 @@ class JobStore:
                     status = "uncertain"
                     result = None
                     error = "provider outcome after cancellation requires reconciliation"
+                # A mission deadline is an absolute execution cutoff, not
+                # merely a claim-time check. A provider that returns between
+                # stop-watcher polls cannot certify a late success.
+                if status == "succeeded":
+                    mission_deadline = c.execute(
+                        "SELECT deadline_at FROM mission_deadlines WHERE mission_id=?",
+                        (row["mission_id"],),
+                    ).fetchone()
+                    if mission_deadline is not None and now >= mission_deadline["deadline_at"]:
+                        status = "uncertain"
+                        result = None
+                        error = (
+                            "mission deadline expired during provider "
+                            "execution; reconcile external effects"
+                        )
                 # The async runtime watcher polls, so a provider can
                 # return between polls after the mission cap is exhausted.
                 # Fence success inside the same transaction as terminalization.
