@@ -1146,3 +1146,38 @@ def test_legacy_validation_routes_are_permanently_no_replay(tmp_path, monkeypatc
             assert body["replay_attempted"] is False
             assert body["workflow"] == "/api/v2/workflow-proposals"
         assert core.store.get_findings(job_id) == before
+
+
+def test_legacy_human_resolution_route_refuses_engine_v2_jobs(
+    tmp_path, monkeypatch,
+):
+    from whaxon.core.findings import Finding
+
+    client, core = _client(tmp_path, monkeypatch)
+    job_id = "v2-human-resolution"
+    core.store.create(job_id)
+    core.store.append_finding(job_id, Finding(
+        kind="sqli",
+        severity="high",
+        source="engine-v2-verifier",
+        data={"parameter": "id"},
+        raw_line="candidate finding",
+    ), 0)
+    core.store.mark_engine_v2_execution_job(job_id)
+    before = core.store.get_findings(job_id)
+
+    def refuse_update(*_args, **_kwargs):
+        raise AssertionError("legacy resolver attempted to mutate Engine V2 evidence")
+
+    monkeypatch.setattr(core.store, "update_verification", refuse_update)
+    for status in ("verified", "refuted"):
+        response = client.post(
+            f"/api/approvals/{job_id}/0/resolve",
+            json={"status": status, "user": "reviewer"},
+        )
+        assert response.status_code == 409
+        body = response.get_json()
+        assert body["approval_granted"] is False
+        assert body["verification_updated"] is False
+        assert body["workflow"] == "/api/v2/workflow-proposals"
+        assert core.store.get_findings(job_id) == before
