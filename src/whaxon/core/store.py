@@ -4832,7 +4832,7 @@ class JobStore:
                 c.execute("BEGIN IMMEDIATE")
                 row = c.execute(
                     "SELECT a.task_id, a.status, p.id AS plan_id, "
-                    "p.status AS plan_status "
+                    "p.status AS plan_status, p.mission_id AS mission_id "
                     "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
                     "JOIN workflow_plans p ON p.id=t.plan_id WHERE a.id=?",
                     (attempt_id,),
@@ -4860,6 +4860,20 @@ class JobStore:
                     status = "uncertain"
                     result = None
                     error = "provider outcome after cancellation requires reconciliation"
+                # The async runtime watcher polls, so a provider can
+                # return between polls after the mission cap is exhausted.
+                # Fence success inside the same transaction as terminalization.
+                # External effects remain uncertain rather than becoming
+                # certified success or a retryable failure.
+                if status == "succeeded" and self._mission_runtime_usage(
+                    c, row["mission_id"], now=now,
+                )["runtime_budget_exhausted"]:
+                    status = "uncertain"
+                    result = None
+                    error = (
+                        "mission runtime budget exhausted during provider "
+                        "execution; reconcile external effects"
+                    )
                 if status == "succeeded" and c.execute(
                     "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
                     (attempt_id,),
