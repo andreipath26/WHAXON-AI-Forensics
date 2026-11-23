@@ -89,8 +89,9 @@ def main(args: list[str] | None = None) -> int:
             print(
                 "This finding belongs to Engine V2 evidence. Use "
                 "'whaxon validate <job_id> <seq> --mission-id MISSION "
-                "--plan-id PLAN [--save]' to prepare a proposal; "
-                "approval and execution are separate.",
+                "--plan-id PLAN [--save]' or 'whaxon workflow plan "
+                "propose-verification --mode verify'; approval and execution "
+                "are separate.",
                 file=sys.stderr,
             )
             return EXIT_V2_WORKFLOW_REQUIRED
