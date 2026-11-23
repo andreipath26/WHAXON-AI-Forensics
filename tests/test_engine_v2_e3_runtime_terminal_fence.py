@@ -8,9 +8,9 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 def _store(tmp_path):
     store = JobStore(tmp_path / "terminal-runtime.db")
     store.create_mission("mission", "controlled local runtime test")
-    for plan_id in ("first", "second"):
+    for plan_id, target in (("first", "192.0.2.10"), ("second", "192.0.2.11")):
         store.save_workflow_plan(plan_id, WorkflowPlan("mission", (
-            WorkflowTask("scan", "fixture", "192.0.2.10"),
+            WorkflowTask("scan", "fixture", target),
         )))
     return store
 
