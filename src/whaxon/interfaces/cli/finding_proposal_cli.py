@@ -32,18 +32,25 @@ def run_finding_proposal(
         mode=mode,
     )
     created = False
-    if save and proposal.get("status") == "proposed":
+    if proposal.get("status") == "proposed":
         try:
             plan_data = proposal.get("plan")
             if not isinstance(plan_data, dict):
                 raise ValueError("proposal did not contain a workflow plan")
-            created = bool(core.save_workflow_plan(
-                plan_id, WorkflowPlan.from_dict(plan_data),
-            ))
+            plan = WorkflowPlan.from_dict(plan_data)
+            if plan.mission_id != mission_id:
+                raise ValueError("proposal mission does not match the requested mission")
+            if proposal.get("plan_id") != plan_id:
+                raise ValueError("proposal plan ID does not match the requested plan")
+            reported_digest = proposal.get("digest")
+            if reported_digest is not None and reported_digest != plan.digest:
+                raise ValueError("proposal digest does not match its workflow plan")
+            if save:
+                created = bool(core.save_workflow_plan(plan_id, plan))
         except (AttributeError, KeyError, TypeError, ValueError, RuntimeError) as exc:
             print(json.dumps({
                 "status": "blocked",
-                "reason": f"proposal could not be persisted: {exc}",
+                "reason": f"proposal is invalid or could not be persisted: {exc}",
                 "created": False,
                 "execution_submitted": False,
                 "approval_granted": False,
