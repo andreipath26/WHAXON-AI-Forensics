@@ -130,7 +130,7 @@ def test_expired_request_or_cross_mission_plan_never_accepts_reply(core):
 
 
 def test_invalid_transport_inputs_and_unknown_mission_rejected(core):
-    for bad in ["", "  ", "x" * 12001, "command\\x00hidden"]:
+    for bad in ["", "  ", "x" * 12001, "command\x00hidden"]:
         with pytest.raises(ValueError):
             question(core, key="bad-" + str(len(bad)), prompt=bad)
     with pytest.raises(ValueError, match="unknown mission"):
