@@ -39,7 +39,9 @@ async def main():
     def seal_then_pause(job_id):
         if not seal_result(job_id):
             raise RuntimeError("provider result did not seal")
-        sealed_marker.write_text(job_id, encoding="utf-8")
+        pending_marker = sealed_marker.with_name(sealed_marker.name + ".tmp")
+        pending_marker.write_text(job_id, encoding="utf-8")
+        pending_marker.replace(sealed_marker)
         while True:
             time.sleep(0.05)
 
