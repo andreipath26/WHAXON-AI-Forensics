@@ -154,6 +154,7 @@ def test_lab_critical_impact_requires_exact_persisted_plan_approval(
     plan = WorkflowPlan("lab-mission", (task,), metadata={
         "provider_bindings": {task.id: {
             "provider_id": provider.PROVIDER_ID,
+            "provider_version": provider.manifest.provider_version,
             "manifest_fingerprint": provider.manifest.fingerprint,
         }},
     })
