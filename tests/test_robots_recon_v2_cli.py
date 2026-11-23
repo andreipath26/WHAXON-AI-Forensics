@@ -78,6 +78,7 @@ def test_workflow_cli_proposes_and_saves_fixed_robots_plan(
     assert task.inputs == {}
     assert plan.metadata["provider_bindings"]["robots-1"] == {
         "provider_id": _MANIFEST.provider_id,
+        "provider_version": _MANIFEST.provider_version,
         "manifest_fingerprint": _MANIFEST.fingerprint,
     }
 
