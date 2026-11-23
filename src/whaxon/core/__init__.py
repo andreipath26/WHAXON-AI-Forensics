@@ -620,6 +620,7 @@ class Core:
         omitted_dispositions: list[dict[str, str]] = []
         declared_coverage = _project_declared_coverage()
         coverage_contract_present = False
+        plan_metadata: dict[str, Any] | None = None
         requested_checks: list[str] | None = None
         included_checks: list[str] | None = None
         unrequested_checks: list[str] | None = None
@@ -638,18 +639,19 @@ class Core:
             try:
                 from .workflow import WorkflowPlan
 
-                persisted_plan = WorkflowPlan.from_dict(persisted_plan)
-                if persisted_plan.digest == evidence.get("plan_digest"):
+                parsed_plan = WorkflowPlan.from_dict(persisted_plan)
+                if parsed_plan.digest == evidence.get("plan_digest"):
+                    plan_metadata = parsed_plan.metadata
                     coverage_contract_present = (
-                        "coverage_contract" in persisted_plan.metadata
+                        "coverage_contract" in plan_metadata
                     )
                     declared_coverage = _project_declared_coverage(
-                        persisted_plan.metadata.get(
+                        plan_metadata.get(
                             "coverage_contract", _COVERAGE_CONTRACT_ABSENT,
                         ),
                     )
                     for field_name in ("requested_checks", "included_checks"):
-                        raw_checks = persisted_plan.metadata.get(field_name)
+                        raw_checks = plan_metadata.get(field_name)
                         if (
                             isinstance(raw_checks, (list, tuple))
                             and len(raw_checks) <= 128
@@ -665,7 +667,7 @@ class Core:
                             else:
                                 included_checks = list(raw_checks)
                     if (
-                        persisted_plan.metadata.get("proposal_type") == "passive_recon"
+                        plan_metadata.get("proposal_type") == "passive_recon"
                         and requested_checks is not None
                     ):
                         from .workflow_proposals import PASSIVE_RECON_CHECKS
@@ -674,7 +676,7 @@ class Core:
                             check for check in PASSIVE_RECON_CHECKS
                             if check not in requested_checks
                         ]
-                    raw_omissions = persisted_plan.metadata.get("omitted_checks", [])
+                    raw_omissions = plan_metadata.get("omitted_checks", [])
                     if isinstance(raw_omissions, (list, tuple)):
                         for omission in raw_omissions:
                             if not isinstance(omission, dict):
@@ -704,13 +706,13 @@ class Core:
             except (AttributeError, KeyError, TypeError, ValueError, RuntimeError):
                 omitted_dispositions = []
                 declared_coverage = _project_declared_coverage({})
-        if coverage_contract_present:
+        if coverage_contract_present and plan_metadata is not None:
             if declared_coverage["status"] != "recorded":
                 requested_checks = None
                 included_checks = None
                 unrequested_checks = None
                 omitted_dispositions = []
-            elif persisted_plan.metadata.get("proposal_type") == "passive_recon":
+            elif plan_metadata.get("proposal_type") == "passive_recon":
                 contract_omissions = sorted(
                     (item["check_id"], item["disposition"])
                     for item in declared_coverage["omissions"]
