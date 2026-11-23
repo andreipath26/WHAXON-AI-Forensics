@@ -70,11 +70,6 @@ def _legacy_msf_execution_enabled() -> bool:
     return False
 
 
-def _legacy_validation_enabled() -> bool:
-    """Direct legacy validation/retest probes are retired in every configuration."""
-    return False
-
-
 def _redact_sensitive_settings(value: Any) -> Any:
     """Return a JSON-safe settings view without disclosing secret values."""
     if isinstance(value, dict):
@@ -2184,147 +2179,31 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         log_override(registry.core.data_dir, tool, target)
         return {"logged": True}
 
-    def _validation_scope_error(target_url: str | None):
-        """Re-check current scope before any validator network replay."""
-        if not target_url:
-            return {"error": "finding has no target URL; replay was not attempted"}, 400
-        try:
-            match = _check_execution_scope(registry.core.scope, target_url)
-        except Exception:
-            app.logger.exception("Scope evaluation failed before validation replay")
-            return {"error": "scope evaluation failed; replay was not attempted"}, 503
-        if match is None or not getattr(match, "allowed", False):
-            reason = getattr(match, "reason", "target could not be confirmed in scope")
-            return {
-                "error": f"target out of scope: {reason}; replay was not attempted",
-                "matched_rule": getattr(match, "matched_rule", None),
-            }, 403
-        return None
-
-    def _validation_authorize_request(target_url: str) -> bool:
-        """Recheck current scope immediately before each validator network request."""
-        try:
-            match = _check_execution_scope(registry.core.scope, target_url)
-        except Exception:
-            app.logger.exception("Scope evaluation failed before validation request")
-            return False
-        return match is not None and getattr(match, "allowed", False) is True
-
-    def _legacy_validation_v2_error(job_id: str):
-        """Keep legacy validators from mutating sealed V2 evidence."""
-        checker = getattr(registry.core.store, "is_engine_v2_execution_job", None)
-        if not callable(checker):
-            return {"error": "could not confirm evidence ownership; replay was not attempted"}, 503
-        try:
-            is_v2_job = checker(job_id)
-        except Exception:
-            app.logger.exception("Could not confirm evidence ownership before validation replay")
-            return {"error": "could not confirm evidence ownership; replay was not attempted"}, 503
-        if is_v2_job:
-            return {
-                "error": "Engine V2 evidence requires a plan-bound verification or retest workflow",
-                "workflow": "whaxon workflow plan propose-verification",
-            }, 409
-        return None
-
     @app.post("/api/validate/<job_id>/<int:seq>")
     def api_validate(job_id: str, seq: int):
-        if not _legacy_validation_enabled():
-            return {
-                "error": (
-                    "Legacy finding validation is disabled. Use the Engine V2 "
-                    "plan-bound verification workflow for V2 evidence."
-                ),
-                "legacy_validation_enabled": False,
-                "approval_granted": False,
-                "replay_attempted": False,
-            }, 410
-        from whaxon.core.findings import Finding
-        from whaxon.core.validator import Validator
-        findings = registry.core.store.get_findings(job_id) or []
-        target_f = next((f for f in findings if f["seq"] == seq), None)
-        if not target_f:
-            return {"error": "finding not found"}, 404
-        evidence_error = _legacy_validation_v2_error(job_id)
-        if evidence_error:
-            return evidence_error
-        job = registry.core.store.get(job_id) or {}
-        raw_target = job.get("target", "")
-        if raw_target.startswith(("http://", "https://")):
-            target_url = raw_target
-        elif raw_target:
-            target_url = f"http://{raw_target}"
-        else:
-            target_url = None
-        scope_error = _validation_scope_error(target_url)
-        if scope_error:
-            return scope_error
-        f_obj = Finding(
-            kind=target_f["kind"], severity=target_f["severity"],
-            source=target_f["source"], data=target_f["data"],
-            raw_line=target_f["raw_line"],
-            request_context=target_f.get("request_context") or {},
-        )
-        pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
-        v = Validator(
-            pkg_payloads,
-            authorize_request=_validation_authorize_request,
-        )
-        status, reason = v.validate(f_obj, target_url=target_url)
-        registry.core.store.update_verification(job_id, seq, status, by="engine", reason=reason)
-        return {"status": status, "reason": reason}
+        return {
+            "error": (
+                "Legacy finding validation is disabled. Use the Engine V2 "
+                "plan-bound verification workflow for V2 evidence."
+            ),
+            "legacy_validation_enabled": False,
+            "approval_granted": False,
+            "replay_attempted": False,
+            "workflow": "/api/v2/workflow-proposals",
+        }, 410
 
     @app.post("/api/retest/<job_id>/<int:seq>")
     def api_retest(job_id: str, seq: int):
-        if not _legacy_validation_enabled():
-            return {
-                "error": (
-                    "Legacy finding retest is disabled. Use the Engine V2 "
-                    "plan-bound retest workflow for V2 evidence."
-                ),
-                "legacy_validation_enabled": False,
-                "approval_granted": False,
-                "replay_attempted": False,
-            }, 410
-        from whaxon.core.findings import Finding
-        from whaxon.core.validator import Validator
-        findings = registry.core.store.get_findings(job_id) or []
-        target_f = next((f for f in findings if f["seq"] == seq), None)
-        if not target_f:
-            return {"error": "finding not found"}, 404
-        evidence_error = _legacy_validation_v2_error(job_id)
-        if evidence_error:
-            return evidence_error
-        if target_f.get("verification_status") != "verified":
-            return {
-                "error": "not verified",
-                "verification_status": target_f.get("verification_status"),
-            }, 400
-        job = registry.core.store.get(job_id) or {}
-        raw_target = job.get("target", "")
-        if raw_target.startswith(("http://", "https://")):
-            target_url = raw_target
-        elif raw_target:
-            target_url = f"http://{raw_target}"
-        else:
-            target_url = None
-        scope_error = _validation_scope_error(target_url)
-        if scope_error:
-            return scope_error
-        f_obj = Finding(
-            kind=target_f["kind"], severity=target_f["severity"],
-            source=target_f["source"], data=target_f["data"],
-            raw_line=target_f["raw_line"],
-            request_context=target_f.get("request_context") or {},
-        )
-        pkg_payloads = Path(__file__).resolve().parent.parent / "data" / "payloads"
-        v = Validator(
-            pkg_payloads,
-            authorize_request=_validation_authorize_request,
-        )
-        status, reason = v.revalidate(f_obj, target_url=target_url)
-        registry.core.store.update_verification(job_id, seq, status, by="engine", reason=reason)
-        return {"status": status, "reason": reason}
+        return {
+            "error": (
+                "Legacy finding retest is disabled. Use the Engine V2 "
+                "plan-bound retest workflow for V2 evidence."
+            ),
+            "legacy_validation_enabled": False,
+            "approval_granted": False,
+            "replay_attempted": False,
+            "workflow": "/api/v2/workflow-proposals",
+        }, 410
 
     @app.get("/api/coverage/<job_id>")
     def api_coverage(job_id: str):
