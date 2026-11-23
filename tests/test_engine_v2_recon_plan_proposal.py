@@ -24,6 +24,7 @@ def _proposal(mission_id, check):
         tasks=(task,),
         metadata={"provider_bindings": {"task-1": {
             "provider_id": f"provider.{check}",
+            "provider_version": "1",
             "manifest_fingerprint": "a" * 64,
         }}},
     )
@@ -74,6 +75,10 @@ def test_default_recon_proposal_combines_ready_providers_and_lists_omissions(mon
     assert set(result["plan"]["metadata"]["provider_bindings"]) == {
         task["id"] for task in result["plan"]["tasks"]
     }
+    assert {
+        binding["provider_version"]
+        for binding in result["plan"]["metadata"]["provider_bindings"].values()
+    } == {"1"}
     assert result["omitted_checks"] == []
     assert list(result["plan"]["metadata"]["omitted_checks"]) == result["omitted_checks"]
     assert result["plan"]["metadata"]["provider_outputs"]["task-https"] == (
