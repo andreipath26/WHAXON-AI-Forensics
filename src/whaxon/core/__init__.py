@@ -1254,7 +1254,9 @@ class Core:
             request_id = request["id"]
             lease_lost = asyncio.Event()
 
-            async def heartbeat(active_id=request_id, active_token=token):
+            async def heartbeat(
+                active_id=request_id, active_token=token, lost_signal=lease_lost,
+            ):
                 while True:
                     await asyncio.sleep(5)
                     try:
@@ -1265,7 +1267,7 @@ class Core:
                         # A failed heartbeat cannot establish continuing authority.
                         renewed = False
                     if not renewed:
-                        lease_lost.set()
+                        lost_signal.set()
                         return
 
             pulse = asyncio.create_task(heartbeat())
