@@ -98,6 +98,24 @@ def test_recovery_refuses_incomplete_provider_results(
     assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
 
 
+def test_recovery_refuses_provider_evidence_added_after_job_completion(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(tmp_path)
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, data_json, "
+            "raw_line, enrichment_json) VALUES (?, 0, 'open_port', 'info', 'nmap', ?, ?, ?)",
+            (attempt_id, '{"port":80,"protocol":"tcp"}', "80/tcp open http", "{}"),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="changed after completion"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
 @pytest.mark.parametrize(
     "tamper", ["tool", "target", "ownership", "finding_data", "finding_enrichment"],
 )

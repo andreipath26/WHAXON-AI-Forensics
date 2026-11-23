@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS engine_v2_execution_jobs (
     job_id TEXT PRIMARY KEY,
     marked_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS engine_v2_provider_result_seals (
+    attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, digest TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1, sealed_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, tool TEXT DEFAULT '', target TEXT DEFAULT '', status TEXT DEFAULT 'starting', exit_code INTEGER, error TEXT, started_at REAL, finished_at REAL, duration_s REAL, lease_owner TEXT, lease_token TEXT, heartbeat_at REAL);
 CREATE TABLE IF NOT EXISTS lines (job_id TEXT, seq INTEGER, stream TEXT, text TEXT, PRIMARY KEY (job_id, seq));
 CREATE TABLE IF NOT EXISTS findings (job_id TEXT, seq INTEGER, kind TEXT, severity TEXT, source TEXT, data_json TEXT, raw_line TEXT, enrichment_json TEXT DEFAULT '{}', verification_status TEXT DEFAULT 'candidate', verified_by TEXT DEFAULT 'engine', verification_reason TEXT DEFAULT '', PRIMARY KEY (job_id, seq));
@@ -669,18 +673,55 @@ class JobStore:
         with self._lock:
             c = self._conn()
             try:
+                c.execute("BEGIN IMMEDIATE")
+                finished_at = time.time()
                 if lease_token:
                     cur = c.execute(
                         "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? "
                         "WHERE id=? AND status='running' AND lease_token=?",
-                        (exit_code, duration_s, time.time(), job_id, lease_token),
+                        (exit_code, duration_s, finished_at, job_id, lease_token),
                     )
                 else:
                     cur = c.execute(
                         "UPDATE jobs SET status='finished', exit_code=?, duration_s=?, finished_at=? WHERE id=?",
-                        (exit_code, duration_s, time.time(), job_id),
+                        (exit_code, duration_s, finished_at, job_id),
                     )
-                return cur.rowcount == 1
+                if cur.rowcount != 1:
+                    c.commit()
+                    return False
+
+                # Capture the provider's durable output while the completion
+                # transition is serialized. Recovery can then reject evidence
+                # that changed after the provider reported completion.
+                if c.execute(
+                    "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
+                    (job_id,),
+                ).fetchone() is not None:
+                    binding = c.execute(
+                        "SELECT t.target, t.capability_id, p.digest AS plan_digest "
+                        "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
+                        "JOIN workflow_plans p ON p.id=t.plan_id WHERE a.id=?",
+                        (job_id,),
+                    ).fetchone()
+                    if binding is not None:
+                        digest = _workflow_evidence_digest(
+                            c, attempt_id=job_id, job_id=job_id,
+                            target=binding["target"],
+                            capability_id=binding["capability_id"],
+                            plan_digest=binding["plan_digest"],
+                        )
+                        if digest is not None:
+                            c.execute(
+                                "INSERT INTO engine_v2_provider_result_seals "
+                                "(attempt_id, job_id, digest, version, sealed_at) "
+                                "VALUES (?, ?, ?, 1, ?)",
+                                (job_id, job_id, digest, finished_at),
+                            )
+                c.commit()
+                return True
+            except Exception:
+                c.rollback()
+                raise
             finally:
                 c.close()
 
@@ -2315,6 +2356,20 @@ class JobStore:
                 )
                 if evidence_digest is None:
                     raise ValueError("durable provider evidence failed identity validation")
+                provider_seal = c.execute(
+                    "SELECT job_id, digest, version FROM engine_v2_provider_result_seals "
+                    "WHERE attempt_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if (
+                    provider_seal is None
+                    or provider_seal["job_id"] != attempt_id
+                    or provider_seal["version"] != 1
+                    or not hmac.compare_digest(provider_seal["digest"], evidence_digest)
+                ):
+                    raise ValueError(
+                        "durable provider result changed after completion or has no completion seal",
+                    )
                 if c.execute(
                     "SELECT 1 FROM workflow_evidence_seals WHERE attempt_id=?",
                     (attempt_id,),

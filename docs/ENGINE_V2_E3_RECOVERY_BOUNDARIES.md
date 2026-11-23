@@ -63,3 +63,11 @@
 - Before an uncertain attempt can be recovered from a terminal V2-owned provider job, persisted finding rows are checked for nonnegative sequence identities, string-valued finding fields and JSON-object `data`/`enrichment` payloads. Malformed rows leave the attempt uncertain and unsealed; recovery never repairs or rewrites provider output.
 - `tests/test_engine_v2_e3_provider_job_recovery.py` corrupts both finding payload forms in SQLite and verifies the recovery path refuses them while preserving the uncertain attempt.
 - This validates the shape of persisted finding rows, not provider-specific semantic completeness, binary-artifact integrity, production scanner behavior or an independent audit anchor. Those E3 boundaries remain open.
+
+
+## Provider completion snapshot before uncertain recovery — 2026-11-23
+
+- A V2-owned provider job now records a versioned SHA-256 snapshot of its persisted job, output lines, findings, coverage, and evidence metadata in the same SQLite transaction that marks the job finished.
+- Lost-ack recovery requires the matching completion snapshot before it seals workflow evidence. Added, removed, or changed persisted output after provider completion leaves the attempt uncertain for manual reconciliation.
+- The regression adds a well-formed finding after job completion and verifies recovery refuses to certify it.
+- This is a local database drift check, not an independent trust anchor; it does not validate provider-specific semantic completeness, evidence-file contents, or production scanner effects. Those E3 and G05 obligations remain open.
