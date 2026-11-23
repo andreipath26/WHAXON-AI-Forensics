@@ -281,6 +281,8 @@ class AIAdvisoryLedger:
             raise ValueError("provider and client must be scoped together")
         if provider_id is not None:
             _identifier("provider_id", provider_id)
+            if client_id is None:
+                raise ValueError("provider and client must be scoped together")
             _identifier("client_id", client_id)
         conn = self.store._conn()
         try:
