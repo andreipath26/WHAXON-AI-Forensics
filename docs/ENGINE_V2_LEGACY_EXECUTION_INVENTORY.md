@@ -1,8 +1,8 @@
 # Engine V2 current execution-path reconciliation — 2026-11-23
 
-This status supersedes older route-gate descriptions in this inventory where they conflict with current PR #268 source at exact source snapshot 5f7e4c78a470af9811843a95e5999d7de7aea547. The web compatibility endpoints `POST /api/run`, `POST /api/ai/run`, and `POST /api/ai/runs/<run_id>/answer` return HTTP 410 and do not dispatch, approve, or resume work. Their responses direct clients to Engine V2 proposal and workflow endpoints. V2 proposal creation still requires separate review, exact-task approval, and durable run submission.
+This status supersedes older route-gate descriptions where they conflict with current PR #268 source at exact source snapshot 27faf26ecb20f5b22dad33fab031c240fbfcf47e. The web compatibility endpoints `POST /api/run`, `POST /api/ai/run`, `POST /api/ai/runs/<run_id>/answer`, `POST /api/validate/<job_id>/<seq>`, and `POST /api/retest/<job_id>/<seq>` return HTTP 410 without dispatch, approval, replay, resume, or finding mutation. V2 proposal creation still requires separate review, exact-task approval, and durable run submission. The legacy human-resolution endpoint continues to serve legacy jobs but returns HTTP 409 before changing Engine V2 findings.
 
-These retired endpoints are not the remaining legacy execution surface. Explicit legacy CLI modes, Metasploit module/session/port-forward operations, legacy validation/retest API routes and bare CLI invocations, and the older GUI compatibility module remain separate migration or qualification work under their existing gates. This note records current source behavior; it does not close G01–G10 or change the release HOLD.
+These retired endpoints are not the remaining legacy execution surface. Explicit legacy CLI modes, blocked bare CLI validation/retest invocations, Metasploit module/session/port-forward operations, and the older GUI compatibility module remain separately scoped migration or qualification work under their existing gates. This note records current source behavior; it does not close G01–G10 or change the release HOLD.
 
 ---
 
@@ -96,7 +96,7 @@ recon still uses its dedicated service rather than `ToolRunner`. The
 `propose_finding_verification_plan` service. They print an inert proposal;
 `--save` persists it without granting approval or submitting execution. Bare
 legacy invocations remain blocked. The verifier remains bounded to supported
-finding kinds and provider contracts; it does not migrate the legacy API routes.
+finding kinds and provider contracts. The legacy validation/retest web routes are retired with HTTP 410; these CLI aliases only create V2 proposals, with review, approval and run submission remaining separate.
 
 ## Dedicated network-service entry points
 
@@ -109,13 +109,13 @@ runner inventory.
 | `interfaces/cli/recon_cmd.py` | default proposal / `--engine v2 --plan-id` / explicit `--legacy` | Default creates one fixed multi-provider plan and never dispatches; approved saved V2 plans use Core workflow services; legacy `core.recon.run` is behind `--legacy` plus `WHAXON_LEGACY_RECON_ENABLED=true` | Each included task is preflighted by its provider proposal and remains unapproved until the operator grants exact task consent. Explicit selections block if any requested provider is unsupported or unavailable. | V2 task attempts and evidence use the shared workflow store. Aggregated `headers`, `tech`, `cookies`, and `waf` checks select the one fixed `web.recon.passive` HTTPS task; it emits all bundled observation kinds and avoids duplicate requests. This remains bounded recon coverage, not full legacy parity. |
 | `interfaces/cli/validate_cmd.py` | `main` with explicit `--mission-id` and `--plan-id` | `propose_finding_verification_plan(mode="verify")` | Requires persisted V2 source evidence, current scope, supported finding kind and a ready verifier; without explicit V2 context it refuses without replay. | Prints an unapproved proposal; only `--save` persists the immutable plan. Approval and run submission remain separate. |
 | `interfaces/cli/retest_cmd.py` | `main` with explicit `--mission-id` and `--plan-id` | `propose_finding_verification_plan(mode="retest")` | Requires sealed V2 provenance and an exact matching prior V2 verification; the provider rechecks current scope and source eligibility. Without explicit context it refuses without replay. | Prints an unapproved proposal; only `--save` persists the immutable plan. Approval and run submission remain separate. |
-| `interfaces/web/server.py` | `create_app.api_validate` | `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy jobs still pass `_validation_scope_error` before the probe. | Legacy job updates remain in `JobStore`; V2 verification uses the plan-bound provider path. |
-| `interfaces/web/server.py` | `create_app.api_retest` | `Validator.revalidate` → `Validator.validate` | V2-owned jobs receive HTTP 409 before replay; legacy findings still require prior verification and current scope. | Legacy job updates remain in `JobStore`; V2 retest uses the plan-bound provider path. |
+| `interfaces/web/server.py` | `create_app.api_validate` | Retired static HTTP 410 response | Always refuses with `legacy_validation_enabled=false`, `approval_granted=false`, and `replay_attempted=false`; points clients to `/api/v2/workflow-proposals`. | No Validator call or JobStore finding mutation; V2 plan review, approval and durable submission remain separate. |
+| `interfaces/web/server.py` | `create_app.api_retest` | Retired static HTTP 410 response | Always refuses with `legacy_validation_enabled=false`, `approval_granted=false`, and `replay_attempted=false`; points clients to `/api/v2/workflow-proposals`. | No Validator call or JobStore finding mutation; V2 plan review, approval and durable submission remain separate. |
 | `interfaces/web/server.py`, `adapters/msf.py` | `create_app.msf_run._do_run` → `MSFAdapter.run_module` | `MSFClient.execute` (module and optional auto-chain post modules) | The MSF route validates module/target inputs and checks target scope before enqueueing its worker. This direct adapter path is not a `ToolRunner` dispatch. The optional post-module auto-chain is not plan-bound V2 dispatch. | Persists job output/findings through `JobStore`; no V2 workflow task, lease, attempt or cancellation record. Keep separate from catalog tools routed through `ToolRunner`. |
 | `interfaces/web/server.py` | `create_app.msf_session_exec` | `MSFClient.session_exec` | `_msf_session_scope_error` resolves the session host and checks current scope before sending the supplied session command. | Returns output directly; no V2 task/attempt record or durable workflow evidence link. |
 | `core/runner.py` | `run_in_session` → `_run_msf_session` | `MSFClient.session_exec` | Runner requires a persisted open session, authorizes its stored host, re-reads the live RPC session and authorizes its host, rejects host identity drift, and enforces a required session type when available before dispatch. | Emits legacy job events and stores capped output; this session-scoped execution path is not scheduler-owned V2 workflow dispatch. |
 
-The legacy validation/retest API paths remain separate from the bounded V2 provider; the CLI aliases call the shared V2 proposal service.
+The legacy validation/retest web routes are retired (HTTP 410); the CLI aliases call the shared V2 proposal service for sealed V2 evidence. The following validator limitations describe remaining legacy CLI/service behavior only.
 For SQLi, the current replay uses three baseline and three injected samples
 and verifies only when a specific SQL parser error appears consistently after
 the quote probe. Missing proof, network failure and timing-only signals remain
@@ -279,7 +279,7 @@ execution evidence; deployment-host readiness remains unverified.
 | Client surface | V2 path | Existing legacy path | Durable owner / relevant evidence |
 | --- | --- | --- | --- |
 | CLI workflow | `whaxon run`, default `whaxon ai`, default `whaxon recon`, and `whaxon workflow` use shared `Core` workflow/proposal/approval/provider services; `recon --engine v2 --plan-id` submits a durable request for an approved fixed recon plan | `whaxon run --legacy`, `whaxon ai --legacy`,  `recon --legacy`, bare `validate` and `retest` remain guarded compatibility commands; explicit mission/plan flags create V2 proposals; `whaxon msf` only inspects status/sessions/modules | Default recon saves one reviewable plan from ready fixed providers, reports omitted checks, and never approves or dispatches. Explicit check selections fail as a unit if any check is unsupported or unavailable. Legacy recon requires both `--legacy` and `WHAXON_LEGACY_RECON_ENABLED=true`. V2 plans, approvals, requests, tasks, events and evidence use `JobStore`/`WorkflowRunQueue`; see `test_recon_v2_cli.py`, `test_engine_v2_recon_plan_proposal.py`, `test_workflow_cli.py`, `test_workflow.py`, `test_workflow_run_requests.py`, and `test_providers.py`. |
-| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `POST /api/run`, `POST /api/ai/run`, and `POST /api/ai/runs/<id>/answer` are retired no-dispatch compatibility endpoints (HTTP 410); `/api/msf/run`, session commands, port-forward creation, validation, and retest remain route-gated legacy paths | The retired tool/AI endpoints return 410 after request validation and do not reach legacy execution, approval, or resume code. MSF module launch, session commands, and port-forward creation require `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; port-forward DELETE remains available for cleanup. Validate/retest are gated by `WHAXON_LEGACY_VALIDATION_ENABLED=true` for legacy evidence and still reject V2-owned evidence before replay. V2 clients use shared workflow services; proposal creation, exact approval, and durable submission remain separate steps. |
+| HTTP API and web clients | `/api/v2/ai/proposals`, `/api/v2/workflow-proposals`, workflow lifecycle APIs and V2 AI, Findings, BAS, Retest and Approvals clients use shared Core services | `POST /api/run`, `POST /api/ai/run`, `POST /api/ai/runs/<id>/answer`, `POST /api/validate/<job_id>/<seq>`, and `POST /api/retest/<job_id>/<seq>` are retired compatibility endpoints (HTTP 410); `/api/msf/run`, session commands, port-forward creation, and legacy human resolution remain separately scoped | The retired tool/AI/validation/retest endpoints return 410 and do not dispatch or mutate findings. The human-resolution route preserves legacy behavior but rejects V2-owned findings with HTTP 409 before mutation. MSF module launch, session commands, and port-forward creation require `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; port-forward DELETE remains available for cleanup. V2 clients use shared workflow services; proposal creation, exact approval, and durable submission remain separate steps. |
 | Headless service | `whaxon serve` plus `whaxon workflow plan serve-requests` | Legacy worker/Automator follow-ups remain separate and do not auto-drain by default | V2 worker claims durable requests; see `test_workflow_continuous_worker.py`, E5 systemd and Docker tests. Legacy queue drain requires `WHAXON_LEGACY_QUEUE_DRAIN_ENABLED=true`. |
 | Native desktop and terminal | `whaxon-gui` embeds `/ui-v2`; TUI workflow screen and catalog Run-to-plan handoff use shared V2 workflow services | The unreferenced older `interfaces/gui/main_window.py` retains direct `Core.runner` calls behind `WHAXON_LEGACY_GUI_EXECUTION_ENABLED=true`; no TUI catalog legacy action remains | The legacy gate has explicit default-deny coverage. Desktop destination/root-route behavior is covered by `test_gui_entrypoint.py`; see also `test_tui_main.py`. Clean-wheel desktop launch and broader UI acceptance remain open. |
 
@@ -341,7 +341,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/ai/runs/<run_id>` | `ai_run_get` | Legacy AI run state/executor |
 | `POST` | `/api/ai/runs/<run_id>/answer` | `ai_run_answer` | Retired no-dispatch compatibility response (HTTP 410) |
 | `GET` | `/api/ai/runs/<run_id>/stream` | `ai_run_stream` | Legacy AI run state/executor |
-| `POST` | `/api/approvals/<job_id>/<int:seq>/resolve` | `api_approval_resolve` | Legacy finding review state |
+| `POST` | `/api/approvals/<job_id>/<int:seq>/resolve` | `api_approval_resolve` | Legacy finding review state; HTTP 409 before mutation for Engine V2 jobs |
 | `POST` | `/api/bounty/import` | `import_bounty_program` | Bounty import/review draft |
 | `GET` | `/api/coverage/<job_id>` | `api_coverage` | Legacy coverage records |
 | `GET` | `/api/dependencies` | `api_dependencies_get` | Local dependency/readiness or installer service |
@@ -386,7 +386,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/pivot/graph` | `api_pivot_graph` | Legacy pivot/session graph |
 | `GET` | `/api/pivot/sessions/<session_id>/chain` | `api_pivot_chain` | Legacy pivot/session graph |
 | `GET` | `/api/report` | `api_report` | Legacy report, finding or loot view |
-| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
+| `POST` | `/api/retest/<job_id>/<int:seq>` | `api_retest` | Retired static HTTP 410; no replay, approval, Validator call, or finding mutation; points to `/api/v2/workflow-proposals` |
 | `POST` | `/api/run` | `run_tool` | Retired no-dispatch compatibility response (HTTP 410) |
 | `GET` | `/api/scope` | `get_scope` | Scope policy service/configuration |
 | `POST` | `/api/scope` | `save_scope` | Scope policy service/configuration |
@@ -449,7 +449,7 @@ test family remain authoritative for side effects and access-control limits.
 | `GET` | `/api/v2/workflows/<plan_id>/resources` | `workflow_v2_resources` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/<plan_id>/run` | `workflow_v2_run` | Core workflow registry, stores and lifecycle services |
 | `POST` | `/api/v2/workflows/attempts/<attempt_id>/cost` | `workflow_v2_attempt_cost` | Core workflow registry, stores and lifecycle services |
-| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Default-denied unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; when enabled, legacy Validator handles legacy jobs and V2 jobs still fail closed before replay |
+| `POST` | `/api/validate/<job_id>/<int:seq>` | `api_validate` | Retired static HTTP 410; no replay, approval, Validator call, or finding mutation; points to `/api/v2/workflow-proposals` |
 
 | Route group | Paths and owner | Authorization/effect boundary | V2 ownership and evidence |
 | --- | --- | --- | --- |
@@ -457,7 +457,7 @@ test family remain authoritative for side effects and access-control limits.
 | Retired web tool and AI compatibility routes | `POST /api/run`, `POST /api/ai/run`, `POST /api/ai/runs/<run_id>/answer` | Each returns HTTP 410 without dispatch, approval, answer persistence, or resume; request-shape and relevant scope checks remain fail-closed before retirement responses. | No separate web execution authority remains on these routes. V2 proposal, approval, and durable submission are separate; see `test_server.py`, `test_server_ai.py`, and V2 workflow tests. |
 | Legacy Metasploit | `POST /api/msf/run`; `POST /api/msf/sessions/<session_id>/exec` | Both are default-denied unless `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true`; module path validates inputs and scope before worker dispatch. Session command checks live session scope before RPC. | Legacy job/session paths; no V2 task/attempt lifecycle. |
 | Metasploit pivot forwarding | `GET`, `POST`, and `DELETE /api/msf/sessions/<session_id>/portfwd` | GET inspects; POST creation is gated by `WHAXON_LEGACY_MSF_EXECUTION_ENABLED=true` and checks session plus destination scope; DELETE cleanup remains available and checks the session host. | Network/pivot side effects remain outside V2 task ownership. See `test_server_portfwd.py` and scope-denial cases in `test_server.py`. |
-| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validate/retest default-deny before finding reads, replay or mutation unless `WHAXON_LEGACY_VALIDATION_ENABLED=true`; with opt-in, they recheck current target scope and retest requires existing verified status. V2-owned evidence remains rejected before replay. The separate resolve route writes verified/refuted state using a caller-supplied display label; it is not a plan-bound V2 approval. | Validator routes are legacy and not scheduler-owned. Route trust-boundary evidence includes `test_web_trust_layer.py`, `test_validator_retest.py`, and `test_server.py`. |
+| Verification and human resolution | `POST /api/validate/<job_id>/<seq>`; `POST /api/retest/<job_id>/<seq>`; `POST /api/approvals/<job_id>/<seq>/resolve` | Validation/retest endpoints always return static HTTP 410 without replay or mutation. Human resolution remains available for legacy jobs but returns 409 before mutating an Engine V2-owned finding; it is not a plan-bound V2 approval. | V2 proposal/workflow paths remain scheduler-owned. Route evidence includes `test_legacy_validation_routes_are_permanently_no_replay`, `test_retired_validation_api_handlers_have_no_execution_authority`, `test_legacy_human_resolution_route_refuses_engine_v2_jobs`, and `test_web_trust_layer.py`. |
 | V2 authoring scope preview | `POST /api/v2/scope/check` | Uses the selected capability's target policy for authoring feedback; passive DNS requires a hostname and DNS-query scope. This preview does not authorize or dispatch a task. | Core scheduler and the supervised DNS child recheck current scope before execution. |
 | Scope policy | `GET`, `POST /api/scope`; `POST /api/scope/check`; `POST /api/scope/override` | Scope POST persists rules and requires explicit confirmation to disable enforcement. Scope check evaluates a target. Override only writes a legacy audit-style record; it does not authorize dispatch. | Scope configuration feeds shared Core checks, but the legacy override record is not a V2 approval. See `test_web_scope.py`, `test_scope_failclosed.py`, and `test_server.py`. |
 | Legacy job cancellation | `POST /api/jobs/<job_id>/cancel` | Calls `_cancel_job_blocking` for a legacy job process/event state. | Separate from durable V2 run-request and plan cancellation endpoints. Route-level lifecycle parity remains open under G05. |
@@ -643,8 +643,8 @@ The AI Gate page now uses the V2 proposal endpoint and hands saved plans to the
 Run page. Default `whaxon ai "<goal>"` now creates and saves a scope-checked V2
 proposal, then prints separate review, approval and submission commands. It
 does not grant approval or submit a run. The old autonomous executor and
-`--resume` path require explicit `--legacy`; `/api/ai/run` remains a legacy API
-for existing clients. V2 AI action generation is still bounded to one
+`--resume` path require explicit `--legacy`; `/api/ai/run` is a retired HTTP 410
+compatibility endpoint for existing clients. V2 AI action generation is still bounded to one
 moderate-impact catalog action with an exact target and no dynamic arguments;
 multi-step autonomous planning remains outside this migration slice.
 
@@ -652,16 +652,16 @@ The V2 Approvals page now reads `GET /api/v2/approval-queue` and grants
 plan/task-bound, expiring consent through
 `POST /api/v2/workflows/<plan_id>/approvals`. It never resumes a legacy AI
 run: `/api/ai/pending` is displayed read-only, and
-`POST /api/ai/runs/<id>/answer` remains available only for older clients.
+`POST /api/ai/runs/<id>/answer` is retired with HTTP 410 for older clients.
 Granting consent does not submit the separate V2 run request; blocked tasks
 remain blocked and must be replanned.
 
-The V2 Findings, BAS and Retest pages no longer call the legacy validation or
+The V2 Findings, BAS and Retest pages no longer call the retired validation or
 retest mutation routes. They hand off candidate findings for V2 verification
 plans and verified findings for V2 retest plans. The server requires sealed V2
-evidence and current scope before saving either plan. Legacy validation and
-retest APIs remain available for compatibility clients; saved plans still
-require review, approval, and separate run submission.
+evidence and current scope before saving either plan. Legacy validation/retest
+web APIs return HTTP 410; CLI aliases only create inert V2 proposals. Saved
+plans still require review, approval, and separate run submission.
 
 ## Cancellation ownership boundary — 2026-11-11
 
