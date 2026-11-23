@@ -482,3 +482,127 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
     }
     assert "source_job_id" not in json.dumps(recorded)
     assert "source_finding_seq" not in json.dumps(recorded)
+
+
+def _declared_coverage_report(tmp_path, contract, *, stale_digest=False):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    store = JobStore(tmp_path / "declared-coverage.db")
+    store.create_mission("mission-1", "declared coverage test")
+    plan = WorkflowPlan(
+        "mission-1",
+        (WorkflowTask("scan", "tool.nmap", "192.0.2.10"),),
+        metadata={"coverage_contract": contract},
+    )
+    store.save_workflow_plan("declared-plan", plan)
+    evidence = _evidence()
+    evidence["plan_id"] = "declared-plan"
+    evidence["mission_id"] = "mission-1"
+    evidence["plan_digest"] = "stale-digest" if stale_digest else plan.digest
+    core = _core_with(evidence)
+    core.workflow_plan_details = lambda _plan_id: {
+        "plan": store.get_workflow_plan("declared-plan")["plan"],
+    }
+    return Core.workflow_report(core, "declared-plan")
+
+
+def test_workflow_report_projects_digest_bound_generic_declared_coverage(tmp_path):
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "http", "tls", "headers"],
+        "requested": ["dns", "http", "tls"],
+        "included": ["dns"],
+        "dispositions": [
+            {"check_id": "http", "disposition": "provider_unavailable"},
+            {"check_id": "tls", "disposition": "inaccessible"},
+        ],
+    }
+
+    report = _declared_coverage_report(tmp_path, contract)
+
+    assert report["coverage"]["declared_coverage"] == {
+        "status": "recorded",
+        "schema_version": 1,
+        "checklist": ["dns", "http", "tls", "headers"],
+        "requested": ["dns", "http", "tls"],
+        "included": ["dns"],
+        "unrequested": ["headers"],
+        "omissions": [
+            {"check_id": "http", "disposition": "provider_unavailable"},
+            {"check_id": "tls", "disposition": "inaccessible"},
+        ],
+    }
+    assert report["coverage"]["completeness_claim"] is False
+    assert report["status"] == "complete"
+
+
+def test_workflow_report_fails_closed_on_invalid_declared_coverage(tmp_path):
+    from copy import deepcopy
+
+    valid = {
+        "schema_version": 1,
+        "checklist": ["dns", "http"],
+        "requested": ["dns", "http"],
+        "included": ["dns"],
+        "dispositions": [{"check_id": "http", "disposition": "unsupported"}],
+    }
+    invalid_contracts = []
+    duplicate = deepcopy(valid)
+    duplicate["checklist"].append("dns")
+    invalid_contracts.append(duplicate)
+    outside_requested = deepcopy(valid)
+    outside_requested["included"] = ["dns", "elsewhere"]
+    invalid_contracts.append(outside_requested)
+    missing_omission = deepcopy(valid)
+    missing_omission["dispositions"] = []
+    invalid_contracts.append(missing_omission)
+    unknown_disposition = deepcopy(valid)
+    unknown_disposition["dispositions"][0]["disposition"] = "timeout"
+    invalid_contracts.append(unknown_disposition)
+    unknown_field = deepcopy(valid)
+    unknown_field["dispositions"][0]["reason"] = "private provider detail"
+    invalid_contracts.append(unknown_field)
+    invalid_contracts.append({
+        "schema_version": 1,
+        "checklist": ["x"] * 257,
+        "requested": ["x"],
+        "included": [],
+        "dispositions": [{"check_id": "x", "disposition": "unsupported"}],
+    })
+
+    for index, contract in enumerate(invalid_contracts):
+        report = _declared_coverage_report(tmp_path / str(index), contract)
+        declared = report["coverage"]["declared_coverage"]
+        assert declared["status"] == "invalid"
+        assert declared["checklist"] == []
+        assert declared["requested"] == []
+        assert declared["included"] == []
+        assert declared["unrequested"] == []
+        assert declared["omissions"] == []
+        assert report["coverage"]["completeness_claim"] is False
+
+
+def test_workflow_report_suppresses_declared_coverage_on_digest_mismatch(tmp_path):
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "http"],
+        "requested": ["dns"],
+        "included": ["dns"],
+        "dispositions": [],
+    }
+
+    report = _declared_coverage_report(tmp_path, contract, stale_digest=True)
+
+    assert report["coverage"]["declared_coverage"]["status"] == "not_recorded"
+    assert report["coverage"]["declared_coverage"]["checklist"] == []
+    assert report["coverage"]["unrequested_checks"] is None
+
+
+def test_workflow_report_has_no_declared_projection_without_checklist(tmp_path):
+    report = Core.workflow_report(
+        _core_with(_evidence()), "plan-1",
+    )
+
+    assert report["coverage"]["declared_coverage"]["status"] == "not_recorded"
