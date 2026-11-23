@@ -6,6 +6,7 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
+from typing import Literal
 
 from .provider_execution import (
     provider_capability_identity_is_known,
@@ -686,6 +687,43 @@ class JobStore:
                     (job_id, seq, f.get("kind",""), f.get("severity","info"), f.get("source",""), json.dumps(f.get("data",{})), f.get("raw_line",""), json.dumps(enrichment))
                 )
             finally: c.close()
+
+    def update_legacy_verification_if_unowned(
+        self, job_id, seq, status, by="engine", reason="",
+    ) -> Literal["updated", "v2_owned", "not_found"]:
+        """Atomically update a legacy finding only while V2 does not own its job."""
+        with self._lock:
+            c = self._conn()
+            try:
+                c.execute("BEGIN IMMEDIATE")
+                if c.execute(
+                    "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
+                    (job_id,),
+                ).fetchone() is not None:
+                    c.commit()
+                    return "v2_owned"
+                if c.execute(
+                    "SELECT 1 FROM findings WHERE job_id=? AND seq=?",
+                    (job_id, seq),
+                ).fetchone() is None:
+                    c.commit()
+                    return "not_found"
+                updated = c.execute(
+                    "UPDATE findings SET verification_status=?, verified_by=?, "
+                    "verification_reason=? WHERE job_id=? AND seq=?",
+                    (status, by, reason, job_id, seq),
+                )
+                if updated.rowcount != 1:
+                    c.commit()
+                    return "not_found"
+                c.commit()
+                return "updated"
+            except Exception:
+                if c.in_transaction:
+                    c.rollback()
+                raise
+            finally:
+                c.close()
 
     def update_verification(self, job_id, seq, status, by="engine", reason=""):
         with self._lock:

@@ -2216,7 +2216,12 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         status = data.get("status", "").strip().lower()
         if status not in ("verified", "refuted"):
             return {"error": "status must be verified or refuted"}, 400
-        if registry.core.store.is_engine_v2_execution_job(job_id):
+        user = data.get("user") or "human"
+        result = registry.core.store.update_legacy_verification_if_unowned(
+            job_id, seq, status,
+            by=f"human:{user}", reason=f"human review by {user}",
+        )
+        if result == "v2_owned":
             return {
                 "error": (
                     "Engine V2 finding state must come from its plan-bound "
@@ -2226,12 +2231,8 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
                 "verification_updated": False,
                 "workflow": "/api/v2/workflow-proposals",
             }, 409
-        findings = registry.core.store.get_findings(job_id) or []
-        target_f = next((f for f in findings if f["seq"] == seq), None)
-        if not target_f:
+        if result == "not_found":
             return {"error": "finding not found"}, 404
-        user = data.get("user") or "human"
-        registry.core.store.update_verification(job_id, seq, status, by=f"human:{user}", reason=f"human review by {user}")
         return {"ok": True, "status": status, "by": f"human:{user}"}
 
     @app.post("/api/import/burp")
