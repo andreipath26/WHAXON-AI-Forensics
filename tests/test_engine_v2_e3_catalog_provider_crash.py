@@ -14,10 +14,8 @@ import sys
 import time
 
 import pytest
-
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
-
 
 _CATALOG_WORKER = """
 import asyncio
