@@ -1083,8 +1083,7 @@ class BoundProviderRouter:
             return False
         return (
             expected.get("provider_id") == manifest.provider_id
-            and expected.get("provider_version", manifest.provider_version)
-            == manifest.provider_version
+            and expected.get("provider_version") == manifest.provider_version
             and expected.get("manifest_fingerprint") == manifest.fingerprint
         )
 
