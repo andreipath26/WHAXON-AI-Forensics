@@ -49,7 +49,7 @@ def test_v2_finding_alias_proposes_and_saves_only_when_requested(
         mission_id="mission-1",
         tasks=(WorkflowTask(
             id="verification-1",
-            capability_id="tool.verify_sqli",
+            capability_id="tool.retest_sqli" if mode == "retest" else "tool.verify_sqli",
             target="http://192.0.2.10/search",
             inputs={"source_job_id": "0123456789ab", "finding_seq": 2},
             impact="moderate",
@@ -89,6 +89,7 @@ def test_v2_finding_alias_proposes_and_saves_only_when_requested(
     assert output["approval_granted"] is False
     assert output["created"] is save
     assert len(core.saved) == int(save)
+
 
 @pytest.mark.parametrize(
     "args",
