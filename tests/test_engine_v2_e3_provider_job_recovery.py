@@ -135,7 +135,7 @@ def test_recovery_refuses_incomplete_provider_results(
     core, _, attempt_id = _uncertain_catalog_attempt(
         tmp_path, job_status=job_status, exit_code=exit_code,
     )
-    with pytest.raises(ValueError, match="provider effects require manual reconciliation"):
+    with pytest.raises(ValueError, match="no matching successful durable"):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
     assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
