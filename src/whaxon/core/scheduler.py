@@ -94,22 +94,30 @@ class WorkflowScheduler:
 
     async def _dispatch_with_cancellation_watch(
         self, plan_id: str, task: WorkflowTask, deadline: float,
+        lease_lost: asyncio.Event,
     ) -> tuple[str | None, Any]:
-        """Cancel the provider coroutine after durable plan stop intent.
+        """Stop async providers on durable plan stop OR lost worker ownership.
 
-        Async providers such as ToolRunner can stop their child process. A
-        synchronous provider running in a thread may continue after coroutine
-        cancellation; its caller still records uncertainty and never replays.
+        A thread-backed synchronous provider may continue after cancellation.
+        Any such outcome stays uncertain and must never be replayed blindly.
         """
         dispatch = asyncio.create_task(self._invoke(self.dispatch, task, deadline))
         cancellation = asyncio.create_task(self._wait_for_execution_stop(plan_id))
+        ownership = asyncio.create_task(lease_lost.wait())
         try:
             done, _pending = await asyncio.wait(
-                (dispatch, cancellation), return_when=asyncio.FIRST_COMPLETED,
+                (dispatch, cancellation, ownership),
+                return_when=asyncio.FIRST_COMPLETED,
             )
+            # Losing a lease takes precedence even when provider completion
+            # races with the heartbeat: this worker cannot certify ownership.
+            if ownership in done or lease_lost.is_set():
+                dispatch.cancel()
+                await asyncio.gather(dispatch, return_exceptions=True)
+                return "lease_lost", None
             if cancellation in done:
-                # Surface storage/read failures as dispatch uncertainty rather
-                # than silently allowing execution with an unknown stop state.
+                # Storage/read failures propagate as uncertain outcomes. Never
+                # silently accept a result when stop state could not be read.
                 stop_reason = cancellation.result()
                 dispatch.cancel()
                 await asyncio.gather(dispatch, return_exceptions=True)
@@ -121,9 +129,10 @@ class WorkflowScheduler:
             await asyncio.gather(dispatch, return_exceptions=True)
             raise
         finally:
-            if not cancellation.done():
-                cancellation.cancel()
-            await asyncio.gather(cancellation, return_exceptions=True)
+            for watcher in (cancellation, ownership):
+                if not watcher.done():
+                    watcher.cancel()
+            await asyncio.gather(cancellation, ownership, return_exceptions=True)
 
     async def _execute(self, row: dict[str, Any]) -> dict[str, str]:
         task = WorkflowTask(
@@ -218,9 +227,13 @@ class WorkflowScheduler:
                 }
             dispatch_started = True
             stop_reason, result = await self._dispatch_with_cancellation_watch(
-                row["plan_id"], task, deadline,
+                row["plan_id"], task, deadline, lease_lost,
             )
             if stop_reason:
+                # An expired/stolen lease may already have been reconciled by
+                # another worker. Do not mutate an attempt we no longer own.
+                if stop_reason == "lease_lost" or lease_lost.is_set():
+                    return {"task_id": task.id, "status": "uncertain"}
                 reason = (
                     "cancellation requested while provider was executing"
                     if stop_reason == "plan_cancelled"
