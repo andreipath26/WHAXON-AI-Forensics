@@ -165,8 +165,14 @@ def test_catalog_dig_crash_after_seal_recovers_without_replay(
     assert recovered_attempt["integrity_status"] == "verified"
     assert any(
         finding["kind"] == "a_record"
-        and finding["data"] == {"ip": "203.0.113.10"}
+        and finding["raw_line"] == "203.0.113.10"
         for finding in recovered_attempt["findings"]
+    )
+    persisted_findings = restarted.store.get_findings(attempt_id)
+    assert any(
+        finding["kind"] == "a_record"
+        and finding["data"] == {"ip": "203.0.113.10"}
+        for finding in persisted_findings
     )
 
     with pytest.raises(ValueError, match="only uncertain"):
