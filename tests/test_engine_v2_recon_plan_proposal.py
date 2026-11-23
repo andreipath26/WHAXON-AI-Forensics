@@ -88,9 +88,9 @@ def test_default_recon_proposal_combines_ready_providers_and_lists_omissions(mon
         "included": result["included_checks"],
         "dispositions": [],
     }
-    assert result["plan"]["metadata"]["provider_outputs"]["task-https"] == (
+    assert result["plan"]["metadata"]["provider_outputs"]["task-https"] == [
         "http_header_missing", "tech_detected", "open_port", "cookie_insecure", "waf_detected",
-    )
+    ]
 
 
 def test_default_recon_plan_persists_provider_unavailable_disposition(monkeypatch):
@@ -159,9 +159,9 @@ def test_explicit_bundled_http_checks_use_one_https_task(monkeypatch):
     assert result["included_checks"] == ["headers", "tech", "cookies", "waf"]
     assert len(result["plan"]["tasks"]) == 1
     assert result["plan"]["tasks"][0]["id"] == "task-https"
-    assert result["plan"]["metadata"]["provider_outputs"]["task-https"] == (
+    assert result["plan"]["metadata"]["provider_outputs"]["task-https"] == [
         "http_header_missing", "tech_detected", "open_port", "cookie_insecure", "waf_detected",
-    )
+    ]
     assert calls == [("recon-1-https", "example.test")]
 
 
