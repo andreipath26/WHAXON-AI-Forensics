@@ -89,7 +89,7 @@ def test_persisted_attempt_loss_on_provider_return_does_not_certify_success(tmp_
             # Simulate lease reconciliation by another worker between the
             # last heartbeat and provider completion.
             store.finish_task_attempt(
-                getattr(task, "_attempt_id"), "uncertain",
+                task._attempt_id, "uncertain",
                 error="simulated worker ownership loss",
             )
             return {"result": "must not be certified"}
@@ -122,7 +122,7 @@ def test_reconciled_attempt_cannot_be_rewritten_by_late_provider_error(tmp_path)
 
         async def provider(task):
             store.finish_task_attempt(
-                getattr(task, "_attempt_id"), "uncertain",
+                task._attempt_id, "uncertain",
                 error="simulated independent reconciliation",
             )
             raise RuntimeError("late provider disconnect")
