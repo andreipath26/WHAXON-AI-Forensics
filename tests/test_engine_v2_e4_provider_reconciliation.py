@@ -112,6 +112,7 @@ def test_e4_audit_cannot_approve_or_execute_a_semantic_plan():
     assert router.plan_binding_valid(task, {
         "provider_bindings": {"scan": {
             "provider_id": provider.manifest.provider_id,
+            "provider_version": provider.manifest.provider_version,
             "manifest_fingerprint": provider.manifest.fingerprint,
         }},
     }) is True
