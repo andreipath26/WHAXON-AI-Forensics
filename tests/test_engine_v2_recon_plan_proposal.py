@@ -81,6 +81,13 @@ def test_default_recon_proposal_combines_ready_providers_and_lists_omissions(mon
     } == {"1"}
     assert result["omitted_checks"] == []
     assert list(result["plan"]["metadata"]["omitted_checks"]) == result["omitted_checks"]
+    assert result["plan"]["metadata"]["coverage_contract"] == {
+        "schema_version": 1,
+        "checklist": list(workflow_proposals.PASSIVE_RECON_CHECKS),
+        "requested": list(workflow_proposals.PASSIVE_RECON_CHECKS),
+        "included": result["included_checks"],
+        "dispositions": [],
+    }
     assert result["plan"]["metadata"]["provider_outputs"]["task-https"] == (
         "http_header_missing", "tech_detected", "open_port", "cookie_insecure", "waf_detected",
     )
@@ -118,6 +125,9 @@ def test_default_recon_plan_persists_provider_unavailable_disposition(monkeypatc
     assert unavailable == [{
         "check": "dns", "reason": "provider is not ready",
         "disposition": "provider_unavailable",
+    }]
+    assert result["plan"]["metadata"]["coverage_contract"]["dispositions"] == [{
+        "check_id": "dns", "disposition": "provider_unavailable",
     }]
 
 
