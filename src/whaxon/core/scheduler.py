@@ -273,9 +273,18 @@ class WorkflowScheduler:
             return {"task_id": task.id, "status": "uncertain"}
         except asyncio.CancelledError:
             if not lease_lost.is_set() and self.store.workflow_attempt_owned(attempt_id):
+                # A scheduler can stop while policy/authorization is pending.
+                # Only a dispatch with a committed external-effect intent
+                # requires manual reconciliation. Never mislabel a known
+                # pre-dispatch stop as an unknown provider outcome.
+                outcome = "uncertain" if dispatch_started else "cancelled"
+                error = (
+                    "scheduler cancelled after provider dispatch; reconcile before retry"
+                    if dispatch_started
+                    else "scheduler cancelled before provider dispatch"
+                )
                 self.store.finish_task_attempt(
-                    attempt_id, "uncertain",
-                    error="scheduler cancelled while task was active; reconcile before retry",
+                    attempt_id, outcome, error=error,
                 )
             raise
         except Exception as exc:
