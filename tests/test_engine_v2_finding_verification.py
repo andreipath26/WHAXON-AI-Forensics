@@ -78,6 +78,7 @@ def _bound_plan(core, *, plan_id, capability_id, target, inputs):
         mission_id=plan_id, tasks=(task,),
         metadata={"provider_bindings": {task.id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
     )
@@ -111,6 +112,7 @@ async def _seed_sealed_source(
         mission_id=plan_id, tasks=(task,),
         metadata={"provider_bindings": {task.id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
     ))
@@ -118,7 +120,7 @@ async def _seed_sealed_source(
 
     async def fake_scan(_task):
         nonlocal source_job
-        source_job = getattr(_task, "_attempt_id")
+        source_job = _task._attempt_id
         core.store.create(source_job)
         core.store.set_started(source_job, tool_id, target)
         core.store.mark_engine_v2_execution_job(source_job, manifest)
@@ -137,6 +139,7 @@ async def _seed_sealed_source(
             }),
         ), 0)
         core.store.set_finished(source_job, 0, 0.01)
+        core.store.seal_engine_v2_provider_result(source_job)
         return {
             "job_id": source_job, "tool_id": tool_id, "target": target,
             "exit_code": 0,

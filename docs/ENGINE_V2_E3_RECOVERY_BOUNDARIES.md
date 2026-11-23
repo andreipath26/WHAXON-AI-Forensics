@@ -67,9 +67,10 @@
 
 ## Provider completion snapshot before uncertain recovery — 2026-11-23
 
-- A V2-owned provider job now records a versioned SHA-256 snapshot of its persisted job, output lines, findings, coverage, and evidence metadata in the same SQLite transaction that marks the job finished.
-- Lost-ack recovery requires the matching completion snapshot before it seals workflow evidence. Added, removed, or changed persisted output after provider completion leaves the attempt uncertain for manual reconciliation.
-- The regression adds a well-formed finding after job completion and verifies recovery refuses to certify it.
+- A V2-owned provider job records a versioned SHA-256 snapshot of its persisted job, output lines, findings, coverage, and evidence metadata only after the provider has parsed and persisted its complete output. The generic `JobFinished` event is not the seal boundary because ToolRunner emits findings afterward.
+- Lost-ack recovery and ordinary success terminalization require the matching completion snapshot. Added, removed, or changed persisted output after that final seal leaves the attempt uncertain for manual reconciliation.
+- Result-only recovery requires a positive capability allowlist and a plan-pinned provider ID, version, and manifest fingerprint. It verifies the registered manifest's impact, permissions and declared effects, and refuses file-backed evidence whose bytes are outside the database digest.
+- Regressions cover findings persisted after `JobFinished` but before final sealing, output mutation after sealing, unpinned and alternate provider identities, nonzero durable job exit under a caller-reported success, and file-backed evidence refusal.
 - This is a local database drift check, not an independent trust anchor; it does not validate provider-specific semantic completeness, evidence-file contents, or production scanner effects. Those E3 and G05 obligations remain open.
 
 

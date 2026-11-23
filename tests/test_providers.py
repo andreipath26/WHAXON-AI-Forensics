@@ -29,6 +29,12 @@ class _Runner:
 
 
 class _Store:
+    def mark_engine_v2_execution_job(self, job_id, manifest=None):
+        self.execution_binding = (job_id, manifest)
+
+    def seal_engine_v2_provider_result(self, job_id):
+        return True
+
     def get(self, job_id):
         return {
             "id": job_id, "tool": "nmap", "target": "192.0.2.10",

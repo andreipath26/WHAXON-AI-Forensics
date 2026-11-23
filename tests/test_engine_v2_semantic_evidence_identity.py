@@ -10,6 +10,14 @@ from whaxon.core.providers import SEMANTIC_OPERATION_IDS
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 
+def _provider_metadata(manifest):
+    return {"provider_bindings": {"scan": {
+        "provider_id": manifest.provider_id,
+        "provider_version": manifest.provider_version,
+        "manifest_fingerprint": manifest.fingerprint,
+    }}}
+
+
 def test_semantic_operation_map_is_the_provider_tool_identity_contract():
     assert {
         tool_id: capability_id
@@ -26,12 +34,13 @@ def test_semantic_operation_map_is_the_provider_tool_identity_contract():
 def test_semantic_catalog_workflow_job_is_sealed_and_reportable(tmp_path):
     core = Core(tmp_path)
     core.create_mission("semantic", "seal semantic capability evidence")
+    manifest = core.providers.manifest_for("network.services.discover")
     core.save_workflow_plan("semantic-plan", WorkflowPlan("semantic", (
         WorkflowTask(
             "scan", "network.services.discover", "192.0.2.10",
             permissions=("network.scan",), impact="moderate",
         ),
-    )))
+    ), metadata=_provider_metadata(manifest)))
     claim = core.store.claim_ready_workflow_task(
         "semantic-plan", "test-worker", max_attempts=1,
     )
@@ -41,11 +50,21 @@ def test_semantic_catalog_workflow_job_is_sealed_and_reportable(tmp_path):
         "semantic-plan", attempt_id, provider_execution_id=attempt_id,
     )
     core.store.mark_engine_v2_execution_job(
-        attempt_id, core.providers.manifest_for("network.services.discover"),
+        attempt_id, manifest,
     )
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 0, 0.25)
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, data_json, "
+            "raw_line, enrichment_json) VALUES (?, 0, 'open_port', 'info', 'nmap', ?, ?, ?)",
+            (attempt_id, '{"port":443,"protocol":"tcp"}', "443/tcp open https", "{}"),
+        )
+    finally:
+        conn.close()
+    assert core.store.seal_engine_v2_provider_result(attempt_id)
 
     core.store.finish_task_attempt(attempt_id, "succeeded", result={
         "job_id": attempt_id,
@@ -74,7 +93,7 @@ def test_success_terminalization_rejects_provider_output_changed_after_completio
             "scan", "network.services.discover", "192.0.2.10",
             permissions=manifest.permissions, impact=manifest.impact,
         ),
-    )))
+    ), metadata=_provider_metadata(manifest)))
     claim = core.store.claim_ready_workflow_task(
         "semantic-mutated-plan", "test-worker", max_attempts=1,
     )
@@ -87,6 +106,7 @@ def test_success_terminalization_rejects_provider_output_changed_after_completio
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 0, 0.25)
+    assert core.store.seal_engine_v2_provider_result(attempt_id)
 
     conn = core.store._conn()
     try:
@@ -111,15 +131,54 @@ def test_success_terminalization_rejects_provider_output_changed_after_completio
     assert core.store.get_workflow_audit_integrity("semantic-mutated-plan")["consistent"] is True
 
 
+def test_success_terminalization_rejects_nonzero_durable_provider_exit(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("semantic-nonzero", "reject a nonzero provider job as success")
+    manifest = core.providers.manifest_for("network.services.discover")
+    core.save_workflow_plan("semantic-nonzero-plan", WorkflowPlan(
+        "semantic-nonzero", (
+            WorkflowTask(
+                "scan", "network.services.discover", "192.0.2.10",
+                permissions=manifest.permissions, impact=manifest.impact,
+            ),
+        ), metadata=_provider_metadata(manifest),
+    ))
+    claim = core.store.claim_ready_workflow_task(
+        "semantic-nonzero-plan", "test-worker", max_attempts=1,
+    )
+    assert claim is not None
+    attempt_id = claim["attempt_id"]
+    assert core.store.mark_workflow_dispatch_started(
+        "semantic-nonzero-plan", attempt_id, provider_execution_id=attempt_id,
+    )
+    core.store.mark_engine_v2_execution_job(attempt_id, manifest)
+    core.store.create(attempt_id)
+    assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
+    assert core.store.set_finished(attempt_id, 2, 0.25)
+    assert core.store.seal_engine_v2_provider_result(attempt_id)
+
+    core.store.finish_task_attempt(attempt_id, "succeeded", result={
+        "job_id": attempt_id, "tool_id": "nmap", "target": "192.0.2.10",
+        "exit_code": 0, "findings": [],
+        "provider_id": manifest.provider_id,
+        "provider_version": manifest.provider_version,
+        "manifest_fingerprint": manifest.fingerprint,
+    })
+
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.has_valid_workflow_evidence_seal(attempt_id) is False
+
+
 def test_semantic_provider_recovery_reuses_exact_catalog_tool_identity(tmp_path):
     core = Core(tmp_path)
     core.create_mission("semantic-recovery", "recover semantic provider result")
+    manifest = core.providers.manifest_for("network.services.discover")
     core.save_workflow_plan("semantic-recovery-plan", WorkflowPlan("semantic-recovery", (
         WorkflowTask(
             "scan", "network.services.discover", "192.0.2.10",
             permissions=("network.scan",), impact="moderate",
         ),
-    )))
+    ), metadata=_provider_metadata(manifest)))
     request = core.enqueue_workflow_run("semantic-recovery-plan")
     run_claim = core.workflow_requests.claim("run-worker")
     assert run_claim and run_claim["id"] == request["id"]
@@ -133,11 +192,12 @@ def test_semantic_provider_recovery_reuses_exact_catalog_tool_identity(tmp_path)
         provider_execution_id=attempt_id,
     )
     core.store.mark_engine_v2_execution_job(
-        attempt_id, core.providers.manifest_for("network.services.discover"),
+        attempt_id, manifest,
     )
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 0, 0.25)
+    assert core.store.seal_engine_v2_provider_result(attempt_id)
     core.store.finish_task_attempt(
         attempt_id, "uncertain", error="worker lost after provider completion",
     )
@@ -164,12 +224,13 @@ def test_semantic_provider_recovery_reuses_exact_catalog_tool_identity(tmp_path)
 def test_semantic_provider_recovery_preserves_nonzero_exit_as_failure(tmp_path):
     core = Core(tmp_path)
     core.create_mission("semantic-failure", "recover failed provider result")
+    manifest = core.providers.manifest_for("network.services.discover")
     core.save_workflow_plan("semantic-failure-plan", WorkflowPlan("semantic-failure", (
         WorkflowTask(
             "scan", "network.services.discover", "192.0.2.10",
             permissions=("network.scan",), impact="moderate",
         ),
-    )))
+    ), metadata=_provider_metadata(manifest)))
     claim = core.store.claim_ready_workflow_task(
         "semantic-failure-plan", "task-worker", max_attempts=1,
     )
@@ -180,11 +241,12 @@ def test_semantic_provider_recovery_preserves_nonzero_exit_as_failure(tmp_path):
         provider_execution_id=attempt_id,
     )
     core.store.mark_engine_v2_execution_job(
-        attempt_id, core.providers.manifest_for("network.services.discover"),
+        attempt_id, manifest,
     )
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 2, 0.25)
+    assert core.store.seal_engine_v2_provider_result(attempt_id)
     core.store.finish_task_attempt(
         attempt_id, "uncertain", error="worker lost after provider completion",
     )

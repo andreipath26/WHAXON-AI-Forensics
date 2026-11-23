@@ -9,7 +9,7 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 def _uncertain_catalog_attempt(
     tmp_path, *, job_status="finished", exit_code=0,
-    capability_id="tool.nmap", file_evidence=False,
+    capability_id="tool.nmap", file_evidence=False, pin_provider=True,
 ):
     core = Core(tmp_path)
     core.create_mission("m", "recover lost provider acknowledgement")
@@ -25,8 +25,9 @@ def _uncertain_catalog_attempt(
     )
     metadata = {"provider_bindings": {"scan": {
         "provider_id": manifest.provider_id,
+        "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
-    }}} if manifest is not None else {}
+    }}} if manifest is not None and pin_provider else {}
     core.save_workflow_plan("p", WorkflowPlan("m", (
         WorkflowTask("scan", capability_id, "192.0.2.10", **task_args),
     ), metadata=metadata))
@@ -52,6 +53,7 @@ def _uncertain_catalog_attempt(
         )
     if job_status == "finished":
         assert core.store.set_finished(attempt_id, exit_code, 0.25)
+        core.store.seal_engine_v2_provider_result(attempt_id)
     else:
         core.store.set_failed(attempt_id, "provider failure")
     core.store.finish_task_attempt(
@@ -137,6 +139,44 @@ def test_recovery_refuses_incomplete_provider_results(
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
     assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
+def test_recovery_refuses_unpinned_provider_identity(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, pin_provider=False,
+    )
+
+    with pytest.raises(ValueError, match="provider manifest effects require manual reconciliation"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+
+
+def test_recovery_refuses_alternate_registered_provider_identity(tmp_path):
+    from dataclasses import replace
+
+    core, _, attempt_id = _uncertain_catalog_attempt(tmp_path)
+    original = core.providers.manifest_for("tool.nmap")
+    alternate = replace(
+        original, provider_id="whaxon.adapter.nmap.alternate",
+        provider_version="catalog-v2.alternate",
+    )
+    core.store.save_capability_manifest(alternate.to_dict())
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE engine_v2_execution_jobs SET provider_id=?, provider_version=?, "
+            "manifest_fingerprint=? WHERE job_id=?",
+            (
+                alternate.provider_id, alternate.provider_version,
+                alternate.fingerprint, attempt_id,
+            ),
+        )
+    finally:
+        conn.close()
+
+    with pytest.raises(ValueError, match="provider manifest effects require manual reconciliation"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
 
 
 def test_recovery_refuses_file_backed_provider_evidence(tmp_path):

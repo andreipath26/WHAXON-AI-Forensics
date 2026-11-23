@@ -380,7 +380,10 @@ class MetasploitableLabAccessProvider:
             )
             self.store.append_line(job_id, "stdout", finding.raw_line)
             self.store.append_finding(job_id, finding, 0)
-            self.store.set_finished(job_id, 0, 0.0)
+            if not self.store.set_finished(job_id, 0, 0.0):
+                raise RuntimeError("could not finish lab access evidence job")
+            if not self.store.seal_engine_v2_provider_result(job_id):
+                raise RuntimeError("could not seal complete provider output")
         except asyncio.CancelledError:
             await self._cleanup_cancelled_dispatch(
                 remote_job_id, before_sessions, job_id,

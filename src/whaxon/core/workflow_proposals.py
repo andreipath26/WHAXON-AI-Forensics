@@ -97,6 +97,7 @@ def propose_passive_dns_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -105,6 +106,7 @@ def propose_passive_dns_plan(
         "status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False,
     }
@@ -187,6 +189,7 @@ def propose_tls_certificate_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -195,6 +198,7 @@ def propose_tls_certificate_plan(
         "status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False,
     }
@@ -287,6 +291,7 @@ def propose_passive_https_recon_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -295,6 +300,7 @@ def propose_passive_https_recon_plan(
         "status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False,
     }
@@ -412,6 +418,7 @@ def propose_dns_full_posture_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -420,6 +427,7 @@ def propose_dns_full_posture_plan(
         "status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False,
     }
@@ -526,6 +534,7 @@ def propose_tool_workflow_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -537,6 +546,7 @@ def propose_tool_workflow_plan(
         "digest": plan.digest,
         "capability_id": capability_id,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False,
         "approval_granted": False,
@@ -637,6 +647,7 @@ def propose_finding_verification_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -648,6 +659,7 @@ def propose_finding_verification_plan(
         "digest": plan.digest,
         "capability_id": capability_id,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False,
         "approval_granted": False,
@@ -737,6 +749,7 @@ def propose_passive_robots_recon_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -748,6 +761,7 @@ def propose_passive_robots_recon_plan(
         "digest": plan.digest,
         "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False,
         "approval_granted": False,
@@ -837,6 +851,7 @@ def propose_passive_redirect_observation_plan(
         mission_id=mission_id,
         metadata={"provider_bindings": {task_id: {
             "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
             "manifest_fingerprint": manifest.fingerprint,
         }}},
         tasks=(task,),
@@ -848,6 +863,7 @@ def propose_passive_redirect_observation_plan(
         "digest": plan.digest,
         "capability_id": CAPABILITY_ID,
         "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
         "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False,
         "approval_granted": False,
@@ -909,11 +925,14 @@ def propose_passive_security_txt_recon_plan(
     except (LookupError, ValueError, TypeError, RuntimeError):
         return {"status": "blocked", "reason": "V2 security.txt provider or target compatibility check failed"}
     plan = WorkflowPlan(mission_id=mission_id, metadata={"provider_bindings": {task_id: {
-        "provider_id": manifest.provider_id, "manifest_fingerprint": manifest.fingerprint,
+        "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version,
+            "manifest_fingerprint": manifest.fingerprint,
     }}}, tasks=(task,))
     return {"status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
-        "provider_id": manifest.provider_id, "manifest_fingerprint": manifest.fingerprint,
+        "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version, "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False}
 
 
@@ -972,11 +991,13 @@ def propose_passive_headers_recon_plan(
     except (LookupError, ValueError, TypeError, RuntimeError):
         return {"status": "blocked", "reason": "V2 headers provider or target compatibility check failed"}
     plan = WorkflowPlan(mission_id=mission_id, metadata={"provider_bindings": {task_id: {
-        "provider_id": manifest.provider_id, "manifest_fingerprint": manifest.fingerprint,
+        "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version, "manifest_fingerprint": manifest.fingerprint,
     }}}, tasks=(task,))
     return {"status": "proposed", "plan_id": plan_id, "plan": plan.to_dict(),
         "digest": plan.digest, "capability_id": CAPABILITY_ID,
-        "provider_id": manifest.provider_id, "manifest_fingerprint": manifest.fingerprint,
+        "provider_id": manifest.provider_id,
+            "provider_version": manifest.provider_version, "manifest_fingerprint": manifest.fingerprint,
         "execution_submitted": False, "approval_granted": False}
 
 

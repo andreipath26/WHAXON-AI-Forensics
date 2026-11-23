@@ -424,6 +424,8 @@ class RedirectObservationProvider:
         duration = time.monotonic() - started
         if not self.store.set_finished(job_id, 0, duration):
             raise RuntimeError("could not finish redirect evidence job")
+        if not self.store.seal_engine_v2_provider_result(job_id):
+            raise RuntimeError("could not seal complete provider output")
         return duration, persisted
 
     async def dispatch(self, task: WorkflowTask) -> dict[str, Any]:

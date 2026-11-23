@@ -351,6 +351,8 @@ class DnsFullPostureProvider:
             duration_s = time.monotonic() - started
             if not self.store.set_finished(job_id, 0, duration_s):
                 raise RuntimeError("could not finish DNS posture evidence job")
+            if not self.store.seal_engine_v2_provider_result(job_id):
+                raise RuntimeError("could not seal complete provider output")
         except asyncio.CancelledError:
             child.request_termination()
             await asyncio.to_thread(

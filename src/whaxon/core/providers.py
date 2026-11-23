@@ -455,6 +455,8 @@ class CatalogAdapterProvider:
         findings = self.store.get_findings(job_id)
         if not isinstance(findings, list):
             raise RuntimeError("provider findings could not be verified in durable store")
+        if not self.store.seal_engine_v2_provider_result(job_id):
+            raise RuntimeError("could not seal complete provider output")
         return {
             "job_id": job_id,
             "tool_id": tool_id,
@@ -870,6 +872,8 @@ class FindingVerificationProvider:
                 evidence_job_id, 0, time.monotonic() - started,
             ):
                 raise RuntimeError("could not finish verification evidence job")
+            if not self.store.seal_engine_v2_provider_result(evidence_job_id):
+                raise RuntimeError("could not seal complete verification output")
         except asyncio.CancelledError:
             # Cancellation cannot abort an in-flight urllib request. Stop any
             # follow-up probes, then drain the current bounded request before
@@ -1079,6 +1083,8 @@ class BoundProviderRouter:
             return False
         return (
             expected.get("provider_id") == manifest.provider_id
+            and expected.get("provider_version", manifest.provider_version)
+            == manifest.provider_version
             and expected.get("manifest_fingerprint") == manifest.fingerprint
         )
 
