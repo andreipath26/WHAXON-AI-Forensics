@@ -22,114 +22,6 @@ from .scope import ScopeManager
 from .store import JobStore
 
 
-_COVERAGE_CONTRACT_ABSENT = object()
-_DECLARED_COVERAGE_DISPOSITIONS = frozenset({
-    "unsupported", "provider_unavailable", "inaccessible",
-})
-
-
-def _project_declared_coverage(
-    contract: Any = _COVERAGE_CONTRACT_ABSENT,
-) -> dict[str, Any]:
-    """Project a strict, plan-digest-bound declaration of planning coverage.
-
-    This describes only what a plan declared at planning time. Runtime skipped
-    and failed outcomes come from persisted task, attempt, and skip records.
-    """
-    result: dict[str, Any] = {
-        "status": "not_recorded",
-        "schema_version": None,
-        "checklist": [],
-        "requested": [],
-        "included": [],
-        "unrequested": [],
-        "omissions": [],
-    }
-    if contract is _COVERAGE_CONTRACT_ABSENT:
-        return result
-
-    result["status"] = "invalid"
-    required = {
-        "schema_version", "checklist", "requested", "included", "dispositions",
-    }
-    if (
-        not isinstance(contract, dict)
-        or set(contract) != required
-        or type(contract.get("schema_version")) is not int
-        or contract.get("schema_version") != 1
-    ):
-        return result
-
-    def normalized_ids(value: Any) -> list[str] | None:
-        if not isinstance(value, list) or len(value) > 256:
-            return None
-        if any(
-            not isinstance(item, str) or not item or item != item.strip()
-            or len(item) > 128
-            or any(ord(char) < 32 for char in item)
-            for item in value
-        ):
-            return None
-        if len(set(value)) != len(value):
-            return None
-        return list(value)
-
-    checklist = normalized_ids(contract.get("checklist"))
-    requested = normalized_ids(contract.get("requested"))
-    included = normalized_ids(contract.get("included"))
-    dispositions = contract.get("dispositions")
-    if (
-        checklist is None or requested is None or included is None
-        or not isinstance(dispositions, list) or len(dispositions) > 256
-    ):
-        return result
-
-    omission_items: list[dict[str, str]] = []
-    omission_ids: set[str] = set()
-    for item in dispositions:
-        if (
-            not isinstance(item, dict)
-            or set(item) != {"check_id", "disposition"}
-            or not isinstance(item.get("check_id"), str)
-            or not item["check_id"] or item["check_id"] != item["check_id"].strip()
-            or len(item["check_id"]) > 128
-            or any(ord(char) < 32 for char in item["check_id"])
-            or item.get("disposition") not in _DECLARED_COVERAGE_DISPOSITIONS
-            or item["check_id"] in omission_ids
-        ):
-            return result
-        omission_ids.add(item["check_id"])
-        omission_items.append({
-            "check_id": item["check_id"],
-            "disposition": item["disposition"],
-        })
-
-    checklist_set = set(checklist)
-    requested_set = set(requested)
-    included_set = set(included)
-    omitted_requested = requested_set - included_set
-    if (
-        not requested_set.issubset(checklist_set)
-        or not included_set.issubset(requested_set)
-        or not omission_ids.issubset(omitted_requested)
-        or omission_ids != omitted_requested
-    ):
-        return result
-
-    result.update({
-        "status": "recorded",
-        "schema_version": 1,
-        "checklist": checklist,
-        "requested": requested,
-        "included": included,
-        "unrequested": [
-            check_id for check_id in checklist if check_id not in requested_set
-        ],
-        "omissions": omission_items,
-    })
-    return result
-
-
 class Core:
     """Single entry point for every interface. Holds no UI state."""
 
@@ -1831,3 +1723,111 @@ class Core:
             # after silently skipping it can strand claims or report false
             # readiness, so fail closed and let the supervisor retry.
             raise RuntimeError("workflow recovery failed; execution is not ready") from exc
+
+
+_COVERAGE_CONTRACT_ABSENT = object()
+_DECLARED_COVERAGE_DISPOSITIONS = frozenset({
+    "unsupported", "provider_unavailable", "inaccessible",
+})
+
+
+def _project_declared_coverage(
+    contract: Any = _COVERAGE_CONTRACT_ABSENT,
+) -> dict[str, Any]:
+    """Project a strict, plan-digest-bound declaration of planning coverage.
+
+    This describes only what a plan declared at planning time. Runtime skipped
+    and failed outcomes come from persisted task, attempt, and skip records.
+    """
+    result: dict[str, Any] = {
+        "status": "not_recorded",
+        "schema_version": None,
+        "checklist": [],
+        "requested": [],
+        "included": [],
+        "unrequested": [],
+        "omissions": [],
+    }
+    if contract is _COVERAGE_CONTRACT_ABSENT:
+        return result
+
+    result["status"] = "invalid"
+    required = {
+        "schema_version", "checklist", "requested", "included", "dispositions",
+    }
+    if (
+        not isinstance(contract, dict)
+        or set(contract) != required
+        or type(contract.get("schema_version")) is not int
+        or contract.get("schema_version") != 1
+    ):
+        return result
+
+    def normalized_ids(value: Any) -> list[str] | None:
+        if not isinstance(value, list) or len(value) > 256:
+            return None
+        if any(
+            not isinstance(item, str) or not item or item != item.strip()
+            or len(item) > 128
+            or any(ord(char) < 32 for char in item)
+            for item in value
+        ):
+            return None
+        if len(set(value)) != len(value):
+            return None
+        return list(value)
+
+    checklist = normalized_ids(contract.get("checklist"))
+    requested = normalized_ids(contract.get("requested"))
+    included = normalized_ids(contract.get("included"))
+    dispositions = contract.get("dispositions")
+    if (
+        checklist is None or requested is None or included is None
+        or not isinstance(dispositions, list) or len(dispositions) > 256
+    ):
+        return result
+
+    omission_items: list[dict[str, str]] = []
+    omission_ids: set[str] = set()
+    for item in dispositions:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"check_id", "disposition"}
+            or not isinstance(item.get("check_id"), str)
+            or not item["check_id"] or item["check_id"] != item["check_id"].strip()
+            or len(item["check_id"]) > 128
+            or any(ord(char) < 32 for char in item["check_id"])
+            or item.get("disposition") not in _DECLARED_COVERAGE_DISPOSITIONS
+            or item["check_id"] in omission_ids
+        ):
+            return result
+        omission_ids.add(item["check_id"])
+        omission_items.append({
+            "check_id": item["check_id"],
+            "disposition": item["disposition"],
+        })
+
+    checklist_set = set(checklist)
+    requested_set = set(requested)
+    included_set = set(included)
+    omitted_requested = requested_set - included_set
+    if (
+        not requested_set.issubset(checklist_set)
+        or not included_set.issubset(requested_set)
+        or not omission_ids.issubset(omitted_requested)
+        or omission_ids != omitted_requested
+    ):
+        return result
+
+    result.update({
+        "status": "recorded",
+        "schema_version": 1,
+        "checklist": checklist,
+        "requested": requested,
+        "included": included,
+        "unrequested": [
+            check_id for check_id in checklist if check_id not in requested_set
+        ],
+        "omissions": omission_items,
+    })
+    return result
