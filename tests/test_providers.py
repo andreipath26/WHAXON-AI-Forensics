@@ -890,6 +890,7 @@ def test_router_enforces_provider_input_and_output_contracts(tmp_path):
             "provider_bindings": {
                 "task": {
                     "provider_id": provider.manifest.provider_id,
+                    "provider_version": provider.manifest.provider_version,
                     "manifest_fingerprint": provider.manifest.fingerprint,
                 },
             },
@@ -922,6 +923,7 @@ def test_router_enforces_provider_input_and_output_contracts(tmp_path):
             "provider_bindings": {
                 "task": {
                     "provider_id": provider.manifest.provider_id,
+                    "provider_version": provider.manifest.provider_version,
                     "manifest_fingerprint": provider.manifest.fingerprint,
                 },
             },
@@ -1219,6 +1221,7 @@ def test_multi_provider_execution_requires_approval_bound_manifest(tmp_path):
         "provider_bindings": {
             "http": {
                 "provider_id": second.manifest.provider_id,
+                "provider_version": second.manifest.provider_version,
                 "manifest_fingerprint": second.manifest.fingerprint,
             },
         },
@@ -1287,6 +1290,7 @@ def test_provider_pin_remains_required_after_alternative_is_removed(monkeypatch)
     assert router.plan_binding_valid(task, {
         "provider_bindings": {
             "scan": {"provider_id": selected.provider_id,
+                     "provider_version": selected.provider_version,
                      "manifest_fingerprint": selected.fingerprint},
         },
     }) is True
@@ -1455,6 +1459,7 @@ def test_semantic_operation_and_legacy_alias_use_same_guarded_runner(monkeypatch
     assert router.plan_binding_valid(task, {
         "provider_bindings": {
             "scan": {"provider_id": selected.provider_id,
+                     "provider_version": selected.provider_version,
                      "manifest_fingerprint": selected.fingerprint},
         },
     }) is True
@@ -1593,6 +1598,7 @@ def _followup_auth_core(tmp_path):
             "provider_bindings": {
                 task_id: {
                     "provider_id": provider.manifest.provider_id,
+                    "provider_version": provider.manifest.provider_version,
                     "manifest_fingerprint": provider.manifest.fingerprint,
                 },
             },
