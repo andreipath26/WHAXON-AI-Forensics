@@ -1122,6 +1122,8 @@ def propose_passive_recon_plan(
         if (
             not isinstance(binding, dict)
             or not isinstance(binding.get("provider_id"), str)
+            or not isinstance(binding.get("provider_version"), str)
+            or not binding.get("provider_version")
             or not isinstance(binding.get("manifest_fingerprint"), str)
         ):
             return {
@@ -1143,6 +1145,7 @@ def propose_passive_recon_plan(
         tasks.append(task)
         provider_bindings[task_id] = {
             "provider_id": binding["provider_id"],
+            "provider_version": binding["provider_version"],
             "manifest_fingerprint": binding["manifest_fingerprint"],
         }
         provider_outputs[task_id] = provider_outputs_by_check.get(provider_check, [])
