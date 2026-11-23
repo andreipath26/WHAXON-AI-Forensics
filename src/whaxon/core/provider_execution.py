@@ -45,6 +45,29 @@ def provider_capability_identity_is_known(capability_id: str) -> bool:
     )
 
 
+READ_ONLY_PROVIDER_TOOL_IDS = frozenset(SEMANTIC_OPERATION_TO_TOOL.values()) - {
+    "sqlmap",
+}
+READ_ONLY_FIRST_PARTY_CAPABILITY_IDS = FIRST_PARTY_PROVIDER_CAPABILITY_IDS - {
+    "lab.initial_access.samba_usermap",
+}
+
+
+def provider_supports_result_only_recovery(capability_id: str) -> bool:
+    """Whether a provider has an explicit observational result recovery contract.
+
+    Stateful, mutating, and unclassified capabilities require operator effect
+    reconciliation even when their local job record is terminal.
+    """
+    if not isinstance(capability_id, str) or not capability_id:
+        return False
+    if capability_id.startswith("tool."):
+        return capability_id.removeprefix("tool.") in READ_ONLY_PROVIDER_TOOL_IDS
+    if capability_id in SEMANTIC_OPERATION_TO_TOOL:
+        return SEMANTIC_OPERATION_TO_TOOL[capability_id] in READ_ONLY_PROVIDER_TOOL_IDS
+    return capability_id in READ_ONLY_FIRST_PARTY_CAPABILITY_IDS
+
+
 def provider_tool_id_for_capability(capability_id: str) -> str:
     """Resolve the persisted provider tool identity for a workflow capability."""
     if not isinstance(capability_id, str) or not capability_id:

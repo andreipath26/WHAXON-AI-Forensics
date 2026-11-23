@@ -69,6 +69,25 @@ def test_recovery_seals_successful_job_and_never_replays(tmp_path):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
 
 
+@pytest.mark.parametrize("capability_id", [
+    "tool.sqlmap",
+    "tool.unclassified",
+    "web.sql_injection.assess",
+    "lab.initial_access.samba_usermap",
+])
+def test_recovery_requires_manual_reconciliation_for_effectful_capabilities(
+    tmp_path, capability_id,
+):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, capability_id=capability_id,
+    )
+
+    with pytest.raises(ValueError, match="provider effects require manual reconciliation"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
 def test_recovery_supports_first_party_provider_capabilities(tmp_path):
     capability_id = "recon.http"
     core, _, attempt_id = _uncertain_catalog_attempt(

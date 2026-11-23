@@ -71,3 +71,11 @@
 - Lost-ack recovery requires the matching completion snapshot before it seals workflow evidence. Added, removed, or changed persisted output after provider completion leaves the attempt uncertain for manual reconciliation.
 - The regression adds a well-formed finding after job completion and verifies recovery refuses to certify it.
 - This is a local database drift check, not an independent trust anchor; it does not validate provider-specific semantic completeness, evidence-file contents, or production scanner effects. Those E3 and G05 obligations remain open.
+
+
+## Capability-level effect recovery policy — 2026-11-23
+
+- Result-only recovery is now restricted to an explicit allowlist of observational catalog and first-party provider capabilities. A terminal job row and sealed local output do not establish recovery semantics for stateful, mutating, or unclassified providers.
+- SQLMap capabilities, the Samba user-map initial-access provider, and unclassified tool-prefixed capabilities remain uncertain until an operator performs effect reconciliation. No provider is invoked or retried by this path.
+- Regressions exercise those denied capabilities while preserving result-only recovery for Nmap and the read-only first-party recon provider.
+- The allowlist is a conservative boundary, not evidence that external target effects were independently witnessed. G05 real-effect and production qualification remain open.

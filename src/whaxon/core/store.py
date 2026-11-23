@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .provider_execution import (
     provider_capability_identity_is_known,
+    provider_supports_result_only_recovery,
     provider_tool_id_for_capability,
 )
 
@@ -712,7 +713,7 @@ class JobStore:
                         )
                         if digest is not None:
                             c.execute(
-                                "INSERT INTO engine_v2_provider_result_seals "
+                                "INSERT OR IGNORE INTO engine_v2_provider_result_seals "
                                 "(attempt_id, job_id, digest, version, sealed_at) "
                                 "VALUES (?, ?, ?, 1, ?)",
                                 (job_id, job_id, digest, finished_at),
@@ -2305,6 +2306,10 @@ class JobStore:
                 if not identity_is_known:
                     raise ValueError(
                         "provider capability identity is unknown; manual reconciliation required",
+                    )
+                if not provider_supports_result_only_recovery(capability_id):
+                    raise ValueError(
+                        "provider effects require manual reconciliation",
                     )
                 tool_id = provider_tool_id_for_capability(capability_id)
                 dispatch_events = c.execute(
