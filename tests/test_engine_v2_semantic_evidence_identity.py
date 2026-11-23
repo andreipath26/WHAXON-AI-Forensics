@@ -40,7 +40,9 @@ def test_semantic_catalog_workflow_job_is_sealed_and_reportable(tmp_path):
     assert core.store.mark_workflow_dispatch_started(
         "semantic-plan", attempt_id, provider_execution_id=attempt_id,
     )
-    core.store.mark_engine_v2_execution_job(attempt_id)
+    core.store.mark_engine_v2_execution_job(
+        attempt_id, core.providers.manifest_for("network.services.discover"),
+    )
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 0, 0.25)
@@ -49,6 +51,9 @@ def test_semantic_catalog_workflow_job_is_sealed_and_reportable(tmp_path):
         "job_id": attempt_id,
         "tool_id": "nmap",
         "target": "192.0.2.10",
+        "provider_id": core.providers.manifest_for("network.services.discover").provider_id,
+        "provider_version": core.providers.manifest_for("network.services.discover").provider_version,
+        "manifest_fingerprint": core.providers.manifest_for("network.services.discover").fingerprint,
         "exit_code": 0,
         "findings": [],
     })
@@ -58,6 +63,52 @@ def test_semantic_catalog_workflow_job_is_sealed_and_reportable(tmp_path):
     assert evidence["attempts"][0]["evidence_status"] == "recorded"
     assert evidence["attempts"][0]["integrity_status"] == "verified"
     assert core.store.get_workflow_audit_integrity("semantic-plan")["consistent"] is True
+
+
+def test_success_terminalization_rejects_provider_output_changed_after_completion(tmp_path):
+    core = Core(tmp_path)
+    core.create_mission("semantic-mutated", "reject output changed after provider completion")
+    manifest = core.providers.manifest_for("network.services.discover")
+    core.save_workflow_plan("semantic-mutated-plan", WorkflowPlan("semantic-mutated", (
+        WorkflowTask(
+            "scan", "network.services.discover", "192.0.2.10",
+            permissions=manifest.permissions, impact=manifest.impact,
+        ),
+    )))
+    claim = core.store.claim_ready_workflow_task(
+        "semantic-mutated-plan", "test-worker", max_attempts=1,
+    )
+    assert claim is not None
+    attempt_id = claim["attempt_id"]
+    assert core.store.mark_workflow_dispatch_started(
+        "semantic-mutated-plan", attempt_id, provider_execution_id=attempt_id,
+    )
+    core.store.mark_engine_v2_execution_job(attempt_id, manifest)
+    core.store.create(attempt_id)
+    assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
+    assert core.store.set_finished(attempt_id, 0, 0.25)
+
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "INSERT INTO findings (job_id, seq, kind, severity, source, data_json, "
+            "raw_line, enrichment_json) VALUES (?, 0, 'open_port', 'info', 'nmap', ?, ?, ?)",
+            (attempt_id, '{"port":80,"protocol":"tcp"}', "80/tcp open http", "{}"),
+        )
+    finally:
+        conn.close()
+
+    core.store.finish_task_attempt(attempt_id, "succeeded", result={
+        "job_id": attempt_id, "tool_id": "nmap", "target": "192.0.2.10",
+        "exit_code": 0, "findings": [],
+        "provider_id": manifest.provider_id,
+        "provider_version": manifest.provider_version,
+        "manifest_fingerprint": manifest.fingerprint,
+    })
+
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.has_valid_workflow_evidence_seal(attempt_id) is False
+    assert core.store.get_workflow_audit_integrity("semantic-mutated-plan")["consistent"] is True
 
 
 def test_semantic_provider_recovery_reuses_exact_catalog_tool_identity(tmp_path):
@@ -81,7 +132,9 @@ def test_semantic_provider_recovery_reuses_exact_catalog_tool_identity(tmp_path)
         "semantic-recovery-plan", attempt_id,
         provider_execution_id=attempt_id,
     )
-    core.store.mark_engine_v2_execution_job(attempt_id)
+    core.store.mark_engine_v2_execution_job(
+        attempt_id, core.providers.manifest_for("network.services.discover"),
+    )
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 0, 0.25)
@@ -126,7 +179,9 @@ def test_semantic_provider_recovery_preserves_nonzero_exit_as_failure(tmp_path):
         "semantic-failure-plan", attempt_id,
         provider_execution_id=attempt_id,
     )
-    core.store.mark_engine_v2_execution_job(attempt_id)
+    core.store.mark_engine_v2_execution_job(
+        attempt_id, core.providers.manifest_for("network.services.discover"),
+    )
     core.store.create(attempt_id)
     assert core.store.set_started(attempt_id, "nmap", "192.0.2.10")
     assert core.store.set_finished(attempt_id, 2, 0.25)

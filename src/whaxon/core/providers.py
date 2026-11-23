@@ -407,7 +407,7 @@ class CatalogAdapterProvider:
             raise RuntimeError(f"required tool is not installed: {tool.id}")
         return resolution
 
-    async def dispatch(self, task: WorkflowTask) -> dict:
+    async def dispatch(self, task: WorkflowTask, *, binding_manifest=None) -> dict:
         resolution = self.resolve_task(task, require_installed=True)
         expected = resolution.manifest
         if set(task.permissions) != set(expected.permissions) or task.impact != expected.impact:
@@ -422,6 +422,9 @@ class CatalogAdapterProvider:
         # happen before ToolRunner may publish any findings.
         if self._suppress_legacy_followup is not None:
             self._suppress_legacy_followup(job_id)
+        self.store.mark_engine_v2_execution_job(
+            job_id, binding_manifest or expected,
+        )
         timeout_s = min(float(task.timeout_s), expected.timeout_s)
         returned_id = await self.runner.run_tool(
             tool_id=tool_id,
@@ -533,7 +536,12 @@ class SemanticOperationProvider:
     async def dispatch(self, task: WorkflowTask) -> dict:
         resolved = self.resolve_task(task, require_installed=True)
         original, expected = self._legacy_task(task)
-        result = await self.bridge.dispatch(original)
+        # dataclasses.replace() does not copy scheduler-only execution context;
+        # retain the attempt fence before the catalog bridge derives a job ID.
+        for attribute in ("_attempt_id", "_provider_execution_id", "_plan_id"):
+            if hasattr(task, attribute):
+                object.__setattr__(original, attribute, getattr(task, attribute))
+        result = await self.bridge.dispatch(original, binding_manifest=expected)
         legacy = self._operations[task.capability_id][1]
         if (
             result.get("provider_id") != legacy.provider_id
@@ -811,7 +819,7 @@ class FindingVerificationProvider:
             evidence_job_id, task.capability_id.removeprefix("tool."), task.target,
         ):
             raise RuntimeError("could not start verification evidence job")
-        self.store.mark_engine_v2_execution_job(evidence_job_id)
+        self.store.mark_engine_v2_execution_job(evidence_job_id, expected)
         started = time.monotonic()
 
         def run_validation():

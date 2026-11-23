@@ -53,7 +53,11 @@ SCHEMA = """
 -- Registered V2 jobs must never be dispatched by legacy follow-up rules.
 CREATE TABLE IF NOT EXISTS engine_v2_execution_jobs (
     job_id TEXT PRIMARY KEY,
-    marked_at REAL NOT NULL
+    marked_at REAL NOT NULL,
+    capability_id TEXT,
+    provider_id TEXT,
+    provider_version TEXT,
+    manifest_fingerprint TEXT
 );
 CREATE TABLE IF NOT EXISTS engine_v2_provider_result_seals (
     attempt_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, digest TEXT NOT NULL,
@@ -334,6 +338,16 @@ class JobStore:
         c = self._conn()
         try:
             c.executescript(SCHEMA)
+            for column in (
+                "capability_id TEXT", "provider_id TEXT", "provider_version TEXT",
+                "manifest_fingerprint TEXT",
+            ):
+                try:
+                    c.execute(
+                        f"ALTER TABLE engine_v2_execution_jobs ADD COLUMN {column}"
+                    )
+                except sqlite3.OperationalError:
+                    pass
             # Durable worker leases. Existing databases are upgraded in place.
             try:
                 c.execute("ALTER TABLE task_attempts ADD COLUMN heartbeat_at REAL")
@@ -420,18 +434,72 @@ class JobStore:
         c.execute("PRAGMA synchronous=NORMAL")
         c.row_factory = sqlite3.Row
         return c
-    def mark_engine_v2_execution_job(self, job_id: str) -> None:
-        """Persist V2 job ownership before any external process starts."""
+    def mark_engine_v2_execution_job(self, job_id: str, manifest=None) -> None:
+        """Persist V2 ownership and the resolved manifest before provider effects."""
         if not isinstance(job_id, str) or not job_id:
             raise ValueError("valid V2 job identity required")
+        binding = None
+        if manifest is not None:
+            document = manifest.to_dict() if callable(getattr(manifest, "to_dict", None)) else manifest
+            if not isinstance(document, dict):
+                raise TypeError("provider manifest binding must be an object")
+            required = ("capability_id", "provider_id", "provider_version")
+            if any(not isinstance(document.get(key), str) or not document[key] for key in required):
+                raise ValueError("provider manifest binding is incomplete")
+            encoded = json.dumps(document, sort_keys=True, separators=(",", ":"))
+            fingerprint = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+            declared = getattr(manifest, "fingerprint", fingerprint)
+            if declared != fingerprint:
+                raise ValueError("provider manifest fingerprint is inconsistent")
+            binding = (
+                document["capability_id"], document["provider_id"],
+                document["provider_version"], fingerprint, encoded,
+            )
         with self._lock:
             conn = self._conn()
             try:
+                conn.execute("BEGIN IMMEDIATE")
                 conn.execute(
                     "INSERT OR IGNORE INTO engine_v2_execution_jobs "
                     "(job_id, marked_at) VALUES (?, ?)",
                     (job_id, time.time()),
                 )
+                if binding is not None:
+                    cap, provider, version, fingerprint, encoded = binding
+                    registered = conn.execute(
+                        "SELECT fingerprint, manifest_json FROM capability_manifests "
+                        "WHERE capability_id=? AND provider_id=? AND provider_version=?",
+                        (cap, provider, version),
+                    ).fetchone()
+                    if (
+                        registered is None
+                        or registered["fingerprint"] != fingerprint
+                        or registered["manifest_json"] != encoded
+                    ):
+                        raise ValueError("provider manifest is not the registered immutable binding")
+                    existing = conn.execute(
+                        "SELECT capability_id, provider_id, provider_version, manifest_fingerprint "
+                        "FROM engine_v2_execution_jobs WHERE job_id=?", (job_id,),
+                    ).fetchone()
+                    current = tuple(existing[key] for key in (
+                        "capability_id", "provider_id", "provider_version",
+                        "manifest_fingerprint",
+                    ))
+                    expected = (cap, provider, version, fingerprint)
+                    if current == (None, None, None, None):
+                        conn.execute(
+                            "UPDATE engine_v2_execution_jobs SET capability_id=?, provider_id=?, "
+                            "provider_version=?, manifest_fingerprint=? WHERE job_id=? "
+                            "AND capability_id IS NULL AND provider_id IS NULL "
+                            "AND provider_version IS NULL AND manifest_fingerprint IS NULL",
+                            (*expected, job_id),
+                        )
+                    elif current != expected:
+                        raise ValueError("V2 provider manifest binding is immutable")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
             finally:
                 conn.close()
 
@@ -699,25 +767,72 @@ class JobStore:
                     (job_id,),
                 ).fetchone() is not None:
                     binding = c.execute(
-                        "SELECT t.target, t.capability_id, p.digest AS plan_digest "
-                        "FROM task_attempts a JOIN workflow_tasks t ON t.id=a.task_id "
-                        "JOIN workflow_plans p ON p.id=t.plan_id WHERE a.id=?",
+                        "SELECT t.target, t.capability_id, t.task_key, t.impact, "
+                        "t.permissions_json, p.digest AS plan_digest, p.plan_json, "
+                        "v.capability_id AS bound_capability_id, v.provider_id, "
+                        "v.provider_version, v.manifest_fingerprint, m.fingerprint, "
+                        "m.manifest_json FROM task_attempts a "
+                        "JOIN workflow_tasks t ON t.id=a.task_id "
+                        "JOIN workflow_plans p ON p.id=t.plan_id "
+                        "JOIN engine_v2_execution_jobs v ON v.job_id=a.id "
+                        "LEFT JOIN capability_manifests m ON "
+                        "m.capability_id=v.capability_id AND m.provider_id=v.provider_id "
+                        "AND m.provider_version=v.provider_version WHERE a.id=?",
                         (job_id,),
                     ).fetchone()
-                    if binding is not None:
-                        digest = _workflow_evidence_digest(
-                            c, attempt_id=job_id, job_id=job_id,
-                            target=binding["target"],
-                            capability_id=binding["capability_id"],
-                            plan_digest=binding["plan_digest"],
-                        )
-                        if digest is not None:
-                            c.execute(
-                                "INSERT OR IGNORE INTO engine_v2_provider_result_seals "
-                                "(attempt_id, job_id, digest, version, sealed_at) "
-                                "VALUES (?, ?, ?, 1, ?)",
-                                (job_id, job_id, digest, finished_at),
+                    if binding is not None and (
+                        binding["bound_capability_id"] == binding["capability_id"]
+                        and binding["fingerprint"] is not None
+                        and binding["fingerprint"] == binding["manifest_fingerprint"]
+                    ):
+                        try:
+                            manifest = json.loads(binding["manifest_json"])
+                            if (
+                                not isinstance(manifest, dict)
+                                or not isinstance(manifest.get("permissions"), list)
+                                or any(not isinstance(item, str) for item in manifest["permissions"])
+                            ):
+                                manifest = None
+                            plan_document = json.loads(binding["plan_json"])
+                            manifest_fingerprint = hashlib.sha256(
+                                json.dumps(
+                                    manifest, sort_keys=True, separators=(",", ":"),
+                                ).encode("utf-8"),
+                            ).hexdigest()
+                            provider_bindings = plan_document.get("metadata", {}).get(
+                                "provider_bindings", {},
                             )
+                            planned_binding = provider_bindings.get(binding["task_key"])
+                            if provider_bindings and (
+                                not isinstance(planned_binding, dict)
+                                or planned_binding.get("provider_id") != binding["provider_id"]
+                                or planned_binding.get("manifest_fingerprint")
+                                != binding["manifest_fingerprint"]
+                            ):
+                                manifest = None
+                            if manifest is not None and (
+                                manifest_fingerprint != binding["manifest_fingerprint"]
+                                or manifest.get("impact") != binding["impact"]
+                                or sorted(manifest.get("permissions", []))
+                                != sorted(json.loads(binding["permissions_json"]))
+                            ):
+                                manifest = None
+                        except (TypeError, ValueError, AttributeError):
+                            manifest = None
+                        if manifest is not None:
+                            digest = _workflow_evidence_digest(
+                                c, attempt_id=job_id, job_id=job_id,
+                                target=binding["target"],
+                                capability_id=binding["capability_id"],
+                                plan_digest=binding["plan_digest"],
+                            )
+                            if digest is not None:
+                                c.execute(
+                                    "INSERT OR IGNORE INTO engine_v2_provider_result_seals "
+                                    "(attempt_id, job_id, digest, version, sealed_at) "
+                                    "VALUES (?, ?, ?, 1, ?)",
+                                    (job_id, job_id, digest, finished_at),
+                                )
                 c.commit()
                 return True
             except Exception:
@@ -2282,7 +2397,8 @@ class JobStore:
                 row = c.execute(
                     "SELECT a.id, a.status AS attempt_status, t.id AS task_ref, "
                     "t.task_key, t.status AS task_status, t.active_attempt_id, "
-                    "t.target, t.capability_id, p.digest AS plan_digest, "
+                    "t.target, t.capability_id, t.impact, "
+                    "t.permissions_json, p.digest AS plan_digest, p.plan_json, "
                     "p.status AS plan_status FROM task_attempts a "
                     "JOIN workflow_tasks t ON t.id=a.task_id "
                     "JOIN workflow_plans p ON p.id=t.plan_id "
@@ -2346,6 +2462,82 @@ class JobStore:
                     or isinstance(job["exit_code"], bool)
                 ):
                     raise ValueError("no matching successful durable provider job is available")
+                provider_binding = c.execute(
+                    "SELECT v.capability_id, v.provider_id, v.provider_version, "
+                    "v.manifest_fingerprint, m.fingerprint, m.manifest_json "
+                    "FROM engine_v2_execution_jobs v LEFT JOIN capability_manifests m "
+                    "ON m.capability_id=v.capability_id AND m.provider_id=v.provider_id "
+                    "AND m.provider_version=v.provider_version WHERE v.job_id=?",
+                    (attempt_id,),
+                ).fetchone()
+                if (
+                    provider_binding is None
+                    or provider_binding["capability_id"] != capability_id
+                    or not provider_binding["provider_id"]
+                    or not provider_binding["provider_version"]
+                    or provider_binding["fingerprint"] is None
+                    or provider_binding["fingerprint"]
+                    != provider_binding["manifest_fingerprint"]
+                ):
+                    raise ValueError("provider manifest binding is missing or changed")
+                try:
+                    manifest = json.loads(provider_binding["manifest_json"])
+                    if not isinstance(manifest, dict):
+                        raise ValueError("provider manifest is not an object")
+                    plan_document = json.loads(row["plan_json"])
+                    task_permissions = json.loads(row["permissions_json"])
+                    manifest_fingerprint = hashlib.sha256(
+                        json.dumps(
+                            manifest, sort_keys=True, separators=(",", ":"),
+                        ).encode("utf-8"),
+                    ).hexdigest()
+                    provider_bindings = plan_document.get("metadata", {}).get(
+                        "provider_bindings", {},
+                    )
+                    planned_binding = provider_bindings.get(row["task_key"])
+                    planned_binding_matches = (
+                        not provider_bindings or (
+                            isinstance(planned_binding, dict)
+                            and planned_binding.get("provider_id")
+                            == provider_binding["provider_id"]
+                            and planned_binding.get("manifest_fingerprint")
+                            == provider_binding["manifest_fingerprint"]
+                        )
+                    )
+                except (TypeError, ValueError, AttributeError):
+                    manifest = None
+                    task_permissions = None
+                    manifest_fingerprint = None
+                    planned_binding_matches = False
+                allowed_side_effects = {
+                    "dns_queries", "resolver_logs", "https_requests",
+                    "network_traffic", "target_service_logs",
+                    "tls_connection", "certificate_metadata",
+                }
+                if (
+                    not planned_binding_matches or manifest is None
+                    or manifest.get("capability_id") != capability_id
+                    or manifest.get("provider_id") != provider_binding["provider_id"]
+                    or manifest.get("provider_version") != provider_binding["provider_version"]
+                    or manifest_fingerprint != provider_binding["manifest_fingerprint"]
+                    or manifest.get("impact") != row["impact"]
+                    or manifest.get("impact") != "moderate"
+                    or not isinstance(task_permissions, list)
+                    or any(not isinstance(item, str) for item in task_permissions)
+                    or not isinstance(manifest.get("permissions"), list)
+                    or any(not isinstance(item, str) for item in manifest["permissions"])
+                    or sorted(manifest["permissions"]) != sorted(task_permissions)
+                    or not isinstance(manifest.get("side_effects"), list)
+                    or any(not isinstance(item, str) for item in manifest["side_effects"])
+                    or not set(manifest["side_effects"]).issubset(allowed_side_effects)
+                    or not manifest["side_effects"]
+                ):
+                    raise ValueError("provider manifest effects require manual reconciliation")
+                if c.execute(
+                    "SELECT 1 FROM evidence WHERE job_id=? AND path IS NOT NULL AND path<>''",
+                    (attempt_id,),
+                ).fetchone() is not None:
+                    raise ValueError("file-backed provider evidence requires manual reconciliation")
                 if not _recovery_findings_are_well_formed(c, attempt_id):
                     raise ValueError("durable provider findings are malformed")
                 findings = [dict(item) for item in c.execute(
@@ -2389,6 +2581,9 @@ class JobStore:
                     "job_id": attempt_id, "tool_id": tool_id,
                     "target": row["target"], "exit_code": job["exit_code"],
                     "duration_s": job["duration_s"], "findings": findings,
+                    "provider_id": provider_binding["provider_id"],
+                    "provider_version": provider_binding["provider_version"],
+                    "manifest_fingerprint": provider_binding["manifest_fingerprint"],
                     "recovered_from_durable_provider_job": True,
                     "provider_effect_state": (
                         "completed" if recovered_status == "succeeded"
@@ -4558,6 +4753,100 @@ class JobStore:
                     status = "uncertain"
                     result = None
                     error = "provider outcome after cancellation requires reconciliation"
+                if status == "succeeded" and c.execute(
+                    "SELECT 1 FROM engine_v2_execution_jobs WHERE job_id=?",
+                    (attempt_id,),
+                ).fetchone() is not None:
+                    seal_is_current = False
+                    task_binding = c.execute(
+                        "SELECT t.target, t.capability_id, t.task_key, t.impact, "
+                        "t.permissions_json, p.digest AS plan_digest, p.plan_json "
+                        "FROM workflow_tasks t JOIN workflow_plans p ON p.id=t.plan_id "
+                        "WHERE t.id=?", (row["task_id"],),
+                    ).fetchone()
+                    if isinstance(result, dict) and task_binding is not None:
+                        job_id = result.get("job_id")
+                        provider = c.execute(
+                            "SELECT v.capability_id, v.provider_id, v.provider_version, "
+                            "v.manifest_fingerprint, m.fingerprint, m.manifest_json "
+                            "FROM engine_v2_execution_jobs v LEFT JOIN capability_manifests m "
+                            "ON m.capability_id=v.capability_id AND m.provider_id=v.provider_id "
+                            "AND m.provider_version=v.provider_version WHERE v.job_id=?",
+                            (attempt_id,),
+                        ).fetchone()
+                        completion = c.execute(
+                            "SELECT job_id, digest, version FROM engine_v2_provider_result_seals "
+                            "WHERE attempt_id=?", (attempt_id,),
+                        ).fetchone()
+                        digest_now = (
+                            _workflow_evidence_digest(
+                                c, attempt_id=attempt_id, job_id=attempt_id,
+                                target=task_binding["target"],
+                                capability_id=task_binding["capability_id"],
+                                plan_digest=task_binding["plan_digest"],
+                            )
+                            if job_id == attempt_id else None
+                        )
+                        try:
+                            manifest = json.loads(provider["manifest_json"]) if (
+                                provider is not None and provider["manifest_json"]
+                            ) else None
+                            if not isinstance(manifest, dict):
+                                manifest = None
+                            plan_document = json.loads(task_binding["plan_json"])
+                            task_permissions = json.loads(task_binding["permissions_json"])
+                            manifest_fingerprint = hashlib.sha256(
+                                json.dumps(
+                                    manifest, sort_keys=True, separators=(",", ":"),
+                                ).encode("utf-8"),
+                            ).hexdigest()
+                            provider_bindings = plan_document.get("metadata", {}).get(
+                                "provider_bindings", {},
+                            )
+                            planned_binding = provider_bindings.get(task_binding["task_key"])
+                            planned_binding_matches = (
+                                not provider_bindings or (
+                                    isinstance(planned_binding, dict)
+                                    and planned_binding.get("provider_id") == provider["provider_id"]
+                                    and planned_binding.get("manifest_fingerprint")
+                                    == provider["manifest_fingerprint"]
+                                )
+                            )
+                        except (TypeError, ValueError, AttributeError):
+                            manifest = None
+                            task_permissions = None
+                            manifest_fingerprint = None
+                            planned_binding_matches = False
+                        seal_is_current = bool(
+                            provider is not None
+                            and provider["capability_id"] == task_binding["capability_id"]
+                            and provider["fingerprint"] == provider["manifest_fingerprint"]
+                            and manifest is not None
+                            and manifest_fingerprint == provider["manifest_fingerprint"]
+                            and isinstance(task_permissions, list)
+                            and all(isinstance(item, str) for item in task_permissions)
+                            and isinstance(manifest.get("permissions"), list)
+                            and all(isinstance(item, str) for item in manifest["permissions"])
+                            and manifest.get("impact") == task_binding["impact"]
+                            and sorted(manifest["permissions"]) == sorted(task_permissions)
+                            and planned_binding_matches
+                            and result.get("provider_id") == provider["provider_id"]
+                            and result.get("provider_version") == provider["provider_version"]
+                            and result.get("manifest_fingerprint")
+                            == provider["manifest_fingerprint"]
+                            and completion is not None
+                            and completion["job_id"] == attempt_id
+                            and completion["version"] == 1
+                            and digest_now is not None
+                            and hmac.compare_digest(completion["digest"], digest_now)
+                        )
+                    if not seal_is_current:
+                        status = "uncertain"
+                        result = None
+                        error = (
+                            "provider completion snapshot or manifest binding changed; "
+                            "reconcile external effects"
+                        )
                 encoded = json.dumps(result, sort_keys=True) if result is not None else None
                 c.execute(
                     "UPDATE task_attempts SET status=?, finished_at=?, result_json=?, error=? WHERE id=?",

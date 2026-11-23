@@ -9,15 +9,27 @@ from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
 def _uncertain_catalog_attempt(
     tmp_path, *, job_status="finished", exit_code=0,
-    capability_id="tool.nmap",
+    capability_id="tool.nmap", file_evidence=False,
 ):
     core = Core(tmp_path)
     core.create_mission("m", "recover lost provider acknowledgement")
-    task_args = {"permissions": ("network.scan",), "impact": "moderate"} \
-        if capability_id.startswith("tool.") else {}
+    try:
+        manifest = core.providers.manifest_for(capability_id)
+    except (LookupError, ValueError):
+        manifest = None
+    task_args = (
+        {"permissions": manifest.permissions, "impact": manifest.impact}
+        if manifest is not None else
+        ({"permissions": ("network.scan",), "impact": "moderate"}
+         if capability_id.startswith("tool.") else {})
+    )
+    metadata = {"provider_bindings": {"scan": {
+        "provider_id": manifest.provider_id,
+        "manifest_fingerprint": manifest.fingerprint,
+    }}} if manifest is not None else {}
     core.save_workflow_plan("p", WorkflowPlan("m", (
         WorkflowTask("scan", capability_id, "192.0.2.10", **task_args),
-    )))
+    ), metadata=metadata))
     request = core.enqueue_workflow_run("p")
     run_claim = core.workflow_requests.claim("run-worker")
     assert run_claim and run_claim["id"] == request["id"]
@@ -27,10 +39,17 @@ def _uncertain_catalog_attempt(
     assert core.store.mark_workflow_dispatch_started(
         "p", attempt_id, provider_execution_id=attempt_id,
     )
-    core.store.mark_engine_v2_execution_job(attempt_id)
+    core.store.mark_engine_v2_execution_job(attempt_id, manifest)
     core.store.create(attempt_id)
-    tool_id = capability_id.removeprefix("tool.")
+    tool_id = (
+        capability_id.removeprefix("tool.")
+        if capability_id.startswith("tool.") else capability_id
+    )
     assert core.store.set_started(attempt_id, tool_id, "192.0.2.10")
+    if file_evidence:
+        core.store.add_evidence(
+            attempt_id, "provider_output", "scan.json", path="/tmp/provider-output.json",
+        )
     if job_status == "finished":
         assert core.store.set_finished(attempt_id, exit_code, 0.25)
     else:
@@ -74,6 +93,9 @@ def test_recovery_seals_successful_job_and_never_replays(tmp_path):
     "tool.unclassified",
     "web.sql_injection.assess",
     "lab.initial_access.samba_usermap",
+    "tool.verify_sqli",
+    "tool.retest_xss",
+    "recon.http",
 ])
 def test_recovery_requires_manual_reconciliation_for_effectful_capabilities(
     tmp_path, capability_id,
@@ -89,7 +111,7 @@ def test_recovery_requires_manual_reconciliation_for_effectful_capabilities(
 
 
 def test_recovery_supports_first_party_provider_capabilities(tmp_path):
-    capability_id = "recon.http"
+    capability_id = "dns.recon.passive"
     core, _, attempt_id = _uncertain_catalog_attempt(
         tmp_path, capability_id=capability_id,
     )
@@ -112,6 +134,17 @@ def test_recovery_refuses_incomplete_provider_results(
         tmp_path, job_status=job_status, exit_code=exit_code,
     )
     with pytest.raises(ValueError, match="no matching successful durable"):
+        core.recover_workflow_attempt_from_provider_job("p", attempt_id)
+    assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
+    assert core.store.get_workflow_audit_integrity("p")["consistent"] is True
+
+
+def test_recovery_refuses_file_backed_provider_evidence(tmp_path):
+    core, _, attempt_id = _uncertain_catalog_attempt(
+        tmp_path, file_evidence=True,
+    )
+
+    with pytest.raises(ValueError, match="file-backed provider evidence"):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
     assert core.store.get_workflow_audit_integrity("p")["consistent"] is True

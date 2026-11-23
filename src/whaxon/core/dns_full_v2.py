@@ -321,7 +321,7 @@ class DnsFullPostureProvider:
         self.store.create(job_id)
         if not self.store.set_started(job_id, CAPABILITY_ID, task.target):
             raise RuntimeError("could not start DNS posture evidence job")
-        self.store.mark_engine_v2_execution_job(job_id)
+        self.store.mark_engine_v2_execution_job(job_id, resolution.manifest)
         started = time.monotonic()
         child = _BoundedDnsWorker(
             task.target, str(self.scope.path.resolve()),

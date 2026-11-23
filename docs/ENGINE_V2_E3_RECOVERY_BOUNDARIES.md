@@ -75,7 +75,8 @@
 
 ## Capability-level effect recovery policy — 2026-11-23
 
-- Result-only recovery is now restricted to an explicit allowlist of observational catalog and first-party provider capabilities. A terminal job row and sealed local output do not establish recovery semantics for stateful, mutating, or unclassified providers.
-- SQLMap capabilities, the Samba user-map initial-access provider, and unclassified tool-prefixed capabilities remain uncertain until an operator performs effect reconciliation. No provider is invoked or retried by this path.
-- Regressions exercise those denied capabilities while preserving result-only recovery for Nmap and the read-only first-party recon provider.
-- The allowlist is a conservative boundary, not evidence that external target effects were independently witnessed. G05 real-effect and production qualification remain open.
+- Result-only recovery is restricted to an explicit positive allowlist of catalog, semantic-operation, and first-party observation capabilities. Verification/retest probes, SQLMap, the Samba user-map initial-access provider, stale aliases and unknown tool-prefixed IDs require operator reconciliation.
+- Every provider dispatcher records the exact capability, provider ID, provider version, and manifest fingerprint before its external effect. Recovery rechecks that immutable registration, the task permission/impact contract, declared side effects, and any provider identity pinned into plan metadata.
+- Both ordinary success terminalization and lost-ack recovery compare the persisted output with the completion-time snapshot. A post-completion database change cannot be sealed as success. Lost-ack recovery also refuses provider evidence that points to an external file because file bytes are not covered by the database digest.
+- Regressions exercise denied capabilities, changed output at both success and recovery boundaries, file-backed evidence refusal, and a registered passive-DNS provider as the first-party recovery example. The stale `recon.http` alias is not registered on this branch and is deliberately excluded.
+- These are local database and declared-contract checks, not proof that a production provider's external effects were independently witnessed. G05 real-effect and production qualification remain open.
