@@ -484,17 +484,21 @@ def test_workflow_report_derives_finding_verification_outcomes_from_plan_tasks()
     assert "source_finding_seq" not in json.dumps(recorded)
 
 
-def _declared_coverage_report(tmp_path, contract, *, stale_digest=False):
+def _declared_coverage_report(
+    tmp_path, contract, *, stale_digest=False, extra_metadata=None,
+):
     from whaxon.core.store import JobStore
     from whaxon.core.workflow import WorkflowPlan, WorkflowTask
 
     tmp_path.mkdir(parents=True, exist_ok=True)
     store = JobStore(tmp_path / "declared-coverage.db")
     store.create_mission("mission-1", "declared coverage test")
+    metadata = {"coverage_contract": contract}
+    metadata.update(extra_metadata or {})
     plan = WorkflowPlan(
         "mission-1",
         (WorkflowTask("scan", "tool.nmap", "192.0.2.10"),),
-        metadata={"coverage_contract": contract},
+        metadata=metadata,
     )
     store.save_workflow_plan("declared-plan", plan)
     evidence = _evidence()
@@ -606,3 +610,35 @@ def test_workflow_report_has_no_declared_projection_without_checklist(tmp_path):
     )
 
     assert report["coverage"]["declared_coverage"]["status"] == "not_recorded"
+
+
+def test_workflow_report_fails_closed_on_conflicting_recon_projections(tmp_path):
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "tls"],
+        "requested": ["dns", "tls"],
+        "included": ["dns"],
+        "dispositions": [{"check_id": "tls", "disposition": "provider_unavailable"}],
+    }
+    legacy_metadata = {
+        "proposal_type": "passive_recon",
+        "requested_checks": ["dns"],
+        "included_checks": ["dns"],
+        "omitted_checks": [
+            {"check": "tls", "reason": "provider unavailable",
+             "disposition": "provider_unavailable"},
+        ],
+    }
+
+    report = _declared_coverage_report(
+        tmp_path, contract, extra_metadata=legacy_metadata,
+    )
+
+    assert report["coverage"]["declared_coverage"]["status"] == "invalid"
+    assert report["coverage"]["declared_coverage"]["omissions"] == []
+    assert report["coverage"]["requested_checks"] is None
+    assert report["coverage"]["included_checks"] is None
+    assert report["coverage"]["unrequested_checks"] is None
+    assert report["coverage"]["unsupported_or_inaccessible_work"] == {
+        "status": "not_recorded", "count": None, "items": [],
+    }
