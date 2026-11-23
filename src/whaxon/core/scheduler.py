@@ -346,7 +346,21 @@ class WorkflowScheduler:
                     claimed += 1
                 outcomes.append(await self._execute(row))
 
-        await asyncio.gather(*(worker() for _ in range(min(max_concurrency, max_tasks))))
+        workers = [
+            asyncio.create_task(worker())
+            for _ in range(min(max_concurrency, max_tasks))
+        ]
+        try:
+            await asyncio.gather(*workers)
+        except BaseException:
+            # asyncio.gather propagates the first exception but does not
+            # cancel sibling workers. Never return a failed durable run while
+            # another worker could still dispatch an untracked external effect.
+            for active in workers:
+                if not active.done():
+                    active.cancel()
+            await asyncio.gather(*workers, return_exceptions=True)
+            raise
         tasks = self.store.list_workflow_tasks(plan_id)
         # Failed attempts may still be retryable. Report completion only when
         # every task has reached a terminal outcome under the attempt policy.
