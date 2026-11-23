@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import os
+import pathlib
 import subprocess
 import sys
 import time
-from pathlib import Path
-
 import pytest
 
 from whaxon.core import Core
@@ -58,7 +57,7 @@ asyncio.run(main())
 """
 
 
-def _write_fake_dig(directory: Path) -> None:
+def _write_fake_dig(directory: pathlib.Path) -> None:
     directory.mkdir()
     executable = directory / "dig"
     executable.write_text(
