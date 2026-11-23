@@ -358,7 +358,15 @@ def test_workflow_contract_nested_mappings_are_immutable():
         task.inputs["new"] = "value"
     with pytest.raises(TypeError, match="immutable"):
         task.inputs["options"]["new"] = "value"
-    assert task.inputs["options"]["ports"] == (80, 443)
+    ports = task.inputs["options"]["ports"]
+    assert isinstance(ports, list)
+    assert ports == [80, 443]
+    with pytest.raises(TypeError, match="immutable"):
+        ports.append(8080)
+    labels = plan.metadata["labels"]
+    assert isinstance(labels, list)
+    with pytest.raises(TypeError, match="immutable"):
+        labels.append("changed")
 
 
 def test_workflow_task_rejects_non_finite_timeout():
