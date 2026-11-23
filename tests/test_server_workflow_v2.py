@@ -1103,29 +1103,46 @@ def test_v2_ai_proposal_rejects_oversized_history_before_provider(tmp_path, monk
     assert core.store.get_workflow_plan("p-ai") is None
 
 
-def test_legacy_validation_routes_refuse_engine_v2_evidence(tmp_path, monkeypatch):
+def test_legacy_validation_routes_are_permanently_no_replay(tmp_path, monkeypatch):
     from whaxon.core.findings import Finding
+    from whaxon.core.validator import Validator
 
     monkeypatch.setenv("WHAXON_LEGACY_VALIDATION_ENABLED", "true")
+
+    def refuse_probe(*_args, **_kwargs):
+        raise AssertionError("retired validation API attempted a probe")
+
+    monkeypatch.setattr(Validator, "validate", refuse_probe)
+    monkeypatch.setattr(Validator, "revalidate", refuse_probe)
     client, core = _client(tmp_path, monkeypatch)
-    job_id = "0123456789ab"
-    core.store.create(job_id)
-    core.store.set_started(job_id, "verify_sqli", "http://192.0.2.10/search?id=1")
-    core.store.append_finding(job_id, Finding(
-        kind="sqli", severity="high", source="engine-v2-verifier",
-        data={"parameter": "id"}, raw_line="verified finding",
-    ), 0)
-    core.store.update_verification(job_id, 0, "verified", by="engine-v2", reason="sealed result")
-    core.store.mark_engine_v2_execution_job(job_id)
 
-    before = core.store.get_findings(job_id)
-    validate = client.post(f"/api/validate/{job_id}/0")
-    retest = client.post(f"/api/retest/{job_id}/0")
+    for job_id, is_v2 in (("legacy-job", False), ("0123456789ab", True)):
+        core.store.create(job_id)
+        core.store.set_started(
+            job_id, "verify_sqli", "http://192.0.2.10/search?id=1",
+        )
+        core.store.append_finding(job_id, Finding(
+            kind="sqli",
+            severity="high",
+            source="engine-v2-verifier" if is_v2 else "test",
+            data={"parameter": "id"},
+            raw_line="finding",
+        ), 0)
+        if is_v2:
+            core.store.update_verification(
+                job_id, 0, "verified", by="engine-v2", reason="sealed result",
+            )
+            core.store.mark_engine_v2_execution_job(job_id)
 
-    assert validate.status_code == 410
-    assert retest.status_code == 410
-    assert validate.get_json()["legacy_validation_enabled"] is False
-    assert retest.get_json()["legacy_validation_enabled"] is False
-    assert validate.get_json()["replay_attempted"] is False
-    assert retest.get_json()["replay_attempted"] is False
-    assert core.store.get_findings(job_id) == before
+        before = core.store.get_findings(job_id)
+        validate = client.post(f"/api/validate/{job_id}/0")
+        retest = client.post(f"/api/retest/{job_id}/0")
+
+        for response in (validate, retest):
+            assert response.status_code == 410
+            body = response.get_json()
+            assert body["legacy_validation_enabled"] is False
+            assert body["approval_granted"] is False
+            assert body["replay_attempted"] is False
+            assert body["workflow"] == "/api/v2/workflow-proposals"
+        assert core.store.get_findings(job_id) == before
