@@ -26,17 +26,28 @@ def main(args: list[str] | None = None) -> int:
     mission_id: str | None = None
     plan_id: str | None = None
     save = False
+    seen_options: set[str] = set()
     i = 0
     while i < len(args):
         a = args[i]
-        if a == "--data" and i + 1 < len(args):
-            data_dir = Path(args[i + 1])
-            i += 2
-        elif a == "--mission-id" and i + 1 < len(args):
-            mission_id = args[i + 1]
-            i += 2
-        elif a in ("--plan-id", "--id") and i + 1 < len(args):
-            plan_id = args[i + 1]
+        value_options = {"--data": "data", "--mission-id": "mission", "--plan-id": "plan", "--id": "plan"}
+        if a in value_options:
+            option_key = value_options[a]
+            if (
+                option_key in seen_options
+                or i + 1 >= len(args)
+                or args[i + 1].startswith("-")
+            ):
+                print(_USAGE, file=sys.stderr)
+                return EXIT_USAGE
+            seen_options.add(option_key)
+            value = args[i + 1]
+            if option_key == "data":
+                data_dir = Path(value)
+            elif option_key == "mission":
+                mission_id = value
+            else:
+                plan_id = value
             i += 2
         elif a == "--save":
             save = True
@@ -46,6 +57,9 @@ def main(args: list[str] | None = None) -> int:
         elif a in ("-h", "--help"):
             print(_USAGE, file=sys.stderr)
             return EXIT_OK
+        elif a.startswith("-"):
+            print(_USAGE, file=sys.stderr)
+            return EXIT_USAGE
         else:
             positional.append(a)
             i += 1
@@ -59,6 +73,9 @@ def main(args: list[str] | None = None) -> int:
     try:
         seq = int(seq_str)
     except ValueError:
+        print(f"Invalid seq: {seq_str}", file=sys.stderr)
+        return EXIT_USAGE
+    if seq < 0:
         print(f"Invalid seq: {seq_str}", file=sys.stderr)
         return EXIT_USAGE
 
