@@ -12,7 +12,6 @@ import re
 import time
 import uuid
 
-
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _ALLOWED_DECISIONS = frozenset({"reviewed", "dismissed"})
 
