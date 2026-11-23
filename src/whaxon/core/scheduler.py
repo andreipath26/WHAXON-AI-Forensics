@@ -261,21 +261,21 @@ class WorkflowScheduler:
             committed = self.store.get_workflow_attempt_status(attempt_id)
             return {"task_id": task.id, "status": committed}
         except TimeoutError:
-            if lease_lost.is_set():
+            if lease_lost.is_set() or not self.store.workflow_attempt_owned(attempt_id):
                 return {"task_id": task.id, "status": "uncertain"}
             self.store.finish_task_attempt(
                 attempt_id, "uncertain", error="task timed out; reconcile before retry",
             )
             return {"task_id": task.id, "status": "uncertain"}
         except asyncio.CancelledError:
-            if not lease_lost.is_set():
+            if not lease_lost.is_set() and self.store.workflow_attempt_owned(attempt_id):
                 self.store.finish_task_attempt(
                     attempt_id, "uncertain",
                     error="scheduler cancelled while task was active; reconcile before retry",
                 )
             raise
         except Exception as exc:
-            if lease_lost.is_set():
+            if lease_lost.is_set() or not self.store.workflow_attempt_owned(attempt_id):
                 return {"task_id": task.id, "status": "uncertain"}
             _log.exception("workflow task %s failed", task.id)
             # A provider may have produced external effects before raising.
