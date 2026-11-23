@@ -2216,6 +2216,16 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
         status = data.get("status", "").strip().lower()
         if status not in ("verified", "refuted"):
             return {"error": "status must be verified or refuted"}, 400
+        if registry.core.store.is_engine_v2_execution_job(job_id):
+            return {
+                "error": (
+                    "Engine V2 finding state must come from its plan-bound "
+                    "verification workflow"
+                ),
+                "approval_granted": False,
+                "verification_updated": False,
+                "workflow": "/api/v2/workflow-proposals",
+            }, 409
         findings = registry.core.store.get_findings(job_id) or []
         target_f = next((f for f in findings if f["seq"] == seq), None)
         if not target_f:
