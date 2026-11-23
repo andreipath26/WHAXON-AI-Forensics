@@ -323,6 +323,7 @@ def test_robots_plan_requires_exact_separate_approval(tmp_path):
     plan = WorkflowPlan("mission", (task,), metadata={
         "provider_bindings": {task.id: {
             "provider_id": provider.bindings()[0].provider_id,
+            "provider_version": provider.bindings()[0].provider_version,
             "manifest_fingerprint": provider.bindings()[0].fingerprint,
         }},
     })
