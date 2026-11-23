@@ -312,6 +312,6 @@ def test_reconciliation_requires_exact_tool_for_first_party_provider(tmp_path):
     assert mismatched["provider_job_identity_verified"] is False
     assert mismatched["provider_job_identity_mismatch"] is True
     assert mismatched["manual_reconciliation_required"] is True
-    with pytest.raises(ValueError, match="no matching successful durable"):
+    with pytest.raises(ValueError, match="provider effects require manual reconciliation"):
         core.recover_workflow_attempt_from_provider_job("p", attempt_id)
     assert core.store.get_workflow_attempt_status(attempt_id) == "uncertain"
