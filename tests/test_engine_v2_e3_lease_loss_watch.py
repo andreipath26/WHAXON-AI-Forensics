@@ -107,3 +107,34 @@ def test_persisted_attempt_loss_on_provider_return_does_not_certify_success(tmp_
         assert store.list_workflow_tasks("plan")[0]["status"] == "uncertain"
 
     asyncio.run(scenario())
+
+
+def test_reconciled_attempt_cannot_be_rewritten_by_late_provider_error(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan
+
+    async def scenario():
+        store = JobStore(tmp_path / "lost-before-exception.db")
+        store.create_mission("mission", "controlled local error race")
+        store.save_workflow_plan("plan", WorkflowPlan("mission", (
+            WorkflowTask("first", "fixture", "192.0.2.10"),
+        )))
+
+        async def provider(task):
+            store.finish_task_attempt(
+                getattr(task, "_attempt_id"), "uncertain",
+                error="simulated independent reconciliation",
+            )
+            raise RuntimeError("late provider disconnect")
+
+        result = await WorkflowScheduler(
+            store, authorize=lambda task: True, dispatch=provider,
+        ).run("plan", max_attempts=1)
+        assert result["outcomes"] == [
+            {"task_id": "first", "status": "uncertain"},
+        ]
+        task = store.list_workflow_tasks("plan")[0]
+        assert task["status"] == "uncertain"
+        assert task["error"] == "simulated independent reconciliation"
+
+    asyncio.run(scenario())
