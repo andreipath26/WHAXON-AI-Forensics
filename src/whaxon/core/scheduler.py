@@ -234,11 +234,15 @@ class WorkflowScheduler:
                 # another worker. Do not mutate an attempt we no longer own.
                 if stop_reason == "lease_lost" or lease_lost.is_set():
                     return {"task_id": task.id, "status": "uncertain"}
-                reason = (
-                    "cancellation requested while provider was executing"
-                    if stop_reason == "plan_cancelled"
-                    else "mission runtime budget exhausted while provider was executing"
-                )
+                reason = {
+                    "plan_cancelled": "cancellation requested while provider was executing",
+                    "mission_deadline_exceeded": (
+                        "mission deadline expired while provider was executing"
+                    ),
+                    "mission_runtime_budget_exhausted": (
+                        "mission runtime budget exhausted while provider was executing"
+                    ),
+                }.get(stop_reason, "execution stop requested while provider was executing")
                 self.store.finish_task_attempt(
                     attempt_id, "uncertain",
                     error=f"{reason}; outcome requires reconciliation",
@@ -269,9 +273,18 @@ class WorkflowScheduler:
             return {"task_id": task.id, "status": "uncertain"}
         except asyncio.CancelledError:
             if not lease_lost.is_set() and self.store.workflow_attempt_owned(attempt_id):
+                # A scheduler can stop while policy/authorization is pending.
+                # Only a dispatch with a committed external-effect intent
+                # requires manual reconciliation. Never mislabel a known
+                # pre-dispatch stop as an unknown provider outcome.
+                outcome = "uncertain" if dispatch_started else "cancelled"
+                error = (
+                    "scheduler cancelled after provider dispatch; reconcile before retry"
+                    if dispatch_started
+                    else "scheduler cancelled before provider dispatch"
+                )
                 self.store.finish_task_attempt(
-                    attempt_id, "uncertain",
-                    error="scheduler cancelled while task was active; reconcile before retry",
+                    attempt_id, outcome, error=error,
                 )
             raise
         except Exception as exc:
@@ -333,7 +346,21 @@ class WorkflowScheduler:
                     claimed += 1
                 outcomes.append(await self._execute(row))
 
-        await asyncio.gather(*(worker() for _ in range(min(max_concurrency, max_tasks))))
+        workers = [
+            asyncio.create_task(worker())
+            for _ in range(min(max_concurrency, max_tasks))
+        ]
+        try:
+            await asyncio.gather(*workers)
+        except BaseException:
+            # asyncio.gather propagates the first exception but does not
+            # cancel sibling workers. Never return a failed durable run while
+            # another worker could still dispatch an untracked external effect.
+            for active in workers:
+                if not active.done():
+                    active.cancel()
+            await asyncio.gather(*workers, return_exceptions=True)
+            raise
         tasks = self.store.list_workflow_tasks(plan_id)
         # Failed attempts may still be retryable. Report completion only when
         # every task has reached a terminal outcome under the attempt policy.

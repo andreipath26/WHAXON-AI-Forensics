@@ -1252,30 +1252,62 @@ class Core:
                 break
             token = request["lease_token"]
             request_id = request["id"]
-            async def heartbeat(active_id=request_id, active_token=token):
+            lease_lost = asyncio.Event()
+
+            async def heartbeat(
+                active_id=request_id, active_token=token, lost_signal=lease_lost,
+            ):
                 while True:
                     await asyncio.sleep(5)
-                    if not self.workflow_requests.heartbeat(active_id, active_token):
+                    try:
+                        renewed = await asyncio.to_thread(
+                            self.workflow_requests.heartbeat, active_id, active_token,
+                        )
+                    except Exception:
+                        # A failed heartbeat cannot establish continuing authority.
+                        renewed = False
+                    if not renewed:
+                        lost_signal.set()
                         return
 
             pulse = asyncio.create_task(heartbeat())
+            work = None
+            ownership_watch = None
             status = "uncertain"
             error = ""
             try:
-                result = await self.run_workflow_plan(
+                work = asyncio.create_task(self.run_workflow_plan(
                     request["plan_id"], worker_id=owner, **request["limits"],
+                ))
+                ownership_watch = asyncio.create_task(lease_lost.wait())
+                done, _ = await asyncio.wait(
+                    (work, ownership_watch), return_when=asyncio.FIRST_COMPLETED,
                 )
-                status = "completed" if result["complete"] else "incomplete"
+                if ownership_watch in done or lease_lost.is_set():
+                    # The request lease is the authority for the entire DAG.
+                    # Do not allow a lost owner to claim/dispatch further tasks.
+                    work.cancel()
+                    await asyncio.gather(work, return_exceptions=True)
+                    error = "run request lease lost; reconcile effects before retry"
+                else:
+                    result = work.result()
+                    status = "completed" if result["complete"] else "incomplete"
             except Exception as exc:
                 # Dispatch may have produced an external effect before failure.
                 # Never automatically retry this request.
                 error = f"worker error after claim: {type(exc).__name__}"
             finally:
+                # Cancellation of the drainer must also stop its child scheduler.
+                if work is not None and not work.done():
+                    work.cancel()
+                    await asyncio.gather(work, return_exceptions=True)
+                if ownership_watch is not None:
+                    ownership_watch.cancel()
+                    await asyncio.gather(ownership_watch, return_exceptions=True)
                 pulse.cancel()
-                try:
-                    await pulse
-                except asyncio.CancelledError:
-                    pass
+                await asyncio.gather(pulse, return_exceptions=True)
+                # The finish operation is token-fenced and refuses a stale
+                # owner. Never overwrite another worker's reconciliation.
                 self.workflow_requests.finish(
                     request_id, token, status=status, error=error,
                 )
