@@ -234,11 +234,15 @@ class WorkflowScheduler:
                 # another worker. Do not mutate an attempt we no longer own.
                 if stop_reason == "lease_lost" or lease_lost.is_set():
                     return {"task_id": task.id, "status": "uncertain"}
-                reason = (
-                    "cancellation requested while provider was executing"
-                    if stop_reason == "plan_cancelled"
-                    else "mission runtime budget exhausted while provider was executing"
-                )
+                reason = {
+                    "plan_cancelled": "cancellation requested while provider was executing",
+                    "mission_deadline_exceeded": (
+                        "mission deadline expired while provider was executing"
+                    ),
+                    "mission_runtime_budget_exhausted": (
+                        "mission runtime budget exhausted while provider was executing"
+                    ),
+                }.get(stop_reason, "execution stop requested while provider was executing")
                 self.store.finish_task_attempt(
                     attempt_id, "uncertain",
                     error=f"{reason}; outcome requires reconciliation",
