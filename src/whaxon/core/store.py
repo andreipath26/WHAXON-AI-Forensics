@@ -692,6 +692,8 @@ class JobStore:
         self, job_id, seq, status, by="engine", reason="",
     ) -> Literal["updated", "v2_owned", "not_found"]:
         """Atomically update a legacy finding only while V2 does not own its job."""
+        if status not in ("verified", "refuted"):
+            raise ValueError("legacy verification status must be verified or refuted")
         with self._lock:
             c = self._conn()
             try:

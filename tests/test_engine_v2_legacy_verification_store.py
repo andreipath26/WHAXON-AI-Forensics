@@ -4,6 +4,8 @@ from __future__ import annotations
 import threading
 import time
 
+import pytest
+
 from whaxon.core.store import JobStore
 
 
@@ -30,6 +32,11 @@ def test_legacy_verification_update_reports_typed_outcomes(tmp_path):
     assert finding["verification_status"] == "verified"
     assert finding["verified_by"] == "human:reviewer"
     assert finding["verification_reason"] == "reviewed"
+
+    before = store.get_findings("job")
+    with pytest.raises(ValueError, match="legacy verification status"):
+        store.update_legacy_verification_if_unowned("job", 0, "candidate")
+    assert store.get_findings("job") == before
 
     assert store.update_legacy_verification_if_unowned(
         "missing-job", 0, "verified",
