@@ -81,3 +81,10 @@
 - Both ordinary success terminalization and lost-ack recovery compare the persisted output with the completion-time snapshot. A post-completion database change cannot be sealed as success. Lost-ack recovery also refuses provider evidence that points to an external file because file bytes are not covered by the database digest.
 - Regressions exercise denied capabilities, changed output at both success and recovery boundaries, file-backed evidence refusal, and a registered passive-DNS provider as the first-party recovery example. The stale `recon.http` alias is not registered on this branch and is deliberately excluded.
 - These are local database and declared-contract checks, not proof that a production provider's external effects were independently witnessed. G05 real-effect and production qualification remain open.
+
+
+## Catalog dig crash and lost-ack recovery regression — 2026-11-23
+
+- `tests/test_engine_v2_e3_catalog_provider_crash.py::test_catalog_dig_crash_after_seal_recovers_without_replay` uses a temporary fake `dig` executable and exercises the real catalog provider, ToolRunner, adapter parser, SQLite persistence, result seal, and provider-job recovery path without external DNS.
+- The worker is stopped after the durable provider-result seal but before scheduler terminalization. On restart, the attempt becomes uncertain; explicit recovery verifies the sealed matching result, duplicate recovery is refused, and a later scheduler run dispatches no work. The test checks the typed A-record observation through the safe evidence projection and its parsed persisted finding row.
+- Exact source head `27faf26ecb20f5b22dad33fab031c240fbfcf47e` passed CI [45171571410](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/45171571410), including Python 3.11–3.13. This is a deterministic local catalog-provider crash regression; it does not prove universal exactly-once effects, production scanner behavior, or external audit anchoring.
