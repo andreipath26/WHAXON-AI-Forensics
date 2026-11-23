@@ -66,3 +66,44 @@ def test_lease_loss_precedes_a_simultaneous_provider_result():
         assert result is None
 
     asyncio.run(scenario())
+
+
+def test_persisted_attempt_loss_on_provider_return_does_not_certify_success(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan
+
+    async def scenario():
+        store = JobStore(tmp_path / "lost-before-heartbeat.db")
+        store.create_mission("mission", "controlled local ownership race")
+        store.save_workflow_plan("plan", WorkflowPlan("mission", (
+            WorkflowTask("first", "fixture", "192.0.2.10"),
+            WorkflowTask(
+                "dependent", "fixture", "192.0.2.10",
+                depends_on=("first",),
+            ),
+        )))
+        dispatched = []
+
+        async def provider(task):
+            dispatched.append(task.id)
+            # Simulate lease reconciliation by another worker between the
+            # last heartbeat and provider completion.
+            store.finish_task_attempt(
+                getattr(task, "_attempt_id"), "uncertain",
+                error="simulated worker ownership loss",
+            )
+            return {"result": "must not be certified"}
+
+        result = await WorkflowScheduler(
+            store, authorize=lambda task: True, dispatch=provider,
+        ).run("plan", max_attempts=1)
+        assert dispatched == ["first"]
+        assert result["outcomes"] == [
+            {"task_id": "first", "status": "uncertain"},
+        ]
+        tasks = {row["id"]: row["status"] for row in result["tasks"]}
+        assert tasks["first"] == "uncertain"
+        assert tasks["dependent"] != "succeeded"
+        assert store.list_workflow_tasks("plan")[0]["status"] == "uncertain"
+
+    asyncio.run(scenario())
