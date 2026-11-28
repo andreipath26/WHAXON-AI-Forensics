@@ -743,3 +743,19 @@ For **every Engine V2 phase E0–E9**, engineering completion, phase merge and f
 **Deferred to the final full Engine V2 deployment gate, not waived:** authorized real-scanner controlled-target laboratory runs, externally protected audit-anchor/witness and retention validation, production-like service and multi-worker operation, host/network crash and recovery, backup/restore, complete cross-client end-to-end validation, and deployment/operator sign-off. These remain explicitly **NOT PASSED** until evidenced. No frozen phase, green CI or mock test implies production readiness or closes the overall release gates. Security authorization, fail-closed behavior, uncertain-effect reconciliation and audit integrity remain mandatory implementation requirements. Reopen a frozen phase only for evidenced correctness/security defects or necessary cross-phase integration repairs with regression coverage.
 
 This operator decision supersedes earlier requirements to finish deployment-level tests *before phase engineering freeze*, but does not supersede final release safety and acceptance gates.
+
+
+## P0 URGENT — 100x Engineer verification and completion discipline
+
+**Priority: P0 / URGENT. Status: planned; not implemented or verified.** Begin evaluation and integration immediately alongside existing critical work; do not bypass current release gates or change established scope.
+
+Reference: https://github.com/deadinternetstudios/100x-engineer-skill — audit source, license and dependencies before adapting; benchmark claims independently. Prefer native, minimal implementations over mandatory external agent/runtime dependencies.
+
+- [ ] Audit upstream architecture, threat model, license and reproducibility; record adoption/rejection decisions.
+- [ ] Translate requirements into executable contracts, invariants and acceptance criteria; use bounded model checking where appropriate and report its limits.
+- [ ] Implement mutation and adversarial tests, cross-component integration verification and independent review with explicit findings and remediation.
+- [ ] Maintain an authenticated evidence ledger bound to source/dependency/configuration hashes and CI run artifacts; invalidate stale results and distinguish unchecked, failed, stale and verified evidence.
+- [ ] Enforce non-bypassable CI completion gates for required evidence; sandbox verification commands, protect against fabricated results, and record exceptions explicitly without silently marking work complete.
+- [ ] Use isolated parallel workstreams, incremental verification/caching, resource-aware local reviewers where suitable, and reproducible release reports. Evaluate SMT/TLA+ only where justified.
+- [ ] Project-specific scope: Map verification to G01–G10, especially authorization, independent verification, recovery and evidence integrity. Fail closed on stale or missing evidence; verify security invariants and adversarial regressions. Existing HOLD remains until existing deployment gates pass.
+- [ ] Acceptance: demonstrate that intentional defects and stale/missing evidence block completion, independent findings are resolved, and all existing project acceptance gates pass. Record exact commit, environment, test results and limitations; no unsupported readiness claims.
