@@ -373,3 +373,86 @@ def test_profile_batch_audit_failure_never_claims_verified(monkeypatch):
     assert result["status"] == "AUDIT_FAILED"
     assert result["original_status"] == "VERIFIED"
     assert "audit event could not be persisted" in result["recovery"]
+
+
+def test_keyboard_interrupt_terminates_child_and_audits_partial_state(monkeypatch, tmp_path):
+    """Interruption is recorded; already-applied package changes are not rolled back."""
+    import whaxon.core.installer as installer
+
+    monkeypatch.setattr(sys, "prefix", "/tmp/whaxon-test-venv")
+    monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(
+        installer,
+        "build_remediation_plan",
+        lambda **_kwargs: {
+            "plan_id": "plan-interrupted-install",
+            "unknown_dependency_ids": [],
+            "actions": [{
+                "dependency_id": "textual",
+                "options": [{"kind": "python-package"}],
+            }],
+        },
+    )
+    monkeypatch.setattr(
+        installer,
+        "load_dependency_manifest",
+        lambda: {
+            "schema_version": 1,
+            "policy": {
+                "automatic_installation_enabled": True,
+                "automatic_installation_kinds": ["python-package"],
+            },
+            "dependencies": [{
+                "id": "textual",
+                "kind": "python-package",
+                "minimum_version": "0.80",
+                "import_name": "textual",
+            }],
+        },
+    )
+    monkeypatch.setattr(
+        installer, "build_python_package_argv",
+        lambda _entry: [sys.executable, "-m", "pip", "install", "textual"],
+    )
+    monkeypatch.setattr(installer, "_audit_path", lambda: tmp_path / "audit.jsonl")
+
+    class InterruptedProcess:
+        returncode = None
+
+        def __init__(self):
+            self.terminated = False
+            self.communicate_calls = 0
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, timeout=None):
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                raise KeyboardInterrupt
+            return "partial package output", ""
+
+        def terminate(self):
+            self.terminated = True
+            self.returncode = -15
+
+        def kill(self):
+            pytest.fail("termination should complete before the kill fallback")
+
+    process = InterruptedProcess()
+    monkeypatch.setattr(installer.subprocess, "Popen", lambda *_args, **_kwargs: process)
+
+    with pytest.raises(KeyboardInterrupt):
+        installer.apply_approved_dependency_plan(
+            "textual", "plan-interrupted-install"
+        )
+
+    assert process.terminated is True
+    records = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
+    assert [record["event_type"] for record in records] == [
+        "PLAN_CREATED", "APPROVAL_ACCEPTED", "ACTION_STARTED", "ACTION_FINISHED",
+    ]
+    terminal = records[-1]
+    assert terminal["status"] == "INTERRUPTED"
+    assert "may have partially changed" in terminal["recovery"]
+    assert "rollback" not in terminal["recovery"].lower()
