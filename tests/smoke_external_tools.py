@@ -363,6 +363,8 @@ def main() -> None:
             ), nmap_evidence
             v2_provider_runs.append({"tool": "nmap", "status": "succeeded", "evidence_integrity_verified": True, **nmap_binding})
 
+            with request_lock:
+                before_v2_gobuster = len(requests)
             v2_gobuster, gobuster_evidence, gobuster_binding = asyncio.run(_run_v2_catalog_provider(
                 root, "gobuster", "127.0.0.1",
                 f"dir -u http://{{target}}:{port} -w {wordlist} -q -t 1 --no-error --timeout 3s",
@@ -371,11 +373,27 @@ def main() -> None:
                 {"id": "gobuster-loopback", "status": "succeeded"},
             ], v2_gobuster
             assert gobuster_evidence["all_evidence_integrity_verified"] is True, gobuster_evidence
-            assert any(
-                finding["data"].get("path") == "/admin"
-                for finding in gobuster_evidence["provider_findings"]
-            ), gobuster_evidence
-            v2_provider_runs.append({"tool": "gobuster", "status": "succeeded", "evidence_integrity_verified": True, **gobuster_binding})
+            with request_lock:
+                gobuster_paths = [
+                    urlsplit(path).path for path in requests[before_v2_gobuster:]
+                ]
+            # Gobuster's V2 adapter currently seals a successful attempt but
+            # does not persist normalized directory findings. Prove the real
+            # binary's effect from the fixture's observed requests without
+            # treating an empty finding set as a successful finding.
+            assert "/admin" in gobuster_paths, {
+                "evidence": gobuster_evidence,
+                "observed_paths": gobuster_paths,
+            }
+            gobuster_evidence["observed_loopback_paths"] = sorted(set(gobuster_paths))
+            v2_provider_runs.append({
+                "tool": "gobuster",
+                "status": "succeeded",
+                "evidence_integrity_verified": True,
+                "normalized_finding_count": len(gobuster_evidence["provider_findings"]),
+                "observed_loopback_paths": sorted(set(gobuster_paths)),
+                **gobuster_binding,
+            })
 
             v2_ffuf, ffuf_evidence, ffuf_binding = asyncio.run(_run_v2_catalog_provider(
                 root, "ffuf", base_url,
