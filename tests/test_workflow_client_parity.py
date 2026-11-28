@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import json
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 from textual.widgets import Button, DataTable, Static
 
