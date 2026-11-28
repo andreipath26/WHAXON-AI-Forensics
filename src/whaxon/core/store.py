@@ -1793,7 +1793,10 @@ class JobStore:
             ).fetchone()
             if row is None or row["status"] == "cancel_requested":
                 return False
-            plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+            try:
+                plan = WorkflowPlan.from_dict(json.loads(row["plan_json"]))
+            except (json.JSONDecodeError, TypeError, ValueError, KeyError, OverflowError):
+                return False
             task = next((task for task in plan.tasks if task.id == task_key), None)
             if task is None:
                 return False
@@ -1803,14 +1806,26 @@ class JobStore:
                 (plan_id, task_key, policy_version),
             ).fetchall()
             for approval in approvals:
-                value = json.loads(approval["binding_json"])
-                value["permissions"] = tuple(value.get("permissions") or ())
-                binding = ApprovalBinding(**value)
-                if binding.is_valid(
-                    plan_digest=row["digest"], task=task,
-                    policy_version=policy_version, now=time.time(),
-                ):
-                    return True
+                try:
+                    value = json.loads(approval["binding_json"])
+                    if not isinstance(value, dict):
+                        continue
+                    permissions = value.get("permissions", [])
+                    if (
+                        not isinstance(permissions, list)
+                        or any(not isinstance(item, str) for item in permissions)
+                    ):
+                        continue
+                    value["permissions"] = tuple(permissions)
+                    binding = ApprovalBinding(**value)
+                    if binding.is_valid(
+                        plan_digest=row["digest"], task=task,
+                        policy_version=policy_version, now=time.time(),
+                    ):
+                        return True
+                except (json.JSONDecodeError, TypeError, ValueError, KeyError, OverflowError):
+                    # Corrupt or stale persisted consent is never authorization.
+                    continue
             return False
         finally:
             c.close()

@@ -365,9 +365,32 @@ class ApprovalBinding:
 
     def is_valid(self, *, plan_digest: str, task: WorkflowTask,
                  policy_version: str, now: float) -> bool:
+        # Persisted approval rows are a trust boundary. Malformed types must
+        # never raise through the authorization service or be coerced into a
+        # valid grant (notably bool is an int in Python).
+        if (
+            isinstance(self.expires_at, bool)
+            or not isinstance(self.expires_at, (int, float))
+            or isinstance(now, bool)
+            or not isinstance(now, (int, float))
+            or not isinstance(self.plan_digest, str)
+            or not isinstance(self.task_id, str)
+            or not isinstance(self.target, str)
+            or not isinstance(self.input_digest, str)
+            or not isinstance(self.policy_version, str)
+            or not isinstance(self.permissions, tuple)
+            or any(not isinstance(permission, str) for permission in self.permissions)
+            or not isinstance(self.impact, str)
+            or self.impact not in _ALLOWED_IMPACTS
+        ):
+            return False
+        try:
+            if not math.isfinite(self.expires_at) or not math.isfinite(now):
+                return False
+        except (OverflowError, TypeError, ValueError):
+            return False
         return (
-            math.isfinite(self.expires_at)
-            and now < self.expires_at
+            now < self.expires_at
             and self.plan_digest == plan_digest
             and self.task_id == task.id
             and self.target == task.target
