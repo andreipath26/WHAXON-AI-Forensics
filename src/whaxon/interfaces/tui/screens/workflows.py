@@ -355,7 +355,6 @@ class WorkflowScreen(Screen):
             self._say(
                 f"Durable request {self.run_request_id} queued. Completion is not yet claimed."
             )
-            await self.app.core.drain_workflow_run_requests(max_runs=1)
             self._refresh_request_status()
         except (AttributeError, TypeError, ValueError, RuntimeError) as exc:
             self._say(f"Plan was not submitted: {exc}", error=True)

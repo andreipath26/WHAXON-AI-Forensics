@@ -54,10 +54,10 @@ async def test_tui_reviews_approves_and_cancels_durable_v2_request(tmp_path, mon
 
         monkeypatch.setattr(core, "authorize_workflow_task_for_plan", lambda *_: True)
 
-        async def leave_queued(**_kwargs):
-            return 0
+        async def forbidden_drain(**_kwargs):
+            raise AssertionError("TUI submission must not drain provider work inline")
 
-        monkeypatch.setattr(core, "drain_workflow_run_requests", leave_queued)
+        monkeypatch.setattr(core, "drain_workflow_run_requests", forbidden_drain)
         worker = screen._submit_plan()
         await worker.wait()
 
