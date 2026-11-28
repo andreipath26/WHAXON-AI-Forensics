@@ -130,6 +130,7 @@ async def _run_v2_catalog_provider(root: Path, tool_id: str, target: str, args: 
     evidence = core.workflow_evidence(plan_id)
     job_id = evidence["attempts"][0].get("job_id")
     evidence["provider_findings"] = core.store.get_findings(job_id) if job_id else []
+    evidence["provider_output_tail"] = core.store.lines_since(job_id)[-30:] if job_id else []
     manifest = core.providers.manifest_for(f"tool.{tool_id}")
     binding = {
         "provider_id": manifest.provider_id,
@@ -147,7 +148,7 @@ async def _cancel_real_gobuster_after_loopback_effect(root: Path, server, port: 
     scenario_root = root / "gobuster-cancel"
     scenario_root.mkdir(parents=True)
     wordlist = scenario_root / "cancel-words.txt"
-    wordlist.write_text("hold\\n", encoding="utf-8")
+    wordlist.write_text("hold\n", encoding="utf-8")
     core, plan_id, data_dir = await _prepare_v2_catalog_provider(
         scenario_root, "gobuster", "127.0.0.1",
         f"dir -u http://{{target}}:{port} -w {wordlist} -q -t 1 --no-error --timeout 10s",
@@ -399,11 +400,17 @@ def main() -> None:
                 gobuster_paths = [
                     urlsplit(path).path for path in requests[before_v2_gobuster:]
                 ]
-            # Gobuster's V2 adapter currently seals a successful attempt but
-            # does not persist normalized directory findings. Prove the real
-            # binary's effect from the fixture's observed requests without
-            # treating an empty finding set as a successful finding.
             assert "/admin" in gobuster_paths, {
+                "evidence": gobuster_evidence,
+                "observed_paths": gobuster_paths,
+            }
+            assert any(
+                finding["kind"] == "found_path"
+                and finding["data"].get("path") == "/admin"
+                and finding["data"].get("status") == 200
+                for finding in gobuster_evidence["provider_findings"]
+            ), {
+                "message": "Engine V2 Gobuster did not persist the observed /admin directory result",
                 "evidence": gobuster_evidence,
                 "observed_paths": gobuster_paths,
             }
@@ -429,9 +436,9 @@ def main() -> None:
             assert ffuf_evidence["all_evidence_integrity_verified"] is True, ffuf_evidence
             with request_lock:
                 ffuf_paths = [urlsplit(path).path for path in requests[before_v2_ffuf:]]
-            # The V2 FFuf adapter currently seals the completed run but does
-            # not persist normalized findings. Verify its effect from requests
-            # received by the fixture and expose the empty finding set.
+            # Keep request observation and normalized findings separate: this
+            # bounded run records exactly what the fixture saw and what the
+            # V2 parser persisted. Empty findings do not imply no tool effect.
             assert "/admin" in ffuf_paths, {
                 "evidence": ffuf_evidence,
                 "observed_paths": ffuf_paths,
@@ -488,7 +495,7 @@ http:
                 "schema_version": "whaxon.provider-loopback-smoke.v1",
                 "fixture": "ephemeral HTTP server bound to 127.0.0.1",
                 "engine_v2_provider_runs": v2_provider_runs,
-                "external_egress_isolated_by_workflow": True,
+                "external_egress_isolated_by_workflow": os.environ.get("WHAXON_EGRESS_ISOLATED") == "1",
                 "limitations": [
                     "Covers only Nmap, Gobuster, ffuf, and SQLmap in this job.",
                     "The CI package manager selects tool versions; binary versions and SHA-256 values are retained separately.",
@@ -496,7 +503,7 @@ http:
                 ],
             }
             Path("provider-smoke-evidence.json").write_text(
-                json.dumps(evidence, indent=2, sort_keys=True) + "\\n", encoding="utf-8",
+                json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8",
             )
             print(
                 "Loopback scanner smoke passed: Nmap, Gobuster, ffuf and SQLmap; "
