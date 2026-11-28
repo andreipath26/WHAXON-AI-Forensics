@@ -885,7 +885,7 @@ jobs:
                   "binary_sha256": digest,
               }
           Path("provider-binary-provenance.json").write_text(
-              json.dumps(evidence, indent=2, sort_keys=True) + "\\n",
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           PY
@@ -908,7 +908,7 @@ jobs:
           PYTHON_BIN="$(command -v python)"
           # Run every scanner in a fresh network namespace containing only lo.
           # The fixture and all provider child processes share this namespace.
-          sudo env "PATH=$PATH" unshare --net -- /bin/bash -ceu '
+          sudo env "PATH=$PATH" WHAXON_EGRESS_ISOLATED=1 unshare --net -- /bin/bash -ceu '
             ip link set lo up
             exec "$1" tests/smoke_external_tools.py
           ' _ "$PYTHON_BIN"
@@ -918,6 +918,14 @@ jobs:
         run: |
           test -s provider-binary-provenance.json
           test -s provider-smoke-evidence.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          provenance = json.loads(Path("provider-binary-provenance.json").read_text(encoding="utf-8"))
+          smoke = json.loads(Path("provider-smoke-evidence.json").read_text(encoding="utf-8"))
+          assert provenance and smoke["schema_version"] == "whaxon.provider-loopback-smoke.v1"
+          assert isinstance(smoke["external_egress_isolated_by_workflow"], bool)
+          PY
 
       - name: Retain loopback provider evidence
         if: always()
