@@ -340,6 +340,23 @@ def _resolve_evidence_path(core, relative_path):
         raise ValueError("evidence path resolves outside the data directory")
     return full_path
 
+def _default_rate_limits(*, host: str, auth_disabled: bool, test_override: bool) -> list[str]:
+    """Use a high global cap only for an explicitly isolated loopback test server.
+
+    Route-specific limits remain attached to their individual endpoints. The
+    production default is always 200 requests per minute.
+    """
+    import ipaddress
+
+    try:
+        loopback = ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        loopback = host.lower() == "localhost"
+    if test_override and auth_disabled and loopback:
+        return ["10000 per minute"]
+    return ["200 per minute"]
+
+
 def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     import os as _os
     _host = _os.environ.get("WHAXON_HOST", "127.0.0.1")
@@ -364,10 +381,18 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     if not 1 <= max_upload_mb <= 1024:
         max_upload_mb = 25
     app.config["MAX_CONTENT_LENGTH"] = max_upload_mb * 1024 * 1024
+    default_rate_limits = _default_rate_limits(
+        host=_host,
+        auth_disabled=_os.environ.get("WHAXON_AUTH_DISABLED", "").strip().lower()
+        in {"1", "true", "yes"},
+        test_override=_os.environ.get("WHAXON_TEST_RATE_LIMITS", "").strip().lower()
+        in {"1", "true", "yes"},
+    )
+    app.config["WHAXON_DEFAULT_RATE_LIMITS"] = tuple(default_rate_limits)
     limiter = Limiter(
         key_func=get_remote_address,
         app=app,
-        default_limits=["200 per minute"],
+        default_limits=default_rate_limits,
         storage_uri="memory://",
     )
     app.config["RATELIMIT_STORAGE_URI"] = "memory://"
