@@ -40,6 +40,17 @@ def test_gobuster_200_path_is_informational_not_a_vulnerability():
     assert by_path["/api"].severity == "info"
 
 
+def test_gobuster_parses_real_relative_directory_output_and_expanded_url():
+    lines = _stdout([
+        "admin                 (Status: 200) [Size: 17]",
+        "https://example.test/public (Status: 301) [Size: 12]",
+    ])
+    findings = GobusterAdapter().parse(lines)
+    assert [finding.data["path"] for finding in findings] == ["/admin", "/public"]
+    assert [finding.data["status"] for finding in findings] == [200, 301]
+    assert [finding.data["size"] for finding in findings] == [17, 12]
+
+
 def test_gobuster_ignores_stderr_and_non_matching():
     lines = [
         ("stderr", "/admin (Status: 200) [Size: 100]"),
