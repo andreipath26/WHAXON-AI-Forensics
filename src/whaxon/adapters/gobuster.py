@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import urlsplit
 
 from ..core.findings import Finding
 from .base import Adapter
 from .registry import register
 
-# "/admin                (Status: 200) [Size: 1234]"
+# "admin                 (Status: 200) [Size: 1234]"
+# Gobuster directory mode prints the wordlist entry as a relative path;
+# expanded mode may print an absolute URL.
 _PATH_RE = re.compile(
-    r"^(?P<path>/\S+)\s+\(Status:\s*(?P<status>\d+)\)"
+    r"^(?P<path>\S+)\s+\(Status:\s*(?P<status>\d+)\)"
     r"(?:\s+\[Size:\s*(?P<size>\d+)\])?"
 )
 
@@ -82,6 +85,11 @@ class GobusterAdapter(Adapter):
             m = _PATH_RE.match(stripped)
             if not m:
                 continue
+            raw_path = m.group("path")
+            if raw_path.startswith(("http://", "https://")):
+                path = urlsplit(raw_path).path or "/"
+            else:
+                path = "/" + raw_path.lstrip("/")
             status = int(m.group("status"))
             # Skip 404s — false positives from the scan
             if status == 404:
@@ -95,7 +103,7 @@ class GobusterAdapter(Adapter):
                 severity=knowledge["severity"],
                 source="gobuster",
                 data={
-                    "path": m.group("path"),
+                    "path": path,
                     "status": status,
                     "size": int(m.group("size")) if m.group("size") else None,
                 },
