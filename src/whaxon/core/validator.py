@@ -161,7 +161,7 @@ class Validator:
             return "candidate", "no target URL supplied"
         param = (finding.data or {}).get("parameter")
         if not isinstance(param, str) or not param.strip():
-            return "candidate", "finding has no valid parameter to inject"
+            return "candidate", "finding has no parameter to inject or parameter is invalid"
 
         if kind == "command_injection":
             return self._validate_command_injection(target_url, param)
