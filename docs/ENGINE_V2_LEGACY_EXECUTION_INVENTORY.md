@@ -9,7 +9,7 @@ These retired endpoints are not the remaining legacy execution surface. Explicit
 # Engine V2 legacy execution inventory
 
 This inventory records Python callsites that invoke `run_tool` or
-`run_in_session` directly. It is guarded by
+`run_in_session` directly. The exact API decorator census is pinned in the same guard; its current expected mapping contains 115 API method/path bindings. It is guarded by
 `tests/test_engine_v2_legacy_callsite_inventory.py`: adding, removing, or moving
 a callsite requires reviewing its execution path and updating the classification.
 
@@ -290,7 +290,7 @@ handler binding for all Flask `/api/*` routes, including read/status/export
 routes. The matrix below summarizes consequential ownership and authorization
 boundaries; it does not claim to guard UI controls.
 
-A static decorator census currently finds 104 `/api/*` method/path bindings,
+A static decorator census currently finds 115 `/api/*` method/path bindings,
 22 distinct `/ui-v2/*` page handlers with 23 route aliases, and five other
 health/root/settings/favicon routes in `interfaces/web/server.py`. The matrix below covers consequential
 execution, authorization-state, cancellation and provisioning routes. This census makes every method/path/handler binding reviewable. It does not replace the handler-family semantics, persistence, access-control or test evidence mapped below; those remain bounded and are not inferred from route registration.
@@ -327,7 +327,7 @@ is not UI acceptance or authorization to change the frozen pages.
 
 #### Exact Flask API method/path/handler census
 
-The following index lists every one of the **105** `/api/*` decorator bindings
+The following index lists every one of the **115** `/api/*` decorator bindings
 from the AST guard. It is a binding census, not a security approval: GET routes
 are reads/status/exports; POST and DELETE routes may mutate state or dispatch
 work, as classified in the family tables below. Handler source and the cited
