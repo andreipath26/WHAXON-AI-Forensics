@@ -50,3 +50,41 @@ async def test_dispatch_gate_failure_records_exact_non_execution_reason(tmp_path
         e for e in store.list_workflow_events("plan")
         if e["event_type"] == "dispatch_started"
     ]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_boundary_denial_never_reaches_provider(tmp_path):
+    """A grant revoked while queued is rechecked immediately before dispatch."""
+    store = JobStore(tmp_path / "revoked-approval.db")
+    store.create_mission("mission", "P1 dispatch authorization recheck")
+    store.save_workflow_plan("plan", WorkflowPlan(
+        "mission", (WorkflowTask("task", "fixture", "192.0.2.10"),),
+    ))
+    authorize_calls = []
+    dispatched = []
+
+    def authorize(_task):
+        authorize_calls.append(True)
+        # Authorization succeeds at initial admission, then is revoked before
+        # the scheduler's second, dispatch-boundary decision.
+        return len(authorize_calls) == 1
+
+    async def dispatch(task):
+        dispatched.append(task.id)
+        return {"unexpected": "provider ran after revocation"}
+
+    result = await WorkflowScheduler(
+        store, authorize=authorize, dispatch=dispatch,
+    ).run("plan", max_tasks=1)
+
+    assert len(authorize_calls) == 2
+    assert dispatched == []
+    assert result["outcomes"][0]["status"] == "blocked"
+    assert result["tasks"][0]["status"] == "blocked"
+    attempt = store.list_workflow_attempts("plan")[0]
+    assert attempt["status"] == "blocked"
+    assert "dispatch-boundary policy denied" in attempt["error"]
+    assert not [
+        event for event in store.list_workflow_events("plan")
+        if event["event_type"] == "dispatch_started"
+    ]
