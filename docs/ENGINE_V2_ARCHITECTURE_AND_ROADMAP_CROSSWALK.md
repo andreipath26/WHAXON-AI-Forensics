@@ -759,3 +759,16 @@ Reference: https://github.com/deadinternetstudios/100x-engineer-skill — audit 
 - [ ] Use isolated parallel workstreams, incremental verification/caching, resource-aware local reviewers where suitable, and reproducible release reports. Evaluate SMT/TLA+ only where justified.
 - [ ] Project-specific scope: Map verification to G01–G10, especially authorization, independent verification, recovery and evidence integrity. Fail closed on stale or missing evidence; verify security invariants and adversarial regressions. Existing HOLD remains until existing deployment gates pass.
 - [ ] Acceptance: demonstrate that intentional defects and stale/missing evidence block completion, independent findings are resolved, and all existing project acceptance gates pass. Record exact commit, environment, test results and limitations; no unsupported readiness claims.
+
+
+## P0 — PentAGI architectural reference and evaluation
+
+**Priority: P0 / URGENT. Status: planned research; not implemented or validated.**
+
+Reference: https://github.com/vxcontrol/pentagi
+
+- [ ] Review upstream source, architecture, licensing (including NOTICE and separately licensed components), dependency footprint and security claims; document reproducible findings and adoption/rejection decisions.
+- [ ] Project-specific scope: Evaluate defensive investigation supervision, human authorization and approval boundaries, tenant isolation, evidence provenance, tamper-evident records, privacy-preserving investigation memory, structured forensic reporting and observability. Map findings to G01–G10; retain Engine V2 HOLD until existing gates pass. Do not import autonomous offensive execution capabilities.
+- [ ] Evaluate least-privilege access, explicit approval, isolation, data retention and redaction, and auditable failure handling wherever applicable. Use synthetic or authorized test data only.
+- [ ] Compare lightweight native alternatives against upstream design; measure resource cost and reliability before adoption. Do not blindly fork the stack.
+- [ ] Apply the existing 100x Engineer evidence discipline: source-bound test evidence, independent review, negative tests, stale-evidence invalidation and existing release gates. No unsupported readiness claims.
