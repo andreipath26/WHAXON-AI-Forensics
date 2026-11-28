@@ -1,6 +1,7 @@
 """Cross-client V2 request state is shared and remains worker-owned."""
 from __future__ import annotations
 
+import asyncio
 import json
 
 from textual.widgets import Button, DataTable, Static
@@ -81,9 +82,11 @@ async def test_tui_approved_run_is_observed_by_api_and_cancelled_by_cli(
         assert "lease_token" not in snapshot["request"]
 
         # The headless CLI cancels the request through the same persisted service.
-        assert workflow_cmd.main([
+        cli_args = [
             "--data-dir", str(tmp_path), "plan", "cancel-request", "--id", run_id,
-        ]) == 0
+        ]
+        cli_exit = await asyncio.to_thread(workflow_cmd.main, cli_args)
+        assert cli_exit == 0
         cli_state = json.loads(capsys.readouterr().out)
         assert cli_state["id"] == run_id
         assert cli_state["status"] == "cancelled"
