@@ -5,6 +5,7 @@ All scanner targets bind to and resolve to 127.0.0.1.
 """
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 import os
@@ -122,8 +123,6 @@ async def _prepare_v2_catalog_provider(root: Path, tool_id: str, target: str, ar
 
 
 async def _run_v2_catalog_provider(root: Path, tool_id: str, target: str, args: str):
-    from whaxon.core import Core
-
     core, plan_id, _data_dir = await _prepare_v2_catalog_provider(
         root, tool_id, target, args,
     )
