@@ -2,8 +2,12 @@
 # separate, intentionally unchanged Metasploitable laboratory definition.
 # Requires explicit credentials via environment or a protected .env file.
 # Deploy only after reviewing network, scope, secrets and host permissions.
+# CPU, memory, and process limits are finite by default; tune via environment for the host.
 services:
   web:
+    cpus: ${WHAXON_WEB_CPUS:-2.0}
+    mem_limit: ${WHAXON_WEB_MEMORY_LIMIT:-2g}
+    pids_limit: ${WHAXON_WEB_PIDS_LIMIT:-256}
     build: .
     image: whaxon:e5-local
     init: true
@@ -27,6 +31,9 @@ services:
       - "127.0.0.1:5001:5001"
 
   workflow-worker:
+    cpus: ${WHAXON_WORKER_CPUS:-2.0}
+    mem_limit: ${WHAXON_WORKER_MEMORY_LIMIT:-2g}
+    pids_limit: ${WHAXON_WORKER_PIDS_LIMIT:-128}
     image: whaxon:e5-local
     build: .
     init: true
