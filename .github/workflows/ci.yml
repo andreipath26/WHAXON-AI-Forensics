@@ -650,6 +650,56 @@ jobs:
           PY
 
 
+  install-readiness-smoke:
+    name: G07 clean partial and offline wheel install
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build the candidate wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+      - name: Prepare a wheelhouse for core runtime dependencies
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/whaxon-wheelhouse"
+          python -m pip download --only-binary=:all: --dest "$RUNNER_TEMP/whaxon-wheelhouse" \
+            "platformdirs>=4.0" "dnspython>=2.6" "defusedxml>=0.7.1"
+          find "$RUNNER_TEMP/whaxon-wheelhouse" -maxdepth 1 -type f -name '*.whl' -print
+      - name: Install core wheel offline in a clean non-admin environment
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          WHEEL="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$WHEEL"
+          python -m venv "$RUNNER_TEMP/whaxon-core-only"
+          PYTHON="$RUNNER_TEMP/whaxon-core-only/bin/python"
+          "$PYTHON" -m pip install --no-index --find-links "$RUNNER_TEMP/whaxon-wheelhouse" "$GITHUB_WORKSPACE/$WHEEL"
+          "$RUNNER_TEMP/whaxon-core-only/bin/whaxon" --help
+          "$RUNNER_TEMP/whaxon-core-only/bin/whaxon" doctor --check flask --json --data "$RUNNER_TEMP/whaxon-partial-data" > "$RUNNER_TEMP/whaxon-partial-doctor.json"
+          "$PYTHON" - <<'PY'
+          import importlib.metadata
+          import json
+          from importlib.resources import files
+          from pathlib import Path
+          report = json.loads(Path("$RUNNER_TEMP/whaxon-partial-doctor.json").read_text())
+          assert report["dependencies"][0]["id"] == "flask", report
+          assert report["dependencies"][0]["status"] == "MISSING", report
+          assert report["overall_status"] == "DEGRADED", report
+          try:
+              importlib.metadata.distribution("flask")
+          except importlib.metadata.PackageNotFoundError:
+              pass
+          else:
+              raise AssertionError("core-only install unexpectedly includes the web extra")
+          assert files("whaxon").joinpath("data", "tools.json").is_file()
+          print("Core-only wheel install passed without index access; missing web extra is reported.")
+          PY
+
   headless-server-smoke:
     name: headless Linux server (no display)
     runs-on: ubuntu-latest
