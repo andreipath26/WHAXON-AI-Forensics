@@ -1,0 +1,46 @@
+# Engine V2 P3 install and deployment qualification matrix
+
+**Review basis:** repository main at `be5acd974c38560be4b0a32ee64d4218b5a31e20` (2026-11-28).
+**Decision:** **P3 NOT QUALIFIED — G07 remains OPEN; deployment status remains HOLD.**
+
+This matrix separates checks encoded in the repository from installation and deployment exercises that still require an exact-candidate CI artifact or an operator-controlled host. A source-level assertion, dependency registration, or historical run is not evidence that an install mode passed on the current release candidate.
+
+## Evidence already present in source
+
+| Area | Repository evidence | What it supports | What it does not establish |
+|---|---|---|---|
+| Package metadata and optional extras | `pyproject.toml`; `tests/test_pypi_release_verification.py`; release workflow `.github/workflows/release.yml` | Hatch wheel/sdist configuration, optional `tui`, `gui`, `web`, `metasploit`, and `dev` extras; release workflow defines a Python 3.12 build, metadata check, clean venv wheel install, CLI smoke, and packaged-resource checks. | A completed build/install of the current candidate; partial install, offline install, or upgrade behavior. The release workflow runs only for a `v*` tag. |
+| Linux and platform installer policy | `tests/test_setup_environment.py`; `src/whaxon/core/setup_environment.py` | Unit-level OS/distro/architecture classification; curated apt support is limited by source policy; macOS and Windows are identified as manual paths; WSL is identified separately. | Live package-manager installs on Debian, Ubuntu, Kali, macOS, Windows, or WSL. A mocked host detector is not a platform acceptance run. |
+| Dependency setup and audit | `tests/test_setup_installers.py`, `tests/test_dependency_installer.py`, `tests/test_setup_batch.py`; `src/whaxon/core/installer.py` | Unit-level command planning and curated installer behavior; dependency-install events are locally hash-linked and write failures can stop the operation. | An independent/remote trust anchor, host interruption behavior, or rollback of package-manager effects. Completed external package changes are not generally rolled back. |
+| Headless diagnostics | `tests/test_doctor_cmd.py`, `tests/test_setup_cmd.py`, `tests/test_setup_environment.py` | CLI doctor/setup command behavior under tests. | A clean-machine first-run workflow through administrator, mission, campaign, job, approval, and recovery operations with no browser. |
+| systemd deployment | `whaxon.service`, `whaxon-workflow-worker.service`; `tests/test_engine_v2_e5_systemd_deployment.py` | Static unit-file contracts: dedicated supervised worker, shared state identity, restart policy, hardening directives, and artifact manifest entries. | Installation/enable/upgrade/restart on supported host systems, service permissions in situ, TLS/reverse proxy, log retention, backup restore, or worker recovery on a real service manager. |
+| Docker deployment | `Dockerfile`, `docker-compose.e5.yml`; `tests/test_engine_v2_e5_docker_compose.py` | Static configuration contracts: separate web and worker processes, persistent shared volume, non-root image, localhost port binding, credential presence, read-only root filesystem, and reduced capabilities. | Image build/start/health/restart under the current candidate, production secret delivery, TLS/reverse proxy, resource limits, backup retention/restore, persistent-volume failure, or worker recovery in a real Docker runtime. |
+| Health and recovery | `tests/test_engine_v2_e5_core_readiness.py`, `tests/test_engine_v2_e5_backup_restore.py`; `docs/ENGINE_V2_E5_SERVICE_READINESS.md` | Core-store readiness and stale-work uncertainty in unit/fault tests; SQLite online-backup behavior in a test process. | External health monitoring, off-host backup witness, production retention, host/network interruption, or end-to-end recovery from an actual deployed service. |
+
+## Required qualification not evidenced by the checks above
+
+| Qualification | Required evidence | Status |
+|---|---|---|
+| Clean install | Exact candidate wheel and sdist contents; fresh venv install with core and each advertised extra; command/resource smoke on clean supported runners. | OPEN |
+| Partial install and missing assets | Install with optional extras absent, corrupt or missing packaged resources, and incompatible tool versions; verify diagnostics identify each state and do not imply readiness. | OPEN |
+| Virtual environment and no-admin paths | Non-root user, no system-site writes, isolated data path, and safe behavior when optional native packages are unavailable. | OPEN |
+| Upgrade and interrupted installation | Previous-version to candidate upgrade; cancellation and process interruption at each package transaction stage; restart; retained audit evidence. Explicitly record that external package changes are not generally rolled back. | OPEN |
+| Offline fallback and PATH conflicts | No-network dependency resolution using only available cache/wheelhouse; duplicate binaries and conflicting PATH order; verify selected executable/version and reported status. | OPEN |
+| Supported OS combinations | Exact tested combinations for curated Debian/Ubuntu/Kali apt; Homebrew on macOS; manual native Windows; WSL reported and tested separately. Unknown distributions and architectures remain manual/unsupported unless separately qualified. | OPEN |
+| Headless first-run and operations | Browser-free walkthrough covering first-run, doctor, admin, mission/campaign, job status, approval, cancellation, restart, and recovery with persisted evidence. | OPEN |
+| Foreground mode | Documented authentication/secrets, bind/TLS/reverse-proxy expectations, filesystem permissions, persistent data, health, and worker supervision; run smoke on exact candidate. | OPEN |
+| systemd mode | Install/upgrade, least-privilege service account, environment/secrets permissions, reverse proxy/TLS, state directory, persistent storage, backup/restore, liveness/readiness, restart and worker-loss recovery. | OPEN |
+| Docker mode | Build and run exact image; non-default credentials, TLS/proxy, volume permissions/persistence, CPU/memory limits, health checks, backup/restore, restart and worker-loss recovery. | OPEN |
+| Audit and trust | Demonstrate audit-write failure, refusal or documented safe degradation; export evidence to an independently controlled trust anchor and verify it after restart. | OPEN |
+
+## Platform and rollback wording
+
+- PyPI classifiers advertise POSIX Linux and Python 3.11–3.13; this is package metadata, not proof of every Linux distribution or interpreter combination.
+- Source tests classify macOS and Windows as manual install paths. WSL is a distinct environment and must not inherit a Linux distro qualification without its own run.
+- Setup planning and local fake installers establish test behavior only. They do not qualify host package managers or external tools on a supported operating system.
+- Installation cancellation does not imply rollback: completed package changes made by an OS package manager or pip may remain. Recovery guidance must identify actual state and require operator reconciliation.
+- `GET /api/health` is an application/core readiness probe, not proof that TLS, the worker, network egress, backup, or deployment recovery are ready.
+
+## Gate disposition
+
+P3 can be closed only after the required matrix rows have exact candidate commit SHA, CI/lab run, runner/host details, assertions and observed result, retained artifact/evidence location, limitations, and reviewer. Current source-level checks remain useful bounded evidence, but they do not close G07. Keep the release decision **HOLD** until the complete E0–E6 and external qualification requirements in `ENGINE_V2_G10_RELEASE_DECISION.md` are satisfied.
