@@ -37,26 +37,38 @@ To qualify each provider, retain an exact-candidate run record for the supported
 - `tests/test_engine_v2_e3_catalog_provider_crash.py` is bounded evidence for a fake-`dig` catalog-provider crash/recovery scenario. `tests/test_engine_v2_e3_external_effect_crash.py` exercises a real loopback HTTP receiver with accepted, disconnected, and cancelled response cases. These tests establish conservative uncertain-effect handling in those fixtures; they do not qualify all scanner effects, provider versions, external networks, or cross-host recovery.
 - Operator reconciliation is explicit and audited. “No effect verified” requires operator evidence and a new run; an observed or unresolved effect is not certified as success and is not blindly replayed.
 
-## Added real-provider loopback acceptance (pending exact-head CI)
+## Exact-head real-provider loopback evidence — 2026-11-28
 
-This branch extends the curated CI tool smoke to run in a new Linux network
-namespace with only loopback enabled. The fixture and scanner subprocesses share
-that namespace, so the scanner cannot reach external networks during the
-acceptance step. Apt/setup work occurs before isolation. The candidate exercises
-real `nmap`, `gobuster`, `ffuf`, and `sqlmap` binaries; Nmap, Gobuster, ffuf,
-and SQLmap run through approved Engine V2 plans with persisted, integrity-checked
-evidence. It also holds one real Gobuster request, cancels after the fixture
-observes the request, restarts the Core, and asserts the attempt remains
-uncertain and is not replayed. The CI artifact records binary paths, version
-output, SHA-256 identities, provider IDs, versions, manifest fingerprints, and
-the bounded outcome summary.
+The curated provider smoke implementation passed exact-head CI at source head
+`9f26e848642518b95138305a0ab43cedca23e1c4`, workflow run
+[#46144343464](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46144343464)
+(**23/23 checks successful**). The run also passed the G01 controlled-lab chain.
+The provider smoke evidence artifact is
+[whaxon-p2-provider-loopback-b36b42006ee517a6935e7440496007cfd9dd2c46](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46144343464/artifacts/15263048381),
+artifact ID `15263048381`, SHA-256
+`55827c0e93470b030de59cd5d5468564bbdcd6833d884c9d48d9644dd6d85261`.
+GitHub retention is 30 days from 2026-11-28.
 
-This exact-head acceptance is **pending** until CI passes and the artifact is
-retained. The workflow still obtains package versions from the runner package
-manager; it records the exact binary hashes used, but does not yet lock binary
-versions before installation. This evidence can qualify only the four named
-tools for the stated loopback cases, never the remaining eight providers or
-external-target/production behavior.
+The Ubuntu apt lane runs actual `nmap`, `gobuster`, `ffuf`, and `sqlmap`
+through approved Engine V2 plans inside a Linux network namespace containing
+only loopback; evidence records binary paths, version output, SHA-256 identities,
+attempt outcomes, and the observed fixture requests. It recorded a real
+Gobuster request, cancellation after the fixture observed the effect, process
+restart, an uncertain persisted attempt, and no automatic replay. The smoke
+reported zero normalized directory findings for Gobuster and ffuf. That is
+evidence about the current adapter result, not a successful directory-finding
+qualification. The macOS Homebrew lane ran the same named loopback smoke and
+Nuclei template-matching check, but it does not run inside the Linux network
+namespace. Its evidence is limited to the loopback-configured test case.
+
+The binary hashes and version outputs are pinned in the retained run artifact,
+but the workflow does not pin package versions before installation. The
+installed-tool set and these loopback fixtures do not establish coverage of
+all provider inputs, resource use, general subprocess egress, production
+cancellation, real-target output quality, cross-host recovery, or complete
+end-to-end workflows. All 12 admitted providers therefore remain
+`not_qualified`; the smoke is bounded evidence for the exact installed
+versions and loopback cases only.
 
 ## Gate disposition
 
