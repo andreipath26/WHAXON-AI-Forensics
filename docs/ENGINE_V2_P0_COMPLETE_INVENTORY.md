@@ -3,9 +3,9 @@
 **Review date:** 2026-11-28  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
 **Second-pass branch base:** `8e938fe65790af3954c5613e05904a00e42268a8`  
-**Latest main observed during review:** `e90c11fd24d489815840dc28a00db14bd04aaec5`  
-**Evidence cutoff:** 2026-11-28 11:44 UTC. Main includes merged PR #274 and PR #279; open PR #278 is tracked separately below. This branch is documentation-only and based on the earlier main SHA shown above.  
-**Disposition:** P0 inventory is documented, but evidence gaps remain; this is not runtime qualification, approval to execute against a target, or a release decision. Repository release status remains **HOLD**.
+**Latest main observed during review:** `9b4b2417fa37557e7d726905dec39d93716234d8`  
+**Evidence cutoff:** 2026-11-28 15:04 UTC. Main includes merged PRs #273–#283 for the documented workstreams, including provider readiness, client worker ownership, and G02/G03 validator hardening. This inventory's static census is reconciled through `e90c11fd24d489815840dc28a00db14bd04aaec5`; no route/capability count change was identified in the later validator-only PR #283. Exact main CI at `9b4b2417fa37557e7d726905dec39d93716234d8` passed 21/21 jobs in [run #46157672540](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672540), with README freeze [run #46157672587](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672587) passing. This pass does not mean runtime qualification or operator sign-off.  
+**Disposition:** P0 static inventory is complete at its stated census cutoff, while runtime readiness, target authorization, and release sign-off remain open. This is not approval to execute against a target or a release decision. Repository status remains **HOLD**.
 
 ## 1. Evidence method and limits
 
