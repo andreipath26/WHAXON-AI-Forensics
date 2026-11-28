@@ -2212,28 +2212,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/approvals/<job_id>/<int:seq>/resolve")
     def api_approval_resolve(job_id: str, seq: int):
-        data = request.get_json(silent=True) or {}
-        status = data.get("status", "").strip().lower()
-        if status not in ("verified", "refuted"):
-            return {"error": "status must be verified or refuted"}, 400
-        user = data.get("user") or "human"
-        result = registry.core.store.update_legacy_verification_if_unowned(
-            job_id, seq, status,
-            by=f"human:{user}", reason=f"human review by {user}",
-        )
-        if result == "v2_owned":
-            return {
-                "error": (
-                    "Engine V2 finding state must come from its plan-bound "
-                    "verification workflow"
-                ),
-                "approval_granted": False,
-                "verification_updated": False,
-                "workflow": "/api/v2/workflow-proposals",
-            }, 409
-        if result == "not_found":
-            return {"error": "finding not found"}, 404
-        return {"ok": True, "status": status, "by": f"human:{user}"}
+        """Retire the legacy human-resolution mutation surface.
+
+        Findings, whether legacy or Engine V2-owned, must not be marked verified
+        or refuted through this compatibility endpoint. V2 verification is
+        represented by a plan-bound workflow with retained evidence.
+        """
+        return {
+            "error": (
+                "Legacy human resolution is retired. Use the plan-bound Engine V2 "
+                "verification workflow; this endpoint does not update findings."
+            ),
+            "approval_granted": False,
+            "verification_updated": False,
+            "workflow": "/api/v2/workflow-proposals",
+        }, 409
 
     @app.post("/api/import/burp")
     def import_burp():
