@@ -800,6 +800,43 @@ jobs:
           assert completed == {"nmap", "gobuster", "sqlmap", "ffuf"}, installation
           assert installation["network_accessed"] is True
           PY
+      - name: Record installed scanner binary identity
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import subprocess
+          from pathlib import Path
+
+          checks = {
+              "nmap": (["nmap", "--version"],),
+              "gobuster": (["gobuster", "version"],),
+              "sqlmap": (["sqlmap", "--version"],),
+              "ffuf": (["ffuf", "-V"],),
+          }
+          evidence = {}
+          for tool, (version_argv,) in checks.items():
+              binary = shutil.which(tool)
+              if not binary:
+                  raise SystemExit(f"required scanner is absent: {tool}")
+              result = subprocess.run(
+                  version_argv, capture_output=True, text=True, timeout=20, check=False,
+              )
+              if result.returncode != 0:
+                  raise SystemExit(f"version query failed for {tool}: {result.stderr}")
+              digest = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
+              evidence[tool] = {
+                  "path": binary,
+                  "version_argv": version_argv,
+                  "version_output": (result.stdout + result.stderr).strip(),
+                  "binary_sha256": digest,
+              }
+          Path("provider-binary-provenance.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\\n",
+              encoding="utf-8",
+          )
+          PY
       - name: Verify curated executables and run a loopback-only scanner smoke test
         run: |
           set -euo pipefail
@@ -816,8 +853,24 @@ jobs:
           expected = {"nmap", "gobuster", "sqlmap", "ffuf"}
           assert all(states.get(tool) == "READY" for tool in expected), states
           PY
-          nmap -sn -n 127.0.0.1
-          python tests/smoke_external_tools.py
+          PYTHON_BIN="$(command -v python)"
+          # Run every scanner in a fresh network namespace containing only lo.
+          # The fixture and all provider child processes share this namespace.
+          sudo env "PATH=$PATH" unshare --net -- /bin/bash -ceu '
+            ip link set lo up
+            exec "$1" tests/smoke_external_tools.py
+          ' _ "$PYTHON_BIN"
+
+      - name: Retain loopback provider evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: whaxon-p2-provider-loopback-${{ github.sha }}
+          path: |
+            provider-binary-provenance.json
+            provider-smoke-evidence.json
+          if-no-files-found: warn
+          retention-days: 30
 
   setup-homebrew-tool-smoke:
     name: curated Homebrew tool installation smoke

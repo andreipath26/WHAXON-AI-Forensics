@@ -37,6 +37,27 @@ To qualify each provider, retain an exact-candidate run record for the supported
 - `tests/test_engine_v2_e3_catalog_provider_crash.py` is bounded evidence for a fake-`dig` catalog-provider crash/recovery scenario. `tests/test_engine_v2_e3_external_effect_crash.py` exercises a real loopback HTTP receiver with accepted, disconnected, and cancelled response cases. These tests establish conservative uncertain-effect handling in those fixtures; they do not qualify all scanner effects, provider versions, external networks, or cross-host recovery.
 - Operator reconciliation is explicit and audited. “No effect verified” requires operator evidence and a new run; an observed or unresolved effect is not certified as success and is not blindly replayed.
 
+## Added real-provider loopback acceptance (pending exact-head CI)
+
+This branch extends the curated CI tool smoke to run in a new Linux network
+namespace with only loopback enabled. The fixture and scanner subprocesses share
+that namespace, so the scanner cannot reach external networks during the
+acceptance step. Apt/setup work occurs before isolation. The candidate exercises
+real `nmap`, `gobuster`, `ffuf`, and `sqlmap` binaries; Nmap, Gobuster, ffuf,
+and SQLmap run through approved Engine V2 plans with persisted, integrity-checked
+evidence. It also holds one real Gobuster request, cancels after the fixture
+observes the request, restarts the Core, and asserts the attempt remains
+uncertain and is not replayed. The CI artifact records binary paths, version
+output, SHA-256 identities, provider IDs, versions, manifest fingerprints, and
+the bounded outcome summary.
+
+This exact-head acceptance is **pending** until CI passes and the artifact is
+retained. The workflow still obtains package versions from the runner package
+manager; it records the exact binary hashes used, but does not yet lock binary
+versions before installation. This evidence can qualify only the four named
+tools for the stated loopback cases, never the remaining eight providers or
+external-target/production behavior.
+
 ## Gate disposition
 
 Provider inventory and conservative fake/loopback effect recovery have source and regression coverage, but the complete admitted provider portfolio, real-provider effect behavior, multi-process/outbox recovery, and operator recovery across the supported deployment matrix remain open. **G01/G05/G08/G10 provider acceptance must remain open; this record does not authorize deployment.**
