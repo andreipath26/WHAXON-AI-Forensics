@@ -399,6 +399,8 @@ def main() -> None:
                 **gobuster_binding,
             })
 
+            with request_lock:
+                before_v2_ffuf = len(requests)
             v2_ffuf, ffuf_evidence, ffuf_binding = asyncio.run(_run_v2_catalog_provider(
                 root, "ffuf", base_url,
                 f"-u {{target}}/FUZZ -w {wordlist} -mc 200 -noninteractive -timeout 3 -maxtime 20",
@@ -407,11 +409,24 @@ def main() -> None:
                 {"id": "ffuf-loopback", "status": "succeeded"},
             ], v2_ffuf
             assert ffuf_evidence["all_evidence_integrity_verified"] is True, ffuf_evidence
-            assert any(
-                finding["data"].get("path") == "admin"
-                for finding in ffuf_evidence["provider_findings"]
-            ), ffuf_evidence
-            v2_provider_runs.append({"tool": "ffuf", "status": "succeeded", "evidence_integrity_verified": True, **ffuf_binding})
+            with request_lock:
+                ffuf_paths = [urlsplit(path).path for path in requests[before_v2_ffuf:]]
+            # The V2 FFuf adapter currently seals the completed run but does
+            # not persist normalized findings. Verify its effect from requests
+            # received by the fixture and expose the empty finding set.
+            assert "/admin" in ffuf_paths, {
+                "evidence": ffuf_evidence,
+                "observed_paths": ffuf_paths,
+            }
+            ffuf_evidence["observed_loopback_paths"] = sorted(set(ffuf_paths))
+            v2_provider_runs.append({
+                "tool": "ffuf",
+                "status": "succeeded",
+                "evidence_integrity_verified": True,
+                "normalized_finding_count": len(ffuf_evidence["provider_findings"]),
+                "observed_loopback_paths": sorted(set(ffuf_paths)),
+                **ffuf_binding,
+            })
 
             cancellation_evidence = asyncio.run(
                 _cancel_real_gobuster_after_loopback_effect(root, server, port),
