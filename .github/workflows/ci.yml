@@ -730,7 +730,8 @@ jobs:
           "$VENV/bin/python" -m pip install "$GITHUB_WORKSPACE/$WHEEL[$WHAXON_EXTRA]"
           "$VENV/bin/whaxon" --help > "$RUNNER_TEMP/whaxon-extra-help.txt"
           "$VENV/bin/whaxon" doctor --json --data "$RUNNER_TEMP/whaxon-extra-data" > "$RUNNER_TEMP/whaxon-extra-doctor.json"
-          VENV_PYTHON="$VENV/bin/python"           WHAXON_EXTRA="$WHAXON_EXTRA"           DOCTOR_REPORT="$RUNNER_TEMP/whaxon-extra-doctor.json"           python - <<'PY'
+          WHAXON_EXTRA="$WHAXON_EXTRA" DOCTOR_REPORT="$RUNNER_TEMP/whaxon-extra-doctor.json" \
+            "$VENV/bin/python" - <<'PY'
           import importlib.metadata
           import json
           import os
