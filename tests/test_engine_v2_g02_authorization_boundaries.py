@@ -11,12 +11,13 @@ from whaxon.core.validator import Validator
 
 class _RedirectFixture(BaseHTTPRequestHandler):
     paths: list[str] = []
+    redirect_location = "/sink?id=1"
 
     def do_GET(self):
         type(self).paths.append(self.path)
         if self.path.startswith("/source"):
             self.send_response(302)
-            self.send_header("Location", "/sink?id=1")
+            self.send_header("Location", type(self).redirect_location)
             self.end_headers()
             return
         body = b"You have an error in your SQL syntax"
@@ -53,3 +54,52 @@ def test_sqli_verifier_does_not_follow_redirect_to_unapproved_path():
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+
+class _RedirectSink(BaseHTTPRequestHandler):
+    paths: list[str] = []
+
+    def do_GET(self):
+        type(self).paths.append(self.path)
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, *_args):
+        pass
+
+
+def test_sqli_verifier_does_not_follow_cross_origin_redirect():
+    _RedirectFixture.paths = []
+    _RedirectSink.paths = []
+    sink = HTTPServer(("127.0.0.1", 0), _RedirectSink)
+    source = HTTPServer(("127.0.0.1", 0), _RedirectFixture)
+    _RedirectFixture.redirect_location = (
+        f"http://127.0.0.1:{sink.server_port}/sink?id=1"
+    )
+    threads = [
+        threading.Thread(target=server.serve_forever, daemon=True)
+        for server in (sink, source)
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        finding = Finding(
+            kind="sqli", severity="high", source="sqlmap",
+            data={"parameter": "id"}, raw_line="cross-origin redirect fixture",
+        )
+        payload_dir = Path(__file__).resolve().parents[1] / "src" / "whaxon" / "data" / "payloads"
+        status, reason = Validator(payload_dir).validate(
+            finding, target_url=f"http://127.0.0.1:{source.server_port}/source?id=1",
+        )
+        assert status == "candidate"
+        assert "redirect blocked" in reason
+        assert _RedirectFixture.paths == ["/source?id=1"]
+        assert _RedirectSink.paths == []
+    finally:
+        _RedirectFixture.redirect_location = "/sink?id=1"
+        for server in (source, sink):
+            server.shutdown()
+            server.server_close()
+        for thread in threads:
+            thread.join(timeout=2)
