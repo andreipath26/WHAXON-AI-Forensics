@@ -1,3 +1,28 @@
+# Current deployment readiness ledger — 2026-11-28
+
+**Candidate code head:** `9b4b2417fa37557e7d726905dec39d93716234d8`  
+**Exact main CI:** [run #46157672540](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672540), 21/21 jobs passed; [README freeze #46157672587](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672587) passed.  
+**Decision:** **HOLD — NOT READY TO DEPLOY.** No external target test, independent security/evidence review, manual UI acceptance, production host qualification, release identity, or operator deployment approval is recorded.
+
+This is the current G01–G10 ledger. The 2026-11-05 table and notes below are retained as a historical snapshot and do not override this current record.
+
+| Gate | Current evidence | Remaining blocking obligation | Status |
+|---|---|---|---|
+| G01 — capability and workflow inventory | P0 source inventory and caller census in [inventory](ENGINE_V2_P0_COMPLETE_INVENTORY.md); controlled-lab G01 and provider loopback smoke passed exact-head CI. | End-to-end acceptance of the complete supported workflow on the release candidate and supported host; inventory does not prove every UI/client path or external-target behavior. | OPEN |
+| G02 — authorization and execution | PRs [#274](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/274), [#281](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/281), and [#283](https://github.com/andreipath26/WHAXON-AI-Forensics/pull/283) add fail-closed URL/context/origin/proxy, dispatch-revocation, cross-origin redirect, and audit-insert-failure regressions. | Full original/redirect/DNS/secondary-request authorization, external scanner egress, session/pivot/worker races, and independent deterministic authorization audit remain incomplete. | OPEN |
+| G03 — independent verification | PR #283 hardens request-context parsing, same-origin replay, proxy isolation, stale proof reset, and retained source/evidence seals. Unsupported and inconclusive outcomes remain conservative. | Complete supported finding/method matrix and independent verification evidence; network failure/timing must never imply fixed. No full target-side verification was performed. | OPEN |
+| G04 — evidence, coverage, and reporting | Existing digest-bound evidence seals and coverage dispositions; PR #281 tests failed versus unsupported/inaccessible/unrequested separation and dispatch-audit failure behavior. | Independent trust anchor/custody review, full redaction and completeness proof, and audit-write failure/recovery across all terminal outcomes remain unqualified. | OPEN |
+| G05 — durable lifecycle and effects | PR #276 retires legacy human resolution with HTTP 409; PR #280 removes TUI inline worker draining; PR #278 records bounded real-tool loopback outcomes and uncertain Gobuster restart/no-replay behavior. | Full API/CLI/web/TUI/headless parity, multi-process effect reconciliation, provider-specific recovery for the admitted set, and deployment-worker recovery remain open. Exactly-once external effects are not claimed. | OPEN |
+| G06 — supplied UI | Route/control inventory and automated page/route suites exist. | Approved design, complete live-control wiring, responsive/keyboard/accessibility review, and full client parity have not passed acceptance. | BLOCKED |
+| G07 — install and deployment | PR #275 adds a clean partial/offline wheel install lane; PR #279 isolates test rate limiting while production stays at 200/minute. Linux/macOS/Windows setup smoke and systemd/Docker checks have run in CI. | No-admin and venv host matrix, optional extras, PATH/version/missing-asset conflicts, WSL, secrets/TLS/reverse proxy, durable storage, resource quotas, backup/restore, and real operator-host recovery are incomplete. | OPEN |
+| G08 — release CI | Exact main head `9b4b2417fa37557e7d726905dec39d93716234d8` passed 21/21 CI jobs; README freeze passed. Merged implementation PR heads also passed their exact-head suites. | A final release candidate with all gates closed, supported deployment matrix, and retained qualification artifacts does not exist. Any code change requires new exact-head verification. | OPEN |
+| G09 — release identity | No production V2 release tag or published package is recorded. | Approve version, build reproducible distribution artifacts and checksums, verify release workflow, and publish only after qualification. | OPEN |
+| G10 — decision and sign-off | This current ledger and linked audit record document HOLD and remaining obligations. | Independent reviewers and operator must accept exact-candidate evidence and explicitly authorize deployment. | OPEN |
+
+**No gate is marked READY.** Historical passing tests and current exact-head CI are bounded engineering evidence; they do not substitute for open external, UI, release, or operator obligations.
+
+---
+
 # E6 deployment acceptance ledger — non-waivable release gates
 
 **Review:** 2026-11-05. **Candidate:** E6 PR #125, starting at E5 main `80c3ca566ecdaef1181209fab90fc23184796251`.
