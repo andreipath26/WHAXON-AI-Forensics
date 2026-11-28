@@ -702,6 +702,104 @@ jobs:
           print("Core-only wheel install passed without index access; missing web extra is reported.")
           PY
 
+  optional-extra-install-smoke:
+    name: G07 optional extra install (${{ matrix.extra }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        extra: [tui, gui, web, metasploit, dev]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Build wheel and install one optional extra in a fresh non-admin venv
+        env:
+          WHAXON_EXTRA: ${{ matrix.extra }}
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          python -m pip install --upgrade build
+          python -m build --wheel
+          WHEEL="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$WHEEL"
+          VENV="$RUNNER_TEMP/whaxon-extra-$WHAXON_EXTRA"
+          python -m venv "$VENV"
+          "$VENV/bin/python" -m pip install "$GITHUB_WORKSPACE/$WHEEL[$WHAXON_EXTRA]"
+          "$VENV/bin/whaxon" --help > "$RUNNER_TEMP/whaxon-extra-help.txt"
+          "$VENV/bin/whaxon" doctor --json --data "$RUNNER_TEMP/whaxon-extra-data" > "$RUNNER_TEMP/whaxon-extra-doctor.json"
+          WHAXON_EXTRA="$WHAXON_EXTRA" DOCTOR_REPORT="$RUNNER_TEMP/whaxon-extra-doctor.json" \
+            "$VENV/bin/python" - <<'PY'
+          import importlib.metadata
+          import json
+          import os
+          import re
+          import sys
+          import tomllib
+          from importlib.resources import files
+          from pathlib import Path
+
+          extra = os.environ["WHAXON_EXTRA"]
+          project = tomllib.loads(
+              Path("pyproject.toml").read_text(encoding="utf-8")
+          )["project"]
+          requirements = project["optional-dependencies"][extra]
+          names = []
+          for requirement in requirements:
+              name = re.split(r"[<>=!~; ]", requirement.strip(), maxsplit=1)[0]
+              name = name.split("[", 1)[0]
+              names.append(name)
+          versions = {
+              name: importlib.metadata.version(name)
+              for name in names
+          }
+          doctor = json.loads(
+              Path(os.environ["DOCTOR_REPORT"]).read_text(encoding="utf-8")
+          )
+          assert doctor["schema_version"] == 1
+          assert doctor["safety"]["read_only"] is True
+          assert doctor["safety"]["network_accessed"] is False
+          assert (files("whaxon").joinpath("data", "dependencies.json").is_file())
+          assert (files("whaxon").joinpath("data", "tools.json").is_file())
+          payloads = files("whaxon").joinpath("data", "payloads")
+          assert payloads.is_dir() and any(item.is_file() for item in payloads.rglob("*"))
+          assert sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+          if hasattr(os, "geteuid"):
+              assert os.geteuid() != 0
+          evidence = {
+              "extra": extra,
+              "python": sys.version,
+              "venv": sys.prefix,
+              "euid": os.geteuid() if hasattr(os, "geteuid") else None,
+              "distribution_versions": versions,
+              "resource_checks": {
+                  "dependency_manifest": True,
+                  "tool_catalog": True,
+                  "validation_payloads": True,
+              },
+              "doctor_overall_status": doctor["overall_status"],
+              "limitations": [
+                  "Ubuntu 24.04 and Python 3.12 only",
+                  "package versions were resolved at CI run time",
+                  "no optional-extra offline install or native GUI display test",
+              ],
+          }
+          Path("g07-optional-extra-evidence.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(evidence, indent=2))
+          PY
+      - name: Retain optional-extra installation evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: g07-optional-extra-${{ matrix.extra }}
+          path: g07-optional-extra-evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
   headless-server-smoke:
     name: headless Linux server (no display)
     runs-on: ubuntu-latest
