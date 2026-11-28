@@ -220,6 +220,8 @@ class CatalogAdapterProvider:
                 "smoke_tested": False,
                 "lab_validated": False,
                 "end_to_end_verified": False,
+                "qualification_status": "not_qualified",
+                "readiness_basis": "not_bound_or_not_admitted",
             })
         return rows
 
@@ -304,6 +306,8 @@ class CatalogAdapterProvider:
                 "smoke_tested": False,
                 "lab_validated": False,
                 "end_to_end_verified": False,
+                "qualification_status": "not_qualified",
+                "readiness_basis": "catalog_adapter_binding_audit_only",
             })
         summary = {state: sum(row["state"] == state for row in rows) for state in (
             "bound", "stale_binding", "catalog_only", "adapter_only",
@@ -348,7 +352,7 @@ class CatalogAdapterProvider:
                 "executable": bound and installed,
                 "readiness": "installed" if bound and installed else "registered" if bound else "blocked",
                 "reason": (
-                    "ready_for_local_execution" if bound and installed
+                    "installed_unverified" if bound and installed
                     else "manifest_binding_mismatch" if not bound
                     else "catalog_changed_requires_reload" if not current_catalog
                     else "binary_not_installed"
@@ -357,6 +361,8 @@ class CatalogAdapterProvider:
                 "smoke_tested": False,
                 "lab_validated": False,
                 "end_to_end_verified": False,
+                "qualification_status": "not_qualified",
+                "readiness_basis": "catalog_contract_and_binary_presence_only",
             })
         return inventory
 
