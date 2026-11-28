@@ -68,7 +68,7 @@ jobs:
               time.sleep(2)
           else:
               raise SystemExit("systemd web Core readiness did not become true")
-          assert state["worker_liveness_verified"] is False if "worker_liveness_verified" in state else True
+          assert state.get("worker_liveness_verified") is False, state
           PY
           sudo systemctl is-active --quiet whaxon.service
           sudo systemctl is-active --quiet whaxon-workflow-worker.service
