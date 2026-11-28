@@ -371,10 +371,8 @@ class ApprovalBinding:
         if (
             isinstance(self.expires_at, bool)
             or not isinstance(self.expires_at, (int, float))
-            or not math.isfinite(self.expires_at)
             or isinstance(now, bool)
             or not isinstance(now, (int, float))
-            or not math.isfinite(now)
             or not isinstance(self.plan_digest, str)
             or not isinstance(self.task_id, str)
             or not isinstance(self.target, str)
@@ -385,6 +383,11 @@ class ApprovalBinding:
             or not isinstance(self.impact, str)
             or self.impact not in _ALLOWED_IMPACTS
         ):
+            return False
+        try:
+            if not math.isfinite(self.expires_at) or not math.isfinite(now):
+                return False
+        except (OverflowError, TypeError, ValueError):
             return False
         return (
             now < self.expires_at
