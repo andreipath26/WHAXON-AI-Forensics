@@ -585,3 +585,432 @@ See [the binding architecture and gates](docs/ENGINE_V2_MASTER.md#engine-v2--acc
   prompt-injection and cross-client replay tests; all Engine V2 existing
   functional and deployment acceptance gates. The Zalmoxis source itself is
   not yet proof of a deployed MCP/inference connection.
+
+
+---
+
+## Deferred expansion — ARTEX technology adoption register (2026-11-28)
+
+**Owner decision: DEFER ALL A01–A281.** This is a future candidate backlog, not an implementation directive, current release requirement, or new G01–G10 gate. No item is authorized to start now. Preserve the complete existing roadmap, approved UI and Engine V2 scope. Activate only after the existing solo v1.0 / Engine V2 deployment foundation and all applicable G01–G10 gates are accepted, and after explicit owner approval of the relevant expansion batch. Existing obligations continue independently; overlap with existing requirements does not defer those existing obligations.
+
+### Provenance and admission
+
+Reference: [BaaRai/ARTEX](https://github.com/BaaRai/ARTEX), main tree `e9659c8ae15d71df178b6be4552a93da0cfe6df8`; WHAXON comparison tree `9e26c07afa986b1c296ac558b8e61369567ed390`. The comparison used full repository inventories, selected source inspection and architecture documentation, not exhaustive line-by-line verification or runtime benchmarks. These 281 candidates include enhancements, tests and inferred proposals; they are not 281 proven missing features. Before activation classify each as existing, partial, missing, unsuitable or deferred; map to canonical roadmap IDs, deduplicate, verify source and license, define acceptance and obtain approval.
+
+### Architectural constraints
+
+Keep Python, SQLite for local deployment, the approved WHAXON UI, existing Engine V2 lifecycle, provider contracts, deterministic authorization, independent verification, evidence integrity and least privilege. The proposed intelligence layer may submit typed recommendations; it cannot authorize or execute actions independently. Prefer independently implemented concepts. ARTEX is AGPLv3; direct reuse and third-party datasets require individual licensing review, especially for WHAXON commercial/enterprise licensing. Do not fork ARTEX wholesale, mandate Go, PostgreSQL or Norma, inherit unlimited default inference budgets, disable untrusted-content protection, or accept AI claims as verified findings. Preserve original evidence independently of compacted context; isolate customer data, use shadow-mode memory evaluation before activation, and require verified archive commits before local cleanup. No live keyless model inference is implied by MCP connectivity.
+
+### 1. Persistent intelligence architecture
+
+ARTEX reference paths: `db/exploration.go`, `db/exploration_sources.go`, `db/assets.go`, `agent/hypothesis.go`, `agent/goals.go`, `db/lessons.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A01 | Asset graph | Deferred |
+| A02 | Exploration graph | Deferred |
+| A03 | Shared worker memory | Deferred |
+| A04 | Hypothesis ledger | Deferred |
+| A05 | Goal ledger | Deferred |
+| A06 | Fact provenance | Deferred |
+| A07 | Confidence model | Deferred |
+| A08 | Historical knowledge | Deferred |
+| A09 | Asset context retrieval | Deferred |
+| A10 | Knowledge lifecycle | Deferred |
+| A11 | Graph visualization | Deferred |
+| A12 | Assessment context snapshots | Deferred |
+
+### 2. AI intelligence and orchestration
+
+ARTEX reference paths: `agent/assembly.go`, `agent/goals.go`, `agent/planner.go`, `agent/worker.go`, `agent/triage.go`, `agent/retester.go`, `sidequestion/`, `server/ask_operator.go`, `agent/antipoll.go`, `agent/terminalreason.go`, `agent/cancelcause.go`, `agent/wrapup.go`, `agent/task_brief.go`, `db/conversation.go`, `db/digest.go`, `server/intent_intervention.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A13 | Specialized AI roles | Deferred |
+| A14 | Dedicated objective reasoning | Deferred |
+| A15 | Persistent planner context | Deferred |
+| A16 | Shared worker context | Deferred |
+| A17 | Finding review and triage assistance | Deferred |
+| A18 | Evidence-based retest assistance | Deferred |
+| A19 | Operator questions during workflows | Deferred |
+| A20 | Suspended task and answer resumption | Deferred |
+| A21 | Stagnation detection | Deferred |
+| A22 | Explicit termination reasons | Deferred |
+| A23 | Controlled cancellation | Deferred |
+| A24 | Final assessment synthesis | Deferred |
+| A25 | Context-aware task briefing | Deferred |
+| A26 | Persistent conversation context | Deferred |
+| A27 | Context digest generation | Deferred |
+| A28 | Read-only operator intervention | Deferred |
+
+### 3. Learning from previous assessments
+
+ARTEX reference paths: `docs/rsi-lessons.md`, `db/lessons.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A29 | Positive lessons from verified findings | Deferred |
+| A30 | Negative lessons from false positives | Deferred |
+| A31 | Cautionary lessons from inconclusive retests | Deferred |
+| A32 | Evidence-linked lesson extraction | Deferred |
+| A33 | Lesson confidence and relevance scoring | Deferred |
+| A34 | Historical lesson retrieval | Deferred |
+| A35 | Lesson withdrawal and correction | Deferred |
+| A36 | Lesson evidence history | Deferred |
+| A37 | Engagement-specific memory isolation | Deferred |
+| A38 | Shadow-mode evaluation before AI integration | Deferred |
+| A39 | Measurement of memory usefulness | Deferred |
+
+### 4. AI efficiency and context optimization
+
+ARTEX reference paths: `llmrec/context_telemetry.go`, `docs/context-telemetry.md`, `agent/compaction.go`, `agent/worker.go`, `db/llm_context.go`, `agent/spill.go`, `agent/data_envelope.go`, `agent/toolrag.go`, `agent/toolcatalog.go`, `agent/budget.go`, `db/llm_usage.go`, `db/tool_usage.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A40 | Context size telemetry | Deferred |
+| A41 | Token attribution by context category | Deferred |
+| A42 | Bounded context windows | Deferred |
+| A43 | Evidence-preserving context compaction | Deferred |
+| A44 | Prompt cache prefix stabilization | Deferred |
+| A45 | Retrieval of relevant historical context | Deferred |
+| A46 | Large-output external storage | Deferred |
+| A47 | Structured tool-result envelopes | Deferred |
+| A48 | Context-aware tool selection | Deferred |
+| A49 | Dynamic tool catalog retrieval | Deferred |
+| A50 | Hierarchical token budgets | Deferred |
+| A51 | Hierarchical inference-turn budgets | Deferred |
+| A52 | Reserved final-response budget | Deferred |
+| A53 | Per-agent inference usage accounting | Deferred |
+| A54 | Tool usage analytics | Deferred |
+
+### 5. Multi-provider AI infrastructure
+
+ARTEX reference paths: `llmpool/`, `agent/providerstop.go`, `db/llmretry.go`, `agent/provider.go`, `server/task_llm.go`, `llmrec/`, `agent/bedrock_gateway.go`, `server/mcpdiscover.go`, `mcphttp/client.go`, `db/config.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A55 | Provider pooling | Deferred |
+| A56 | Provider health monitoring | Deferred |
+| A57 | Provider failure classification | Deferred |
+| A58 | Controlled inference retry | Deferred |
+| A59 | Provider quota monitoring | Deferred |
+| A60 | Role-specific model selection | Deferred |
+| A61 | Provider compatibility testing | Deferred |
+| A62 | Inference request telemetry | Deferred |
+| A63 | Configurable diagnostic retention | Deferred |
+| A64 | AWS Bedrock integration | Deferred |
+| A65 | MCP server discovery | Deferred |
+| A66 | MCP HTTP/SSE connectivity | Deferred |
+| A67 | Provider configuration management | Deferred |
+
+### 6. Security and execution isolation
+
+ARTEX reference paths: `agent/untrusted_prompt.go`, `agent/untrusted_boundary.go`, `intercept/`, `egress/`, `server/pathconfine.go`, `server/isolation.go`, `server/execpriv.go`, `server/env_scrub.go`, `server/envseal.go`, `db/secrets.go`, `server/login_limit.go`, `server/security_headers.go`, `mcphttp/client.go`, `db/intercept_execution.go`, `server/upload_open_unix.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A68 | Untrusted AI input isolation | Deferred |
+| A69 | Untrusted tool-output boundaries | Deferred |
+| A70 | Structured command-policy validation | Deferred |
+| A71 | Compound-command policy enforcement | Deferred |
+| A72 | Fail-closed approval decisions | Deferred |
+| A73 | Stateful security guards | Deferred |
+| A74 | Destination authorization rechecks | Deferred |
+| A75 | DNS rebinding protection | Deferred |
+| A76 | Redirect authorization | Deferred |
+| A77 | Network egress enforcement | Deferred |
+| A78 | Filesystem confinement | Deferred |
+| A79 | Agent process isolation | Deferred |
+| A80 | Execution privilege separation | Deferred |
+| A81 | Environment-variable sanitization | Deferred |
+| A82 | Protected credential handling | Deferred |
+| A83 | Encryption of secrets at rest | Deferred |
+| A84 | Startup isolation self-tests | Deferred |
+| A85 | Login rate limiting | Deferred |
+| A86 | HTTP security headers | Deferred |
+| A87 | MCP endpoint security | Deferred |
+| A88 | Approval decision provenance | Deferred |
+| A89 | Approval execution traceability | Deferred |
+| A90 | Request rate and concurrency controls | Deferred |
+| A91 | Adaptive backoff on server overload | Deferred |
+| A92 | Secure file upload validation | Deferred |
+
+### 7. Network traffic and forensic evidence
+
+ARTEX reference paths: `traffic/`, `db/finding_traffic.go`, `server/finding_traffic_export.go`, `db/finding_traffic_archive.go`, `agent/finding_recorder.go`, `evidence/store.go`, `db/secrets.go`, `web/src/`, `server/sharedbrowser.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A93 | Integrated HTTP traffic capture | Deferred |
+| A94 | Request and response inspection | Deferred |
+| A95 | Traffic evidence binding | Deferred |
+| A96 | HAR import and export | Deferred |
+| A97 | External traffic ingestion | Deferred |
+| A98 | Traffic streaming | Deferred |
+| A99 | Searchable traffic index | Deferred |
+| A100 | Traffic body compression | Deferred |
+| A101 | Traffic archival | Deferred |
+| A102 | Persistent finding-to-traffic relationships | Deferred |
+| A103 | Evidence export | Deferred |
+| A104 | Evidence retention during archival | Deferred |
+| A105 | Host-controlled atomic evidence recording | Deferred |
+| A106 | Evidence reference existence checks | Deferred |
+| A107 | Evidence integrity validation | Deferred |
+| A108 | Credential and sensitive-data redaction | Deferred |
+| A109 | Traffic evidence inspection interface | Deferred |
+| A110 | Browser-generated assessment evidence | Deferred |
+
+### 8. Asset and assessment management
+
+ARTEX reference paths: `db/assets.go`, `db/companies.go`, `db/company_scope.go`, `db/task_assets.go`, `db/task_assets_context.go`, `db/asset_dsl.go`, `db/finding_assets.go`, `server/target_fingerprint.go`, `server/sync_scopesentry.go`, `agent/scan_ingest.go`, `agent/bbot_ingest.go`, `db/task_templates.go`, `db/task_categories.go`, `server/task_metadata.go`, `db/task_outcome.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A111 | Structured asset inventory | Deferred |
+| A112 | Organization-level asset ownership | Deferred |
+| A113 | Organization-level scope management | Deferred |
+| A114 | Assessment-specific asset inventories | Deferred |
+| A115 | Asset context summaries | Deferred |
+| A116 | Advanced asset filtering | Deferred |
+| A117 | Finding-to-asset relationships | Deferred |
+| A118 | Asset change history | Deferred |
+| A119 | Target identity fingerprinting | Deferred |
+| A120 | External asset inventory synchronization | Deferred |
+| A121 | Structured scanner-result ingestion | Deferred |
+| A122 | BBOT data ingestion | Deferred |
+| A123 | Reusable assessment templates | Deferred |
+| A124 | Assessment categorization | Deferred |
+| A125 | Assessment metadata management | Deferred |
+| A126 | Assessment outcome tracking | Deferred |
+
+### 9. Coverage, findings and verification
+
+ARTEX reference paths: `db/coverage_ledger.go`, `agent/coverage_ledger.go`, `agent/coverage.go`, `web/src/`, `agent/finding_fingerprint.go`, `db/finding_dedup_pool.go`, `db/findings.go`, `agent/finding_workflow.go`, `server/findings_groups.go`, `report/quality.go`, `db/finding_retests.go`, `db/finding_verification.go`, `db/migrations/0007_finding_report_state.sql`, `agent/goals.go`, `agent/terminalreason.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A127 | Structured coverage ledger | Deferred |
+| A128 | Evidence-backed negative results | Deferred |
+| A129 | Coverage gap identification | Deferred |
+| A130 | Assessment completeness tracking | Deferred |
+| A131 | Asset coverage visualization | Deferred |
+| A132 | Stable finding fingerprints | Deferred |
+| A133 | Finding deduplication pools | Deferred |
+| A134 | Structured finding reasoning | Deferred |
+| A135 | Finding review workflows | Deferred |
+| A136 | Finding grouping | Deferred |
+| A137 | Evidence quality checks | Deferred |
+| A138 | Structured retest histories | Deferred |
+| A139 | Finding verification state | Deferred |
+| A140 | Finding lifecycle history | Deferred |
+| A141 | Report readiness state | Deferred |
+| A142 | Goal-to-evidence relationships | Deferred |
+| A143 | Unresolved assessment outcome tracking | Deferred |
+
+### 10. Knowledge and skills infrastructure
+
+ARTEX reference paths: `knowledge/`, `skills/`, `db/skill_gaps.go`, `db/skill_usage.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A144 | MITRE ATT&CK knowledge integration | Deferred |
+| A145 | CWE weakness classification | Deferred |
+| A146 | OWASP WSTG reference integration | Deferred |
+| A147 | Structured security knowledge retrieval | Deferred |
+| A148 | Source and version tracking | Deferred |
+| A149 | Modular skill definitions | Deferred |
+| A150 | Skill registry | Deferred |
+| A151 | Skill usage analytics | Deferred |
+| A152 | Skill-gap identification | Deferred |
+| A153 | Skill version management | Deferred |
+| A154 | Third-party skill review and approval | Deferred |
+| A155 | Evidence interpretation skills | Deferred |
+| A156 | Source-code review assistance | Deferred |
+| A157 | Patch comparison assistance | Deferred |
+| A158 | Remediation validation guidance | Deferred |
+| A159 | Secure knowledge package import | Deferred |
+
+### 11. Browser workspace
+
+ARTEX reference paths: `server/sharedbrowser.go`, `server/sharedbrowser_cdp.go`, `server/sharedbrowser_guard.go`, `db/browser_mcp.go`, `extension/`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A160 | Integrated browser workspace | Deferred |
+| A161 | Operator and AI shared browser context | Deferred |
+| A162 | Browser session isolation | Deferred |
+| A163 | Browser MCP connectivity | Deferred |
+| A164 | Browser evidence recording | Deferred |
+| A165 | Screenshot evidence management | Deferred |
+| A166 | Browser activity audit | Deferred |
+| A167 | Browser session lifecycle management | Deferred |
+| A168 | Browser extension integration | Deferred |
+| A169 | Browser credential protection | Deferred |
+
+### 12. Operator experience and frontend
+
+ARTEX reference paths: `web/src/`, `screenshots/`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A170 | Interactive exploration graph | Deferred |
+| A171 | Interactive asset graph | Deferred |
+| A172 | Real-time assessment activity | Deferred |
+| A173 | AI conversation workspace | Deferred |
+| A174 | Agent execution visualization | Deferred |
+| A175 | Resource usage dashboard | Deferred |
+| A176 | Assessment progress breakdown | Deferred |
+| A177 | Operator questions inbox | Deferred |
+| A178 | Approval history inspection | Deferred |
+| A179 | Evidence-linked finding inspection | Deferred |
+| A180 | Traffic search interface | Deferred |
+| A181 | Assessment context viewer | Deferred |
+| A182 | Historical lesson viewer | Deferred |
+| A183 | Skill management interface | Deferred |
+| A184 | Model configuration dashboard | Deferred |
+| A185 | Provider health dashboard | Deferred |
+| A186 | Live backend diagnostics | Deferred |
+| A187 | Assessment archive browser | Deferred |
+| A188 | Structured task intervention controls | Deferred |
+| A189 | Internationalization architecture | Deferred |
+| A190 | Reusable frontend state management | Deferred |
+
+### 13. Notifications and operator communication
+
+ARTEX reference paths: `notify/`, `chatbridge/`, `db/activity_outbox.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A191 | Central notification service | Deferred |
+| A192 | Event-based notification rules | Deferred |
+| A193 | Email notifications | Deferred |
+| A194 | Telegram notifications | Deferred |
+| A195 | Generic webhook notifications | Deferred |
+| A196 | Optional enterprise messaging integrations | Deferred |
+| A197 | Notification filtering | Deferred |
+| A198 | Sensitive-information masking | Deferred |
+| A199 | Notification templates | Deferred |
+| A200 | Delivery history | Deferred |
+| A201 | Durable delivery retries | Deferred |
+| A202 | Notification deduplication | Deferred |
+| A203 | Operator chat bridge | Deferred |
+| A204 | Pending approval notifications | Deferred |
+| A205 | Assessment completion notifications | Deferred |
+| A206 | Provider failure notifications | Deferred |
+
+### 14. Archiving, backup and storage management
+
+ARTEX reference paths: `docs/task-archive-storage.md`, `archivestore/s3.go`, `db/task_archives.go`, `db/task_archives_restore.go`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A207 | Complete assessment archival | Deferred |
+| A208 | Compressed evidence packages | Deferred |
+| A209 | S3-compatible archival storage | Deferred |
+| A210 | Encrypted remote archives | Deferred |
+| A211 | Archive integrity checksums | Deferred |
+| A212 | Upload verification | Deferred |
+| A213 | Durable archive transaction journals | Deferred |
+| A214 | Interrupted upload recovery | Deferred |
+| A215 | Interrupted restoration recovery | Deferred |
+| A216 | Orphan archive cleanup | Deferred |
+| A217 | Idempotent archive deletion | Deferred |
+| A218 | Archive metadata search | Deferred |
+| A219 | Archived assessment statistics | Deferred |
+| A220 | Storage consumption monitoring | Deferred |
+| A221 | Archive storage connectivity diagnostics | Deferred |
+| A222 | Configurable retention policies | Deferred |
+| A223 | Disaster recovery qualification | Deferred |
+
+### 15. Database and persistence
+
+ARTEX reference paths: `db/`, `db/migrations/`, `db/schema.sql`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A224 | More modular persistence services | Deferred |
+| A225 | Versioned database migrations | Deferred |
+| A226 | Database schema compatibility tests | Deferred |
+| A227 | Dedicated graph persistence | Deferred |
+| A228 | Database query performance telemetry | Deferred |
+| A229 | Targeted database indexing | Deferred |
+| A230 | Encrypted sensitive columns | Deferred |
+| A231 | Durable notification outbox | Deferred |
+| A232 | Database operation fault-injection tests | Deferred |
+| A233 | Optional PostgreSQL backend for enterprise deployments | Deferred |
+| A234 | Database backup and restoration validation | Deferred |
+| A235 | Per-engagement data isolation | Deferred |
+
+### 16. Deployment and infrastructure
+
+ARTEX reference paths: `Dockerfile`, `install.sh`, `docs/OPS.md`, `docker-compose.yml`, `.github/workflows/release.yml`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A236 | One-command installation | Deferred |
+| A237 | Automated upgrade management | Deferred |
+| A238 | Cross-platform release archives | Deferred |
+| A239 | Prebuilt container images | Deferred |
+| A240 | Docker Desktop compatibility | Deferred |
+| A241 | Native systemd deployment | Deferred |
+| A242 | Graceful process shutdown | Deferred |
+| A243 | Startup configuration validation | Deferred |
+| A244 | Startup security self-tests | Deferred |
+| A245 | Service readiness diagnostics | Deferred |
+| A246 | Release artifact verification | Deferred |
+| A247 | Pinned container dependencies | Deferred |
+| A248 | Protected runtime key directories | Deferred |
+| A249 | Offline installation qualification | Deferred |
+| A250 | Reverse proxy deployment profiles | Deferred |
+| A251 | Version and build revision reporting | Deferred |
+| A252 | Controlled update checks | Deferred |
+| A253 | External database deployment profiles | Deferred |
+
+### 17. Testing and engineering quality
+
+ARTEX reference paths: `scripts/benchmark/`, `agent/`, `server/`, `db/`, `traffic/`.
+
+| ID | Candidate requirement | Status |
+|---|---|---|
+| A254 | Adversarial prompt-injection regression tests | Deferred |
+| A255 | Untrusted-content boundary tests | Deferred |
+| A256 | Authorization bypass regression tests | Deferred |
+| A257 | Destination-validation tests | Deferred |
+| A258 | Redirect and DNS security tests | Deferred |
+| A259 | Filesystem confinement tests | Deferred |
+| A260 | Secret exposure tests | Deferred |
+| A261 | Evidence provenance tests | Deferred |
+| A262 | Evidence reference integrity tests | Deferred |
+| A263 | Finding deduplication regression tests | Deferred |
+| A264 | Coverage completeness tests | Deferred |
+| A265 | Agent memory isolation tests | Deferred |
+| A266 | Historical lesson correctness tests | Deferred |
+| A267 | AI context budget tests | Deferred |
+| A268 | Hierarchical budget enforcement tests | Deferred |
+| A269 | Provider failure and quota tests | Deferred |
+| A270 | Concurrent worker coordination tests | Deferred |
+| A271 | Cancellation and timeout tests | Deferred |
+| A272 | Archive interruption tests | Deferred |
+| A273 | Migration integrity tests | Deferred |
+| A274 | Browser integration tests | Deferred |
+| A275 | Notification delivery tests | Deferred |
+| A276 | Ground-truth benchmark fixtures | Deferred |
+| A277 | False-positive measurement | Deferred |
+| A278 | Assessment coverage measurement | Deferred |
+| A279 | AI inference cost measurement | Deferred |
+| A280 | Context consumption measurement | Deferred |
+| A281 | Regression benchmark reporting | Deferred |
+
+### Deferred delivery sequence (not active)
+
+1. Existing Engine V2 completion remains the current priority; do not introduce new ARTEX scope to close it. Existing security/evidence obligations remain binding independently.
+2. Persistent intelligence: dual graphs, provenance, hypotheses and shared context.
+3. AI infrastructure: specialized analytical roles, context optimization, provider reliability, bounded budgets and historical lessons.
+4. Evidence infrastructure: integrated acquisition, inspection, coverage and finding quality.
+5. Knowledge and browser workspace: approved reference material, skills and isolated browser evidence.
+6. Platform integration: notifications, archives, operator experience and frontend integration without redesign.
+7. Enterprise qualification: optional PostgreSQL, organization isolation, scalability, comparative benchmarks and deployment qualification.
+
+Highest-value study topics (qualitative, not benchmarks): dual graphs; evidence provenance; shared memory; isolation; evidence-backed coverage; context optimization; historical lessons; provider pooling/budgets; traffic evidence; durable archives. The future architecture is operator workspace → AI intelligence → persistent knowledge → deterministic trust/authorization → Engine V2 → evidence acquisition → forensic verification → platform infrastructure. These are conceptual layers, not new release claims.
+
+**Acceptance rule:** no candidate may be marked implemented or accepted without code-level crosswalk, tests and retained evidence appropriate to its scope. All 281 remain deferred until explicitly admitted.

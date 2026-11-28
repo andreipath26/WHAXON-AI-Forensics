@@ -642,3 +642,42 @@ def test_workflow_report_fails_closed_on_conflicting_recon_projections(tmp_path)
     assert report["coverage"]["unsupported_or_inaccessible_work"] == {
         "status": "not_recorded", "count": None, "items": [],
     }
+
+
+
+def test_workflow_report_keeps_persisted_failure_and_coverage_omissions_distinct(tmp_path):
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    contract = {
+        "schema_version": 1,
+        "checklist": ["dns", "http", "tls", "headers"],
+        "requested": ["dns", "http", "tls"],
+        "included": ["dns"],
+        "dispositions": [
+            {"check_id": "http", "disposition": "unsupported"},
+            {"check_id": "tls", "disposition": "inaccessible"},
+        ],
+    }
+    store = JobStore(tmp_path / "workflow-outcome-distinction.db")
+    store.create_mission("mission", "preserve persisted outcomes")
+    plan = WorkflowPlan(
+        "mission", (WorkflowTask("scan", "tool.nmap", "192.0.2.10"),),
+        metadata={"coverage_contract": contract},
+    )
+    store.save_workflow_plan("plan", plan)
+    attempt = store.claim_ready_workflow_task("plan", "coverage-test-worker")
+    assert attempt is not None
+    store.finish_task_attempt(attempt["attempt_id"], "failed", error="provider exited nonzero")
+
+    core = Core.__new__(Core)
+    core.store = store
+    report = Core.workflow_report(core, "plan")
+
+    assert report["summary"]["task_status_counts"] == {"failed": 1}
+    assert report["coverage"]["declared_coverage"]["omissions"] == [
+        {"check_id": "http", "disposition": "unsupported"},
+        {"check_id": "tls", "disposition": "inaccessible"},
+    ]
+    assert report["coverage"]["declared_coverage"]["unrequested"] == ["headers"]
+    assert report["coverage"]["completeness_claim"] is False

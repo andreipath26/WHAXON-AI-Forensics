@@ -30,3 +30,23 @@ def test_v2_plan_propagates_failure(monkeypatch, tmp_path):
     with pytest.raises(SystemExit) as exc:
         run_cmd.main(["--v2-plan", "existing-plan", "--data", str(tmp_path)])
     assert exc.value.code == 1
+
+
+
+@pytest.mark.parametrize("arguments", [
+    ["nmap", "192.0.2.10", "--legacy"],
+    ["nmap", "192.0.2.10", "--extra", "-sV"],
+])
+def test_legacy_direct_dispatch_stops_before_core_initialization(
+    monkeypatch, tmp_path, capsys, arguments,
+):
+    monkeypatch.setattr(
+        run_cmd, "Core",
+        lambda **kwargs: pytest.fail("retired direct dispatch initialized Core"),
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        run_cmd.main([*arguments, "--data", str(tmp_path)])
+
+    assert exc.value.code == run_cmd.EXIT_USAGE
+    assert "retired" in capsys.readouterr().err

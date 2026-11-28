@@ -340,6 +340,23 @@ def _resolve_evidence_path(core, relative_path):
         raise ValueError("evidence path resolves outside the data directory")
     return full_path
 
+def _default_rate_limits(*, host: str, auth_disabled: bool, test_override: bool) -> list[str]:
+    """Use a high global cap only for an explicitly isolated loopback test server.
+
+    Route-specific limits remain attached to their individual endpoints. The
+    production default is always 200 requests per minute.
+    """
+    import ipaddress
+
+    try:
+        loopback = ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        loopback = host.lower() == "localhost"
+    if test_override and auth_disabled and loopback:
+        return ["10000 per minute"]
+    return ["200 per minute"]
+
+
 def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     import os as _os
     _host = _os.environ.get("WHAXON_HOST", "127.0.0.1")
@@ -364,10 +381,18 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
     if not 1 <= max_upload_mb <= 1024:
         max_upload_mb = 25
     app.config["MAX_CONTENT_LENGTH"] = max_upload_mb * 1024 * 1024
+    default_rate_limits = _default_rate_limits(
+        host=_host,
+        auth_disabled=_os.environ.get("WHAXON_AUTH_DISABLED", "").strip().lower()
+        in {"1", "true", "yes"},
+        test_override=_os.environ.get("WHAXON_TEST_RATE_LIMITS", "").strip().lower()
+        in {"1", "true", "yes"},
+    )
+    app.config["WHAXON_DEFAULT_RATE_LIMITS"] = tuple(default_rate_limits)
     limiter = Limiter(
         key_func=get_remote_address,
         app=app,
-        default_limits=["200 per minute"],
+        default_limits=default_rate_limits,
         storage_uri="memory://",
     )
     app.config["RATELIMIT_STORAGE_URI"] = "memory://"
@@ -2212,28 +2237,21 @@ def create_app(core: Core, registry: JobRegistry, runner: AsyncRunner) -> Flask:
 
     @app.post("/api/approvals/<job_id>/<int:seq>/resolve")
     def api_approval_resolve(job_id: str, seq: int):
-        data = request.get_json(silent=True) or {}
-        status = data.get("status", "").strip().lower()
-        if status not in ("verified", "refuted"):
-            return {"error": "status must be verified or refuted"}, 400
-        user = data.get("user") or "human"
-        result = registry.core.store.update_legacy_verification_if_unowned(
-            job_id, seq, status,
-            by=f"human:{user}", reason=f"human review by {user}",
-        )
-        if result == "v2_owned":
-            return {
-                "error": (
-                    "Engine V2 finding state must come from its plan-bound "
-                    "verification workflow"
-                ),
-                "approval_granted": False,
-                "verification_updated": False,
-                "workflow": "/api/v2/workflow-proposals",
-            }, 409
-        if result == "not_found":
-            return {"error": "finding not found"}, 404
-        return {"ok": True, "status": status, "by": f"human:{user}"}
+        """Retire the legacy human-resolution mutation surface.
+
+        Findings, whether legacy or Engine V2-owned, must not be marked verified
+        or refuted through this compatibility endpoint. V2 verification is
+        represented by a plan-bound workflow with retained evidence.
+        """
+        return {
+            "error": (
+                "Legacy human resolution is retired. Use the plan-bound Engine V2 "
+                "verification workflow; this endpoint does not update findings."
+            ),
+            "approval_granted": False,
+            "verification_updated": False,
+            "workflow": "/api/v2/workflow-proposals",
+        }, 409
 
     @app.post("/api/import/burp")
     def import_burp():
