@@ -1078,3 +1078,35 @@ a plan, enqueue work, dispatch tools or change findings' verification state.
 an answer with a verified security finding, or a reviewed advisory with
 permission to execute. This work must coexist with, never bypass, the sole
 Engine V2 scheduler/approval authority.
+
+
+
+## P1 authorization and evidence boundary regressions — 2026-11-28
+
+The verifier regression suite now includes a cross-origin redirect on a
+separate local port and asserts that the destination receives no request.
+The scheduler follow-up regression cancels a source plan between the child's
+initial authorization and dispatch-boundary authorization; the persisted child
+is blocked before a `dispatch_started` event or provider effect. A separate
+failure-injection regression aborts insertion of the dispatch-intent audit
+event and checks that no provider callback runs and the attempt is recorded as
+failed. These tests are internal regression evidence, not a complete
+external-target security qualification.
+
+Network scope resolution and pinned address checks cover the resolver results
+used by the in-process scope layer. They do not establish that every external
+scanner subprocess, its redirects, plugins, DNS re-resolution, or secondary
+HTTP/DNS connections stay on the authorized address set. No network namespace,
+firewall, proxy, or packet-capture evidence in this repository proves scanner
+egress isolation. Operators must treat these subprocess side effects as
+unbounded beyond each provider's documented fixed argv until separately
+qualified.
+
+Generic digest-bound coverage declarations already preserve separate
+`unsupported`, `provider_unavailable`, `inaccessible`, and unrequested
+dispositions in persisted reports. Those declarations describe recorded
+coverage intent and omission reasons; they do not prove measured runtime
+completeness or convert a failed, skipped, inaccessible, or unsupported task
+into a successful check. Independent audit custody, external target
+qualification, and broad replay/session/pivot/worker-race acceptance remain
+open.

@@ -147,3 +147,42 @@ def test_stale_task_recovery_audit_failure_never_partially_updates_task(tmp_path
         core.store.reconcile_workflow_attempts(stale_after_s=60)
     assert core.store.workflow_attempt_owned(attempt["attempt_id"])
     assert core.store.get_workflow_attempt_status(attempt["attempt_id"]) == "running"
+
+
+
+def test_dispatch_audit_insert_failure_prevents_provider_effect(tmp_path):
+    import asyncio
+
+    from whaxon.core.scheduler import WorkflowScheduler
+
+    core = Core(tmp_path)
+    core.create_mission("m", "dispatch audit fails closed")
+    core.save_workflow_plan(
+        "p", WorkflowPlan("m", (WorkflowTask("t", "fixture", "192.0.2.10"),)),
+    )
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "CREATE TRIGGER deny_dispatch_audit BEFORE INSERT ON workflow_events "
+            "WHEN NEW.event_type='dispatch_started' "
+            "BEGIN SELECT RAISE(ABORT, 'dispatch audit unavailable'); END"
+        )
+    finally:
+        conn.close()
+
+    dispatched = []
+    scheduler = WorkflowScheduler(
+        core.store, authorize=lambda _task: True,
+        dispatch=lambda task: dispatched.append(task.id),
+    )
+    result = asyncio.run(scheduler.run("p", max_attempts=1))
+
+    assert dispatched == []
+    assert result["tasks"] == [{"id": "t", "status": "failed"}]
+    assert not [
+        event for event in core.store.list_workflow_events("p")
+        if event["event_type"] == "dispatch_started"
+    ]
+    assert core.store.get_workflow_attempt_status(
+        core.store.list_workflow_attempts("p")[0]["id"],
+    ) == "failed"
