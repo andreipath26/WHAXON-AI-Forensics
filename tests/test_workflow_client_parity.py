@@ -1,21 +1,21 @@
 """Cross-client V2 request state is shared and remains worker-owned."""
 from __future__ import annotations
 
-import asyncio
 import json
+import subprocess
+import sys
 
 from textual.widgets import Button, DataTable, Static
 
 from whaxon.core import Core
 from whaxon.core.workflow import WorkflowPlan, WorkflowTask
-from whaxon.interfaces.cli import workflow_cmd
 from whaxon.interfaces.tui.app import WhaxonApp
 from whaxon.interfaces.tui.screens.workflows import WorkflowScreen
 from whaxon.interfaces.web.server import AsyncRunner, JobRegistry, create_app
 
 
 async def test_tui_approved_run_is_observed_by_api_and_cancelled_by_cli(
-    tmp_path, monkeypatch, capsys,
+    tmp_path, monkeypatch,
 ):
     """Exercise TUI create/approve/submit, API observation, CLI cancel, TUI refresh."""
     app = WhaxonApp(data_dir=tmp_path)
@@ -85,9 +85,24 @@ async def test_tui_approved_run_is_observed_by_api_and_cancelled_by_cli(
         cli_args = [
             "--data-dir", str(tmp_path), "plan", "cancel-request", "--id", run_id,
         ]
-        cli_exit = await asyncio.to_thread(workflow_cmd.main, cli_args)
-        assert cli_exit == 0
-        cli_state = json.loads(capsys.readouterr().out)
+        cli_process = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "import sys; "
+                    "from whaxon.interfaces.cli import workflow_cmd; "
+                    "raise SystemExit(workflow_cmd.main(sys.argv[1:]))"
+                ),
+                *cli_args,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert cli_process.returncode == 0, cli_process.stderr
+        cli_state = json.loads(cli_process.stdout)
         assert cli_state["id"] == run_id
         assert cli_state["status"] == "cancelled"
 
