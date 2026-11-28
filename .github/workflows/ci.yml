@@ -680,13 +680,15 @@ jobs:
           PYTHON="$RUNNER_TEMP/whaxon-core-only/bin/python"
           "$PYTHON" -m pip install --no-index --find-links "$RUNNER_TEMP/whaxon-wheelhouse" "$GITHUB_WORKSPACE/$WHEEL"
           "$RUNNER_TEMP/whaxon-core-only/bin/whaxon" --help
-          "$RUNNER_TEMP/whaxon-core-only/bin/whaxon" doctor --check flask --json --data "$RUNNER_TEMP/whaxon-partial-data" > "$RUNNER_TEMP/whaxon-partial-doctor.json"
-          "$PYTHON" - <<'PY'
+          DOCTOR_REPORT="$RUNNER_TEMP/whaxon-partial-doctor.json"
+          "$RUNNER_TEMP/whaxon-core-only/bin/whaxon" doctor --check flask --json --data "$RUNNER_TEMP/whaxon-partial-data" > "$DOCTOR_REPORT"
+          DOCTOR_REPORT="$DOCTOR_REPORT" "$PYTHON" - <<'PY'
           import importlib.metadata
           import json
+          import os
           from importlib.resources import files
           from pathlib import Path
-          report = json.loads(Path("$RUNNER_TEMP/whaxon-partial-doctor.json").read_text())
+          report = json.loads(Path(os.environ["DOCTOR_REPORT"]).read_text())
           assert report["dependencies"][0]["id"] == "flask", report
           assert report["dependencies"][0]["status"] == "MISSING", report
           assert report["overall_status"] == "DEGRADED", report
