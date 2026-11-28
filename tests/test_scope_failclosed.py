@@ -287,3 +287,25 @@ def test_malformed_url_authority_fails_closed(tmp_path: Path, target: str) -> No
     assert match.reason
     execution = sm.check_for_execution(target)
     assert execution.allowed is False
+
+
+@pytest.mark.parametrize("target", [
+    "http://user:secret@127.0.0.1/",
+    "http://@127.0.0.1/",
+    "http://127.0.0.1:invalid/",
+    "http://127.0.0.1:65536/",
+])
+def test_url_authority_credentials_and_invalid_ports_fail_closed(
+    tmp_path: Path, target: str,
+) -> None:
+    cfg = tmp_path / "scope.json"
+    cfg.write_text(json.dumps({
+        "engagement": "test",
+        "enabled": True,
+        "in_scope": ["127.0.0.1"],
+        "out_of_scope": [],
+    }))
+    scope = ScopeManager(cfg)
+
+    assert scope.check(target).allowed is False
+    assert scope.check_for_execution(target).allowed is False
