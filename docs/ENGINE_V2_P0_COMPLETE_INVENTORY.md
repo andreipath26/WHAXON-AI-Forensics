@@ -2,7 +2,8 @@
 
 **Review date:** 2026-11-28  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
-**Inspected source baseline:** `main` at `be5acd974c38560be4b0a32ee64d4218b5a31e20`  
+**Current main after README PR #273:** `71ae4f9c8852da326f8eb76393ffff77ac7e4c5a`  
+**Inspected code baseline:** `be5acd974c38560be4b0a32ee64d4218b5a31e20`; PR #273 changed README/workflow metadata only and introduced no runtime source change. Main CI for the updated head was queued at review time.  
 **Disposition:** P0 static inventory reconciled against the current source tree. This is not runtime qualification, approval to execute against a target, or a release decision. Repository release status remains **HOLD**.
 
 ## 1. Evidence method and limits
@@ -95,7 +96,7 @@ These are provider registrations and bounded contracts; the current provider inv
 | Headless worker | `whaxon workflow plan serve-requests` is the supervised durable V2 request worker; `drain-requests` is the bounded operator drain. | Request, claim, lease, heartbeat and uncertain-result state persist; lease fencing and no-blind-replay tests include `test_workflow_continuous_worker.py`, `test_engine_v2_e5_request_lease_ownership.py`, `test_engine_v2_e3_recovery_boundaries.py`. |
 | Legacy worker / Automator | Separate legacy queue and fixed follow-up behavior; does not gain V2 plan authorization or evidence by being present. Long-running legacy drain is gated. | Legacy JobStore state; `test_autochain_durable.py`, `test_initialize_drain.py`; migration/parity is open in P2-A. |
 
-The server inventory has an internal count inconsistency: `ENGINE_V2_LEGACY_EXECUTION_INVENTORY.md` states both 104 and 105 API decorator bindings in adjacent sections. The guarded exact method/path/handler census is authoritative at the inspected commit; reconcile the summary number before treating a count as a release metric. The route census proves static route registration only, not authorization or behavior.
+The route count is reconciled against `test_engine_v2_legacy_callsite_inventory.py`: its `EXPECTED_API_ROUTE_HANDLERS` mapping and the documented exact method/path/handler table both contain 115 `/api/*` method/path bindings at this source baseline. The older inventory's prose counts of 104 and 105 were stale summary values; they are corrected to 115 on this branch. The route census proves static route registration only, not authorization or behavior.
 
 ## 7. Transports, external effects, and deployment modes
 
@@ -119,15 +120,15 @@ Evidence files/tests: `docs/ENGINE_V2_E5_SERVICE_READINESS.md`, `docs/ENGINE_V2_
 | Packaging, worker services, deployment configuration | Release/operator owner | Setup, systemd, Docker, backup/restore and exact-head CI; no production deployment decision exists in this inventory. |
 | Legacy compatibility and retirement | Core + affected client owner | Every remaining direct dispatch sink remains explicitly legacy or excluded until migrated, retired, or approved as out of V2 scope with rollback evidence. |
 
-No CODEOWNERS coverage or named individual accountable owners were verified for every subsystem in this pass. Assign named reviewers in the gate record before external qualification.
+The functional owner roles below are assigned for inventory and close-out accountability; they are verifiable against the named source trees and evidence files but are not GitHub team identities. `.github/CODEOWNERS` currently names `@andreipath26` only for README and its freeze workflow, so it does not enforce these subsystem roles. Record a named reviewer/operator for each applicable G01–G10 gate before external qualification.
 
 ## 9. P0 exit assessment and handoff
 
 - **Inventory completeness:** source-backed top-level CLI modes (including side-effect category, persistence and regression guard) are enumerated by the existing CSV and AST test; legacy runner/network sinks and catalog/admission dispositions are enumerated by the legacy inventory and callsite test; API method/path/handler bindings and UI page/control counts are separately guarded. This document reconciles them into one current release boundary.
 - **Capability truthfulness:** catalog, adapter, import, session, AI, recon and verifier registration are separated from actual V2 admission and deployment readiness.
 - **Dependencies:** supported provider names and target constraints are recorded; installed/readiness, live egress, and exact deployment-host versions are not verified here.
-- **Work ownership:** domain ownership is mapped; named accountable reviewers remain unassigned in source.
-- **P0 status:** static inventory/disposition exit criteria met for this snapshot. Release gate G01 remains **OPEN** until controlled end-to-end acceptance, client parity, exact-head CI, and authorized lab evidence are recorded. G02–G10 remain unchanged. Overall status remains **HOLD**.
+- **Work ownership:** functional owner roles are explicitly mapped in §8; CODEOWNERS does not enforce those roles, and named reviewers/operators remain unresolved for final gate sign-off.
+- **P0 status: OPEN — inventory documented; exit is not signed off.** The source-backed inventory and dispositions are recorded, but three evidence rows remain unresolved: (1) exact-head CI for current `main` was queued, so the baseline CI result is not yet confirmed; (2) deployment-host versions/installation/readiness for admitted providers are unknown; and (3) named gate reviewers/operators have not been attached to the role owners. G01 remains **OPEN** for controlled end-to-end acceptance and client parity; G02–G10 remain unchanged. Overall status remains **HOLD**.
 
 ### Canonical detail sources
 
