@@ -142,10 +142,14 @@ async def _run_v2_catalog_provider(root: Path, tool_id: str, target: str, args: 
 async def _cancel_real_gobuster_after_loopback_effect(root: Path, server, port: int):
     from whaxon.core import Core
 
-    wordlist = root / "cancel-words.txt"
-    wordlist.write_text("hold\n", encoding="utf-8")
+    # Each saved plan ID is immutable, so keep cancellation in its own
+    # durable store instead of reusing the successful discovery plan.
+    scenario_root = root / "gobuster-cancel"
+    scenario_root.mkdir(parents=True)
+    wordlist = scenario_root / "cancel-words.txt"
+    wordlist.write_text("hold\\n", encoding="utf-8")
     core, plan_id, data_dir = await _prepare_v2_catalog_provider(
-        root, "gobuster", "127.0.0.1",
+        scenario_root, "gobuster", "127.0.0.1",
         f"dir -u http://{{target}}:{port} -w {wordlist} -q -t 1 --no-error --timeout 10s",
     )
     manifest = core.providers.manifest_for("tool.gobuster")
