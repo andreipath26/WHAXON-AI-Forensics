@@ -109,9 +109,18 @@ def _normalize_target(raw: str) -> tuple[str, str]:
         try:
             parsed = urlparse(raw)
             host = parsed.hostname or ""
-            # Reject malformed authorities instead of letting urlparse errors
-            # escape the authorization boundary or treating them as hosts.
-            if not host or any(c.isspace() for c in host):
+            # Reject malformed or credential-bearing authorities rather than
+            # authorizing a URL whose downstream tool may interpret user-info
+            # as credentials or whose invalid port may be parsed differently.
+            # Accessing .port validates malformed and out-of-range port text.
+            port = parsed.port
+            if (
+                not host
+                or any(c.isspace() for c in host)
+                or parsed.username is not None
+                or parsed.password is not None
+                or (port is not None and not 1 <= port <= 65535)
+            ):
                 return "", "url"
             return host.lower().rstrip("."), "url"
         except ValueError:
