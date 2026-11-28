@@ -559,6 +559,7 @@ def test_approval_revocation_serializes_before_dispatch_commit(
         if event["event_type"] == "dispatch_started"
     ]
 
+
 @pytest.mark.parametrize(
     ("field", "malformed"),
     [
