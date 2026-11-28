@@ -141,6 +141,40 @@ jobs:
       - name: Build and start both supervised E5 services
         timeout-minutes: 22
         run: docker compose -f docker-compose.e5.yml up -d --build
+      - name: Verify Docker runtime enforces service resource limits
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import subprocess
+
+          expected = {
+              "web": {"memory": 2 * 1024**3, "nano_cpus": 2_000_000_000, "pids": 256},
+              "workflow-worker": {
+                  "memory": 2 * 1024**3, "nano_cpus": 2_000_000_000, "pids": 128,
+              },
+          }
+          for service, limits in expected.items():
+              container_id = subprocess.check_output(
+                  ["docker", "compose", "-f", "docker-compose.e5.yml", "ps", "-q", service],
+                  text=True,
+              ).strip()
+              if not container_id:
+                  raise SystemExit(f"{service} container was not created")
+              inspect = json.loads(subprocess.check_output(
+                  ["docker", "inspect", container_id], text=True,
+              ))[0]["HostConfig"]
+              observed = {
+                  "memory": inspect["Memory"],
+                  "nano_cpus": inspect["NanoCpus"],
+                  "pids": inspect["PidsLimit"],
+              }
+              if observed != limits:
+                  raise SystemExit(
+                      f"{service} resource limits differ: expected {limits}, got {observed}"
+                  )
+          print("Docker runtime applied finite CPU, memory, and process limits to both services.")
+          PY
       - name: Verify web readiness, worker CLI and shared persistent state
         timeout-minutes: 5
         run: |
