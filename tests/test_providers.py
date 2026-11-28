@@ -1668,3 +1668,34 @@ def test_source_cancellation_cascades_through_approved_followups(tmp_path):
     assert core.authorize_workflow_task_for_plan(
         "grandchild", grandchild_task,
     ) is False
+
+
+
+def test_approved_followup_reauthorizes_ancestor_at_scheduler_dispatch(tmp_path):
+    """Ancestor cancellation racing with dispatch-bound auth prevents effects."""
+    import asyncio
+    from types import SimpleNamespace
+
+    core, _source, _child, _grandchild, child_task, _grandchild_task = (
+        _followup_auth_core(tmp_path)
+    )
+    core.workflow_requests = SimpleNamespace(cancel_queued=lambda _plan_id: None)
+    original_authorize = core.authorize_workflow_task_for_plan
+    calls = 0
+
+    def cancel_source_on_dispatch_check(plan_id, task):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            core.store.request_workflow_cancellation("source")
+        return original_authorize(plan_id, task)
+
+    core.authorize_workflow_task_for_plan = cancel_source_on_dispatch_check
+    result = asyncio.run(core.run_workflow_plan("child", max_attempts=1))
+
+    assert calls == 2
+    assert result["tasks"] == [{"id": child_task.id, "status": "blocked"}]
+    assert not [
+        event for event in core.store.list_workflow_events("child")
+        if event["event_type"] == "dispatch_started"
+    ]
