@@ -21,6 +21,17 @@ def test_e5_compose_has_separate_durable_worker_and_shared_state():
     assert "      - e5-state:/data" in content
 
 
+def test_e5_compose_has_finite_resource_bounds_for_web_and_worker():
+    content = (ROOT / "docker-compose.e5.yml").read_text(encoding="utf-8")
+    web, worker = content.split("  workflow-worker:", 1)
+    assert "cpus: ${WHAXON_WEB_CPUS:-2.0}" in web
+    assert "mem_limit: ${WHAXON_WEB_MEMORY_LIMIT:-2g}" in web
+    assert "pids_limit: ${WHAXON_WEB_PIDS_LIMIT:-256}" in web
+    assert "cpus: ${WHAXON_WORKER_CPUS:-2.0}" in worker
+    assert "mem_limit: ${WHAXON_WORKER_MEMORY_LIMIT:-2g}" in worker
+    assert "pids_limit: ${WHAXON_WORKER_PIDS_LIMIT:-128}" in worker
+
+
 def test_e5_compose_disables_web_local_drain_not_external_worker():
     content = (ROOT / "docker-compose.e5.yml").read_text(encoding="utf-8")
     web, worker = content.split("  workflow-worker:", 1)
