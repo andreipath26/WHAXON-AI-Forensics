@@ -558,3 +558,71 @@ def test_approval_revocation_serializes_before_dispatch_commit(
         event for event in store.list_workflow_events("plan")
         if event["event_type"] == "dispatch_started"
     ]
+
+@pytest.mark.parametrize(
+    ("field", "malformed"),
+    [
+        ("expires_at", "not-a-time"),
+        ("expires_at", True),
+        ("expires_at", 10**5000),
+        ("permissions", {"network.scan": True}),
+        ("impact", []),
+        ("plan_digest", []),
+    ],
+)
+def test_corrupt_persisted_approval_fails_closed(
+    tmp_path, monkeypatch, field, malformed,
+):
+    import json
+
+    core, task = _authorize_test_plan(
+        tmp_path, monkeypatch, impact="low",
+        permissions=("network.scan",), side_effects=(),
+    )
+    assert core.grant_workflow_approval(
+        "approval-plan", task.id, "approval-corrupt", "operator",
+        expires_at=time.time() + 3600,
+    ) is True
+    conn = core.store._conn()
+    try:
+        row = conn.execute(
+            "SELECT binding_json FROM workflow_approvals WHERE approval_id=?",
+            ("approval-corrupt",),
+        ).fetchone()
+        binding = json.loads(row["binding_json"])
+        binding[field] = malformed
+        conn.execute(
+            "UPDATE workflow_approvals SET binding_json=? WHERE approval_id=?",
+            (json.dumps(binding), "approval-corrupt"),
+        )
+    finally:
+        conn.close()
+
+    # Corrupt stored consent is a denial, not an exception or implicit grant.
+    assert core.store.has_valid_workflow_approval("approval-plan", task.id) is False
+    assert core.authorize_workflow_task_for_plan("approval-plan", task) is False
+
+
+@pytest.mark.parametrize("payload", ["{", "[]", "null"])
+def test_unparseable_or_non_object_approval_is_not_authorization(
+    tmp_path, monkeypatch, payload,
+):
+    core, task = _authorize_test_plan(
+        tmp_path, monkeypatch, impact="low",
+        permissions=("network.scan",), side_effects=(),
+    )
+    assert core.grant_workflow_approval(
+        "approval-plan", task.id, "approval-corrupt-json", "operator",
+        expires_at=time.time() + 3600,
+    ) is True
+    conn = core.store._conn()
+    try:
+        conn.execute(
+            "UPDATE workflow_approvals SET binding_json=? WHERE approval_id=?",
+            (payload, "approval-corrupt-json"),
+        )
+    finally:
+        conn.close()
+
+    assert core.store.has_valid_workflow_approval("approval-plan", task.id) is False
+    assert core.authorize_workflow_task_for_plan("approval-plan", task) is False
