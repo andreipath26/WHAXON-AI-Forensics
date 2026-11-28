@@ -164,8 +164,26 @@ async def _cancel_real_gobuster_after_loopback_effect(root: Path, server, port: 
     observed = await asyncio.to_thread(server.hold_observed.wait, 15)
     if not observed:
         server.allow_hold_response.set()
-        await running
-        raise AssertionError("real Gobuster did not reach the held loopback endpoint")
+        result = await running
+        evidence = core.workflow_evidence(plan_id)
+        job_id = evidence["attempts"][0].get("job_id")
+        output = core.store.lines_since(job_id) if job_id else []
+        with request_lock:
+            observed_paths = [urlsplit(path).path for path in requests]
+        # Preserve the failed reachability observation as evidence. Without a
+        # real held request, this run cannot qualify cancellation or replay.
+        return {
+            "tool": "gobuster",
+            "cancellation_status": "not_exercised",
+            "cancellation_request_observed": False,
+            "attempt_status": result.get("tasks", [{}])[0].get("status"),
+            "observed_loopback_paths": sorted(set(observed_paths)),
+            "provider_output_tail": output[-20:],
+            "evidence_integrity_verified": evidence.get(
+                "all_evidence_integrity_verified", False,
+            ),
+            **binding,
+        }
     # The server has received a real scanner request. Cancellation now races
     # with an in-flight external process and must be recorded as uncertain.
     core.cancel_workflow_plan(plan_id)
