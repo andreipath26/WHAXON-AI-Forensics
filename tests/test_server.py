@@ -1256,3 +1256,25 @@ def test_api_engagement_reports_include_persisted_coverage_gaps(tmp_path, monkey
     assert "Coverage and untested work" in html
     assert "scope_blocked" in html
     assert "out of scope; no request was sent" in html
+
+
+
+def test_legacy_human_resolution_route_returns_conflict_without_mutation(
+    tmp_path, monkeypatch,
+):
+    """Human adjudication cannot bypass the plan-bound V2 verification workflow."""
+    app, core = _make_app(tmp_path, monkeypatch)
+    _seed_job(core, findings=[_finding(kind="sqli")])
+    before = core.store.get_findings("j1")[0]
+
+    response = app.test_client().post(
+        "/api/approvals/j1/0/resolve",
+        json={"status": "verified", "user": "operator"},
+    )
+
+    assert response.status_code == 409
+    payload = response.get_json()
+    assert payload["approval_granted"] is False
+    assert payload["verification_updated"] is False
+    assert "plan-bound" in payload["error"]
+    assert core.store.get_findings("j1")[0] == before
