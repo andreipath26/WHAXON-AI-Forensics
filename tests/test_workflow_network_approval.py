@@ -503,6 +503,7 @@ def test_approval_revocation_serializes_before_dispatch_commit(
 ):
     """Revocation between policy recheck and commit still blocks the effect."""
     import asyncio
+    from concurrent.futures import ThreadPoolExecutor
 
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
@@ -540,9 +541,15 @@ def test_approval_revocation_serializes_before_dispatch_commit(
         dispatched.append(current_task.id)
         return {"unexpected": "dispatch after revoked approval"}
 
-    result = asyncio.run(WorkflowScheduler(
-        store, authorize=authorize, dispatch=dispatch,
-    ).run("plan", max_tasks=1))
+    def run_scheduler():
+        return asyncio.run(WorkflowScheduler(
+            store, authorize=authorize, dispatch=dispatch,
+        ).run("plan", max_tasks=1))
+
+    # Keep event-loop ownership on a clean worker thread. The full test suite
+    # can have a loop active in its pytest worker under asyncio auto mode.
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        result = pool.submit(run_scheduler).result(timeout=10)
 
     assert dispatched == []
     assert result["outcomes"][0]["status"] == "blocked"
