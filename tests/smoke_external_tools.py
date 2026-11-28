@@ -128,6 +128,8 @@ async def _run_v2_catalog_provider(root: Path, tool_id: str, target: str, args: 
     )
     result = await core.run_workflow_plan(plan_id, max_tasks=1, max_concurrency=1)
     evidence = core.workflow_evidence(plan_id)
+    job_id = evidence["attempts"][0].get("job_id")
+    evidence["provider_findings"] = core.store.get_findings(job_id) if job_id else []
     manifest = core.providers.manifest_for(f"tool.{tool_id}")
     binding = {
         "provider_id": manifest.provider_id,
@@ -357,7 +359,7 @@ def main() -> None:
             assert nmap_evidence["all_evidence_integrity_verified"] is True, nmap_evidence
             assert any(
                 finding["kind"] == "open_port" and finding["data"].get("port") == port
-                for attempt in nmap_evidence["attempts"] for finding in attempt["findings"]
+                for finding in nmap_evidence["provider_findings"]
             ), nmap_evidence
             v2_provider_runs.append({"tool": "nmap", "status": "succeeded", "evidence_integrity_verified": True, **nmap_binding})
 
@@ -371,7 +373,7 @@ def main() -> None:
             assert gobuster_evidence["all_evidence_integrity_verified"] is True, gobuster_evidence
             assert any(
                 finding["data"].get("path") == "/admin"
-                for attempt in gobuster_evidence["attempts"] for finding in attempt["findings"]
+                for finding in gobuster_evidence["provider_findings"]
             ), gobuster_evidence
             v2_provider_runs.append({"tool": "gobuster", "status": "succeeded", "evidence_integrity_verified": True, **gobuster_binding})
 
@@ -385,7 +387,7 @@ def main() -> None:
             assert ffuf_evidence["all_evidence_integrity_verified"] is True, ffuf_evidence
             assert any(
                 finding["data"].get("path") == "admin"
-                for attempt in ffuf_evidence["attempts"] for finding in attempt["findings"]
+                for finding in ffuf_evidence["provider_findings"]
             ), ffuf_evidence
             v2_provider_runs.append({"tool": "ffuf", "status": "succeeded", "evidence_integrity_verified": True, **ffuf_binding})
 
