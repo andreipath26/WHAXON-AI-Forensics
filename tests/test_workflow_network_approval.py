@@ -564,7 +564,7 @@ def test_approval_revocation_serializes_before_dispatch_commit(
     [
         ("expires_at", "not-a-time"),
         ("expires_at", True),
-        ("expires_at", 10**5000),
+        ("expires_at", 10**4000),
         ("permissions", {"network.scan": True}),
         ("impact", []),
         ("plan_digest", []),
