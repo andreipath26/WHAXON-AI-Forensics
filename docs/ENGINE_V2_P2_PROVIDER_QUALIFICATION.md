@@ -39,15 +39,22 @@ To qualify each provider, retain an exact-candidate run record for the supported
 
 ## Exact-head real-provider loopback evidence — 2026-11-28
 
-The curated provider smoke implementation passed exact-head CI at source head
+The provider smoke implementation passed exact-head CI at source head
 `9f26e848642518b95138305a0ab43cedca23e1c4`, workflow run
 [#46144343464](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46144343464)
-(**23/23 checks successful**). The run also passed the G01 controlled-lab chain.
-The provider smoke evidence artifact is
-[whaxon-p2-provider-loopback-b36b42006ee517a6935e7440496007cfd9dd2c46](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46144343464/artifacts/15263048381),
-artifact ID `15263048381`, SHA-256
-`55827c0e93470b030de59cd5d5468564bbdcd6833d884c9d48d9644dd6d85261`.
-GitHub retention is 30 days from 2026-11-28.
+(**23/23 checks successful**). Current main code head
+`9b4b2417fa37557e7d726905dec39d93716234d8` also passed 21/21 CI jobs in
+[#46157672540](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672540).
+Its current-candidate provider evidence is
+[artifact #15268131819](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672540/artifacts/15268131819),
+SHA-256 `49a1dd3cafdcc845067adce4bd596ba122bccc7e6396561ed5a20ae22c72ca87`;
+its G01 lab evidence is
+[artifact #15268082236](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672540/artifacts/15268082236),
+SHA-256 `14bc890e83edfb19d4d750a6237f65e871663e438e2ca02db07fd8456f4d732b`.
+The original PR-level provider artifact is
+[artifact #15263048381](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46144343464/artifacts/15263048381),
+SHA-256 `55827c0e93470b030de59cd5d5468564bbdcd6833d884c9d48d9644dd6d85261`.
+GitHub retains these artifacts for 30 days from their respective run dates.
 
 The Ubuntu apt lane runs actual `nmap`, `gobuster`, `ffuf`, and `sqlmap`
 through approved Engine V2 plans inside a Linux network namespace containing
