@@ -346,3 +346,59 @@ def test_nuclei_version_probe_accepts_prefixed_version():
     )
     assert re.search(nuclei["version_regex"], "Nuclei Engine Version: v3.4.10")
     assert re.search(nuclei["version_regex"], "Nuclei Engine Version: 3.4.10")
+
+
+@pytest.mark.parametrize("include_payload_directory", [False, True])
+def test_missing_or_empty_packaged_payloads_are_reported_broken(
+    tmp_path, monkeypatch, include_payload_directory,
+):
+    import whaxon.core.dependencies as dependencies
+
+    manifest = dependencies.load_dependency_manifest()
+    package_root = tmp_path / "src" / "whaxon"
+    fake_module = package_root / "core" / "dependencies.py"
+    fake_module.parent.mkdir(parents=True)
+    fake_module.write_text("# resource-location fixture", encoding="utf-8")
+    if include_payload_directory:
+        (package_root / "data" / "payloads").mkdir(parents=True)
+
+    monkeypatch.setattr(dependencies, "__file__", str(fake_module))
+    monkeypatch.setattr(dependencies, "load_dependency_manifest", lambda: manifest)
+    report = dependencies.collect_dependency_report(
+        data_dir=tmp_path / "user-data",
+        include_optional=False,
+        include_external=False,
+    )
+
+    payloads = next(
+        item for item in report["dependencies"] if item["id"] == "validation-payloads"
+    )
+    assert payloads["required"] is True
+    assert payloads["status"] == "BROKEN"
+    assert "could not be inspected" in payloads["reason"]
+    assert report["safety"] == {
+        "read_only": True,
+        "installation_attempted": False,
+        "network_accessed": False,
+        "privilege_escalation_attempted": False,
+    }
+
+
+def test_incompatible_python_distribution_version_is_not_ready(monkeypatch):
+    import whaxon.core.dependencies as dependencies
+
+    monkeypatch.setattr(dependencies.importlib.metadata, "version", lambda _name: "1.2.0")
+    monkeypatch.setattr(dependencies.importlib, "import_module", lambda _name: object())
+
+    item = dependencies._package_result(
+        "example-distribution",
+        "example_module",
+        "2.0",
+        required=False,
+        capabilities=("optional-test",),
+    )
+
+    assert item.status == "INCOMPATIBLE"
+    assert item.detected_version == "1.2.0"
+    assert item.required_version == ">=2.0"
+    assert "below required" in item.reason
