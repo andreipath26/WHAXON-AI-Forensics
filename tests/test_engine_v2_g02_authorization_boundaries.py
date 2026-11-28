@@ -94,7 +94,7 @@ def test_sqli_verifier_does_not_follow_cross_origin_redirect():
         )
         assert status == "candidate"
         assert "redirect blocked" in reason
-        assert _RedirectFixture.paths == ["/source?id=1"]
+        assert _RedirectFixture.paths == ["/source?id=whaxon_baseline"]
         assert _RedirectSink.paths == []
     finally:
         _RedirectFixture.redirect_location = "/sink?id=1"
