@@ -618,6 +618,9 @@ def test_provider_inventory_reports_installed_and_missing_without_false_validati
     inventory = {item["capability_id"]: item for item in provider.inventory()}
     assert inventory["tool.nmap"]["executable"] is True
     assert inventory["tool.nmap"]["readiness"] == "installed"
+    assert inventory["tool.nmap"]["reason"] == "installed_unverified"
+    assert inventory["tool.nmap"]["qualification_status"] == "not_qualified"
+    assert inventory["tool.nmap"]["readiness_basis"] == "catalog_contract_and_binary_presence_only"
     assert inventory["tool.nikto"]["executable"] is False
     assert inventory["tool.nikto"]["reason"] == "binary_not_installed"
     assert not any(item["lab_validated"] for item in inventory.values())
@@ -1668,3 +1671,44 @@ def test_source_cancellation_cascades_through_approved_followups(tmp_path):
     assert core.authorize_workflow_task_for_plan(
         "grandchild", grandchild_task,
     ) is False
+
+
+
+ADMITTED_CATALOG_PROVIDERS = (
+    "arjun", "dig", "dnsrecon", "ffuf", "gobuster", "nikto",
+    "nmap", "nuclei", "sqlmap", "theharvester", "whois", "wpscan",
+)
+
+
+def test_admitted_catalog_binary_presence_never_claims_provider_qualification(monkeypatch):
+    import whaxon.adapters
+    import whaxon.core.providers as provider_module
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    monkeypatch.setattr(provider_module.shutil, "which", lambda binary: f"/fake/{binary}")
+    catalog = _Catalog([
+        SimpleNamespace(
+            id=tool_id, available=True, binary=f"fake-{tool_id}",
+            category="recon", transport="cli",
+        )
+        for tool_id in ADMITTED_CATALOG_PROVIDERS
+    ])
+    provider = CatalogAdapterProvider(
+        catalog=catalog, runner=_Runner(), store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+
+    rows = {row["capability_id"]: row for row in provider.inventory()}
+    assert set(rows) == {f"tool.{tool_id}" for tool_id in ADMITTED_CATALOG_PROVIDERS}
+    for row in rows.values():
+        # This fixture proves only catalog binding and PATH resolution. It is
+        # deliberately insufficient to claim smoke, lab, or E2E qualification.
+        assert row["installed"] is True
+        assert row["executable"] is True
+        assert row["readiness"] == "installed"
+        assert row["reason"] == "installed_unverified"
+        assert row["qualification_status"] == "not_qualified"
+        assert row["readiness_basis"] == "catalog_contract_and_binary_presence_only"
+        assert row["smoke_tested"] is False
+        assert row["lab_validated"] is False
+        assert row["end_to_end_verified"] is False
