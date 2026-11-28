@@ -78,12 +78,12 @@ def test_retest_route_requires_verified(live_server):
     assert body["replay_attempted"] is False
 
 
-def test_approval_resolve_route_writes_human(live_server):
+def test_approval_resolve_route_is_retired(live_server):
     job_id, seq = _seed_sqli_job(live_server)
     status, body = _post(
         f"{live_server}/api/approvals/{job_id}/{seq}/resolve",
         {"status": "verified", "user": "peter"},
     )
-    assert status == 200
-    assert body["ok"] is True
-    assert body["by"] == "human:peter"
+    assert status == 409
+    assert body["approval_granted"] is False
+    assert body["verification_updated"] is False
