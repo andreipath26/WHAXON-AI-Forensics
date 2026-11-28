@@ -2,9 +2,10 @@
 
 **Review date:** 2026-11-28  
 **Repository:** `andreipath26/WHAXON-AI-Forensics`  
-**Current main after README PR #273:** `71ae4f9c8852da326f8eb76393ffff77ac7e4c5a`  
-**Inspected code baseline:** `be5acd974c38560be4b0a32ee64d4218b5a31e20`; PR #273 changed README/workflow metadata only and introduced no runtime source change. Main CI for the updated head was queued at review time.  
-**Disposition:** P0 static inventory reconciled against the current source tree. This is not runtime qualification, approval to execute against a target, or a release decision. Repository release status remains **HOLD**.
+**Second-pass branch base:** `8e938fe65790af3954c5613e05904a00e42268a8`  
+**Latest main observed during review:** `e90c11fd24d489815840dc28a00db14bd04aaec5`  
+**Evidence cutoff:** 2026-11-28 11:44 UTC. Main includes merged PR #274 and PR #279; open PR #278 is tracked separately below. This branch is documentation-only and based on the earlier main SHA shown above.  
+**Disposition:** P0 inventory is documented, but evidence gaps remain; this is not runtime qualification, approval to execute against a target, or a release decision. Repository release status remains **HOLD**.
 
 ## 1. Evidence method and limits
 
@@ -122,13 +123,66 @@ Evidence files/tests: `docs/ENGINE_V2_E5_SERVICE_READINESS.md`, `docs/ENGINE_V2_
 
 The functional owner roles below are assigned for inventory and close-out accountability; they are verifiable against the named source trees and evidence files but are not GitHub team identities. `.github/CODEOWNERS` currently names `@andreipath26` only for README and its freeze workflow, so it does not enforce these subsystem roles. Record a named reviewer/operator for each applicable G01–G10 gate before external qualification.
 
-## 9. P0 exit assessment and handoff
+## 9. CI baseline and capability/readiness evidence snapshot
 
-- **Inventory completeness:** source-backed top-level CLI modes (including side-effect category, persistence and regression guard) are enumerated by the existing CSV and AST test; legacy runner/network sinks and catalog/admission dispositions are enumerated by the legacy inventory and callsite test; API method/path/handler bindings and UI page/control counts are separately guarded. This document reconciles them into one current release boundary.
+Evidence was refreshed from GitHub Actions on 2026-11-28 at approximately 11:44 UTC. A green PR-head workflow is evidence for that exact source head and its named matrix only; the merged main commit e90c11f... has no combined status contexts returned by the GitHub status endpoint in this snapshot. Do not promote a successful PR job or a catalog row into a global deployment claim.
+
+| Change / exact source head | PR state | CI run outcome | What the matrix actually exercised |
+|---|---|---|---|
+| P0 inventory PR #277 / 0c74831152f8dec3a6045ef1838d1cd25ea6260a | Merged | CI #46137652419: 20/20 jobs succeeded; README freeze #46137652401 succeeded. | Python 3.11–3.13 test jobs, Linux/macOS/Windows setup smoke, G01 controlled-lab chain, E1 regressions, systemd, Docker web/worker, headless Linux, package upgrade and install jobs. |
+| P1 authorization PR #274 / ba4a75c1c9017c7f686b52341bee4b45b54d3bd3 | Merged as 8e938fe65790af3954c5613e05904a00e42268a8 | CI #46140276808: 21/21 jobs succeeded; README freeze #46140276802 succeeded. | Full Python 3.11–3.13 test jobs, scope/dispatch-boundary regressions, G01 lab, apt/Homebrew/setup smokes, Windows setup, systemd, Docker, headless, SearchSploit, upgrade matrix and clean/offline install. This is exact PR-head evidence; no separate combined status contexts were returned for the merged main SHA. |
+| PR #279 rate-limit test isolation / 244602008be4e46d67a3e0a04038d71ed51307ff | Merged into current main | CI #46140812530: 21/21 jobs succeeded; README freeze #46140812589 succeeded. | Python 3.11–3.13 tests (including the server rate-limit regression), G01, E1, systemd, Docker, headless, install and upgrade matrix. |
+| PR #278 provider qualification, earlier head 22fbff4c25842a018b3c4ab599a91ffd8ded1ab9 | Superseded; PR remains open | CI #46140843666: cancelled, with 14 successful, 2 failed, and 5 cancelled jobs; README freeze passed. | Apt provider smoke failed at Gobuster version query (No help topic for 'version'). Homebrew smoke failed during real Gobuster cancellation/restart setup because an immutable workflow plan ID was reused. Its expected smoke artifact was not uploaded. This run is failed/incomplete evidence, not provider qualification. |
+| PR #278 current head b30715c9289220e49fce238c77953d5339649b42 | Open | CI run #46141251306 had 5 succeeded, 6 in progress, 10 queued at cutoff; README freeze #46141251300 succeeded. Workflow-level API status still reported queued. | The revised provider smoke and remaining CI jobs had no final outcome at cutoff. Do not assume the earlier failures are fixed or that the revised run passed. |
+| Current main e90c11fd24d489815840dc28a00db14bd04aaec5 | Current branch | Combined status returned no contexts; commit-workflow lookup returned no PR-triggered run. | Main contains the merged #274 and #279 source. PR-head runs above are the available evidence; a final release candidate still needs exact-head verification. |
+
+### Compact capability and readiness matrix
+
+The following states are intentionally separate: registered is code/catalog admission; installed requires a specific runtime host; smoke-tested, lab-validated, and end-to-end verified require retained evidence for their named scope. Unknown means no current evidence, while not qualified is a release disposition. CI unit/parser tests do not prove a scanner binary is installed or that its external effect is safe.
+
+| Capability family | Registered/admitted | Test evidence on exact reviewed PR heads | Installed at deployment target | Smoke | Lab | End-to-end / deployment |
+|---|---|---|---|---|---|---|
+| 12 fixed local catalog providers (next table) | Registered in the current provider bridge; only 12 of 24 catalog IDs are admitted. | CI #46140276808 passed the three Python test jobs and provider/unit suites. #278 attempted real loopback smoke for Nmap, Gobuster, ffuf and SQLmap, but the first run failed/cancelled and the revised run is pending. | Unknown | No completed provider-qualification run at cutoff; prior attempt failed and produced no artifact. | A G01 controlled chain passed, but it is not individual qualification of all 12. | Not qualified as a complete portfolio; external-provider behavior and deployment-host readiness unknown. |
+| Six verifier operations | Registered as fixed HTTP verification/retest operations. | Verification, validator and trust boundary tests were included in the successful Python CI matrix for #274. | N/A (built-in code; host network/runtime configuration unknown) | Unexecuted as a provider smoke | Unexecuted as a verifier-specific lab | Source inventory still records smoke/lab/end-to-end flags false; deployment qualification unknown. |
+| Fixed recon providers (DNS, TLS, HTTP passive, headers, robots, security.txt, redirect) | Registered as bounded V2 providers/proposals where listed in §4. | Focused source tests were included in the successful Python CI matrix for #274; no fresh manual test was run in this pass. | N/A for built-in code; DNS/network conditions at deployment unknown. | No separate real-host smoke recorded | No provider-specific lab record identified | Legacy parity and end-to-end deployment qualification remain open. |
+| Workflow lifecycle, API/CLI clients, queue worker | Implemented shared service/client paths; exact route and command inventories below. | #274 and #279 CI matrices passed their named tests; see exact runs above. | Package/worker installation on a future deployment is unknown | CI host smoke exists for the named jobs only. | The G01 chain passed in the named PR runs only. | Full UI/client parity, operator approval and release candidate acceptance remain open. |
+
+### Fixed catalog provider inventory and per-provider evidence
+
+The current catalog has 24 IDs (17 CLI, 3 Metasploit-session, 2 SMB, 1 SSH, 1 WMI). The static bridge admits only the 12 listed here. Test files below establish parser, binding, or bounded regression behavior; they do not establish provider readiness. The deployment-target installed version is unknown, and no row is marked qualified by the source or CI results cited here.
+
+| Provider | Test evidence source | Evidence class / unexecuted fields |
+|---|---|---|
+| arjun | tests/test_providers.py | Binding only; no dedicated parser test identified. Installed/smoke/lab/E2E: unknown or unexecuted. |
+| dig | tests/test_adapters_whois_dig_whatweb.py; tests/test_engine_v2_e3_catalog_provider_crash.py | Parser and fake-dig crash/recovery regression; not a real dig qualification. |
+| dnsrecon | tests/test_adapters_theharvester_dnsrecon.py | Parser contract; real executable and effect behavior unknown. |
+| ffuf | tests/test_adapters_gobuster_ffuf_nuclei_wpscan.py | Parser/contract suite included in CI; #278 real loopback attempt not finalized. |
+| gobuster | tests/test_adapters_gobuster_ffuf_nuclei_wpscan.py | Parser/contract suite included in CI; #278 version/cancellation checks failed on earlier head. |
+| nikto | tests/test_adapters_parse.py; tests/test_e1_nikto_regressions.py | Parser and bounded regressions; real provider qualification unknown. |
+| nmap | tests/test_adapters_parse.py | Parser suite included in CI; #278 loopback attempt not finalized. |
+| nuclei | tests/test_adapters_gobuster_ffuf_nuclei_wpscan.py | Parser contract; no completed provider-specific smoke record identified. |
+| sqlmap | tests/test_adapters_parse.py; tests/test_engine_v2_g01_lab_compose.py | Parser plus bounded G01 lab chain; not full portfolio or production qualification. |
+| theharvester | tests/test_adapters_theharvester_dnsrecon.py | Parser contract; outbound behavior and provider readiness unknown. |
+| whois | tests/test_adapters_whois_dig_whatweb.py | Parser contract; external lookup behavior and provider readiness unknown. |
+| wpscan | tests/test_adapters_gobuster_ffuf_nuclei_wpscan.py | Parser contract; no completed provider-specific smoke record identified. |
+
+### Reconciled census counts at current main observation
+
+- CLI: the G01 CLI mode inventory CSV has 33 mode rows (including default/help aliases); its AST test compares them with the dispatcher. Rows state owner, classification, persistence, boundary and regression guard.
+- HTTP API: EXPECTED_API_ROUTE_HANDLERS and its exact documented table both contain 115 /api/* method/path/handler bindings. The guard compares exact mapping, not a hand-entered total.
+- UI: 22 distinct UI page handlers / 23 GET aliases in the canonical crosswalk; 808 static control records are a source inventory only and are not accepted as wired controls.
+- Catalog: 24 IDs with the transport split above; 12 admitted local-process providers, 5 excluded CLI entries and 7 unsupported session transports.
+- Adapter modules: registry.py attempts to autoload 22 built-in module names; dynamic third-party entry points and import failures affect runtime registration. The old snapshot of “26 discovered adapters” is point-in-time only and must not be presented as a current runtime count. Four adapter-only IDs are recorded as burp, hashcat, msf, and whatweb; echo and ssh_cmd are catalog entries without registered adapters in the reconciled inventory. Runtime registration count on the deployment target is unknown.
+- Dispatch and side-effect guard: the AST inventory pins 10 direct ToolRunner caller tuples, 7 direct service-call tuples, and 60 process/network effect sink tuples; these are code locations, not proof that all are reachable, authorized, or supported.
+- #278 qualification branch: its new readiness fields and tool loopback qualification are pending review/CI; do not backport its claims to current main until merged and evidence artifacts are verified.
+
+## 10. P0 exit assessment and handoff
+
+- **Inventory completeness:** source-backed top-level CLI modes (including side-effect category, persistence and regression guard) are enumerated by the existing CSV and AST test; legacy runner/network sinks and catalog/admission dispositions are enumerated by the legacy inventory and callsite test; API method/path/handler bindings and UI page/control counts are separately guarded. The second-pass census and exact CI snapshot are in §9.
 - **Capability truthfulness:** catalog, adapter, import, session, AI, recon and verifier registration are separated from actual V2 admission and deployment readiness.
 - **Dependencies:** supported provider names and target constraints are recorded; installed/readiness, live egress, and exact deployment-host versions are not verified here.
 - **Work ownership:** functional owner roles are explicitly mapped in §8; CODEOWNERS does not enforce those roles, and named reviewers/operators remain unresolved for final gate sign-off.
-- **P0 status: OPEN — inventory documented; exit is not signed off.** The source-backed inventory and dispositions are recorded, but three evidence rows remain unresolved: (1) exact-head CI for current `main` was queued, so the baseline CI result is not yet confirmed; (2) deployment-host versions/installation/readiness for admitted providers are unknown; and (3) named gate reviewers/operators have not been attached to the role owners. G01 remains **OPEN** for controlled end-to-end acceptance and client parity; G02–G10 remain unchanged. Overall status remains **HOLD**.
+- **P0 status: OPEN — inventory documented; exit is not signed off.** The exact CLI/API/catalog census is reconciled and merged PR evidence is recorded, but unresolved rows remain: (1) 12-provider installed/readiness on the deployment target is unknown; (2) provider smoke/lab/end-to-end qualification is incomplete, with #278 CI still pending at its revised head; (3) current main `e90c11f...` has no separate combined status contexts returned; and (4) named gate reviewers/operators are not attached to role owners. G01 remains **OPEN** for complete controlled workflow acceptance and client parity; G02–G10 are not closed by these CI runs. Overall status remains **HOLD**.
 
 ### Canonical detail sources
 
