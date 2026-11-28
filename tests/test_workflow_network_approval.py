@@ -496,3 +496,57 @@ def test_approval_queue_stops_at_total_scan_budget(tmp_path, monkeypatch):
     ]
     assert candidates == []
     assert len(task_page_queries) == 2
+
+
+@pytest.mark.asyncio
+async def test_approval_revocation_serializes_before_dispatch_commit(
+    tmp_path, monkeypatch,
+):
+    """Revocation between policy recheck and commit still blocks the effect."""
+    from whaxon.core.scheduler import WorkflowScheduler
+    from whaxon.core.store import JobStore
+    from whaxon.core.workflow import WorkflowPlan, WorkflowTask
+
+    store = JobStore(tmp_path / "approval-dispatch-race.db")
+    store.create_mission("mission", "Approval revocation at dispatch fence")
+    task = WorkflowTask(
+        "task", "fixture.network", "192.0.2.10",
+        permissions=("network.scan",), impact="low",
+    )
+    store.save_workflow_plan("plan", WorkflowPlan("mission", (task,)))
+    assert store.grant_workflow_approval(
+        "plan", task.id, "consent-1", "operator", expires_at=time.time() + 3600,
+    )
+
+    def authorize(current_task):
+        object.__setattr__(current_task, "_workflow_approval_required", True)
+        return store.has_valid_workflow_approval("plan", current_task.id) is True
+
+    original_commit = store.mark_workflow_dispatch_started
+
+    def revoke_at_commit(plan_id, attempt_id, **kwargs):
+        # Simulate a competing revocation after the second policy evaluation
+        # but before the atomic dispatch intent is committed.
+        assert store.revoke_workflow_approval(
+            "plan", "consent-1", actor="operator",
+        )
+        return original_commit(plan_id, attempt_id, **kwargs)
+
+    monkeypatch.setattr(store, "mark_workflow_dispatch_started", revoke_at_commit)
+    dispatched = []
+
+    async def dispatch(current_task):
+        dispatched.append(current_task.id)
+        return {"unexpected": "dispatch after revoked approval"}
+
+    result = await WorkflowScheduler(
+        store, authorize=authorize, dispatch=dispatch,
+    ).run("plan", max_tasks=1)
+
+    assert dispatched == []
+    assert result["outcomes"][0]["status"] == "blocked"
+    assert store.list_workflow_approvals("plan")[0]["revoked_at"] is not None
+    assert not [
+        event for event in store.list_workflow_events("plan")
+        if event["event_type"] == "dispatch_started"
+    ]
