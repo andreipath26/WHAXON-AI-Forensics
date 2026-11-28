@@ -811,7 +811,7 @@ jobs:
 
           checks = {
               "nmap": (["nmap", "--version"],),
-              "gobuster": (["gobuster", "version"],),
+              "gobuster": (["gobuster", "--version"],),
               "sqlmap": (["sqlmap", "--version"],),
               "ffuf": (["ffuf", "-V"],),
           }
@@ -869,7 +869,7 @@ jobs:
           path: |
             provider-binary-provenance.json
             provider-smoke-evidence.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
 
   setup-homebrew-tool-smoke:
