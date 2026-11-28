@@ -1148,7 +1148,7 @@ def test_legacy_validation_routes_are_permanently_no_replay(tmp_path, monkeypatc
         assert core.store.get_findings(job_id) == before
 
 
-def test_human_resolution_route_preserves_legacy_and_blocks_v2_jobs(
+def test_human_resolution_route_is_retired_for_all_findings(
     tmp_path, monkeypatch,
 ):
     from whaxon.core.findings import Finding
@@ -1169,36 +1169,22 @@ def test_human_resolution_route_preserves_legacy_and_blocks_v2_jobs(
             raw_line="candidate finding",
         ), 0)
     core.store.mark_engine_v2_execution_job(v2_job_id)
-    before = core.store.get_findings(v2_job_id)
+    before = {
+        v2_job_id: core.store.get_findings(v2_job_id),
+        legacy_job_id: core.store.get_findings(legacy_job_id),
+    }
 
     for status in ("verified", "refuted"):
-        response = client.post(
-            f"/api/approvals/{v2_job_id}/0/resolve",
-            json={"status": status, "user": "reviewer"},
-        )
-        assert response.status_code == 409
-        body = response.get_json()
-        assert body["approval_granted"] is False
-        assert body["verification_updated"] is False
-        assert body["workflow"] == "/api/v2/workflow-proposals"
-        assert core.store.get_findings(v2_job_id) == before
+        for job_id in (v2_job_id, legacy_job_id, "missing-job"):
+            response = client.post(
+                f"/api/approvals/{job_id}/0/resolve",
+                json={"status": status, "user": "reviewer"},
+            )
+            assert response.status_code == 409
+            body = response.get_json()
+            assert body["approval_granted"] is False
+            assert body["verification_updated"] is False
+            assert body["workflow"] == "/api/v2/workflow-proposals"
 
-        response = client.post(
-            f"/api/approvals/{legacy_job_id}/0/resolve",
-            json={"status": status, "user": "reviewer"},
-        )
-        assert response.status_code == 200
-        assert response.get_json() == {
-            "ok": True, "status": status, "by": "human:reviewer",
-        }
-        legacy_finding = core.store.get_findings(legacy_job_id)[0]
-        assert legacy_finding["verification_status"] == status
-        assert legacy_finding["verified_by"] == "human:reviewer"
-        assert legacy_finding["verification_reason"] == "human review by reviewer"
-
-    missing = client.post(
-        "/api/approvals/missing-job/0/resolve",
-        json={"status": "verified", "user": "reviewer"},
-    )
-    assert missing.status_code == 404
-    assert missing.get_json()["error"] == "finding not found"
+    assert core.store.get_findings(v2_job_id) == before[v2_job_id]
+    assert core.store.get_findings(legacy_job_id) == before[legacy_job_id]
