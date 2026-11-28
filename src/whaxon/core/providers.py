@@ -5,6 +5,7 @@ import asyncio
 import hashlib
 import ipaddress
 import json
+import os
 import re
 import shutil
 import threading
@@ -54,6 +55,24 @@ if set(SEMANTIC_OPERATION_IDS) != set(_CATALOG_TARGETS):
     raise RuntimeError("semantic operation map and admitted adapter list differ")
 
 _ADAPTER_SERIES = "catalog-v2"
+_PROXY_ENVIRONMENT_KEYS = frozenset({
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "FTP_PROXY", "NO_PROXY",
+})
+
+
+def _provider_process_environment() -> dict[str, str]:
+    """Prevent catalog tools from inheriting ambient proxy routing settings.
+
+    This is a defense against accidental proxy-mediated scope bypass, not a
+    network sandbox. Deployment still needs host/firewall egress controls.
+    """
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key.upper() not in _PROXY_ENVIRONMENT_KEYS
+    }
+
+
 _HOST_LABEL = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
@@ -437,6 +456,7 @@ class CatalogAdapterProvider:
             target=task.target,
             job_id=job_id,
             timeout_s=timeout_s,
+            env=_provider_process_environment(),
             phase="workflow",
         )
         if returned_id != job_id:
