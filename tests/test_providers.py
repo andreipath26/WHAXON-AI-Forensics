@@ -1743,3 +1743,37 @@ def test_approved_followup_reauthorizes_ancestor_at_scheduler_dispatch(tmp_path)
         event for event in core.store.list_workflow_events("child")
         if event["event_type"] == "dispatch_started"
     ]
+
+
+def test_catalog_provider_dispatch_passes_sanitized_environment(monkeypatch):
+    import asyncio
+    import whaxon.adapters
+
+    monkeypatch.setattr(whaxon.adapters, "get_adapter", lambda tool_id: object())
+    monkeypatch.setenv("PATH", "/fixture/bin")
+    for name in (
+        "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy",
+        "ALL_PROXY", "all_proxy", "FTP_PROXY", "ftp_proxy",
+        "NO_PROXY", "no_proxy",
+    ):
+        monkeypatch.setenv(name, "http://proxy.example:8080")
+
+    runner = _Runner()
+    provider = CatalogAdapterProvider(
+        catalog=_Catalog([_tool()]), runner=runner, store=_Store(),
+        registry=CapabilityRegistry(),
+    )
+
+    asyncio.run(provider.dispatch(WorkflowTask(
+        "scan", "tool.nmap", "192.0.2.10",
+        permissions=("network.scan",), impact="moderate",
+    )))
+
+    environment = runner.calls[0]["env"]
+    assert environment["PATH"] == "/fixture/bin"
+    assert not any(
+        key.upper() in {
+            "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "FTP_PROXY", "NO_PROXY",
+        }
+        for key in environment
+    )
