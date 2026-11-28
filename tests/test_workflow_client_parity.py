@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import json
 import subprocess
 import sys
@@ -121,4 +122,8 @@ def test_tui_approved_run_is_observed_by_api_and_cancelled_by_cli(
             assert tui_core.workflow_run_request(run_id)["status"] == "cancelled"
             assert tui_core.store.list_workflow_attempts("plan-parity") == []
 
-    asyncio.run(run_scenario())
+    def run_in_fresh_loop_thread():
+        asyncio.run(run_scenario())
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(run_in_fresh_loop_thread).result()
