@@ -3,8 +3,41 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from urllib.parse import ParseResult, urlparse
 
 from whaxon.core.findings import Finding
+
+
+def _http_url(value: object) -> ParseResult:
+    """Parse an absolute, credential-free HTTP URL without silent normalization."""
+    if not isinstance(value, str) or not value or any(
+        ord(char) <= 32 or ord(char) == 127 or 0xD800 <= ord(char) <= 0xDFFF
+        for char in value
+    ) or "\\" in value:
+        raise ValueError("validation URL must be an absolute HTTP(S) URL")
+    try:
+        parsed = urlparse(value)
+        port = parsed.port
+        host = parsed.hostname
+    except ValueError:
+        raise ValueError("validation URL has malformed authority") from None
+    if parsed.scheme not in ("http", "https") or not host or "%" in host:
+        raise ValueError("validation URL must be an absolute HTTP(S) URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("validation URL must not embed credentials")
+    if port == 0 or parsed.netloc.endswith(":") or parsed.fragment:
+        raise ValueError("validation URL has invalid port or fragment")
+    return parsed
+
+
+def _origin(parsed: ParseResult) -> tuple[str, str, int]:
+    return (
+        parsed.scheme, (parsed.hostname or "").lower(),
+        parsed.port if parsed.port is not None else (443 if parsed.scheme == "https" else 80),
+    )
+
+
+_HEADER_NAME = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 
 
 class PayloadLoader:
@@ -101,17 +134,21 @@ class Validator:
 
     def validate(self, finding: Finding, target_url: str | None = None) -> tuple[str, str]:
         """Return a conservative verdict; missing proof remains candidate, not refuted."""
+        self.last_payload = None
         kind = finding.kind
+        if not isinstance(finding.data, dict):
+            return "candidate", "finding data must be an object; no request sent"
         if kind in self.OBSERVATION_KINDS:
             return self._validate_observation(finding, target_url)
         # Finding.request_context is the canonical adapter contract. Keep the
         # legacy data["_request_context"] shape as a compatibility fallback
         # for stored findings created before the field was introduced.
         ctx = getattr(finding, "request_context", None)
-        if not isinstance(ctx, dict) or not ctx.get("url"):
-            legacy_ctx = (finding.data or {}).get("_request_context")
-            ctx = legacy_ctx if isinstance(legacy_ctx, dict) else None
-        if ctx and ctx.get("url"):
+        if ctx is None or ctx == {}:
+            ctx = finding.data.get("_request_context")
+        if ctx is not None and ctx != {}:
+            if not isinstance(ctx, dict):
+                return "candidate", "request context must be an object; no request sent"
             if not target_url:
                 return (
                     "candidate",
@@ -123,8 +160,8 @@ class Validator:
         if not target_url:
             return "candidate", "no target URL supplied"
         param = (finding.data or {}).get("parameter")
-        if not param:
-            return "candidate", "finding has no parameter to inject"
+        if not isinstance(param, str) or not param.strip():
+            return "candidate", "finding has no parameter to inject or parameter is invalid"
 
         if kind == "command_injection":
             return self._validate_command_injection(target_url, param)
@@ -202,15 +239,19 @@ class Validator:
         import ssl
         import urllib.error
         import urllib.request
-        from urllib.parse import urlparse, urlunparse
+        from urllib.parse import urlunparse
 
         if not target_url:
             return "candidate", "no target URL supplied for observation probe"
-        parsed = urlparse(target_url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            return "candidate", "observation target must be an absolute HTTP(S) URL"
-        data = finding.data or {}
+        try:
+            parsed = _http_url(target_url)
+        except ValueError as exc:
+            return "candidate", str(exc)
+        if not isinstance(finding.data, dict):
+            return "candidate", "finding data must be an object; no request sent"
+        data = finding.data
         host = parsed.hostname
+        assert host is not None
 
         def authorized_probe(url: str) -> bool:
             """Fail closed before an observation probe crosses the network."""
@@ -271,20 +312,16 @@ class Validator:
 
         probe_url = target_url
         evidence_url = data.get("url")
-        if isinstance(evidence_url, str) and evidence_url:
-            evidence_parsed = urlparse(evidence_url)
-            if (
-                evidence_parsed.scheme not in ("http", "https")
-                or not evidence_parsed.hostname
-                or evidence_parsed.username is not None
-                or evidence_parsed.password is not None
-                or evidence_parsed.hostname.lower() != host.lower()
-            ):
-                return "candidate", "observation URL does not match the authorized target host"
+        if evidence_url is not None:
+            try:
+                evidence_parsed = _http_url(evidence_url)
+            except ValueError as exc:
+                return "candidate", str(exc)
+            if _origin(evidence_parsed) != _origin(parsed):
+                return "candidate", "observation URL does not match the authorized target origin"
             probe_url = urlunparse(evidence_parsed._replace(query="", fragment=""))
         else:
-            base_parsed = urlparse(target_url)
-            probe_url = urlunparse(base_parsed._replace(query="", fragment=""))
+            probe_url = urlunparse(parsed._replace(query="", fragment=""))
 
         request = urllib.request.Request(
             probe_url, method="GET",
@@ -292,7 +329,7 @@ class Validator:
         )
         if not authorized_probe(probe_url):
             return "candidate", "scope authorization denied; no HTTP request was sent"
-        opener = urllib.request.build_opener(_NoRedirect)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
         try:
             response = opener.open(request, timeout=5.0)
         except urllib.error.HTTPError as exc:
@@ -447,6 +484,7 @@ class Validator:
         inconclusive proof returns "inconclusive"; proving absence requires a
         separate remediation check and cannot be inferred from one replay.
         """
+        self.last_payload = None
         if finding.kind in self.OBSERVATION_KINDS:
             status, reason = self._validate_observation(
                 finding, target_url, revalidation=True,
@@ -469,11 +507,11 @@ class Validator:
         import time
         import urllib.error
         import urllib.request
-        from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+        from urllib.parse import parse_qsl, urlencode, urlunparse
 
-        parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            raise ValueError("validation URL must be an absolute HTTP(S) URL")
+        parsed = _http_url(url)
+        if not isinstance(param, str) or not param.strip() or not isinstance(value, str):
+            raise ValueError("validation parameter and value must be strings")
         q = dict(parse_qsl(parsed.query))
         q[param] = value
         new_url = urlunparse(parsed._replace(query=urlencode(q)))
@@ -486,7 +524,7 @@ class Validator:
                     req.full_url, code, "redirect blocked by validator", headers, fp
                 )
 
-        opener = urllib.request.build_opener(NoRedirect)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
         req = urllib.request.Request(new_url, headers={"User-Agent": "whaxon-validate/0.11"})
         t0 = time.monotonic()
         try:
@@ -503,14 +541,14 @@ class Validator:
 
         C-03 hardening applied:
         1. Method allowlist.
-        2. A caller-supplied authorized target is mandatory and the context URL must match its host/port.
-        3. Redirects are disabled.
+        2. A caller-supplied authorized target is mandatory and the context URL must match its origin.
+        3. Redirects and ambient proxies are disabled.
         4. Auth/Cookie headers are stripped.
         """
         import time
         import urllib.error
         import urllib.request
-        from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+        from urllib.parse import parse_qsl, urlencode, urlunparse
 
         # A request context is evidence, not authorization. Require the caller
         # to supply the already scope-checked engagement target before any network
@@ -518,7 +556,12 @@ class Validator:
         if not target_url:
             return "candidate", "authorized target URL required for request-context replay; no request sent"
 
-        method = (ctx.get("method") or "GET").upper()
+        if not isinstance(ctx, dict):
+            return "candidate", "request context must be an object; no request sent"
+        raw_method = ctx.get("method", "GET")
+        if not isinstance(raw_method, str) or not raw_method:
+            return "candidate", "request context method must be a string; no request sent"
+        method = raw_method.upper()
         # Automatic verification must not replay requests that may mutate data.
         if method not in ("GET", "HEAD", "OPTIONS"):
             return "candidate", f"automatic replay of {method} is disabled because it may change target state"
@@ -526,21 +569,25 @@ class Validator:
         url = ctx.get("url")
         if not isinstance(url, str):
             return "candidate", "request context has no valid url"
-        parsed_url = urlparse(url)
-        if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname:
-            return "candidate", "request context URL must be absolute HTTP(S)"
-        if parsed_url.username is not None or parsed_url.password is not None:
-            return "candidate", "request context URL must not embed credentials"
+        try:
+            parsed_url = _http_url(url)
+            target_parsed = _http_url(target_url)
+        except ValueError as exc:
+            return "candidate", str(exc)
+        if _origin(parsed_url) != _origin(target_parsed):
+            return "candidate", "context URL does not match the authorized target origin"
 
-        # Constrain destination URL to the authorized target host and port.
-        if target_url:
-            target_parsed = urlparse(target_url)
-            ctx_port = parsed_url.port or (443 if parsed_url.scheme == "https" else 80)
-            target_port = target_parsed.port or (443 if target_parsed.scheme == "https" else 80)
-            if parsed_url.hostname.lower() != (target_parsed.hostname or "").lower() or ctx_port != target_port:
-                return "candidate", "context URL does not match the authorized target host/port"
-
-        headers = ctx.get("headers") or {"User-Agent": "whaxon-validate/0.11"}
+        raw_headers = ctx.get("headers", {})
+        if not isinstance(raw_headers, dict):
+            return "candidate", "request context headers must be an object; no request sent"
+        if any(
+            not isinstance(key, str) or not _HEADER_NAME.fullmatch(key)
+            or not isinstance(value, str)
+            or any(ord(char) < 32 or ord(char) == 127 or ord(char) > 255 for char in value)
+            for key, value in raw_headers.items()
+        ):
+            return "candidate", "request context contains invalid headers; no request sent"
+        headers = raw_headers or {"User-Agent": "whaxon-validate/0.11"}
         
         # Strip credentials and authority overrides from captured headers. The
         # URL must determine the destination host; captured Host or proxy-auth
@@ -549,6 +596,8 @@ class Validator:
             k: v for k, v in headers.items()
             if k.lower() not in (
                 "authorization", "proxy-authorization", "cookie", "cookie2", "host",
+                "connection", "proxy-connection", "transfer-encoding", "content-length",
+                "upgrade", "te", "trailer", "expect",
             )
         }
         if "User-Agent" not in headers and "user-agent" not in [k.lower() for k in headers]:
@@ -556,6 +605,13 @@ class Validator:
 
         param = ctx.get("parameter")
         body_template = ctx.get("body")
+        if param is not None and (
+            not isinstance(param, str) or not param.strip()
+            or any(0xD800 <= ord(char) <= 0xDFFF for char in param)
+        ):
+            return "candidate", "request context parameter must be a nonempty string; no request sent"
+        if body_template is not None and not isinstance(body_template, str):
+            return "candidate", "request context body must be a string; no request sent"
 
         payload = None
         cmdi_marker = ""
@@ -585,14 +641,14 @@ class Validator:
             final_url = urlunparse(parsed._replace(query=urlencode(q)))
             data = None
 
-        # Check 3: Disable redirects
+        # Check 3: Disable redirects and ambient proxies
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, req, fp, code, msg, headers, newurl):
                 raise urllib.error.HTTPError(
                     req.full_url, code, f"redirect to {newurl} blocked by validator", headers, fp
                 )
 
-        opener = urllib.request.build_opener(NoRedirect)
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect)
 
         def request_once(request_url: str, request_data: bytes | None) -> tuple[str, float]:
             # The provider must authorize every concrete request immediately

@@ -991,3 +991,58 @@ def test_v2_verification_cancellation_blocks_the_next_probe(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_malformed_context_and_cross_origin_observation_preserve_v2_seals(tmp_path):
+    _SQLiFixture.requests = 0
+    _SQLiFixture.scope_path = None
+    _SQLiFixture.revoke_after = None
+    server = HTTPServer(("127.0.0.1", 0), _SQLiFixture)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    target = f"http://127.0.0.1:{server.server_port}/search?id=1"
+
+    async def exercise():
+        core = Core(tmp_path / "data")
+        await core.initialize(drain=False)
+        cases = (
+            ("malformed", "sqli", FindingVerificationProvider.VERIFY,
+             {"url": target, "method": 7}, None),
+            ("origin", "http_header_missing", FindingVerificationProvider.VERIFY_HTTP_OBSERVATION,
+             {}, {"header": "Content-Security-Policy", "url": target.replace("http:", "https:")}),
+        )
+        for label, kind, capability, context, data in cases:
+            source_plan = f"{label}-source"
+            source_job = await _seed_sealed_source(
+                core, plan_id=source_plan, target=target, kind=kind,
+                request_context=context, finding_data=data,
+            )
+            original = core.store.get_findings(source_job)
+            plan_id = f"{label}-verify"
+            _bound_plan(
+                core, plan_id=plan_id, capability_id=capability,
+                target=target, inputs={"source_job_id": source_job, "finding_seq": 0},
+            )
+            result = await core.run_workflow_plan(plan_id, max_tasks=1, max_concurrency=1)
+            assert result["tasks"] == [{"id": "verification", "status": "succeeded"}]
+            evidence = core.workflow_evidence(plan_id)
+            assert evidence["all_evidence_recorded"] is True
+            assert evidence["all_evidence_integrity_verified"] is True
+            attempt = evidence["attempts"][0]
+            assert attempt["job_id"] != source_job
+            assert attempt["findings"][0]["verification_status"] == "candidate"
+            assert core.store.get_findings(source_job) == original
+            assert core.store.has_valid_workflow_evidence_seal(source_job) is True
+            assert core.store.has_valid_workflow_evidence_seal(attempt["job_id"]) is True
+            assert any(
+                event["event_type"] == "dispatch_started"
+                for event in core.store.list_workflow_events(plan_id)
+            )
+        assert _SQLiFixture.requests == 0
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

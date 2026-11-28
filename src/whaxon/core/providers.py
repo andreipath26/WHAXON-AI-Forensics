@@ -813,7 +813,7 @@ class FindingVerificationProvider:
             impact=selected.get("impact", ""), cvss=selected.get("cvss"),
             cwe=selected.get("cwe", ""), references=tuple(selected.get("references") or ()),
             lookup_hint=selected.get("lookup_hint", ""),
-            request_context=selected.get("request_context") or {},
+            request_context=selected.get("request_context", {}),
         )
         validator = Validator(
             Path(__file__).resolve().parents[1] / "data" / "payloads",
@@ -867,7 +867,9 @@ class FindingVerificationProvider:
                 },
                 raw_line=f"{task.capability_id}: {status}: {reason}",
                 request_context={"method": "GET", "url": task.target,
-                                 "parameter": finding.data.get("parameter", "")},
+                                 "parameter": finding_data.get("parameter", "") if isinstance(
+                                     finding_data.get("parameter"), str,
+                                 ) else ""},
             )
             self.store.append_line(evidence_job_id, "stdout", evidence.raw_line)
             self.store.append_finding(evidence_job_id, evidence, 0)
