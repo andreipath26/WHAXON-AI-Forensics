@@ -30,6 +30,10 @@ The repository's prior release inventory states that its inspected local environ
 
 To qualify each provider, retain an exact-candidate run record for the supported OS and tool version, including package/source provenance, resolved executable/version, fixed argv and target class, expected and observed outputs, cancellation/timeout behavior, resource usage, network/effect boundaries, durable job/evidence records, reviewer, and retained CI artifact. A real target requires explicit operator authorization and a controlled scope. Do not promote a provider based on tool registration, parser-only tests, fake executables, or a successful process exit alone.
 
+## Operator recovery procedure
+
+Use [the provider effect reconciliation runbook](ENGINE_V2_PROVIDER_EFFECT_RECOVERY_RUNBOOK.md) for the supported CLI workflow, evidence requirements, disposition semantics, and audit-retention steps. The runbook does not promote provider qualification or readiness.
+
 ## Effect accounting and restart recovery
 
 - `src/whaxon/core/outbox.py` documents lifecycle publication as at-least-once. If a callback can cause a remote effect then fail before acknowledgement, delivery may be duplicated; consumers must deduplicate by `(plan_id, event.id)`. Exactly-once delivery is not claimed.
