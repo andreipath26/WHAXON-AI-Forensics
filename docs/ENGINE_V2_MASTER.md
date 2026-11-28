@@ -1110,3 +1110,9 @@ completeness or convert a failed, skipped, inaccessible, or unsupported task
 into a successful check. Independent audit custody, external target
 qualification, and broad replay/session/pivot/worker-race acceptance remain
 open.
+
+## P1 malformed persisted approval bindings — 2026-11-28
+
+The deterministic approval check now rejects malformed persisted binding field types without raising through the authorization service. The store ignores unreadable, non-object, or structurally invalid approval rows; they never grant authorization. Regressions cover invalid expiry types (including booleans and oversized integers), permissions, impact, plan digest, malformed JSON and non-object JSON, and verify that the Core plan authorization result remains denied. Tests: `tests/test_workflow_network_approval.py`, `tests/test_workflow.py`.
+
+This closes only the malformed-row fail-closed case. It does not prove tamper resistance against a party able to rewrite a valid approval row, establish an independent trust anchor, or qualify the broader target/session/pivot/worker matrix. Those remain open release gates.
