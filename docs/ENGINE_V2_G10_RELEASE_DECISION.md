@@ -1,3 +1,17 @@
+# Current Engine V2 release decision — 2026-11-28
+
+**Decision:** **HOLD — NOT READY TO DEPLOY**  
+**Current code candidate:** `9b4b2417fa37557e7d726905dec39d93716234d8`  
+**Exact main CI:** [run #46157672540](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672540) passed **21/21 jobs**; [README freeze #46157672587](https://github.com/andreipath26/WHAXON-AI-Forensics/actions/runs/46157672587) passed.
+
+The exact-head suites for the merged implementation batches passed, including Python 3.11–3.13, install/setup lanes, security/recovery regressions, controlled G01 lab, and bounded provider loopback smoke. The latest code changes include the validator security fixes in PR #283; main has since passed a complete 21-job CI run.
+
+This does **not** close the deployment gates. G01–G05 and G07–G10 remain open; G06 remains blocked. The implementation still lacks full client/UI acceptance, qualification of all admitted providers, broad external effect and egress assurance, an independent evidence trust anchor/review, production-host/backup/recovery qualification, release identity, and explicit operator authorization. The 12 admitted providers remain `not_qualified`. No real target was tested. No V2 package or release was published. The previously requested PyPI publication must wait until the candidate is qualified and the hold is lifted.
+
+The authoritative current table is [the deployment ledger](ENGINE_V2_E6_DEPLOYMENT_GATE_LEDGER.md); the supporting audit is [the 2026-11-28 readiness audit](ENGINE_V2_DEPLOYMENT_READINESS_AUDIT_2026-11-28.md). All dated status sections below this point are historical snapshots and remain for traceability only; they do not supersede this decision.
+
+---
+
 # Engine V2 G10 Delivery Status and Release Decision
 
 **Assessment date:** 2026-11-23
