@@ -498,11 +498,12 @@ def test_approval_queue_stops_at_total_scan_budget(tmp_path, monkeypatch):
     assert len(task_page_queries) == 2
 
 
-@pytest.mark.asyncio
-async def test_approval_revocation_serializes_before_dispatch_commit(
+def test_approval_revocation_serializes_before_dispatch_commit(
     tmp_path, monkeypatch,
 ):
     """Revocation between policy recheck and commit still blocks the effect."""
+    import asyncio
+
     from whaxon.core.scheduler import WorkflowScheduler
     from whaxon.core.store import JobStore
     from whaxon.core.workflow import WorkflowPlan, WorkflowTask
@@ -539,9 +540,9 @@ async def test_approval_revocation_serializes_before_dispatch_commit(
         dispatched.append(current_task.id)
         return {"unexpected": "dispatch after revoked approval"}
 
-    result = await WorkflowScheduler(
+    result = asyncio.run(WorkflowScheduler(
         store, authorize=authorize, dispatch=dispatch,
-    ).run("plan", max_tasks=1)
+    ).run("plan", max_tasks=1))
 
     assert dispatched == []
     assert result["outcomes"][0]["status"] == "blocked"
